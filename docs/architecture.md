@@ -1,0 +1,285 @@
+# Mantua AI v2 — Architecture
+
+Living document. Updated as the build progresses.
+
+## Repository layout
+
+```
+mantua-intelligence/
+├── client/                  # Vite + React 19 + TS strict + Tailwind 4 frontend
+├── server/                  # Express 5 + TS + Drizzle + Zod backend
+├── contracts/               # Foundry project for Uniswap v4 hooks
+├── docs/
+│   ├── architecture.md      # this file
+│   ├── tasks/               # roadmaps, task lists
+│   ├── decisions/           # decision memos
+│   ├── design/              # design tokens, deviations from prototype
+│   ├── promptHistory/       # notable LLM prompts and outputs
+│   └── security/            # AI-assisted security analysis findings + sign-off
+├── prototype/               # NOT YET — v1 prototype currently lives at repo root
+│   └── (Mantua Prototype.html, src/, assets/, landing/)
+└── README.md
+```
+
+The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) currently lives at the repo root and is the design reference for Phase D. It will be moved into `prototype/` in a later phase if needed; until then it is read-only.
+
+## Stack at a glance
+
+| Layer       | Tool                                      | Why                                               |
+| ----------- | ----------------------------------------- | ------------------------------------------------- |
+| Frontend    | Vite + React 19 + TypeScript (strict)     | Fast dev loop, strong types, broad ecosystem      |
+| Styling     | Tailwind 4 + Shadcn/ui                    | Token-driven CSS, accessible primitives           |
+| Auth/wallet | Privy (`@privy-io/react-auth`) + viem     | Embedded + external wallets; viem for chain calls |
+| Backend     | Express 5 + TypeScript (strict)           | Mature, predictable; no over-frameworking         |
+| ORM         | Drizzle                                   | TS-first, lightweight, schema-as-code             |
+| Validation  | Zod 4                                     | Runtime + compile-time guarantees at boundaries   |
+| DB          | PostgreSQL (Neon planned per D-004)       | Serverless Postgres with branching for staging    |
+| Contracts   | Foundry (forge / anvil / cast)            | Standard for v4 hook work                         |
+| LLM         | Anthropic Claude primary, OpenAI fallback | Per D-013; provider-abstracted                    |
+
+## Open architectural notes
+
+- **Chain lock:** Base Mainnet only (chain ID 8453). Privy `supportedChains` and viem clients are configured with Base only; any other chain ID is rejected at the boundary. The `useBaseWalletClient` hook (`client/src/lib/privy/wallet-client.ts`) attempts an automatic chain switch and throws if the wallet remains off-Base.
+- **Two-process dev:** `npm run dev` at the root spawns client (Vite, HTTPS via self-signed cert) and server (Express) in parallel. Each has its own port. Frontend talks to backend via a base URL from env.
+- **HTTPS in dev:** Privy's Web Crypto API key sharding silently fails over plain HTTP outside `localhost`. The Vite dev server runs HTTPS by default via `@vitejs/plugin-basic-ssl`. The browser will warn about the self-signed cert on first load — that's expected; click through. Staging/prod use real TLS (Vercel handles this for the frontend).
+- **Single shared logic:** Critical Phase 3 / Phase 4 modules (swap, liquidity) are written once on the server and exposed via API endpoints; the agent (Phase 6) calls the same endpoints. No client-side duplication of swap-construction logic.
+
+## Auth flow (Phase 2)
+
+1. Client renders `<MantuaPrivyProvider>` at the root with `loginMethods` per D-005, `embeddedWallets.createOnLogin: 'users-without-wallets'` per D-006, and `walletConnectCloudProjectId` per D-007.
+2. User logs in via `usePrivy().login()`. Privy provisions an embedded wallet for email/Google/Apple/passkey logins, or uses the connected external wallet.
+3. Client obtains an identity token via `getAccessToken()` and sends it as `Authorization: Bearer <token>` on API calls.
+4. Server `attachAuth` middleware (`server/src/middleware/auth.ts`) verifies the token via `@privy-io/server-auth`, then populates `req.privyUserId` and `req.walletAddress` for downstream handlers.
+5. Routes that must reject anonymous traffic chain `requireAuth` after `attachAuth`.
+
+`req.walletAddress` is what `walletRateLimiter` (P1-007) keys on once auth is wired into write paths.
+
+## CDP agent wallet (Phase 6)
+
+### Wallet boundary (D-008 — confirmed P6-000, 2026-04-30)
+
+Mantua runs **two wallets per user**, owned by different actors:
+
+| Wallet                | Owner     | Holds                    | Signing rights               | Funded by                                  |
+| --------------------- | --------- | ------------------------ | ---------------------------- | ------------------------------------------ |
+| Privy embedded wallet | The user  | The user's primary funds | User only (Privy auth)       | User's existing on-ramp                    |
+| CDP agent wallet      | The agent | A user-set budget        | Agent only (CDP-managed key) | User explicitly transfers from Privy → CDP |
+
+**Hard rule:** the agent never holds, sees, or can sign with the Privy wallet's keys. There is no path in code that lets the agent move funds out of the Privy wallet. The user funds the agent by sending tokens from Privy to CDP — this is the only direction funds cross the boundary, and it always requires the user's signature on the Privy side.
+
+**Why** (full rationale in `docs/decisions/v2-open-decisions.md` D-008): an autonomous LLM-driven actor must not have signing rights over the user's primary funds. Bounding the agent's blast radius to a separately-funded CDP wallet means the worst case from any agent bug, prompt injection, or misparsed instruction is loss of the agent's budget — not the user's main holdings. Mental model: Zapier doesn't get your Gmail password.
+
+**Spending caps stack at the wallet, not the user.** The user's Privy wallet has its own daily cap (D-009 / P1-001). The agent's CDP wallet has its own, independent cap (P6-011) that the user sets when funding the agent. Caps are enforced server-side in `server/src/lib/spending-cap.ts` against `daily_wallet_spend` keyed on the wallet address — the cap doesn't know which wallet is "primary" and which is "agent," and that's intentional.
+
+**Recovery.** If the user wants to "unfund" the agent, they sweep the CDP wallet back to their Privy wallet. The CDP wallet is not destroyed — it just sits empty, ready to be re-funded. There is no protocol-level concept of "deleting an agent."
+
+### Implementation path
+
+The chosen implementation path for P6-003 (Create & Manage Agent Wallet) is **bare [`@coinbase/cdp-sdk`](https://www.npmjs.com/package/@coinbase/cdp-sdk)** in the server (`server/src/lib/cdp/`). This reverses the earlier preference for `create-onchain-agent` / `@coinbase/agentkit`, for three reasons surfaced when scoping P6-003:
+
+1. **`create-onchain-agent` is a project scaffolder, not a runtime dep** — you can't `npm install` it into an existing server. Following the original guidance literally would have meant running it once and copying its output, which is not a maintainable supply-chain story.
+2. **AgentKit pulls in ~30 transitive deps** including `ethers` (alongside our `viem`), `opensea-js`, `twitter-api-v2`, Solana SDKs, ZeroDev, Zora, Jupiter, vaultsfyi, sushi, ensofinance, clanker-sdk, etc. It is a kitchen-sink LLM-tools bundle aimed at autonomous agents that need every possible action. We only need EVM wallet provisioning; the bloat is unjustified.
+3. **The original justifications don't apply to our app:** AgentKit's spending policies are duplicated by our own `server/src/lib/spending-cap.ts` (P1-001); EIP-7702 delegation is not needed for P6-003; AgentKit's "end-user-management story" assumes a single-tenant agent, but we manage agents per-user via the `agent_wallets` Drizzle table.
+
+`@coinbase/cdp-sdk` itself has a small, sensible dep tree (viem, zod, axios, jose, plus Solana/SPL primitives we ignore) and exposes exactly the EVM-account-creation API we need. If a later Phase 6 ticket actually benefits from AgentKit primitives (e.g. autonomous-mode tool routing in P6-009/P6-010), that integration can be added incrementally and locally without retrofitting wallet creation.
+
+Phase 2 already stores the CDP API credentials in env (`CDP_PROJECT_ID`, `CDP_API_KEY_NAME`, `CDP_API_KEY_PRIVATE_KEY`, `CDP_WALLET_SECRET`); they remain `.optional()` in `server/src/env.ts` so the server still boots without them. Wallet provisioning happens in Phase 6 (P6-003).
+
+## Mainnet safety rails (Phase 1)
+
+Server-side enforcement primitives. Every Phase 3+ write path goes through these BEFORE any Trading API or PoolManager call.
+
+| Rail                  | Module                                               | Hard ceiling           | Notes                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spending cap (P1-001) | `server/src/lib/spending-cap.ts`                     | $50,000/day per wallet | Reads from `user_preferences.daily_cap_usd` (primary wallet) or `agent_wallets.daily_cap_usd`. Per-day tracking in `daily_wallet_spend`. Reset at 00:00 UTC.          |
+| Wallet age (P1-002)   | `server/src/lib/wallet-age.ts`                       | n/a                    | `recordFirstSeen` on first connection; `getWalletAge` returns `{ ageDays, tier, tierMaxCapUsd }`. Used by P1-003 cap-raise UI.                                        |
+| Slippage (P1-004)     | `server/src/lib/slippage.ts`                         | 500 bps (5%)           | `classifySlippage(bps)` returns `ok` / `warn` / `double_confirm`. Above 500 bps throws `SafetyError`.                                                                 |
+| Kill-switch (P1-006)  | `server/src/middleware/kill-switch.ts`               | n/a                    | Env `MANTUA_KILL_SWITCH=1` — all POST/PUT/PATCH/DELETE return 503. Reads + wallet connection unaffected.                                                              |
+| Rate limit (P1-007)   | `server/src/middleware/rate-limit.ts`                | 100 req / 15 min IP    | Tighter `writeRateLimiter` and `walletRateLimiter` for chain-touching paths. Wallet keying activates after Phase 2 auth lands.                                        |
+| Audit log (P1-008)    | `server/src/lib/audit.ts` + `mantua_audit_log` table | n/a                    | Every write attempt logged with `(action, outcome, wallet, params, tx_hash, reason, ip, user_agent)`. Distinct from `portfolio_transactions` (which is success-only). |
+
+The hard ceilings live in `server/src/lib/constants.ts`. Lifting any of them requires a code change + redeploy — there is no admin path for them at runtime.
+
+`SafetyError` (`server/src/lib/errors.ts`) is the canonical thrown type for rail violations. The error code (`spending_cap_exceeded`, `slippage_too_high`, etc.) is what gets logged into `mantua_audit_log.outcome` so reviewers can grep on it.
+
+### Deferred UI tasks
+
+Two Phase 1 tasks are explicitly deferred to Phase D, where the UI primitives exist:
+
+- **P1-003 (tiered cap raise UI)** — needs a Shadcn confirmation modal (PD-005) and the cap-management screen layout (PD-004). The server-side primitives (`getWalletAge`, `getDailyCap`) are ready to back it; only the UI is missing.
+- **P1-005 (mandatory transaction confirmation modal)** — superseded by Phase D's `useConfirmedAction` hook (see below).
+
+Both deferrals are tracked in `docs/tasks/v2-roadmap.md` and revisited at the end of Phase D.
+
+## Phase D — design system
+
+The v1 prototype (`Mantua Prototype.html`) is the design spec. Phase D extracts it into a reusable system before feature phases build UIs on top.
+
+| Artifact           | Path                                                          |
+| ------------------ | ------------------------------------------------------------- |
+| Constraint capture | `docs/design/notes.md`                                        |
+| Token source       | `client/src/styles/tokens.css` (CSS vars)                     |
+| Tailwind 4 binding | `client/src/index.css` (`@theme inline`)                      |
+| Component mapping  | `docs/design/components.md`                                   |
+| Shell scaffold     | `client/src/components/shell/{AppShell,Header,Logo,Card}.tsx` |
+| Confirmation seam  | `client/src/hooks/use-confirmed-action.tsx`                   |
+| Theme toggle       | `client/src/hooks/use-theme.tsx` (`html[data-theme]`)         |
+
+### Deviations from the prototype
+
+PD-007 — things the prototype shows differently from how v2 will ship, with rationale.
+
+- **Responsive design.** The prototype hard-locks `<meta viewport width=1400>`. v2 must support mobile. Added our own breakpoints in `docs/design/notes.md`. Right-column slide-in sheet (mobile) lands as a Phase D follow-up when the first feature actually needs it.
+- **Onboarding modal removed.** The four-screen welcome carousel from the prototype was dropped per design feedback (PR [#1](https://github.com/DelleonMcglone/Mantua-Intelligence/pull/1)). v2 lands users on the login screen directly. The login screen reuses the welcome modal's visual style.
+- **Self-signed HTTPS in dev.** Privy needs a secure context. Added `@vitejs/plugin-basic-ssl`. Browser shows a one-time cert warning. (Documented earlier, not a Phase D-specific deviation.)
+- **Focus-visible rings.** Prototype doesn't show keyboard focus. v2 adds a 2px accent-purple ring on every `:focus-visible` (in `client/src/index.css`) per WCAG 2.1 AA.
+- **Density settings location.** Prototype exposes density in the Settings panel. v2 also persists it in the Settings panel; the underlying mechanism is `html[data-density]` driven by a `useTheme`-style hook (lands when the Settings panel is built, Phase 6).
+- **Self-hosted fonts (planned).** Prototype + v2 currently load Inter + JetBrains Mono via Google Fonts. Phase 9 moves them to Vercel-edge fonts to drop the third-party fetch and tighten CSP.
+- **Network dropdown shows only Base.** The prototype renders a multi-network picker; we render the same control for visual consistency, but only Base is selectable (chain-lock).
+
+### Confirmation modal seam (P1-005)
+
+The `useConfirmedAction` hook is the single architectural seam between any UI button click and an on-chain transaction. Every Phase 3+ write path MUST call `confirm()` and wait for user assent before executing. Lint rule incoming in Phase 9 to reject any direct call to swap/LP modules outside a confirmed-action context.
+
+```tsx
+const confirm = useConfirmedAction();
+const ok = await confirm({
+  title: "Swap 0.5 ETH for USDC",
+  description: "Expected output: 1,815.42 USDC. Slippage 0.5%.",
+  doubleConfirm: slippageBps >= 100, // P1-004 calls for double-confirm at ≥1%
+});
+if (!ok) return;
+await submitSwap(...);
+```
+
+## AgentKit agent (`agent/` workspace)
+
+Coinbase **AgentKit `0.10.4`** (TypeScript) agent on **Base Mainnet (8453)**
+via `ViemWalletProvider`. Isolated as its own workspace so it can pin **zod
+3.25.76** + **viem 2.38.3** (AgentKit-compatible) without disturbing the
+server's zod v4 / viem 2.48.4. CDP-native action providers
+(`cdpApiActionProvider`, `deploy_token`) are intentionally not registered — the
+agent's surface is the small allowlisted action set below.
+
+**Chain:** id `8453`, RPC `https://mainnet.base.org` (override via
+`BASE_RPC_URL`), explorer `https://basescan.org` (BaseScan).
+
+**Gas.** Base uses native ETH (18 decimals) for gas; token balances, transfers,
+and ERC-8183 escrow use each token's ERC-20 interface (USDC/EURC 6 dp, cbBTC
+8 dp). Unit helpers are centralized in `agent/src/lib/decimals.ts`, with
+conversion tests both ways.
+
+**Contract addresses** (loaded from env, never hardcoded in source):
+
+| Standard | Contract                       | Address                                      | Source                                                          |
+| -------- | ------------------------------ | -------------------------------------------- | --------------------------------------------------------------- |
+| ERC-8183 | AgenticCommerce (job + escrow) | env-driven, optional — no default            | Base Mainnet deployment pending — see `docs/tasks/v2-roadmap.md` |
+| token    | USDC ERC-20 (6-dp)             | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle USDC contract addresses (Base)                           |
+| token    | EURC ERC-20 (6-dp)             | `0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42` | Circle EURC contract addresses (Base)                           |
+| token    | cbBTC ERC-20 (8-dp)            | `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf` | Coinbase cbBTC contract addresses (Base)                        |
+
+**Funding.** The agent wallet needs a little ETH for gas plus whatever token
+budget the user allocates. The `check_balances` action warns on low gas.
+
+**Assets allowlist.** USDC / EURC / cbBTC only (`agent/src/config/assets.ts`);
+any other asset is rejected with a clear error.
+
+## Decision log
+
+See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.
+
+### Dynamic Market Hook (spec §43)
+
+Spec: `docs/specs/dynamic-market-hook.md`. Code:
+`contracts/src/hooks/dynamic-market/`. Review:
+`docs/security/dynamic-market-hook-review.md`. Deploy:
+`deploy/dynamic-market/`.
+
+The eight questions §43 requires answering:
+
+1. **One hook instance across many markets.** v4 allows one hook per pool key,
+   but nothing requires one hook _contract_ per pool. Every prediction market
+   needs identical logic, so a per-market deployment would mean mining a fresh
+   CREATE2 salt and verifying a fresh contract for every game — hundreds a
+   season — with no behavioural difference. One instance, state keyed by
+   `PoolId`, is the same code path for all of them.
+
+2. **State keyed by `PoolId`.** It is the value v4 already derives from the pool
+   key and passes to every callback, so no lookup table or reverse mapping is
+   needed. Using the market id instead would require the hook to translate
+   pool → market on every swap.
+
+3. **The keeper cannot control pricing.** It writes exactly three fields —
+   model probability, confidence, event state — and every other input is derived
+   on-chain from the pool and the block. Probability comes from `sqrtPriceX96`,
+   not from the keeper. This is the "agent proposes, protocol enforces" split
+   (§2.1): the model's opinion enters as a _risk premium_ weighted by its own
+   stated confidence, never as the price.
+
+4. **Risk bounds are immutable.** `BASE_FEE`, `MAX_FEE`, `ABS_MAX_TRADE`,
+   `MIN_TRADE_CAP` are `constant` in a library, not storage, so there is no
+   setter to protect and no governance path to compromise. An attacker holding
+   every key still cannot charge 50% or lift the size cap. Storage plus an
+   owner check would have made those the same class of risk as the keys.
+
+5. **Kickoff protection is timestamp-driven.** The freeze reads the timestamp
+   stored at registration and compares it to `block.timestamp`. A keeper-driven
+   freeze would fail exactly when it matters most — a crashed or lagging keeper
+   at kickoff would leave a started game tradeable against people who can see
+   the field. Registration is once-only and there is no kickoff setter, so
+   nobody can push the deadline out either.
+
+6. **Stale keeper state fails closed, not shut.** Past `STALE_AFTER` the fee
+   clamps to `MAX_FEE` and the cap to `MIN_TRADE_CAP`, and the model-deviation
+   premium drops out. Reverting instead would let keeper downtime brick a live
+   market, turning an availability problem into a total loss of access;
+   ignoring staleness would price against numbers nobody is maintaining.
+   Expensive-but-open is the middle, and LPs are compensated for the
+   uncertainty while it lasts.
+
+7. **LP removal stays open during a halt.** The hook has no
+   `BEFORE_REMOVE_LIQUIDITY` permission, so the callback does not exist. A halt
+   is a statement about _trading_, not about custody: trapping LP capital
+   because a game was postponed would make providing liquidity a strictly worse
+   bet, and there is no risk it mitigates — an exiting LP takes no directional
+   position.
+
+8. **Fee, size cap, halt — and nothing else.** These three need no changes to
+   the AMM curve, no custody of funds, and no new accounting, so they are
+   auditable in isolation. Curve modification, liquidity provisioning, and LP
+   incentives all touch value flow directly and would each need their own
+   invariants; bundling them into the first deployment would have meant shipping
+   an unreviewable surface for a market that has not traded yet.
+
+**Deviations from spec §30:** eight files rather than seven — `MarketFlow.sol`
+was extracted to keep every file inside the 150-line limit. The Nezlobin
+directional _shape_ is reused from the dynamic-fee hook, but not its code: that
+library keys off an oracle-deviation zone, and a prediction market has no
+external reference price to deviate from, so the analogue is the pool's own
+imbalance.
+
+### Sports pivot (DM-101 … DM-112)
+
+Reasoning and rejected alternatives: `docs/decisions/sports-pivot-decisions.md`.
+Task list: `docs/tasks/sports-pivot.md`. Closed 2026-08-16 unless noted.
+
+| ID     | Decision                   | Outcome                                                                        | Rationale (short)                                                                                                                                                                                                           |
+| ------ | -------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DM-101 | Market mechanism           | Outcome-token AMM — YES/NO ERC-20 against USDC in v4 pools                     | Reuses the existing pool/hook/routing stack; gives the hook a lifecycle to attach to; price maps to implied probability                                                                                                     |
+| DM-102 | Conditional token standard | Purpose-built binary ERC-20 pair per market, USDC-collateralised 1:1           | Binary moneylines need two outcomes; ERC-20 drops into v4 and existing balance code without shims                                                                                                                           |
+| DM-103 | Resolution authority       | **OPEN** — needs owner sign-off                                                | Trust model, not an implementation detail; reaches into Terms and Market Integrity                                                                                                                                          |
+| DM-104 | Chain                      | Base Mainnet (8453)                                                            | Single supported chain; hook + market contracts await mainnet deployment (see `docs/security/hook-deployments.md`)                                                                                                          |
+| DM-105 | League coverage            | NFL + WNBA covered; NBA/MLB/NHL/Soccer show "Coming soon"                      | Owner decision. Bounds B3 data work; `coverage` field in `features/markets/sports.ts` drives nav and pages                                                                                                                  |
+| DM-106 | Market types               | Moneyline at launch; totals W4 (P2); spreads deferred                          | Moneyline is the only genuinely binary type, so the only one fitting DM-102 without new design                                                                                                                              |
+| DM-107 | Settlement data source     | ESPN primary; second provider W3                                               | Covers both leagues, no key; unsupported-endpoint risk mitigated by adapter interface, second source, and manual override                                                                                                   |
+| DM-108 | Jurisdictional posture     | Implied not marketed — no extra jurisdictional notice in the UI                | Owner decision. B10-008 keeps verification, drops disclosure; revisit with counsel before marketing push                                                                                                                     |
+| DM-110 | Dynamic Market Hook spec   | **BLOCKED** — spec not supplied                                                | Blocks B0-003 and all six P0 tasks in B2; permission flags are mined into the hook address and are not changeable after deploy                                                                                              |
+| DM-111 | Agent wallet path          | **CLOSED 2026-08-17** — keep the existing Circle DCW path                      | B8-001 verified Circle Wallets fully supports Base (wallets, contract execution, signing, Gas Station); the current path already is the Circle stack, so coexistence is the plan: no migration (B8-011)                     |
+| DM-112 | Routing split              | Market pools direct to PoolManager/PositionManager; Trading API for base pairs | Mantua-created outcome pools are not third-party indexed; base pairs already route fine                                                                                                                                     |
+
+## Risk acknowledgments
+
+See the **Risk Acknowledgments** section in `docs/tasks/v2-roadmap.md`. Currently:
+
+- **Risk 1:** EOA fee recipient at launch (mitigation: migrate to Safe multisig at \$5k revenue OR 6 months).
+- **Risk 2:** No pre-launch legal review of fee collection (mitigation: post-launch counsel memo before any expansion of fee scope).

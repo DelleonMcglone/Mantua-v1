@@ -1,0 +1,6 @@
+[submodule "contracts/hooks/stable-protection"]
+	path = contracts/hooks/stable-protection
+	url = https://github.com/DelleonMcglone/stableprotection-hook.git
+[submodule "contracts/hooks/dynamic-fee"]
+	path = contracts/hooks/dynamic-fee
+	url = https://github.com/DelleonMcglone/dynamic-fee.git

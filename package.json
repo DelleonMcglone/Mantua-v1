@@ -1,0 +1,51 @@
+{
+  "name": "mantua-intelligence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Mantua AI v2 — agent-driven liquidity protocol on Base Mainnet",
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server",
+    "agent"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:client": "npm run dev -w @mantua/client",
+    "dev:server": "npm run dev -w @mantua/server",
+    "build": "npm run build --workspaces --if-present",
+    "build:server": "node scripts/build-server.mjs",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint . --max-warnings 0",
+    "verify:hooks": "tsx contracts/script/verify-hooks.ts --write",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
+    "prepare": "husky || true"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "25.6.0",
+    "esbuild": "0.25.12",
+    "eslint": "10.2.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "eslint-plugin-react-refresh": "0.5.2",
+    "globals": "17.5.0",
+    "husky": "9.1.7",
+    "lint-staged": "16.4.0",
+    "prettier": "3.8.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.59.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20.18.0"
+  }
+}

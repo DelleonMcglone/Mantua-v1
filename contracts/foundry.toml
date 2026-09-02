@@ -1,0 +1,29 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+test = "test"
+script = "script"
+# Phase 5b-3.2: auto-detect handles per-file pragma. Vendored hook submodules
+# pin `pragma solidity 0.8.26` (exact); monorepo-owned scripts target 0.8.27.
+# A single fixed `solc` setting can't satisfy both.
+auto_detect_solc = true
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+fs_permissions = [{ access = "read", path = "./" }]
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+quote_style = "double"
+number_underscore = "thousands"
+
+[rpc_endpoints]
+base = "https://mainnet.base.org"
+base_fork = "http://127.0.0.1:8545"
+
+[etherscan]
+base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.basescan.org/api" }

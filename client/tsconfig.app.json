@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["src"],
+  "exclude": [
+    // Stash-leftover files from the deferred phase5-ui-port WIP
+    // (`stash@{0}` in the local repo). They aren't imported by any
+    // shipped surface, but they reference component shapes that have
+    // since drifted (e.g. the panel header changed signature). The
+    // canonical source still lives in the stash; pull it back when
+    // the deferred work is picked up. Until then, excluded so the
+    // production build stays green.
+    "src/components/TxSignModal.tsx",
+    "src/components/icons.tsx",
+    "src/components/shell/AskMantuaHeader.tsx",
+    "src/features/liquidity/PegIndicator.tsx",
+    "src/features/swap/DynamicFeePanel.tsx"
+  ]
+}

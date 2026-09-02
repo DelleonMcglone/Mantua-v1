@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+.vite
+coverage
+contracts/out
+contracts/cache
+contracts/lib
+server/drizzle/migrations
+
+# v1 prototype (frozen — design reference only)
+Mantua Prototype.html
+/src/
+/landing/
+/assets/

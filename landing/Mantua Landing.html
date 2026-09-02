@@ -1,0 +1,958 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Mantua.AI — Agent-driven liquidity for stablecoins</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg-soft: #111114;
+    --card: #16161a;
+    --card-hover: #1c1c22;
+    --border: #26262e;
+    --border-strong: #34343e;
+    --text: #f5f5f7;
+    --text-dim: #9a9aa8;
+    --text-faint: #6b6b78;
+    --purple: #a855f7;
+    --purple-bright: #c084fc;
+    --purple-soft: #7c3aed;
+    --teal: #4ade80;
+    --gold: #eab308;
+    --green: #22c55e;
+  }
+  [data-theme="light"] {
+    --bg: #fbfaf7;
+    --bg-soft: #f3f1ec;
+    --card: #ffffff;
+    --card-hover: #f8f7f3;
+    --border: #e6e3dc;
+    --border-strong: #d4d0c7;
+    --text: #18181b;
+    --text-dim: #5e5e6a;
+    --text-faint: #8a8a95;
+    --purple: #8b5cf6;
+    --purple-bright: #7c3aed;
+    --purple-soft: #6d28d9;
+    --teal: #0d9488;
+    --gold: #ca8a04;
+    --green: #16a34a;
+    --preview-shadow: 0 20px 60px rgba(30, 20, 60, .10);
+    --preview-glow: rgba(168, 85, 247, .12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, sans-serif; -webkit-font-smoothing: antialiased; transition: background .2s, color .2s; }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  /* Nav */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 40px;
+    background: color-mix(in srgb, var(--bg) 75%, transparent);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-left { display: flex; align-items: center; gap: 10px; }
+  .nav-logo { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+  .nav-logo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .nav-name { font-weight: 700; font-size: 16px; letter-spacing: -.01em; }
+  .nav-links { display: flex; gap: 36px; font-size: 14px; color: var(--text-dim); }
+  .nav-links a { transition: color .15s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .icon-btn { width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-dim); transition: background .15s, color .15s; }
+  .icon-btn:hover { background: var(--card); color: var(--text); }
+  .btn-primary {
+    background: linear-gradient(135deg, #a855f7, #8b5cf6);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 4px 16px rgba(168,85,247,.35);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(168,85,247,.5); }
+  .btn-primary.big { padding: 16px 32px; font-size: 15px; border-radius: 12px; }
+  .btn-ghost { padding: 14px 26px; border-radius: 12px; font-weight: 500; font-size: 15px; color: var(--text); border: 1px solid var(--border-strong); transition: background .15s, border-color .15s; display: inline-flex; }
+  .btn-ghost:hover { background: var(--card); border-color: #44444e; }
+
+  /* Hero */
+  .hero { position: relative; padding: 120px 24px 140px; text-align: center; overflow: hidden; }
+  .hero-glow {
+    position: absolute; top: 10%; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 900px;
+    background: radial-gradient(circle, rgba(168,85,247,.22) 0%, rgba(168,85,247,.08) 35%, transparent 65%);
+    pointer-events: none;
+    filter: blur(40px);
+  }
+  .hero-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, black 30%, transparent 75%);
+    pointer-events: none;
+  }
+  .hero-inner { position: relative; max-width: 980px; margin: 0 auto; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 7px 14px 7px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: rgba(255,255,255,.02);
+    font-size: 13px; color: var(--text-dim);
+    margin-bottom: 40px;
+  }
+  .hero-badge .dot { width: 7px; height: 7px; border-radius: 4px; background: var(--green); box-shadow: 0 0 10px var(--green); }
+  .hero-badge strong { color: var(--text); font-weight: 600; }
+
+  .logo-big {
+    width: 128px; height: 128px;
+    margin: 0 auto 40px;
+    display: flex; align-items: center; justify-content: center;
+    position: relative;
+    filter: drop-shadow(0 0 60px rgba(168,85,247,.4));
+  }
+  .logo-big img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+  .wordmark {
+    font-size: 44px; font-weight: 700; letter-spacing: -.03em;
+    background: linear-gradient(90deg, #a855f7 0%, #22c55e 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    margin-bottom: 22px;
+  }
+  .headline {
+    font-size: 76px; font-weight: 700; letter-spacing: -.035em; line-height: 1.02;
+    max-width: 900px; margin: 0 auto;
+  }
+  .headline em { font-style: normal; background: linear-gradient(90deg, #9e5eec 0%, #787dc1 50%, #3db17b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .subhead {
+    margin-top: 28px; font-size: 18px; color: var(--text-dim); letter-spacing: -.005em;
+  }
+  .hero-cta { margin-top: 48px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  /* Trust / stats strip */
+  .trust {
+    max-width: 1120px; margin: 0 auto; padding: 32px 24px;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 32px;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .trust-item { text-align: center; }
+  .trust-val { font-size: 32px; font-weight: 700; letter-spacing: -.02em; }
+  .trust-val.gradient { background: linear-gradient(90deg, #9e5eec 0%, #9068dd 10%, #8871d1 20%, #787dc1 35%, #6e86b6 45%, #658eac 55%, #4fa091 75%, #3db17b 90%, #3db17b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .trust-label { font-size: 12px; color: var(--text-faint); letter-spacing: .08em; text-transform: uppercase; margin-top: 6px; }
+
+  /* Section header */
+  .section { padding: 120px 24px; position: relative; }
+  .section-inner { max-width: 1120px; margin: 0 auto; }
+  .eyebrow { font-size: 13px; letter-spacing: .2em; text-transform: uppercase; color: var(--purple-bright); margin-bottom: 16px; font-weight: 600; text-align: center; }
+  .section-title { font-size: 48px; font-weight: 700; letter-spacing: -.025em; line-height: 1.1; text-align: center; max-width: 760px; margin: 0 auto; }
+  .section-sub { text-align: center; color: var(--text-dim); font-size: 17px; margin-top: 18px; max-width: 620px; margin-left: auto; margin-right: auto; }
+
+  /* Feature cards (the 4 hooks from reference) */
+  .features {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    margin-top: 48px;
+  }
+  .features-tri {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px;
+    margin-top: 20px;
+  }
+  .features-split {
+    display: flex; align-items: center; gap: 18px;
+    margin: 56px 0 20px;
+  }
+  .features-split-label {
+    font-family: 'JetBrains Mono',ui-monospace,monospace;
+    font-size: 11px; letter-spacing: .18em; text-transform: uppercase;
+    color: var(--text-faint); white-space: nowrap;
+  }
+  .features-split-rule {
+    flex: 1; height: 1px; background: var(--line);
+  }
+  .feature {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 32px;
+    position: relative;
+    transition: border-color .2s, background .2s, transform .2s;
+  }
+  .feature:hover { border-color: #3a3a48; background: var(--card-hover); transform: translateY(-2px); }
+  .feature-head { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; }
+  .feature-icon {
+    width: 44px; height: 44px; border-radius: 11px;
+    background: linear-gradient(135deg, rgba(168,85,247,.22), rgba(124,58,237,.15));
+    border: 1px solid rgba(168,85,247,.3);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--purple-bright);
+  }
+  .feature-title { font-size: 18px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(34,197,94,.14);
+    color: #4ade80;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    padding: 3px 9px; border-radius: 999px;
+    border: 1px solid rgba(34,197,94,.25);
+  }
+  .live-badge .ld-dot { width: 5px; height: 5px; border-radius: 3px; background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .feature-body { color: var(--text-dim); font-size: 14.5px; line-height: 1.62; }
+  .feature-meta {
+    margin-top: 22px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 16px;
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+  .feature-meta span { display: inline-flex; gap: 6px; align-items: center; }
+  .feature-meta strong { color: var(--text); font-weight: 600; }
+
+  /* Product preview */
+  .preview-wrap { margin-top: 72px; position: relative; }
+  .preview-glow { position: absolute; inset: 20px -20px; background: radial-gradient(ellipse at center, var(--preview-glow, rgba(168,85,247,.25)), transparent 60%); filter: blur(40px); pointer-events: none; }
+  .preview-frame {
+    position: relative;
+    border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--border-strong);
+    background: var(--card);
+    box-shadow: var(--preview-shadow, 0 40px 120px rgba(0,0,0,.6)), 0 0 0 1px rgba(168,85,247,.15);
+  }
+  .preview-bar {
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--card-hover);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text-faint);
+  }
+  .preview-bar .t { width: 11px; height: 11px; border-radius: 6px; }
+  .preview-bar .t.r { background: #ef4444; }
+  .preview-bar .t.y { background: #eab308; }
+  .preview-bar .t.g { background: #22c55e; }
+  .preview-bar .url { margin-left: 16px; padding: 4px 12px; background: var(--bg); border-radius: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11.5px; }
+  .preview-img { width: 100%; display: block; }
+  .preview-live {
+    width: 100%; display: block; border: 0;
+    aspect-ratio: 16 / 9.2;
+    background: #0a0a0c;
+  }
+  .preview-autopilot {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 4px 12px 4px 10px;
+    border-radius: 999px;
+    background: rgba(168,85,247,.10);
+    border: 1px solid rgba(168,85,247,.3);
+    color: #c084fc;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+    white-space: nowrap;
+  }
+  [data-theme="light"] .preview-autopilot { background: rgba(124,58,237,.08); color: #6d28d9; border-color: rgba(124,58,237,.3); }
+  .preview-autopilot .pa-dot {
+    width: 6px; height: 6px; border-radius: 999px; background: #a855f7;
+    box-shadow: 0 0 0 0 rgba(168,85,247,.6);
+    animation: pa-pulse 1.6s infinite;
+  }
+  @keyframes pa-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(168,85,247,.55); }
+    70%  { box-shadow: 0 0 0 8px rgba(168,85,247,0); }
+    100% { box-shadow: 0 0 0 0 rgba(168,85,247,0); }
+  }
+
+  /* Live metrics comparison strip */
+  .metrics { max-width: 1120px; margin: 0 auto; padding: 64px 24px 0;
+             display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; }
+  .metric { padding: 24px 28px; border-left: 1px solid var(--border); position: relative; }
+  .metric:first-child { border-left: none; padding-left: 0; }
+  .metric-big { font-size: 36px; font-weight: 700; letter-spacing: -.025em; line-height: 1;
+    background: linear-gradient(90deg, #a855f7 0%, #22c55e 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .metric-big .unit { font-size: 18px; color: var(--text); background: none; -webkit-text-fill-color: var(--text); margin-left: 2px; font-weight: 600; }
+  .metric-label { font-size: 13px; color: var(--text); margin-top: 10px; font-weight: 500; letter-spacing: -.005em; }
+  .metric-vs { font-size: 12px; color: var(--text-faint); margin-top: 4px; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .metric-vs s { color: var(--text-faint); text-decoration-color: rgba(239,68,68,.55); }
+
+  /* Animated fee curve hero artifact */
+  .feecurve-wrap { max-width: 1120px; margin: 28px auto 0; padding: 0 24px; }
+  .feecurve {
+    position: relative; border: 1px solid var(--border-strong); border-radius: 20px;
+    background: var(--card); padding: 24px 28px 28px;
+    box-shadow: var(--preview-shadow, 0 40px 120px rgba(0,0,0,.55)), 0 0 0 1px rgba(168,85,247,.12);
+    overflow: hidden;
+  }
+  .feecurve::before {
+    content: ''; position: absolute; top: -30%; left: 0; right: 0; height: 220px;
+    background: radial-gradient(ellipse at 30% 0%, rgba(168,85,247,.18), transparent 60%);
+    pointer-events: none;
+  }
+  .fc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; position: relative; }
+  .fc-title { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .fc-sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .fc-readout { text-align: right; }
+  .fc-readout .fc-price { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  .fc-readout .fc-fee { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; color: var(--purple-bright); margin-top: 2px; font-weight: 600; }
+  .fc-zones { display: flex; gap: 8px; margin-top: 18px; font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 11px; letter-spacing: .04em; }
+  .fc-zone { padding: 4px 10px; border-radius: 99px; border: 1px solid var(--border); color: var(--text-faint); background: var(--bg-soft); transition: all .3s; }
+  .fc-zone.active { background: rgba(168,85,247,.12); border-color: rgba(168,85,247,.6); color: #c084fc; }
+  [data-theme="light"] .fc-zone.active { background: rgba(124,58,237,.08); color: #6d28d9; border-color: rgba(124,58,237,.35); }
+  .fc-chart { margin-top: 18px; position: relative; height: 280px; }
+  .fc-chart svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* Solidity snippet section */
+  .code-section { padding: 40px 24px 120px; }
+  .code-inner { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; align-items: center; }
+  .code-copy .eyebrow { text-align: left; }
+  .code-copy .section-title { text-align: left; margin: 0; max-width: none; }
+  .code-copy .section-sub { text-align: left; margin: 18px 0 0; }
+  .code-bullets { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-direction: column; gap: 14px; }
+  .code-bullet { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; color: var(--text-dim); line-height: 1.5; }
+  .code-bullet svg { flex-shrink: 0; margin-top: 2px; color: var(--purple-bright); }
+  .code-bullet strong { color: var(--text); font-weight: 600; }
+  .code-block {
+    position: relative; border-radius: 16px; overflow: hidden;
+    border: 1px solid var(--border-strong); background: var(--card);
+    box-shadow: var(--preview-shadow, 0 30px 80px rgba(0,0,0,.5));
+  }
+  .code-block::before {
+    content: ''; position: absolute; inset: -1px; border-radius: 16px; padding: 1px;
+    background: linear-gradient(135deg, rgba(168,85,247,.35), transparent 40%);
+    -webkit-mask: linear-gradient(#000,#000) content-box, linear-gradient(#000,#000);
+    -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+  }
+  .code-bar {
+    display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+    background: var(--card-hover); border-bottom: 1px solid var(--border);
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: var(--text-faint);
+  }
+  .code-bar .cb-file { flex: 1; }
+  .code-bar .cb-copy {
+    background: transparent; border: 1px solid var(--border); color: var(--text-dim);
+    font-family: inherit; font-size: 11px; padding: 3px 10px; border-radius: 6px; cursor: pointer;
+    transition: all .15s; letter-spacing: .02em;
+  }
+  .code-bar .cb-copy:hover { color: var(--text); border-color: var(--purple); }
+  .code-bar .cb-copy.copied { color: #22c55e; border-color: rgba(34,197,94,.4); }
+  .code-pre {
+    margin: 0; padding: 22px 24px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 13px; line-height: 1.75; color: var(--text);
+    background: var(--card); overflow-x: auto; tab-size: 2;
+  }
+  .tok-kw { color: #c084fc; }
+  .tok-type { color: #60a5fa; }
+  .tok-fn { color: #f0abfc; }
+  .tok-num { color: #fbbf24; }
+  .tok-str { color: #86efac; }
+  .tok-com { color: var(--text-faint); font-style: italic; }
+  [data-theme="light"] .tok-kw { color: #7c3aed; }
+  [data-theme="light"] .tok-type { color: #2563eb; }
+  [data-theme="light"] .tok-fn { color: #c026d3; }
+  [data-theme="light"] .tok-num { color: #b45309; }
+  [data-theme="light"] .tok-str { color: #15803d; }
+
+  /* How it works */
+  .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 64px; }
+  .how-card { padding: 36px 28px; border: 1px solid var(--border); border-radius: 18px; background: var(--card); position: relative; }
+  .how-num { font-size: 56px; font-weight: 700; letter-spacing: -.04em;
+    background: linear-gradient(90deg, #9e5eec 0%, #787dc1 50%, #3db17b 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    line-height: 1;
+  }
+  .how-title { font-size: 19px; font-weight: 600; margin-top: 18px; letter-spacing: -.01em; }
+  .how-body { font-size: 14px; color: var(--text-dim); margin-top: 10px; line-height: 1.6; }
+
+  /* FAQ */
+  .faq { max-width: 760px; margin: 64px auto 0; }
+  .faq-item {
+    border-bottom: 1px solid var(--border);
+  }
+  .faq-item:first-child { border-top: 1px solid var(--border); }
+  .faq-q {
+    width: 100%;
+    text-align: left;
+    padding: 22px 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 16px; font-weight: 500; color: var(--text);
+    transition: color .15s;
+  }
+  .faq-q:hover { color: var(--purple-bright); }
+  .faq-chev { transition: transform .25s; color: var(--text-faint); }
+  .faq-item.open .faq-chev { transform: rotate(180deg); color: var(--purple-bright); }
+  .faq-a {
+    overflow: hidden; max-height: 0; transition: max-height .3s ease, padding .3s ease;
+    color: var(--text-dim); font-size: 15px; line-height: 1.65;
+  }
+  .faq-item.open .faq-a { max-height: 300px; padding: 0 0 24px; }
+
+  /* Footer */
+  .footer { padding: 60px 24px 40px; border-top: 1px solid var(--border); }
+  .footer-inner { max-width: 1120px; margin: 0 auto; }
+  .badges { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 48px; }
+  .badge {
+    display: flex; align-items: center; gap: 14px;
+    padding: 18px 24px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: var(--card);
+  }
+  .badge-ic { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; color: var(--gold); background: rgba(234,179,8,.1); border: 1px solid rgba(234,179,8,.25); }
+  .badge-title { font-size: 14.5px; font-weight: 600; color: var(--gold); }
+  .badge-sub { font-size: 12px; color: var(--text-faint); letter-spacing: .06em; text-transform: uppercase; margin-top: 3px; }
+  .footer-bottom { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-faint); padding-top: 28px; border-top: 1px solid var(--border); }
+  .footer-links { display: flex; gap: 24px; }
+
+  /* CTA section */
+  .cta-section { padding: 120px 24px; text-align: center; position: relative; }
+  .cta-bg {
+    position: absolute; inset: 20px 24px;
+    background: radial-gradient(ellipse at center, rgba(168,85,247,.2), transparent 65%);
+    pointer-events: none; filter: blur(30px);
+  }
+  .cta-card {
+    position: relative;
+    max-width: 900px; margin: 0 auto;
+    padding: 72px 40px;
+    border-radius: 28px;
+    background: linear-gradient(180deg, #141418, #0d0d10);
+    border: 1px solid var(--border-strong);
+    overflow: hidden;
+  }
+  .cta-card::before {
+    content: ''; position: absolute; top: -50%; left: -10%; right: -10%; height: 400px;
+    background: radial-gradient(ellipse at center top, rgba(168,85,247,.35), transparent 70%);
+    pointer-events: none;
+  }
+  .cta-title { position: relative; font-size: 56px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; }
+  .cta-title em { font-style: normal; background: linear-gradient(90deg, #9e5eec 0%, #787dc1 50%, #3db17b 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .cta-sub { position: relative; color: var(--text-dim); font-size: 17px; margin-top: 20px; }
+  .cta-btns { position: relative; margin-top: 40px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+  /* Responsive */
+  @media (max-width: 880px) {
+    .headline { font-size: 48px; }
+    .features, .features-tri, .how-grid, .trust, .badges { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: 1fr 1fr; padding: 48px 24px 0; }
+    .metric { padding: 20px; border-left: none; border-top: 1px solid var(--border); }
+    .metric:nth-child(-n+2) { border-top: none; }
+    .metric:nth-child(odd) { border-left: none; padding-left: 20px; }
+    .code-inner { grid-template-columns: 1fr; gap: 32px; }
+    .nav-links { display: none; }
+    .section-title { font-size: 34px; }
+    .cta-title { font-size: 36px; }
+    .nav { padding: 14px 20px; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-left">
+    <div class="nav-logo"><img src="assets/mantua-dark.png" alt="Mantua" class="logo-dark"/><img src="assets/mantua-light.png" alt="Mantua" class="logo-light" style="display:none"/></div>
+    <div class="nav-name">Mantua.AI</div>
+  </div>
+  <div class="nav-links">
+    <a href="#hooks">Hooks</a>
+    <a href="#agents">Agents</a>
+    <a href="#how">How it works</a>
+    <a href="#faq">FAQ</a>
+    <a href="#">Docs</a>
+  </div>
+  <div class="nav-right">
+    <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme">
+      <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+    </button>
+    <a class="btn-primary">Launch App</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-inner">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      <span><strong>Live on Base</strong></span>
+    </div>
+    <div class="wordmark">Mantua.AI</div>
+    <h1 class="headline">Agent driven liquidity for <em>Defi</em></h1>
+    <p class="subhead">Programmable Sports Agents</p>
+    <div class="hero-cta">
+      <a class="btn-primary big">Launch App →</a>
+      <a class="btn-ghost">Read the docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- LIVE METRICS (differentiating, not vanity) -->
+<div class="metrics">
+  <div class="metric">
+    <div class="metric-big">0.01–0.05<span class="unit">%</span></div>
+    <div class="metric-label">Median slippage</div>
+    <div class="metric-vs">vs <s>0.18%</s> sector avg</div>
+  </div>
+  <div class="metric">
+    <div class="metric-big">1<span class="unit"> signature</span></div>
+    <div class="metric-label">Agent handles the rest</div>
+    <div class="metric-vs">route · simulate · settle</div>
+  </div>
+  <div class="metric">
+    <div class="metric-big">4<span class="unit"> hooks</span></div>
+    <div class="metric-label">Shipped on Base</div>
+    <div class="metric-vs">StableProtection · DynamicFee · RWAGate · ALO</div>
+  </div>
+  <div class="metric">
+    <div class="metric-big">100M<span class="unit">+ addresses</span></div>
+    <div class="metric-label">Address intelligence</div>
+    <div class="metric-vs">exchanges · whales · MEV bots</div>
+  </div>
+</div>
+
+<!-- ANIMATED FEE CURVE -->
+<div class="feecurve-wrap">
+  <div class="feecurve" id="feecurve">
+    <div class="fc-head">
+      <div>
+        <div class="fc-title">StableProtection Hook · Live fee curve</div>
+        <div class="fc-sub" id="fc-pool">USDC / USDT · Base</div>
+      </div>
+      <div class="fc-readout">
+        <div class="fc-price" id="fc-price">1.0000</div>
+        <div class="fc-fee" id="fc-fee">Fee · 0.05%</div>
+      </div>
+    </div>
+    <div class="fc-zones" id="fc-zones">
+      <span class="fc-zone" data-zone="0">Healthy</span>
+      <span class="fc-zone" data-zone="1">Watch</span>
+      <span class="fc-zone" data-zone="2">Stressed</span>
+      <span class="fc-zone" data-zone="3">Depeg</span>
+      <span class="fc-zone" data-zone="4">Breaker</span>
+    </div>
+    <div class="fc-chart">
+      <svg viewBox="0 0 1000 280" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="fc-area" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="#a855f7" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="#a855f7" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="fc-line" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stop-color="#a855f7"/>
+            <stop offset="100%" stop-color="#22c55e"/>
+          </linearGradient>
+        </defs>
+        <!-- baseline ticks -->
+        <g stroke="currentColor" stroke-opacity="0.08" stroke-width="1" fill="none">
+          <line x1="0" y1="56" x2="1000" y2="56"/>
+          <line x1="0" y1="112" x2="1000" y2="112"/>
+          <line x1="0" y1="168" x2="1000" y2="168"/>
+          <line x1="0" y1="224" x2="1000" y2="224"/>
+        </g>
+        <!-- fee curve: piecewise, plotted right-to-left: healthy (x=0..300, fee≈0.05) rising to breaker (x=900..1000, fee=1) -->
+        <path id="fc-area-path" d="" fill="url(#fc-area)"/>
+        <path id="fc-line-path" d="" fill="none" stroke="url(#fc-line)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- moving dot + verticals -->
+        <line id="fc-cursor" x1="0" y1="0" x2="0" y2="280" stroke="#a855f7" stroke-width="1" stroke-dasharray="3 4" stroke-opacity="0.55"/>
+        <circle id="fc-dot" cx="0" cy="0" r="6" fill="#a855f7" stroke="var(--card)" stroke-width="3"/>
+      </svg>
+      <!-- axis labels -->
+      <div style="position:absolute; left:0; right:0; bottom:-4px; display:flex; justify-content:space-between; font-family:'JetBrains Mono',ui-monospace,monospace; font-size:10.5px; color:var(--text-faint); letter-spacing:.04em;">
+        <span>PEG</span>
+        <span>−0.25%</span>
+        <span>−0.50%</span>
+        <span>−1.0%</span>
+        <span>−2.0%+</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PRODUCT PREVIEW -->
+<section class="section">
+  <div class="section-inner">
+    <div class="eyebrow">The product</div>
+    <h2 class="section-title"><em style="font-style:normal;background:linear-gradient(90deg,#a855f7 0%,#22c55e 100%);-webkit-background-clip:text;background-clip:text;color:transparent;">Agent-Driven Liquidity</em> protocol</h2>
+    <p class="section-sub">Swap, provide liquidity, research, and run strategies from a single prompt. Mantua's agent routes through custom v4 hooks purpose-built for stable pairs — execution and intelligence in one place.</p>
+    <div class="preview-wrap">
+      <div class="preview-glow"></div>
+      <div class="preview-frame">
+        <div class="preview-bar">
+          <span class="t r"></span><span class="t y"></span><span class="t g"></span>
+          <span class="preview-autopilot"><span class="pa-dot"></span>Autopilot · Create agent · Chat mode · CDP wallet</span>
+        </div>
+        <iframe class="preview-live" src="../Mantua Prototype.html#demo=agent-wallet" title="Mantua product — live autopilot" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES (the 4 hooks + agent surface) -->
+<section class="section" id="hooks" style="padding-top:40px;">
+  <div class="section-inner">
+    <div class="eyebrow">Key app features</div>
+    <h2 class="section-title">Four hooks. One agent surface.</h2>
+    <p class="section-sub">Every hook is a custom Uniswap v4 primitive</p>
+
+    <div class="features">
+      <!-- Stable Protection -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg>
+          </div>
+          <div class="feature-title">Stable Protection Hook <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          A Uniswap v4 hook that dynamically adjusts swap fees across five depeg zones to protect stablecoin LPs from adverse selection. Fees scale from 0.05% in healthy conditions to 1% during severe depeg, with a circuit breaker for extreme events.
+        </div>
+        <div class="feature-meta">
+          <span><strong>0.05%→1%</strong> fee curve</span>
+          <span>·</span>
+          <span><strong>5</strong> depeg zones</span>
+          <span>·</span>
+          <span><strong>Audited</strong> by Spearbit</span>
+        </div>
+      </div>
+
+      <!-- Dynamic Fee -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          </div>
+          <div class="feature-title">Dynamic Fee Hook <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          A Uniswap v4 hook that reads live Chainlink oracle data to set fees across five volatility zones. Protects LPs from toxic flow during high-volatility windows while staying competitive when markets are calm — targeting ETH/USDC and cbBTC/USDC pools.
+        </div>
+        <div class="feature-meta">
+          <span><strong>Chainlink</strong>-driven</span>
+          <span>·</span>
+          <span><strong>5</strong> vol zones</span>
+          <span>·</span>
+          <span><strong>ETH/USDC</strong> · cbBTC/USDC</span>
+        </div>
+      </div>
+
+      <!-- RWAGate -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+          </div>
+          <div class="feature-title">RWAGate Hook <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          A compliance-native gatekeeper hook that enforces KYC whitelist access for Real World Asset token pools. Every swap and liquidity action is validated against an on-chain registry with per-address expiry — making compliant RWA trading possible on Uniswap v4.
+        </div>
+        <div class="feature-meta">
+          <span><strong>KYC-gated</strong></span>
+          <span>·</span>
+          <span><strong>On-chain</strong> registry</span>
+          <span>·</span>
+          <span><strong>Per-address</strong> expiry</span>
+        </div>
+      </div>
+
+      <!-- Async Limit Order -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h13M7 7l3-3M7 7l3 3M17 17H4M17 17l-3-3M17 17l-3 3"/></svg>
+          </div>
+          <div class="feature-title">Async Limit Order Hook <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          A Uniswap v4 hook that turns concentrated single-tick liquidity into trustless on-chain limit orders. Orders fulfil and redeem automatically when the market crosses the target price — no keepers, no off-chain infrastructure required.
+        </div>
+        <div class="feature-meta">
+          <span><strong>Keeper-less</strong></span>
+          <span>·</span>
+          <span><strong>Trustless</strong> fills</span>
+          <span>·</span>
+          <span><strong>Single-tick</strong> liquidity</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="features-split">
+      <span class="features-split-label">The surface to use them</span>
+      <span class="features-split-rule"></span>
+    </div>
+
+    <div class="features-tri">
+      <!-- AI Agents -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="12" rx="2"/><circle cx="9" cy="13" r="1.4"/><circle cx="15" cy="13" r="1.4"/><path d="M12 3v4M8 19v2M16 19v2"/></svg>
+          </div>
+          <div class="feature-title">AI Agents <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          Autonomous AI agents that manage trading and liquidity strategies collaboratively or independently, executing on-chain actions through natural-language commands.
+        </div>
+        <div class="feature-meta">
+          <span><strong>Chat</strong> or <strong>autonomous</strong></span>
+          <span>·</span>
+          <span><strong>Pre-signed</strong> perms</span>
+        </div>
+      </div>
+
+      <!-- Portfolio -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="5"/><circle cx="16" cy="15" r="5"/></svg>
+          </div>
+          <div class="feature-title">Portfolio <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          Unified portfolio tracking for users and agents, with real-time performance insights and on-chain position management.
+        </div>
+        <div class="feature-meta">
+          <span><strong>Real-time</strong> P&amp;L</span>
+          <span>·</span>
+          <span><strong>Multi-chain</strong> ready</span>
+        </div>
+      </div>
+
+      <!-- Analytics -->
+      <div class="feature">
+        <div class="feature-head">
+          <div class="feature-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20V14M22 20V8"/></svg>
+          </div>
+          <div class="feature-title">Analytics <span class="live-badge"><span class="ld-dot"></span>Live</span></div>
+        </div>
+        <div class="feature-body">
+          Real-time on-chain analytics delivering actionable insights across markets, pools, and agent activity.
+        </div>
+        <div class="feature-meta">
+          <span><strong>Sub-second</strong> indexing</span>
+          <span>·</span>
+          <span><strong>Agent-ready</strong> feeds</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<!-- FAQ -->
+<section class="section" id="faq" style="padding-top:40px;">
+  <div class="section-inner">
+    <h2 class="section-title">Frequently Asked Questions</h2>
+    <div class="faq" id="faq-list">
+      <div class="faq-item">
+        <button class="faq-q">What is Mantua?<svg class="faq-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="faq-a">Mantua.AI is an agent-driven liquidity protocol for stablecoins that allows users and institutions to manage stablecoin positions, deploy liquidity, and execute automated rebalancing strategies through natural language. It combines Uniswap v4 hooks, autonomous AI agents, and real-time onchain execution to transform user intent into automated liquidity actions. The result is a programmable liquidity layer optimized for stablecoins, RWAs, and yield-bearing dollar assets.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">What problem does Mantua solve?<svg class="faq-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="faq-a">Managing stablecoin liquidity today is operationally manual, interface-fragmented, strategy-dependent, and exposed to peg risk across pools, venues, and market conditions. Mantua.AI enables liquidity providers, stablecoin issuers, fintech platforms, and RWA protocols to deploy peg-aware liquidity, automated rebalancing strategies, and yield-seeking routing logic directly from natural-language instructions, executed onchain via agent-managed Uniswap v4 hook strategies.</div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">How does the Stable Protection Hook work?<svg class="faq-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="faq-a">The Stable Protection Hook is a Uniswap v4 hook that dynamically adjusts swap fees based on how far a stablecoin pair has drifted from its peg. It defines five depeg zones — Healthy, Minor, Moderate, Severe, and Critical — each with progressively higher fees to discourage arbitrage during volatility and protect LPs from adverse selection. When the peg is healthy, fees stay low (0.05%). As deviation increases, fees scale up automatically to as high as 1%, and a circuit breaker can pause swaps entirely during extreme depeg events. <a href="#" style="color:var(--accent-a);text-decoration:underline;text-underline-offset:2px;">View the source code on GitHub.</a></div>
+      </div>
+      <div class="faq-item">
+        <button class="faq-q">How can I provide liquidity?<svg class="faq-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="faq-a">Connect on Base, pick a pool, and deposit. From there, you're in control: manage your range manually, or hand it off to an Active Liquidity Operator — an agent that rebalances dynamically as volatility shifts.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA section removed -->
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="badges">
+      <div class="badge">
+        <div class="badge-ic">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M17 4h3v3a5 5 0 01-5 5M7 4H4v3a5 5 0 005 5M7 4h10v6a5 5 0 01-10 0V4z"/></svg>
+        </div>
+        <div>
+          <div class="badge-title">Base Batches 001</div>
+          <div class="badge-sub">DeFi · AI Category Winner</div>
+        </div>
+      </div>
+      <div class="badge">
+        <div class="badge-ic">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c3 5 0 7 0 10 0 2 1.5 4 4 4s4-2 4-4-2-4-4-4"/><path d="M12 3c-3 5 0 7 0 10 0 2-1.5 4-4 4s-4-2-4-4 2-4 4-4"/></svg>
+        </div>
+        <div>
+          <div class="badge-title">Atrium Academy UHI8 Hook Incubator</div>
+          <div class="badge-sub">Pioneer of the Stable Protection Hook</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div>© 2026 Mantua.AI. All rights reserved.</div>
+      <div class="footer-links">
+        <a href="#">Docs</a>
+        <a href="#">GitHub</a>
+        <a href="#">X / Twitter</a>
+        <a href="#">Discord</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Theme toggle
+  const root = document.documentElement;
+  const saved = localStorage.getItem('mantua.theme') || 'dark';
+  const applyTheme = (t) => {
+    root.setAttribute('data-theme', t);
+    document.querySelectorAll('.logo-dark').forEach(el => el.style.display = t === 'dark' ? '' : 'none');
+    document.querySelectorAll('.logo-light').forEach(el => el.style.display = t === 'light' ? '' : 'none');
+    const sun = document.querySelector('.icon-sun');
+    const moon = document.querySelector('.icon-moon');
+    if (sun && moon) { sun.style.display = t === 'dark' ? '' : 'none'; moon.style.display = t === 'light' ? '' : 'none'; }
+  };
+  applyTheme(saved);
+  // Also swap preview screenshot with theme
+  const swapPreview = (t) => {
+    document.querySelectorAll('.preview-dark').forEach(el => el.style.display = t === 'dark' ? '' : 'none');
+    document.querySelectorAll('.preview-light').forEach(el => el.style.display = t === 'light' ? '' : 'none');
+  };
+  swapPreview(saved);
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    localStorage.setItem('mantua.theme', next);
+    applyTheme(next);
+    swapPreview(next);
+  });
+
+  // FAQ expand/collapse — one open at a time
+  document.querySelectorAll('#faq-list .faq-item').forEach((item) => {
+    item.querySelector('.faq-q').addEventListener('click', () => {
+      const wasOpen = item.classList.contains('open');
+      document.querySelectorAll('#faq-list .faq-item').forEach(i => i.classList.remove('open'));
+      if (!wasOpen) item.classList.add('open');
+    });
+  });
+  // open first faq by default
+  document.querySelector('#faq-list .faq-item').classList.add('open');
+
+  // ─── Animated fee curve ───────────────────────────────────────────
+  (function feeCurve(){
+    const W = 1000, H = 280;
+    // fee curve points: mapping x (0..1000 = peg→severe depeg) to fee % (0.05..1.0)
+    // piecewise: flat 0.05 until 30% (healthy), then quadratic rise to 1.0 at 90%, then step to 1.0 breaker
+    const pts = [];
+    for (let x = 0; x <= 100; x++) {
+      const t = x / 100;
+      let feePct;
+      if (t < 0.30) feePct = 0.05;
+      else if (t < 0.90) {
+        const u = (t - 0.30) / 0.60;
+        feePct = 0.05 + (1 - 0.05) * (u * u); // quadratic
+      } else feePct = 1.0;
+      // map fee 0..1% to y (H..20)
+      const y = H - 20 - (feePct / 1.0) * (H - 50);
+      pts.push([t * W, y, feePct, t]);
+    }
+    // build line path
+    let line = 'M' + pts.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' L');
+    let area = line + ` L${W},${H} L0,${H} Z`;
+    document.getElementById('fc-line-path').setAttribute('d', line);
+    document.getElementById('fc-area-path').setAttribute('d', area);
+
+    const dot = document.getElementById('fc-dot');
+    const cursor = document.getElementById('fc-cursor');
+    const priceEl = document.getElementById('fc-price');
+    const feeEl = document.getElementById('fc-fee');
+    const zones = [...document.querySelectorAll('.fc-zone')];
+
+    // zone boundaries (t): healthy <.25, watch <.45, stressed <.65, depeg <.90, breaker >=.90
+    function zoneOf(t) {
+      if (t < 0.25) return 0;
+      if (t < 0.45) return 1;
+      if (t < 0.65) return 2;
+      if (t < 0.90) return 3;
+      return 4;
+    }
+
+    let raf;
+    let t0 = performance.now();
+    function tick(now){
+      const elapsed = (now - t0) / 1000;
+      // triangle wave 0→1→0 over 10s, with brief dwell at breaker
+      const period = 12;
+      const phase = (elapsed % period) / period;
+      // custom curve: ease out to ~0.95, hold, ease back, hold healthy
+      let t;
+      if (phase < 0.35)       t = (phase / 0.35) * 0.95;            // ramp up
+      else if (phase < 0.45)  t = 0.95 + (phase - 0.35) * 0.5;      // push to breaker
+      else if (phase < 0.55)  t = 1.0 - (phase - 0.45) * 0.3;       // dwell
+      else if (phase < 0.85)  t = 0.97 - ((phase - 0.55) / 0.30) * 0.97; // ramp back
+      else                    t = 0;                                // dwell healthy
+      t = Math.max(0, Math.min(1, t));
+
+      // find nearest sample
+      const idx = Math.round(t * 100);
+      const p = pts[idx];
+      const [x, y, feePct, tt] = p;
+      dot.setAttribute('cx', x);
+      dot.setAttribute('cy', y);
+      cursor.setAttribute('x1', x);
+      cursor.setAttribute('x2', x);
+
+      // price readout: peg (1.0000) at t=0, down to ~0.9750 at t=1
+      const price = 1.0000 - tt * 0.0250;
+      priceEl.textContent = price.toFixed(4);
+      const feeDisplay = feePct < 0.1 ? feePct.toFixed(2) : feePct.toFixed(2);
+      feeEl.textContent = 'Fee · ' + feeDisplay + '%';
+
+      const z = zoneOf(tt);
+      zones.forEach((el,i) => el.classList.toggle('active', i === z));
+
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+
+    // pause when off-screen
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          if (!raf) { t0 = performance.now(); raf = requestAnimationFrame(tick); }
+        } else {
+          if (raf) { cancelAnimationFrame(raf); raf = null; }
+        }
+      });
+    }, { threshold: 0.1 });
+    io.observe(document.getElementById('feecurve'));
+  })();
+
+  // Copy-code button
+  (function(){
+    const btn = document.getElementById('cb-copy');
+    const pre = document.getElementById('code-pre');
+    if (!btn || !pre) return;
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(pre.innerText);
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1400);
+      } catch(e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,59 @@
+# High-frequency scheduler for the agent's autonomy loops.
+#
+# Vercel Hobby only allows DAILY cron schedules (the vercel.json crons stay
+# as daily backstops), so the tight cadence comes from here instead: this
+# workflow ticks every 15 minutes and hits the same secret-guarded cron
+# endpoints the Vercel crons use.
+#
+# Cadence per tick (GitHub schedule times drift by a few minutes, so the
+# hourly jobs key off the ACTUAL minute, in drift-tolerant windows):
+#   - intents sweep: every tick (~15 min)
+#   - rebalance:     the tick landing in minutes 00-14 (~hourly)
+#   - peg-sync:      the tick landing in minutes 15-29 (~hourly, offset;
+#                    drift-gated server-side so most runs skip the tx)
+#
+# Requires the repo Actions secret CRON_SECRET to equal the production
+# CRON_SECRET in Vercel. Until it is set, runs fail with 401 (harmless —
+# the daily Vercel crons still cover the loops).
+name: autonomy-loops
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: autonomy-loops
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Intent sweep (every tick)
+        run: |
+          curl -sS -f -m 290 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://test-mantua.vercel.app/api/cron/intents
+      - name: Rebalance (hourly window, minutes 00-14)
+        run: |
+          M=$(date -u +%M)
+          if [ "$M" -lt 15 ]; then
+            curl -sS -f -m 290 \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              https://test-mantua.vercel.app/api/cron/rebalance
+          else
+            echo "skipped (minute $M outside 00-14)"
+          fi
+      - name: Peg-sync (hourly window, minutes 15-29)
+        run: |
+          M=$(date -u +%M)
+          if [ "$M" -ge 15 ] && [ "$M" -lt 30 ]; then
+            curl -sS -f -m 290 \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              https://test-mantua.vercel.app/api/cron/peg-sync
+          else
+            echo "skipped (minute $M outside 15-29)"
+          fi

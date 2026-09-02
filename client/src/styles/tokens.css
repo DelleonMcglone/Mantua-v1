@@ -1,0 +1,152 @@
+/**
+ * PD-002 — Mantua design tokens, extracted from `Mantua Prototype.html`.
+ *
+ * Single source of truth. Every color, radius, spacing, or shadow value
+ * in app code must reference a token via Tailwind utility (e.g. `bg-bg-elev`,
+ * `text-text-dim`, `rounded-sm`) or via `var(--token-name)`. Ad-hoc hex
+ * codes are a code-review reject (lint rule incoming in Phase 9).
+ *
+ * Theme switching: toggle `data-theme="light"` on <html>. Defaults to dark.
+ * Density: toggle `data-density="compact"` on <html>. Defaults to comfortable.
+ */
+
+:root {
+  /* Surfaces */
+  --bg: #000000;
+  --bg-elev: #0a0a0d;
+  --panel: #0f0f14ee;
+  --panel-solid: #0e0e13;
+
+  /* Strokes */
+  --border: #22222a;
+  --border-soft: #1a1a20;
+
+  /* Text */
+  --text: #ffffff;
+  --text-dim: #8e8e96;
+  --text-mute: #5a5a62;
+
+  /* Brand & accents */
+  --accent: #8b6cf0;
+  --accent-2: #b892ff;
+
+  /* Data colors */
+  --amber: #f5a524;
+  --amber-dim: #f5a52433;
+  --green: #3ddc97;
+  --red: #ff6b6b;
+
+  /* Misc fills */
+  --chip: #18181e;
+  --row-hover: #121217;
+
+  /* Agent identity — teal stripe + low/mid alphas. From
+     `mantua-ai/project/Mantua Agent Flows.html`. Used by AgentStrip,
+     agent-mode buttons, and intent-card "agent" pill variant. Same
+     value in both themes (chroma family, not surface-dependent). */
+  --agent: #4cc6c6;
+  --agent-dim: #4cc6c622;
+  --agent-bd: #4cc6c655;
+
+  /* Radii */
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+
+  /* Density (1 = comfortable, 0.82 = compact) */
+  --density: 1;
+
+  /* Shadcn-compatible aliases — map prototype tokens onto Shadcn's token names
+     so any imported Shadcn component renders with our palette without edits. */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--panel-solid);
+  --card-foreground: var(--text);
+  --popover: var(--panel-solid);
+  --popover-foreground: var(--text);
+  --primary: var(--accent);
+  --primary-foreground: #ffffff;
+  --secondary: var(--bg-elev);
+  --secondary-foreground: var(--text);
+  --muted: var(--bg-elev);
+  --muted-foreground: var(--text-dim);
+  --accent-bg: var(--chip);
+  --accent-foreground: var(--text);
+  --destructive: var(--red);
+  --destructive-foreground: #ffffff;
+  --input: var(--border);
+  --ring: var(--accent);
+}
+
+html[data-theme="light"] {
+  --bg: #f6f5f2;
+  --bg-elev: #ffffff;
+  --panel: #ffffffee;
+  --panel-solid: #ffffff;
+  --border: #e5e3dd;
+  --border-soft: #efece5;
+  --text: #1a1a24;
+  --text-dim: #5a5d72;
+  --text-mute: #8a8da0;
+  --accent: #8b6cf0;
+  --accent-2: #6e4fe0;
+  --amber: #e08900;
+  --amber-dim: #e0890033;
+  --green: #14a87a;
+  --red: #d34848;
+  --chip: #f0ede5;
+  --row-hover: #f0ede5;
+
+  --primary-foreground: #ffffff;
+  --destructive-foreground: #ffffff;
+}
+
+html[data-density="compact"] {
+  --density: 0.82;
+}
+
+/* Base typography & body. Inter for UI, JetBrains Mono for numbers/hashes. */
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss01", "cv11";
+}
+body {
+  min-height: 100vh;
+}
+.mono,
+.font-mono {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-feature-settings: "zero";
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-mute);
+}
+
+#root {
+  min-height: 100vh;
+}

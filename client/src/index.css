@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import "./styles/tokens.css";
+
+/**
+ * Tailwind 4 @theme — bind Mantua design tokens to utility classes.
+ * Generates utilities like `bg-bg-elev`, `text-text-dim`, `border-border-soft`,
+ * `rounded-sm`, `text-accent`. Color tokens use `--color-*` prefix per
+ * Tailwind 4 convention; non-color tokens (radius) use their own prefix.
+ */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-panel: var(--panel);
+  --color-panel-solid: var(--panel-solid);
+
+  --color-border: var(--border);
+  --color-border-soft: var(--border-soft);
+
+  --color-text: var(--text);
+  --color-text-dim: var(--text-dim);
+  --color-text-mute: var(--text-mute);
+
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+
+  --color-amber: var(--amber);
+  --color-green: var(--green);
+  --color-red: var(--red);
+
+  --color-chip: var(--chip);
+  --color-row-hover: var(--row-hover);
+
+  --color-agent: var(--agent);
+
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Inter + JetBrains Mono via Google Fonts (will move to self-hosted in
+   Phase 9 to drop the third-party fetch and tighten CSP). */
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+/* Default focus ring for keyboard nav (PD accessibility baseline). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Animations referenced by agent-flow primitives (Spinner, Skel) and
+   AgentStrip / IntentCard transitions. Verbatim from
+   `mantua-ai/project/Mantua Agent Flows.html`. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+@keyframes blink {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

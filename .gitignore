@@ -1,0 +1,83 @@
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code — the whole directory is local tooling (launch.json, settings,
+# worktrees, skills); nothing in it belongs in the repo
+.claude/
+
+# Skills (reinstalled from skills-lock.json via `npx skills experimental_install`)
+.agents/skills/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Env
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.staging
+!.env.example
+
+# Circle entity-secret recovery files (never commit — back up offline)
+circle-entity-secret-recovery.dat
+**/circle-entity-secret-recovery.dat
+recovery_file_*.dat
+**/recovery_file_*.dat
+
+# Build output
+dist/
+build/
+.next/
+out/
+.vite/
+*.tsbuildinfo
+
+# Test / coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Foundry
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/.gas-snapshot
+contracts/lib/
+
+# Design source dropped in by `Mantua Prototype.html` for in-browser
+# comparison via `client/public/_proto/`. The bundle lives in
+# `~/Downloads/mantua-ai/` per the user-memory design-source rule;
+# `_proto/` is just a Vite-served mirror.
+client/public/_proto/
+
+# Drizzle
+drizzle/migrations/meta/_journal.json.bak
+
+# Logs
+logs/
+*.log
+docs/security/slither/*
+!docs/security/slither/.gitkeep
+
+# Local Replit sync notes — never commit
+REPLIT_SYNC.*
+.vercel
+.env*
+# Re-negate after the catch-all above — the templates stay tracked.
+!.env.example
+
+# esbuild-bundled server for the Vercel function (generated at build)
+api/_server.mjs
+api/_dcw.mjs
+api/_ubk.mjs

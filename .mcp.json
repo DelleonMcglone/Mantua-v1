@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "defillama": {
+      "type": "http",
+      "url": "https://mcp.defillama.com/mcp"
+    }
+  }
+}
