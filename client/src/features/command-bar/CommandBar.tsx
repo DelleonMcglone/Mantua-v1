@@ -98,7 +98,7 @@ type State =
 const SUGGESTIONS = [
   "Swap 10 USDC for ETH",
   "Add liquidity to USDC/EURC",
-  "TVL of Uniswap on Base",
+  "TVL of Uniswap today",
 ];
 
 const PLACEHOLDER = 'Type a command… (e.g., "swap 10 USDC for ETH")';

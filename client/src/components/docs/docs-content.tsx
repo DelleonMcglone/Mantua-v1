@@ -96,12 +96,12 @@ export const DOCS_GROUPS: DocsGroup[] = [
 
             <H>3. Fund the wallet</H>
             <P>
-              Mantua runs on Base. Send USDC (or EURC / cbBTC) to your wallet address on Base — from
-              an exchange that supports Base withdrawals, or by bridging from another chain via the
+              Send USDC (or EURC / cbBTC) to your wallet address — from an exchange (choose the
+              Base network when withdrawing so the funds arrive in your wallet), or via the
               app&apos;s built-in bridge.
             </P>
             <Note>
-              On Base, <B>ETH is the gas token</B>. Keep a small amount of ETH on Base to pay for
+              <B>ETH is the gas token</B>. Keep a small amount of ETH in your wallet to pay for
               transactions; your USDC covers the trades themselves.
             </Note>
 
@@ -146,7 +146,7 @@ export const DOCS_GROUPS: DocsGroup[] = [
             </P>
             <Note>
               Each day&apos;s games mint their markets automatically; their pools open at the
-              implied odds and trade under this hook until kickoff freezes them. The Base Mainnet
+              implied odds and trade under this hook until kickoff freezes them. The production
               deployment is pending — addresses will be published here once live.
             </Note>
 
@@ -357,31 +357,15 @@ export const DOCS_GROUPS: DocsGroup[] = [
     label: "Reference",
     pages: [
       {
-        id: "networks",
-        title: "Networks and contracts",
-        summary: "Chain details, deployed hooks, and token addresses.",
+        id: "contracts",
+        title: "Contracts",
+        summary: "Deployed hooks and token addresses.",
         body: (
           <>
-            <H>Base</H>
-            <Table
-              head={["Field", "Value"]}
-              rows={[
-                ["Chain ID", <Code key="id">8453</Code>],
-                ["RPC", <Code key="rpc">https://mainnet.base.org</Code>],
-                [
-                  "Explorer",
-                  <A key="ex" href="https://basescan.org">
-                    basescan.org
-                  </A>,
-                ],
-                ["Gas token", "ETH"],
-              ]}
-            />
-
             <H>Deployed hooks</H>
             <P>
               The Mantua hooks (Stable Protection, Dynamic Fee, Dynamic Market) are pending
-              deployment on Base Mainnet. Their addresses will be published here once live; until
+              production deployment. Their addresses will be published here once live; until
               then, hook venues degrade gracefully to the no-hook path.
             </P>
 

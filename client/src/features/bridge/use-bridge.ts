@@ -77,7 +77,7 @@ export function useBridge() {
       // Fresh kit per run so step handlers don't accumulate across bridges.
       const kit = new BridgeKit();
       kit.on("approve", () => {
-        setState((s) => ({ ...s, status: "burning", message: "Burning USDC on Base…" }));
+        setState((s) => ({ ...s, status: "burning", message: "Starting bridge…" }));
       });
       kit.on("burn", () => {
         setState((s) => ({

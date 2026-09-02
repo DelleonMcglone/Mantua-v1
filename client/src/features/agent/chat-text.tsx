@@ -56,7 +56,7 @@ export function AddressInline({ addr }: { addr: string }) {
         target="_blank"
         rel="noopener noreferrer"
         style={{ color: "var(--text-dim)", textDecoration: "none", fontSize: 11 }}
-        aria-label="View on BaseScan"
+        aria-label="View on explorer"
       >
         ↗
       </a>

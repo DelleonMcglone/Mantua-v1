@@ -72,8 +72,8 @@ export function EarningsTabBody({
           </div>
           <div className="text-[12px] text-text-mute mt-0.5">
             {positions.length === 0
-              ? "Base"
-              : `across ${String(positions.length)} position${positions.length > 1 ? "s" : ""} · Base`}
+              ? " "
+              : `across ${String(positions.length)} position${positions.length > 1 ? "s" : ""}`}
           </div>
         </div>
 
@@ -264,7 +264,6 @@ function SweepModal({ walletAddress, onClose }: { walletAddress: string; onClose
         ) : (
           <div className="space-y-2.5">
             <ModalRow label="Destination wallet" value={shortenAddr(walletAddress)} />
-            <ModalRow label="Network" value="Base" />
             <p className="text-[12px] text-text-mute pt-0.5">
               You&apos;ll confirm one collect transaction per position in your wallet.
             </p>

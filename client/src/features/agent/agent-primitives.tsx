@@ -302,7 +302,7 @@ export function TxRow({
             textDecoration: "none",
           }}
         >
-          ↗ BaseScan
+          ↗ Explorer
         </a>
       )}
     </div>

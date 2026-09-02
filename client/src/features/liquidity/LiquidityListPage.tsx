@@ -4,7 +4,6 @@ import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
-import { NetworkLogo } from "@/components/shell/network-icons.tsx";
 import { networkKeyForChain } from "@/lib/chains.ts";
 import { useTokenPrices } from "./use-token-prices.ts";
 import { TokenPairIcon } from "./TokenPairIcon.tsx";
@@ -338,25 +337,11 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
               <span className="text-right">APR</span>
             </div>
             <div className="flex-1 overflow-auto">
-              {(["base"] as const).map((net) => {
-                const group = filtered.slice(0, 50);
-                if (group.length === 0) return null;
-                return (
-                  <div key={net}>
-                    <div className="flex items-center gap-2 pt-3 pb-1.5">
-                      <NetworkLogo network={net} size={14} />
-                      <span className="text-[11px] text-text-mute uppercase tracking-wide font-medium">
-                        Base
-                      </span>
-                    </div>
-                    <ul>
-                      {group.map((p) => (
-                        <PoolRow key={p.id} pool={p} onSelect={onSelectPool} />
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })}
+              <ul className="pt-1.5">
+                {filtered.slice(0, 50).map((p) => (
+                  <PoolRow key={p.id} pool={p} onSelect={onSelectPool} />
+                ))}
+              </ul>
             </div>
           </>
         )}

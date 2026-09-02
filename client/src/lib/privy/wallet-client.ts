@@ -183,7 +183,7 @@ export function useChainWalletClient() {
         await active.switchChain(chainId);
       } catch {
         throw new Error(
-          `Wallet is on ${active.chainId}; switch it to ${info.displayName} (eip155:${String(chainId)}) to continue.`,
+          "Your wallet is connected to a different network. Approve the network switch in your wallet to continue.",
         );
       }
     }

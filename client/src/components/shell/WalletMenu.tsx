@@ -25,7 +25,7 @@ export function WalletMenu({
   onOpenAgent,
 }: WalletMenuProps) {
   const chainId = useCurrentChainId();
-  const { explorerUrl, explorerName } = CHAIN_INFO[chainId];
+  const { explorerUrl } = CHAIN_INFO[chainId];
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -95,7 +95,7 @@ export function WalletMenu({
           )}
           <MenuItem onClick={handleCopy}>{copied ? "Copied!" : "Copy address"}</MenuItem>
           <MenuLink href={`${explorerUrl}/address/${walletAddress}`}>
-            View on {explorerName}
+            View on explorer
             <ArrowUpRight className="h-3.5 w-3.5" />
           </MenuLink>
           <MenuItem onClick={handleRefresh}>Refresh balances</MenuItem>

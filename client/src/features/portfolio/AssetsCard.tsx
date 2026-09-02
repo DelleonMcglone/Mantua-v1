@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { api } from "@/lib/api.ts";
 import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { CHAIN_INFO, BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
 import { FEE_TIER_LABELS, type FeeTier } from "@/features/liquidity/fee-tiers.ts";
 import { formatFeesEarned } from "@/features/liquidity/position-adapters.ts";
@@ -91,7 +91,6 @@ interface AssetsCardProps {
 
 export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}) {
   const chainId = useCurrentChainId();
-  const chainName = CHAIN_INFO[chainId].displayName;
   const [tab, setTab] = useState<"assets" | "positions" | "agent" | "unified" | "earnings">(
     "assets",
   );
@@ -278,7 +277,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
           <div className="max-h-[320px] overflow-auto">
             {!portfolio.walletAddress && (
               <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                Connect a wallet to see your {chainName} balances.
+                Connect a wallet to see your balances.
               </div>
             )}
             {portfolio.walletAddress && portfolio.loading && filtered.length === 0 && (
@@ -294,7 +293,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
               !portfolio.error &&
               filtered.length === 0 && (
                 <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                  No matching balances on {chainName}.
+                  No matching balances.
                 </div>
               )}
             {filtered.map((a) => (

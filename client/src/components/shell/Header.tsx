@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
 import { WalletMenu } from "./WalletMenu.tsx";
 import { MarketNav, type NavDestination } from "./MarketNav.tsx";
-import { ChainSelector } from "./ChainSelector.tsx";
 
 interface HeaderProps {
   walletAddress?: string | undefined;
@@ -59,7 +58,6 @@ export function Header({
         </button>
         <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
         <div className="ml-auto flex shrink-0 items-center gap-2.5 md:ml-0">
-          <ChainSelector direction="down" />
           <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
             <Icon className="h-[18px] w-[18px]" />
           </Button>

@@ -110,7 +110,7 @@ function bridgeCtaLabel(
     case "approving":
       return "Approve in wallet…";
     case "burning":
-      return "Burning on Base…";
+      return "Starting bridge…";
     case "attesting":
       return "Awaiting attestation…";
     case "minting":
@@ -326,7 +326,7 @@ export function SwapPanel({
     if (!canBridge) return;
     const ok = await confirm({
       title: `Bridge ${amount} USDC → ${destination.label}`,
-      description: `From Base via Circle CCTP. You sign approve + burn on Base; Circle mints USDC to your address on ${destination.label}.`,
+      description: `Via Circle CCTP. You sign approve + burn; Circle mints USDC to your address on ${destination.label}.`,
       confirmLabel: "Bridge",
     });
     if (!ok) return;
@@ -348,7 +348,7 @@ export function SwapPanel({
         {/* Sell card */}
         <div className="bg-bg-elev border border-border-soft rounded-md px-4 py-3.5">
           <div className="flex items-center justify-between text-[13px]">
-            <span>{isBridge ? "Bridge from · Base" : "Sell"}</span>
+            <span>{isBridge ? "Bridge" : "Sell"}</span>
             <span className="text-text-dim">
               Balance: {balanceInDisplay} {tokenIn}
             </span>
@@ -489,7 +489,7 @@ export function SwapPanel({
 
         {isBridge ? (
           <p className="text-[11px] text-text-mute mt-3">
-            Via Circle CCTP + Forwarding Service — you sign approve and burn on Base; Circle mints
+            Via Circle CCTP + Forwarding Service — you sign approve and burn; Circle mints
             USDC to your address on {destination.label}. No destination gas required.
           </p>
         ) : (
@@ -581,7 +581,7 @@ export function SwapPanel({
             rel="noreferrer"
             className="text-xs text-accent hover:text-accent-2 inline-flex items-center gap-1 justify-center mt-3 w-full font-mono"
           >
-            Burn on Base <ExternalLink className="h-3 w-3" />
+            Burn transaction <ExternalLink className="h-3 w-3" />
           </a>
         )}
         {isBridge && bridge.state.mintTx && (
@@ -631,7 +631,7 @@ export function SwapPanel({
             rel="noreferrer"
             className="text-xs text-accent hover:text-accent-2 inline-flex items-center gap-1 justify-center mt-3 w-full"
           >
-            View on BaseScan <ExternalLink className="h-3 w-3" />
+            View on explorer <ExternalLink className="h-3 w-3" />
           </a>
         )}
         {!isBridge && swap.state.status === "success" && (

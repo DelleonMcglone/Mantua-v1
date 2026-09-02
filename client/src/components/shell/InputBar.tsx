@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Send } from "lucide-react";
-import { ChainSelector } from "./ChainSelector.tsx";
 
 interface Props {
   onSubmit: (text: string) => void;
@@ -47,9 +46,6 @@ export function InputBar({ onSubmit, placeholder }: Props) {
         >
           <Send className="h-4 w-4" />
         </button>
-      </div>
-      <div className="mt-2 flex gap-2 items-center">
-        <ChainSelector />
       </div>
     </div>
   );

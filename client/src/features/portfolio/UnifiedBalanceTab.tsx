@@ -42,7 +42,7 @@ export function UnifiedBalanceTab({ ub }: { ub: ReturnType<typeof useUnifiedBala
     <div className="p-4 space-y-3">
       <div className="text-[11px] text-text-mute">
         Consolidate USDC across chains into one balance, accessible anywhere — reduces the working
-        capital you tie up per chain. Deposits move USDC from the agent wallet on Base. (Agent
+        capital you tie up per chain. Deposits move USDC from the agent wallet. (Agent
         treasury · Circle Gateway)
       </div>
 

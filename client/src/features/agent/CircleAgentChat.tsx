@@ -637,7 +637,7 @@ function renderResult(step: ToolStep): ReactNode {
         signals?: { notes: string[] };
       };
       if (!d.found) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No data on BaseScan.</span>;
+        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No explorer data.</span>;
       }
       const activity = (d.tokenTransfers ?? []).slice(0, 5);
       return (
@@ -774,7 +774,7 @@ function Success({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       <Banner tone="success" icon="✓" title={title}>
-        {detail ?? "Executed through your agent wallet on Base."}
+        {detail ?? "Executed through your agent wallet."}
       </Banner>
       <TxRow hash={txHash} explorerUrl={explorerUrl} />
     </div>
@@ -841,7 +841,7 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
-        Hi — I'm your Circle agent. I act on Base. Tell
+        Hi — I'm your Circle agent. Tell
         me what to do in plain language and I'll handle it: check balances, swap or send tokens,
         evaluate sports markets and place bets, or look up market &amp; on-chain data. I act
         autonomously within your daily spending cap.
