@@ -184,6 +184,132 @@ budget the user allocates. The `check_balances` action warns on low gas.
 **Assets allowlist.** USDC / EURC / cbBTC only (`agent/src/config/assets.ts`);
 any other asset is rejected with a clear error.
 
+## v2 reusability audit — keep/replace decisions (2026-09-02)
+
+Five-area audit of the inherited v2 code after the Base Mainnet migration:
+swap, liquidity, wallet layer, safety rails, design system. Each area was
+read end-to-end with file:line evidence; verdicts are **KEEP** (production-
+usable as-is), **REFACTOR** (usable after named changes), **REPLACE** (wrong
+for mainnet), or **MISSING** (needs building). Effort is S/M/L.
+
+### Swap module
+
+The quote path is production-grade; the execution path is not — it was built
+on `PoolSwapTest`, which does not exist on mainnet (`poolSwapTest: null`), so
+every swap-execution entry point (user calldata route, agent swap, intents,
+chat tool, rebalance) currently errors.
+
+| Component | Verdict | Why | Effort |
+| --- | --- | --- | --- |
+| V4Quoter quote path (`quoteExactInputV4`, `resolveInitializedFee`, revert decoding, `readSlot0`/StateView, max-input search) | KEEP | Canonical live mainnet contracts; well-engineered caching and error decoding | S |
+| `buildPoolSwapTestCalldata` (`server/src/lib/v4-onchain-swap.ts:620`) | REPLACE | Target contract absent on 8453; no `amountOutMinimum`, no deadline. Replace with UniversalRouter `V4_SWAP` + Permit2 — both constants already declared in `v4-contracts.ts` but wired to nothing | M |
+| `/api/v4/swap/calldata` route + client `useSwap` | REFACTOR | Route shape (server-side re-quote, min-out derivation) is right; swap the builder, add deadline, replace infinite-approve-to-test-router with bounded approve→Permit2 | M |
+| `swapFromAgentWallet` guard chain | REFACTOR | Cap/ledger/audit scaffolding keeps; `slippageTolerance` is validated then silently dropped — no min-out on agent swaps at all | M |
+| Hook-null fallback (`resolveHookAddress`) | REFACTOR | Silently substitutes the no-hook pool when a hook is undeployed; must fail closed and hide undeployed hook venues in the UI | S |
+| Uniswap Trading API path (`lib/uniswap.ts`, `/api/quote`, `/api/swap/*`) | KEEP as no-hook fallback | Handles Permit2/slippage properly and indexes mainnet pools, but has zero client callers today — wire it or delete it, don't leave it registered-but-unreachable | S |
+| 8 dead client swap components (~456 LOC, incl. the never-wired `SlippageInput` — slippage is hardcoded 50 bps) | REPLACE (delete) | Zero importers | S |
+| CCTP bridge venue | KEEP | Only execution path that works on mainnet today; all-mainnet destinations | — |
+
+### Liquidity module
+
+The calldata layer is genuinely production-grade — real
+`PositionManager.modifyLiquidities` multicalls with Permit2, correct v4 fee
+accounting, no test routers anywhere. The data layer around it has three hard
+mainnet blockers.
+
+| Component | Verdict | Why | Effort |
+| --- | --- | --- | --- |
+| Add/remove/collect calldata builders, v4 action encoding, pool-key/tick/liquidity math, Permit2 helpers, accrued-fees math | KEEP | Correct against v4-periphery; the strongest code in the app | — |
+| On-chain position discovery (`ownedTokenIds`) | REPLACE | Sequential `ownerOf` sweep of tokenIds 1–2000 can never find a real user position on the canonical mainnet PositionManager; replace with subgraph/`Transfer`-log/NFT-index discovery, keep `readOnePosition` | M |
+| `poolKeyHash` (3 divergent formulas across add-route, pool-create, external-positions) | REFACTOR | Hashes never match, so no `positions` DB row is ever written — user and agent position tracking silently dead. One shared helper; highest value-per-effort fix in the module | S |
+| `IS_MAINNET` data-source fork in Positions UI | REFACTOR | Permanently-true flag routes the UI to the broken DB path and dead-codes the authoritative on-chain reader; delete the fork | M |
+| Pool discovery (DefiLlama listing + translator + hook inference) | REPLACE (longer-term) | Returns thousands of mixed v2/v3/v4 Base pools, top-50 reachable, hook binding *guessed* from (pair, fee); move to the v4 subgraph's real PoolKeys | L |
+| `AddLiquidityForm` fee handling | REFACTOR | `ctx.fee` silently discarded → joining a 0.05% pool creates and seeds a brand-new 0.30% pool with real money; honor the fee and gate pool creation behind an explicit confirm | M |
+| `RemoveLiquidityModal` success callback (stale closure), placeholder position values, localStorage pools/positions as source of truth, ~350 LOC dead components | REFACTOR / delete | Breadcrumb overlay logic keeps as the post-mint RPC-lag shim only | S–M |
+
+### Wallet layer
+
+Circle's `"BASE"` blockchain enum is verified correct against the installed
+SDK. The custody split is: user wallets non-custodial via Privy (correctly
+locked to Base at the SDK boundary — KEEP), agent wallets Circle DCW with the
+entity secret as full custody.
+
+| Component | Verdict | Why | Effort |
+| --- | --- | --- | --- |
+| Privy config/provider | KEEP | Single-chain lock enforced at the SDK boundary | — |
+| `hardenProvider` (client tx path) | REFACTOR | Good design; uses legacy `gasPrice` on an EIP-1559 chain (no fee ceiling) and a silent catch that falls back to the rate-limited path | M |
+| `chain-context.tsx` | REPLACE | ~120 of 159 lines provably unreachable single-chain; `useChainSwitch` has zero consumers; collapse `useCurrentChainId` to a constant | S |
+| Circle `execute.ts` | REFACTOR | **Ship-blocker:** returns success at Circle state `SENT` — a reverted tx is reported as success, spending is recorded, audit says "success". Also causes the approve/execute race every agent flow has. Poll to confirmed receipt | L |
+| Circle `client.ts` wallet-set bootstrap | REFACTOR | **Ship-blocker:** unset `CIRCLE_WALLET_SET_ID` mints a new wallet set per serverless cold start, outside any Gas Station policy. Must throw in production | S |
+| Gas Station sponsorship | MISSING | Code assumes sponsored gas everywhere; no policy configuration exists anywhere, no ETH-balance preflight, no distinct "agent wallet has no gas" error | M |
+| `allowed-targets.ts` | KEEP | Best security code in the layer; fix the process-global `registerDynamicTargets` set leaking across warm-instance requests | S |
+| `agent/` workspace | REPLACE / delete | Orphaned (zero importers) second custody model holding a raw `AGENT_PRIVATE_KEY` hot key that bypasses every rail; do not ship to mainnet — delete, or port the ERC-8004/8183 providers onto the Circle rails | S–L |
+| Approval hygiene | REFACTOR | Agent wallet grants infinite Permit2/PositionManager approvals with ~permanent expiry; bound agent-side approvals | M |
+| `auth.ts` middleware | REFACTOR | Uncached Privy round-trip per request; nondeterministic wallet pick when a user has embedded + external wallets (keys the cap ledger) | M |
+
+### Safety rails
+
+The load-bearing distinction: agent wallets are server-signed, so server
+checks are real rails; user wallets are self-custodied, so server checks on
+that path are advisory UX, not controls.
+
+| Rail | Verdict | Why | Effort |
+| --- | --- | --- | --- |
+| Agent-wallet spending caps | KEEP + 2 fixes | Enforced at every server-signed execution point. **Critical hole: the chat LLM tool `set_cap` bypasses the route's zod clamp — the agent can raise its own daily cap $100 → $50,000 with no user assent.** And `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide | S |
+| User-wallet spending caps | REPLACE (or relabel advisory) | Checked only on `/api/quote`; calldata routes skip it; ledger increments only via a client-reported endpoint; user holds the keys | L |
+| Uncapped money paths | MISSING | Sports market trades, user add-liquidity/pool-create, `/api/v4/swap/calldata`, and Gateway spends (which check a counter they never increment) have no cap and mostly no audit | M |
+| Tier system (age-based caps) | REPLACE | `getWalletAge` has zero callers — the documented D-009 policy is entirely unimplemented; a day-one account can be set to $50k | S |
+| x402 caps | KEEP | Server-keyed, per-call + daily, conservative defaults | — |
+| `MANTUA_KILL_SWITCH` | REFACTOR | Gates only POST/PUT/PATCH/DELETE — **all seven GET cron money-loops (rebalance, intents, strategies, resolution, sweeps) keep running with the switch on.** Flipping requires a full redeploy. Move to a per-request DB/Edge-Config read, cover GET, and check it inside `executeAgentCalldata` | M |
+| `STRATEGIES_KILL_SWITCH` | KEEP | Correctly scoped, actively disarms, audited | — |
+| Rate limiting | REFACTOR | Right layering, wrong store: in-memory counters are per-lambda on Vercel and reset on cold start; needs Redis/Upstash | M |
+| Cron/admin auth | REFACTOR | One shared secret unlocks settlement, sweeps, and admin ops; non-constant-time compare; `MANTUA_FEE_ADMIN_KEY` is declared/documented but read by zero code (MISSING) | S |
+| `/api/rpc` proxy | REFACTOR | Method allowlist is good, but open CORS + allowlisted `eth_sendRawTransaction` = free public tx relay | S |
+| Audit log | REFACTOR | Right schema and ~30 call sites, but inserts fail silently, `rejected_kill_switch`/`rejected_chain` outcomes are never emitted, market trades write no rows, no user-id/request-id correlation, no integrity/retention controls | M |
+| Slippage enforcement | REPLACE | `MAX_SLIPPAGE_BPS` unapplied on the v4 path (accepts 100%); min-out is display-only, absent from calldata on both user and agent paths — land it with the UniversalRouter migration | M |
+| Allowed-targets, hook-pair gating, peg/impact guards | KEEP | Server-side, default-deny, enforced in code not prompt; the attested-`force`-override pattern is the model to reuse for cap raises | — |
+
+### Design system
+
+Foundation worth keeping; component layer is scaffolding. The token/theme
+layer (Tailwind 4 `@theme`, dark/light inversion, theme provider, global
+focus-visible) is solid. Above it: 3 primitives built of 10 planned, 32 files
+of raw `<button>`, 5 hand-rolled dropdowns, 2 ARIA-free tab systems, 6
+divergent USD formatters, and a parallel inline-style component library in
+`features/agent/` (ported verbatim from a design file that is not in the
+repo) whose hardcoded dark-theme rgba values render the wrong hue in light
+mode.
+
+| Area | Verdict | Effort |
+| --- | --- | --- |
+| Token/theme system (`tokens.css`, `index.css`, `use-theme`) | KEEP — delete the dead Shadcn alias block + 4 dead tokens, self-host fonts | S |
+| Type scale | REFACTOR — 349 arbitrary `text-[Npx]` across 20 sizes; name ~7 tokens, codemod, lint rule | M |
+| `ui/button` | REFACTOR — radius set per-size collides with the pill variant; `size="sm"` renders square | S |
+| `ui/dialog` | KEEP — but `LoginModal` (the primary auth surface) bypasses it with no focus trap / role / aria-modal → REPLACE its shell | S |
+| Missing primitives (dropdown, tabs, skeleton, toast, empty-state) | REPLACE hand-rolled copies — this is where the a11y debt lives | L |
+| Accessibility | **Zero `aria-live`/`role="alert"` in the entire client** — no error, loading, or tx result is ever announced; no tab semantics; mouse-only token picker. The one user-facing defect class in this area | M |
+| Agent-surface styling idiom | REPLACE — consolidate onto Tailwind+tokens; promote `Banner`/`Skel`/`TxRow` into `components/ui/` | M |
+| Number/currency formatting | REPLACE — one `lib/format.ts`; six divergent USD formatters is a trust bug in a financial product | S |
+| Prototype tracking | REPLACE the reference — the app has outgrown `Mantua Prototype.html`; cited design sources (`Mantua Agent Flows.html`) are not in the repo; declare the built app the spec or commit the sources as frozen provenance | S |
+
+**Correction to P1-005 above:** the "single seam" claim no longer holds — the
+agent chat is a second, deliberate path from user input to on-chain
+transaction that never calls `confirm()` (it acts autonomously within the
+cap). The seam stays mandatory for *user-signed* writes; the agent path's
+control is the cap + allowlist + guard stack, not the modal. Recorded here
+until a decision record formalizes it.
+
+### Ship-blockers before real volume (ranked)
+
+1. Circle `execute.ts` — confirm to mined receipt, not `SENT` (fixes silent-revert-as-success, the approve/execute race, and cap-ledger drift in one change).
+2. Chat `set_cap` tool — clamp through the route's zod schema; gate raises behind the attested-override pattern.
+3. UniversalRouter/Permit2 execution builder with real `amountOutMinimum` + deadline; enforce `MAX_SLIPPAGE_BPS`; fail closed on null hooks.
+4. Kill switch — cover GET crons, make it flippable without a redeploy, check inside `executeAgentCalldata`.
+5. Pricing fail-open — a $0 valuation must reject, not pass the cap.
+6. `CIRCLE_WALLET_SET_ID` — hard-fail when unset in production; verify a mainnet Gas Station policy exists for the wallet set.
+7. `poolKeyHash` unification + position-discovery replacement (positions/earnings surfaces are otherwise empty or wrong on mainnet).
+8. Delete or port the orphaned `agent/` workspace — no raw hot key ships to mainnet.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.
