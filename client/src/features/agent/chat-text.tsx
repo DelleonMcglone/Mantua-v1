@@ -1,6 +1,5 @@
 import { type ReactNode } from "react";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerAddressUrl } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
 import { shortAddr } from "./agent-gate.tsx";
 import { CopyButton } from "./agent-primitives.tsx";
 
@@ -32,7 +31,7 @@ export function UserBubble({ text }: { text: string }) {
 
 /** Inline EVM address — short form, copy button, and a BaseScan link. */
 export function AddressInline({ addr }: { addr: string }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const url = getExplorerAddressUrl(chainId, addr);
   return (
     <span

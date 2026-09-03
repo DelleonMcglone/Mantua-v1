@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { ExternalLink, Trash2 } from "lucide-react";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -24,6 +23,7 @@ import { MetricToggle, RangeToggle, type Metric } from "./Toggles.tsx";
 import { formatPct, formatUsd, normalizePairSymbol } from "./format.ts";
 import type { ChartRange } from "./types.ts";
 import type { Position } from "./positions-types.ts";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 const EXPLORER = EXPLORER_URL;
 
@@ -43,7 +43,7 @@ export function PoolDetailPage({ poolId, onBack, onAddLiquidity, onClose }: Prop
   const { walletAddress } = usePortfolio();
   const onchainPositions = useOnchainPositions(walletAddress);
 
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const derived = data ? tryDeriveAddCtx(data.pool, chainId) : null;
 
   // Pair exchange-rate chart (quote = tokenB priced in base = tokenA) — real

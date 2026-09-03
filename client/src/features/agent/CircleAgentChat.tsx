@@ -9,7 +9,6 @@ import {
 import { ArrowLeft, Bot, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { useAgentPortfolio } from "./use-agent-portfolio.ts";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
 import {
   Banner,
@@ -22,6 +21,7 @@ import {
 } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 /**
  * "Your Circle Agent" — a free-form, autonomous conversational agent.
@@ -108,7 +108,7 @@ const uid = () => {
 
 export function CircleAgentChat({ onClose, initialMessage }: Props) {
   const agent = useAgentPortfolio();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const sessionIdRef = useRef<string | undefined>(undefined);
@@ -516,10 +516,7 @@ function renderResult(step: ToolStep): ReactNode {
             from the minted amount.
           </Banner>
           {d.burnTxHash && (
-            <TxRow
-              hash={d.burnTxHash}
-              explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`}
-            />
+            <TxRow hash={d.burnTxHash} explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`} />
           )}
         </div>
       );
@@ -841,10 +838,9 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
-        Hi — I'm your Circle agent. Tell
-        me what to do in plain language and I'll handle it: check balances, swap or send tokens,
-        evaluate sports markets and place bets, or look up market &amp; on-chain data. I act
-        autonomously within your daily spending cap.
+        Hi — I'm your Circle agent. Tell me what to do in plain language and I'll handle it: check
+        balances, swap or send tokens, evaluate sports markets and place bets, or look up market
+        &amp; on-chain data. I act autonomously within your daily spending cap.
       </div>
       <div
         style={{ display: "flex", flexWrap: "nowrap", gap: 8, overflowX: "auto", paddingBottom: 2 }}

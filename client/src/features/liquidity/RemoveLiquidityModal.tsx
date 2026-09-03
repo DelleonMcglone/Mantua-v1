@@ -10,8 +10,7 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useConfirmedAction } from "@/hooks/use-confirmed-action.tsx";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerTxUrl } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import type { Position } from "./positions-types.ts";
 import { SlippageRow } from "./SlippageRow.tsx";
 import { useRemoveLiquidity } from "./use-remove-liquidity.ts";
@@ -26,7 +25,7 @@ interface Props {
 }
 
 export function RemoveLiquidityModal({ position, onClose, onSuccess }: Props) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [percentage, setPercentage] = useState<number>(50);
   const [slippageBps, setSlippageBps] = useState(50);
   const confirm = useConfirmedAction();

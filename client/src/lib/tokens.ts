@@ -6,12 +6,7 @@
  * legacy `TOKENS` export resolves to the single active chain.
  */
 
-import {
-  BASE_CHAIN_ID,
-  DEFAULT_CHAIN_ID,
-  type SupportedChainId,
-  CHAIN_INFO,
-} from "./chains.ts";
+import { BASE_CHAIN_ID, DEFAULT_CHAIN_ID, type SupportedChainId, CHAIN_INFO } from "./chains.ts";
 import { cleanEnv } from "./env.ts";
 
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
@@ -24,7 +19,7 @@ export const IS_MAINNET = NETWORK === "mainnet";
 
 /**
  * LEGACY single-chain pin — predates multi-chain. Do NOT use in new code;
- * read the selected chain from `useCurrentChainId()` instead.
+ * use the `BASE_CHAIN_ID` constant from chains.ts instead.
  */
 export const ACTIVE_CHAIN_ID: SupportedChainId = BASE_CHAIN_ID;
 

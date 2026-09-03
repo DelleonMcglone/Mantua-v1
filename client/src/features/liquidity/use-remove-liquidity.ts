@@ -2,8 +2,7 @@ import { useState } from "react";
 import { hardenProvider, publicClientFor } from "@/lib/privy/wallet-client.ts";
 import { useWallets } from "@privy-io/react-auth";
 import { createWalletClient, custom } from "viem";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { CHAIN_INFO } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
 import { ApiError, api } from "@/lib/api.ts";
 
 export interface RemoveArgs {
@@ -39,7 +38,7 @@ interface RemoveState {
 }
 
 export function useRemoveLiquidity() {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const { wallets } = useWallets();
   const [state, setState] = useState<RemoveState>({ status: "idle" });
 

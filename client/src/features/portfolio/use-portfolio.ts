@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { ApiError, api } from "@/lib/api.ts";
 import { getTokens, type Token, type TokenSymbol } from "@/lib/tokens.ts";
-import type { SupportedChainId } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
 
 interface PortfolioBalance {
   symbol: TokenSymbol;
@@ -51,7 +50,7 @@ const POLL_MS = 15_000;
  */
 export function usePortfolio(): PortfolioState {
   const { authenticated, ready, user } = usePrivy();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const wallet = user?.wallet?.address ?? null;
   const [state, setState] = useState<PortfolioState>({
     balances: [],

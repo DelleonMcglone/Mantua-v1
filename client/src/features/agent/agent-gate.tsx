@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- co-located formatters + strip component by design. */
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerAddressUrl } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
 import { AgentStrip } from "./AgentStrip.tsx";
 import { CopyButton } from "./agent-primitives.tsx";
 import type { AgentPortfolioState } from "./use-agent-portfolio.ts";
@@ -32,7 +31,7 @@ export function AgentWalletStrip({
   agent: AgentPortfolioState;
   label?: string;
 }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   if (!agent.agentAddress) return null;
   const url = getExplorerAddressUrl(chainId, agent.agentAddress);
   return (

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { api } from "@/lib/api.ts";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
 import { FEE_TIER_LABELS, type FeeTier } from "@/features/liquidity/fee-tiers.ts";
@@ -90,7 +89,7 @@ interface AssetsCardProps {
 }
 
 export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [tab, setTab] = useState<"assets" | "positions" | "agent" | "unified" | "earnings">(
     "assets",
   );

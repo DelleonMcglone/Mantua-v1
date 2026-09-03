@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { ApiError, api } from "@/lib/api.ts";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 import type { FeeTier } from "./fee-tiers.ts";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 export interface PoolState {
   exists: boolean;
@@ -38,7 +38,7 @@ export function usePoolState(
   tokenB: TokenSymbol | null,
   fee: FeeTier | null,
 ): State {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const currentKey =
     tokenA && tokenB && fee !== null
       ? `${String(chainId)}|${tokenA}|${tokenB}|${String(fee)}`

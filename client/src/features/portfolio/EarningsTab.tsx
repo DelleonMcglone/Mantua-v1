@@ -17,8 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerTxUrl } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { fmtToken, fmtUsd, shortenHash, type EarningPosition, type HookGroup } from "./earnings.ts";
 import type { UseEarnings } from "./use-earnings.ts";
 import { useSweep } from "./use-sweep.ts";
@@ -215,7 +214,7 @@ function HookGroupRow({ g }: { g: HookGroup }) {
 }
 
 function SweepModal({ walletAddress, onClose }: { walletAddress: string; onClose: () => void }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const sweep = useSweep();
   const { status, txHash, sweptCount } = sweep.state;
   const busy = status === "preparing" || status === "signing" || status === "pending";

@@ -95,25 +95,6 @@ export function getChainInfo(chainId: SupportedChainId): ChainInfo {
  */
 export type NetworkKey = "base";
 
-export interface NetworkOption {
-  key: NetworkKey;
-  shortName: string;
-  displayName: string;
-  /** Brand-color dot for the chip. */
-  dotColor: string;
-  dataChainId: SupportedChainId;
-}
-
-export const NETWORK_OPTIONS: NetworkOption[] = [
-  {
-    key: "base",
-    shortName: CHAIN_INFO[BASE_CHAIN_ID].shortName,
-    displayName: CHAIN_INFO[BASE_CHAIN_ID].displayName,
-    dotColor: CHAIN_INFO[BASE_CHAIN_ID].dotColor,
-    dataChainId: BASE_CHAIN_ID,
-  },
-];
-
 export const DEFAULT_NETWORK_KEY: NetworkKey = "base";
 
 export function isNetworkKey(s: string): s is NetworkKey {
