@@ -28,23 +28,54 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * League + section nav. Shared by the landing header and the in-app
- * shell header so both stay in step — a league added to `SPORTS` shows
- * up in both without a second edit.
+ * League + section nav. Shared by the landing header, the in-app shell
+ * header, and the mobile nav sheet so all stay in step — a league added
+ * to `SPORTS` shows up everywhere without a second edit.
  *
- * Scrolls sideways rather than wrapping once the row runs out of width.
- * Where a header renders it twice (inline at wide widths, its own strip
- * below at narrow ones), only one is ever displayed: `display: none`
- * keeps the hidden copy out of the accessibility tree, so there is no
- * duplicate landmark.
+ * `layout="row"` (default) scrolls sideways rather than wrapping once
+ * the row runs out of width. Where a header renders it twice (inline at
+ * wide widths, its own strip below at narrow ones), only one is ever
+ * displayed: `display: none` keeps the hidden copy out of the
+ * accessibility tree, so there is no duplicate landmark.
+ *
+ * `layout="column"` renders the same destinations as a single-column
+ * list for the hamburger sheet (B-014 mobile guidance).
  */
 export function MarketNav({
   onNavigate,
   className,
+  layout = "row",
 }: {
   onNavigate: (destination: NavDestination) => void;
   className: string;
+  layout?: "row" | "column";
 }) {
+  if (layout === "column") {
+    return (
+      <nav aria-label="Markets" className={className}>
+        <ul className="flex flex-col text-[14px] font-medium">
+          {NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            return (
+              <li key={item.label}>
+                {item.divider && <div className="my-2 h-px bg-border-soft" aria-hidden="true" />}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigate(item.destination);
+                  }}
+                  className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left text-text hover:bg-row-hover hover:text-accent transition-colors cursor-pointer"
+                >
+                  {Icon && <Icon className="h-[18px] w-[18px]" />}
+                  {item.label}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    );
+  }
   return (
     <nav
       aria-label="Markets"

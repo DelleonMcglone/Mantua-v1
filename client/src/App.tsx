@@ -338,6 +338,9 @@ export default function App() {
         onNavigate={(destination) => {
           setRoute(navDestinationToRoute(destination));
         }}
+        onQuickAction={(id) => {
+          setRoute(promptToRoute(id));
+        }}
         full={fullPage(route, setRoute)}
         dock={
           <InputBar

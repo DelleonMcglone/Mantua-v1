@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
-import { Sun, Moon, ArrowLeft } from "lucide-react";
-import { useTheme } from "@/hooks/use-theme.tsx";
-import { Logo } from "@/components/shell/Logo.tsx";
+import { ArrowLeft } from "lucide-react";
+import { SiteHeader } from "@/components/shell/SiteHeader.tsx";
 
 /** The legal documents reachable from the landing footer. */
 export type LegalDoc = "privacy" | "terms" | "integrity";
@@ -42,38 +41,9 @@ interface Props {
  * starting point, not a cleared legal document.
  */
 export function LegalPage({ title, intro, children, onBack, onLaunch }: Props) {
-  const { theme, toggle } = useTheme();
-  const ThemeIcon = theme === "dark" ? Sun : Moon;
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
-      <header className="flex items-center gap-4 border-b border-border-soft px-5 sm:px-8 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex shrink-0 items-center gap-2.5 cursor-pointer"
-          aria-label="Back to home"
-        >
-          <Logo size={28} />
-          <span className="text-[15px] font-semibold tracking-tight">Mantua</span>
-        </button>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label="Toggle theme"
-            className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim hover:text-text transition-colors"
-          >
-            <ThemeIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onLaunch}
-            className="px-4 py-2 rounded-md bg-accent text-white text-[13px] font-semibold hover:bg-accent-2 transition-colors cursor-pointer"
-          >
-            Launch App
-          </button>
-        </div>
-      </header>
+      <SiteHeader onLogoClick={onBack} onLaunch={onLaunch} />
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-5 sm:px-8 py-12">
         <button

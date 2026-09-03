@@ -15,17 +15,25 @@ const PROMPTS: { id: HomePromptId; title: string; icon: typeof Droplet }[] = [
 
 interface Props {
   onPromptSelect: (id: HomePromptId) => void;
+  /** `responsive` (default): 1 column below `md`, 2 to `lg`, 4 above —
+   *  the single-column mobile layout per the design guidance (B-014).
+   *  `single`: always one column, for the hamburger nav sheet where the
+   *  container is narrow regardless of viewport width. */
+  columns?: "responsive" | "single";
 }
 
 /**
- * The home page's prompt cards — a single row across the top (wrapping to
- * two columns on small screens), ordered agent → analyze → swap →
- * liquidity. Replaces the old 2x2 grid that lived inside the right-column
- * "Ask Mantua" panel.
+ * The home page's prompt cards — a single row across the top (collapsing
+ * to two columns on small screens and one column on mobile), ordered
+ * agent → analyze → swap → liquidity. Replaces the old 2x2 grid that
+ * lived inside the right-column "Ask Mantua" panel. Also reused as the
+ * quick-actions block inside the mobile nav sheet.
  */
-export function HomePromptRow({ onPromptSelect }: Props) {
+export function HomePromptRow({ onPromptSelect, columns = "responsive" }: Props) {
+  const gridCols =
+    columns === "single" ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className={`grid ${gridCols} gap-3`}>
       {PROMPTS.map((p) => {
         const Icon = p.icon;
         return (

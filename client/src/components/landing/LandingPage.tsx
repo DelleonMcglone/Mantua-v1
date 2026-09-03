@@ -1,7 +1,5 @@
 import { useState, type ComponentType, type ReactNode } from "react";
 import {
-  Sun,
-  Moon,
   ChevronDown,
   ShieldCheck,
   Bot,
@@ -10,8 +8,8 @@ import {
   CandlestickChart,
 } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme.tsx";
-import { Logo } from "@/components/shell/Logo.tsx";
-import { MarketNav, type NavDestination } from "@/components/shell/MarketNav.tsx";
+import { SiteHeader } from "@/components/shell/SiteHeader.tsx";
+import type { NavDestination } from "@/components/shell/MarketNav.tsx";
 import type { LegalDoc } from "@/components/legal/LegalPage.tsx";
 import {
   XIcon,
@@ -49,7 +47,7 @@ interface Props {
 export function LandingPage({ onLaunch, onNavigate, onOpenLegal, onOpenDocs }: Props) {
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col">
-      <Header onLaunch={onLaunch} onNavigate={onNavigate} />
+      <SiteHeader onNavigate={onNavigate} gapClassName="gap-4 lg:gap-6" onLaunch={onLaunch} />
       <main className="flex-1 flex flex-col items-center px-5 sm:px-8 pt-10 pb-16">
         <Hero />
         <DemoVideo />
@@ -58,41 +56,6 @@ export function LandingPage({ onLaunch, onNavigate, onOpenLegal, onOpenDocs }: P
       </main>
       <Footer onOpenLegal={onOpenLegal} onOpenDocs={onOpenDocs} />
     </div>
-  );
-}
-
-function Header({ onLaunch, onNavigate }: Omit<Props, "onOpenLegal" | "onOpenDocs">) {
-  const { theme, toggle } = useTheme();
-  const ThemeIcon = theme === "dark" ? Sun : Moon;
-  return (
-    <header className="border-b border-border-soft">
-      <div className="flex items-center gap-4 lg:gap-6 px-5 sm:px-8 py-4">
-        <div className="flex shrink-0 items-center gap-2.5">
-          <Logo size={28} />
-          <span className="text-[15px] font-semibold tracking-tight">Mantua</span>
-        </div>
-        <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
-        <div className="ml-auto flex shrink-0 items-center gap-2 md:ml-0">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label="Toggle theme"
-            className="h-9 w-9 inline-flex items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim hover:text-text transition-colors"
-          >
-            <ThemeIcon className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onLaunch}
-            className="px-4 py-2 rounded-md bg-accent text-white text-[13px] font-semibold hover:bg-accent-2 transition-colors cursor-pointer"
-          >
-            Launch App
-          </button>
-        </div>
-      </div>
-      {/* Too narrow to share the row — the nav gets its own strip. */}
-      <MarketNav onNavigate={onNavigate} className="px-5 pb-3 md:hidden" />
-    </header>
   );
 }
 
