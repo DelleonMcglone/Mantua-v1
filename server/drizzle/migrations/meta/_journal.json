@@ -64,6 +64,13 @@
       "when": 1787450400000,
       "tag": "0008_markets_chain_id",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788393657614,
+      "tag": "0009_prediction_markets_extension",
+      "breakpoints": true
     }
   ]
 }

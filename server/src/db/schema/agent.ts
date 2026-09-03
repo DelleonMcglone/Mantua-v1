@@ -8,6 +8,7 @@ import {
   index,
   boolean,
   integer,
+  jsonb,
   text,
   unique,
 } from "drizzle-orm/pg-core";
@@ -100,3 +101,48 @@ export type NewAgentIntent = typeof agentIntents.$inferInsert;
  *  claim taken by a sweep/trigger so concurrent runs can't double-execute;
  *  stale claims (crashed runs) are reclaimed back to `pending`. */
 export type AgentIntentStatus = "pending" | "executing" | "filled" | "cancelled" | "expired";
+
+/**
+ * Per-user agent trading policy — the declarative constraints the agent's
+ * market-trading loop must satisfy before it acts, distinct from the wallet
+ * spending cap (which bounds dollars, not behavior). Columns the sweeps
+ * filter on are real columns; everything strategy-shaped lives in `config`
+ * jsonb because it will keep changing. One active policy per user for now
+ * (the unique is on user_id, not (user_id, name)) — loosen it if named
+ * policy profiles ever ship.
+ */
+export const agentPolicies = pgTable(
+  "agent_policies",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** active | paused */
+    status: varchar("status", { length: 8 }).notNull().default("active"),
+    /** Master switch for unprompted trades; chat-directed actions ignore it. */
+    autoTradeEnabled: boolean("auto_trade_enabled").notNull().default(false),
+    /** Hard per-trade ceiling in USD. Checked in addition to the daily cap. */
+    maxStakePerTradeUsd: numeric("max_stake_per_trade_usd", { precision: 20, scale: 2 })
+      .notNull()
+      .default("25"),
+    /** conservative | balanced | aggressive — presets the prompt reads. */
+    riskLevel: varchar("risk_level", { length: 12 }).notNull().default("conservative"),
+    /** League slugs the agent may trade; empty array = all launch leagues. */
+    allowedLeagues: jsonb("allowed_leagues")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    /** Everything else: edge thresholds, market-type filters, hedging prefs. */
+    config: jsonb("config")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [unique("agent_policies_user_uq").on(t.userId)],
+);
+
+export type AgentPolicy = typeof agentPolicies.$inferSelect;
+export type NewAgentPolicy = typeof agentPolicies.$inferInsert;

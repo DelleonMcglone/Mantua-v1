@@ -72,6 +72,117 @@ export const leagues = pgTable(
 export type League = typeof leagues.$inferSelect;
 export type NewLeague = typeof leagues.$inferInsert;
 
+/**
+ * Teams, normalised per league. `key` is the provider-agnostic slug the
+ * ingest worker matches on (the same value `events.home_team_key` carries),
+ * so a provider change re-links rather than duplicates. Events keep their
+ * denormalised name columns for display; the FK columns added there are the
+ * relational link.
+ */
+export const teams = pgTable(
+  "teams",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    leagueId: uuid("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    /** Provider-agnostic team key, e.g. "kc", "lv" — unique within a league. */
+    key: varchar("key", { length: 64 }).notNull(),
+    name: varchar("name", { length: 96 }).notNull(),
+    shortName: varchar("short_name", { length: 48 }),
+    abbreviation: varchar("abbreviation", { length: 8 }),
+    logoUrl: varchar("logo_url", { length: 512 }),
+    provider: varchar("provider", { length: 32 }),
+    providerTeamId: varchar("provider_team_id", { length: 128 }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("teams_league_key_uq").on(t.leagueId, t.key),
+    index("teams_league_idx").on(t.leagueId),
+  ],
+);
+
+export type Team = typeof teams.$inferSelect;
+export type NewTeam = typeof teams.$inferInsert;
+
+/**
+ * Players. `teamId` is nullable — free agents and mid-trade players exist,
+ * and injury rows must survive a roster move. Keyed unique on the provider
+ * pair per the B3-004 convention.
+ */
+export const players = pgTable(
+  "players",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    leagueId: uuid("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    name: varchar("name", { length: 96 }).notNull(),
+    position: varchar("position", { length: 16 }),
+    jerseyNumber: smallint("jersey_number"),
+    /** active | inactive | retired */
+    status: varchar("status", { length: 16 }).notNull().default("active"),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    providerPlayerId: varchar("provider_player_id", { length: 128 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("players_provider_uq").on(t.provider, t.providerPlayerId),
+    index("players_team_idx").on(t.teamId),
+    index("players_league_idx").on(t.leagueId),
+  ],
+);
+
+export type Player = typeof players.$inferSelect;
+export type NewPlayer = typeof players.$inferInsert;
+
+/**
+ * Injury reports — a pricing signal for the odds engine, not medical truth.
+ * One row per report; a player's current status is the latest open row
+ * (`resolvedAt` null). `teamId` is denormalised from the player so the
+ * "who's out for tonight's game" query needs no join through rosters that
+ * may have changed since the report.
+ */
+export const injuries = pgTable(
+  "injuries",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    playerId: uuid("player_id")
+      .notNull()
+      .references(() => players.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => teams.id, { onDelete: "set null" }),
+    /** out | doubtful | questionable | probable | day_to_day | ir */
+    status: varchar("status", { length: 16 }).notNull(),
+    /** e.g. "hamstring", "concussion protocol". */
+    description: varchar("description", { length: 256 }),
+    provider: varchar("provider", { length: 32 }).notNull(),
+    /** Provider's own last-updated stamp, for staleness checks. */
+    providerUpdatedAt: timestamp("provider_updated_at", { withTimezone: true }),
+    reportedAt: timestamp("reported_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Set when the player returns — null means the report is still live. */
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("injuries_player_idx").on(t.playerId),
+    index("injuries_team_idx").on(t.teamId),
+    // The odds engine sweeps live reports only.
+    index("injuries_open_idx").on(t.resolvedAt),
+  ],
+);
+
+export type Injury = typeof injuries.$inferSelect;
+export type NewInjury = typeof injuries.$inferInsert;
+
 // ─── Events ──────────────────────────────────────────────────────────────────
 
 /**
@@ -98,6 +209,9 @@ export const events = pgTable(
     /** Provider-agnostic team keys, for cross-provider matching (B3-004). */
     homeTeamKey: varchar("home_team_key", { length: 64 }),
     awayTeamKey: varchar("away_team_key", { length: 64 }),
+    /** Relational team links. Nullable — backfilled by ingest as teams land. */
+    homeTeamId: uuid("home_team_id").references(() => teams.id, { onDelete: "set null" }),
+    awayTeamId: uuid("away_team_id").references(() => teams.id, { onDelete: "set null" }),
     startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
     /** scheduled | in_progress | final | postponed | cancelled */
     status: varchar("status", { length: 16 }).notNull().default("scheduled"),
@@ -238,6 +352,104 @@ export const marketPositions = pgTable(
 
 export type MarketPosition = typeof marketPositions.$inferSelect;
 export type NewMarketPosition = typeof marketPositions.$inferInsert;
+
+/**
+ * Price history — one row per capture of a market's implied probability,
+ * written by the sports-sync sweep and read by the detail-page chart.
+ * Append-only time series: no updates, no unique key beyond the id, and the
+ * composite index is (market, time desc) because every read is "latest N
+ * for one market". Retention/downsampling is the sweep's job, not the
+ * schema's.
+ */
+export const marketPrices = pgTable(
+  "market_prices",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    marketId: varchar("market_id", { length: 66 })
+      .notNull()
+      .references(() => markets.marketId, { onDelete: "cascade" }),
+    /** Implied probability of the YES outcome, 0–1. */
+    impliedProbability: numeric("implied_probability", { precision: 6, scale: 5 }).notNull(),
+    /** pool | consensus | opening — where the observation came from. */
+    source: varchar("source", { length: 16 }).notNull().default("pool"),
+    /** Pool depth at capture, USDC 6dp raw units — context for the chart. */
+    liquidityRaw: numeric("liquidity_raw", { precision: 78, scale: 0 }),
+    capturedAt: timestamp("captured_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("market_prices_market_time_idx").on(t.marketId, t.capturedAt)],
+);
+
+export type MarketPrice = typeof marketPrices.$inferSelect;
+export type NewMarketPrice = typeof marketPrices.$inferInsert;
+
+// ─── Combos (parlays) ────────────────────────────────────────────────────────
+
+/**
+ * A combo (parlay) ticket — several market legs that must all win.
+ * SCHEMA ONLY for now: the feature ships later, but the tables land ahead of
+ * it (deliberate) so position/fill writers can reference combo ids without a
+ * follow-up migration. Nothing writes these tables yet.
+ */
+export const combos = pgTable(
+  "combos",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    /** draft | open | won | lost | void */
+    status: varchar("status", { length: 8 }).notNull().default("draft"),
+    /** Stake, USDC 6dp raw units. */
+    stakeRaw: numeric("stake_raw", { precision: 78, scale: 0 }),
+    /** Product of the legs' entry odds at placement, as a decimal multiplier. */
+    combinedOdds: numeric("combined_odds", { precision: 12, scale: 6 }),
+    /** Stake × combinedOdds at placement, USDC 6dp raw units. */
+    potentialPayoutRaw: numeric("potential_payout_raw", { precision: 78, scale: 0 }),
+    placedAt: timestamp("placed_at", { withTimezone: true }),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("combos_user_idx").on(t.userId), index("combos_status_idx").on(t.status)],
+);
+
+export type Combo = typeof combos.$inferSelect;
+export type NewCombo = typeof combos.$inferInsert;
+
+/** One leg of a combo. A market appears at most once per ticket. */
+export const comboLegs = pgTable(
+  "combo_legs",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    comboId: uuid("combo_id")
+      .notNull()
+      .references(() => combos.id, { onDelete: "cascade" }),
+    marketId: varchar("market_id", { length: 66 })
+      .notNull()
+      .references(() => markets.marketId, { onDelete: "cascade" }),
+    /** yes | no */
+    side: varchar("side", { length: 3 }).notNull(),
+    /** Entry as implied probability at placement, 0–1. */
+    entryPrice: numeric("entry_price", { precision: 6, scale: 5 }),
+    /** pending | won | lost | void */
+    result: varchar("result", { length: 8 }).notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("combo_legs_combo_market_uq").on(t.comboId, t.marketId),
+    index("combo_legs_market_idx").on(t.marketId),
+  ],
+);
+
+export type ComboLeg = typeof comboLegs.$inferSelect;
+export type NewComboLeg = typeof comboLegs.$inferInsert;
 
 /**
  * Resolution record — the public log required by B4-006. One row per
