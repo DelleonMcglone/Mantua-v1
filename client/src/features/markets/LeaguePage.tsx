@@ -219,7 +219,7 @@ export function LeaguePage({
             />
           )}
           {!detailEvent && loading && !slate && (
-            <p className="text-[13px] text-text-dim">Loading games…</p>
+            <p role="status" className="text-[13px] text-text-dim">Loading games…</p>
           )}
           {!detailEvent && !loading && events.length === 0 && (
             <div className="rounded-md border border-border-soft px-5 py-10 text-center">

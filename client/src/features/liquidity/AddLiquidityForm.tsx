@@ -381,6 +381,8 @@ export function AddLiquidityForm({ ctx, onBack, onClose }: Props) {
         <Button
           variant="primary"
           size="lg"
+          aria-live="polite"
+          aria-atomic="true"
           disabled={
             !ready ||
             add.state.status === "creating-pool" ||
@@ -447,7 +449,9 @@ export function AddLiquidityForm({ ctx, onBack, onClose }: Props) {
           </button>
         )}
         {add.state.status === "error" && add.state.error && (
-          <p className="text-xs text-red text-center mt-3">{add.state.error.message}</p>
+          <p role="alert" className="text-xs text-red text-center mt-3">
+            {add.state.error.message}
+          </p>
         )}
       </div>
     </>

@@ -47,9 +47,13 @@ export function PositionsList({ onClose }: Props = {}) {
         {...(onClose ? { onClose } : {})}
       />
 
-      {loading && <p className="px-5 py-8 text-xs text-text-dim text-center">Loading positions…</p>}
+      {loading && (
+        <p role="status" className="px-5 py-8 text-xs text-text-dim text-center">
+          Loading positions…
+        </p>
+      )}
       {error && (
-        <p className="px-5 py-8 text-xs text-red text-center">
+        <p role="alert" className="px-5 py-8 text-xs text-red text-center">
           Failed to load positions: {error.message}
         </p>
       )}

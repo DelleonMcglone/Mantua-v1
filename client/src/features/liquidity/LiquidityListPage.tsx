@@ -299,9 +299,13 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
       </div>
 
       <div className="flex-1 flex flex-col min-h-0 px-5 pb-2">
-        {loading && <p className="px-1 py-8 text-xs text-text-dim text-center">Loading pools…</p>}
+        {loading && (
+          <p role="status" className="px-1 py-8 text-xs text-text-dim text-center">
+            Loading pools…
+          </p>
+        )}
         {error && (
-          <p className="px-1 py-8 text-xs text-red text-center">
+          <p role="alert" className="px-1 py-8 text-xs text-red text-center">
             Failed to load pools: {error.message}
           </p>
         )}
