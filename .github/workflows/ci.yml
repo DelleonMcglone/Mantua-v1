@@ -34,12 +34,6 @@ jobs:
 
       - name: Server typecheck
         run: npm run typecheck --workspace=@mantua/server
-        # Pre-existing baseline: tsconfig.json TS5101 baseUrl deprecation.
-        # That's a single warning-shaped error; we tolerate it via the
-        # known-baseline policy — see CLAUDE memory note. If the count
-        # rises above 1, the step still fails (good) and we'll see the
-        # new error in the diff.
-        continue-on-error: true
 
       - name: Server tests
         # `env.ts` parses required vars at module load; tests that
@@ -54,10 +48,6 @@ jobs:
 
       - name: Server lint
         run: npm run lint --workspace=@mantua/server
-        # Pre-existing baseline lint errors live in
-        # docs/tech-debt.md. New errors should fail this step; until
-        # we drive the baseline to zero, treat lint as advisory.
-        continue-on-error: true
 
       - name: Client typecheck
         run: npm run typecheck --workspace=@mantua/client
@@ -67,4 +57,3 @@ jobs:
 
       - name: Client lint
         run: npm run lint --workspace=@mantua/client
-        continue-on-error: true
