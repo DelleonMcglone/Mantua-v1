@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { CHAIN_INFO } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
 
 interface WalletMenuProps {
   walletAddress: string;
@@ -24,7 +23,7 @@ export function WalletMenu({
   onOpenProfile,
   onOpenAgent,
 }: WalletMenuProps) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const { explorerUrl } = CHAIN_INFO[chainId];
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);

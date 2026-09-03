@@ -2,8 +2,7 @@ import { useState } from "react";
 import { hardenProvider } from "@/lib/privy/wallet-client.ts";
 import { useWallets } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, custom } from "viem";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { CHAIN_INFO, getRpcTransport } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, CHAIN_INFO, getRpcTransport } from "@/lib/chains.ts";
 import { ApiError, api } from "@/lib/api.ts";
 import { type TokenSymbol } from "@/lib/tokens.ts";
 import type { FeeTier } from "./fee-tiers.ts";
@@ -47,7 +46,7 @@ function existingPoolFromError(err: unknown): ExistingPoolDetails | null {
 
 export function useCreatePool() {
   const { wallets } = useWallets();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [state, setState] = useState<CreateState>({ status: "idle" });
 
   async function execute(req: CalldataReq): Promise<`0x${string}` | null> {

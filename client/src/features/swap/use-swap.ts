@@ -9,8 +9,7 @@ import { hardenProvider } from "@/lib/privy/wallet-client.ts";
 import { useEffect, useMemo, useState } from "react";
 import { useWallets } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, custom, parseAbi } from "viem";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getChainInfo, getRpcTransport } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getChainInfo, getRpcTransport } from "@/lib/chains.ts";
 import { ApiError, api } from "@/lib/api.ts";
 import { getToken, type TokenSymbol } from "@/lib/tokens.ts";
 import { type FeeTier } from "@/features/liquidity/fee-tiers.ts";
@@ -98,7 +97,7 @@ export function useSwapMaxInput(args: {
   balanceRaw: bigint;
   enabled: boolean;
 }): MaxInputState {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [state, setState] = useState<MaxInputState>({
     maxInputRaw: null,
     loading: false,
@@ -153,7 +152,7 @@ export function useSwapQuote(args: {
   amountInRaw: string;
   enabled: boolean;
 }): QuoteState {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [state, setState] = useState<QuoteState>({ data: null, loading: false, error: null });
 
   useEffect(() => {
@@ -192,7 +191,7 @@ export function useSwapQuote(args: {
 
 export function useSwap() {
   const { wallets } = useWallets();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [state, setState] = useState<State>({ status: "idle" });
 
   // Memoize the public client by chain so we don't re-create it every

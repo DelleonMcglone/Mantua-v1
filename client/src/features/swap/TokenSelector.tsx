@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { getTokens, getUserFacingTokenSymbols, type TokenSymbol } from "@/lib/tokens.ts";
 import { TokenIcon } from "./TokenIcon.tsx";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 interface TokenSelectorProps {
   value: TokenSymbol;
@@ -19,7 +19,7 @@ interface TokenSelectorProps {
 export function TokenSelector({ value, onChange, disabledSymbol }: TokenSelectorProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const symbols = useMemo(() => getUserFacingTokenSymbols(chainId), [chainId]);
   const tokens = useMemo(() => getTokens(chainId), [chainId]);
 

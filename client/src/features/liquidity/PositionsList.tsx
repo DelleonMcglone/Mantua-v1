@@ -3,8 +3,7 @@ import { ExternalLink, Trash2 } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerTxUrl } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { IS_MAINNET } from "@/lib/tokens.ts";
 import { usePortfolio } from "@/features/portfolio/use-portfolio.ts";
 import { useOnchainPositions } from "@/features/portfolio/use-onchain-positions.ts";
@@ -89,7 +88,7 @@ function PositionRow({
   position: Position;
   onRemove: (p: Position) => void;
 }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const sym = `${tokenLabelByAddress(position.token0)}/${tokenLabelByAddress(position.token1)}`;
   const feeLabel = isFeeTier(position.fee)
     ? FEE_TIER_LABELS[position.fee]

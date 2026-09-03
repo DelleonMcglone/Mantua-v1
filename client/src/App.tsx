@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useCurrentChainId } from "./lib/chain-context.tsx";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, mentionsHook, type Intent } from "./lib/chat-intent.ts";
 import { LandingPage } from "./components/landing/LandingPage.tsx";
@@ -31,6 +30,7 @@ import type { HookName } from "./features/liquidity/use-create-pool.ts";
 import { LiquidityListPage } from "./features/liquidity/LiquidityListPage.tsx";
 import { PoolDetailPage } from "./features/liquidity/PoolDetailPage.tsx";
 import { PositionsList } from "./features/liquidity/PositionsList.tsx";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 type AnalyzeTopic =
   | "eth-price"
@@ -585,7 +585,7 @@ function AddLiquidityFullPage({
   route: Extract<Route, { kind: "add-liquidity" }>;
   setRoute: (r: Route) => void;
 }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   return (
     <PanelPage>
       <AddLiquidityForm
@@ -633,7 +633,7 @@ function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
 /** B7-001/002 — full-width trading page: swap and liquidity side by side
  *  at equal height, pool list across the full width beneath. */
 function TradingFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-6">
       <div className="grid items-stretch gap-5 lg:grid-cols-2">

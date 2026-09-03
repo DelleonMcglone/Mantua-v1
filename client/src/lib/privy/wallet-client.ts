@@ -1,13 +1,7 @@
 import { useCallback } from "react";
 import { useWallets } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, custom } from "viem";
-import { useCurrentChainId } from "../chain-context.tsx";
-import {
-  BASE_CHAIN_ID,
-  CHAIN_INFO,
-  getRpcTransport,
-  type SupportedChainId,
-} from "../chains.ts";
+import { BASE_CHAIN_ID, CHAIN_INFO, getRpcTransport, type SupportedChainId } from "../chains.ts";
 
 /**
  * Per-chain public viem clients for read-only chain calls, on the
@@ -171,7 +165,7 @@ export function hardenProvider(
  */
 export function useChainWalletClient() {
   const { wallets } = useWallets();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
 
   return useCallback(async () => {
     const active = wallets.find((w) => w.walletClientType === "privy") ?? wallets.at(0);

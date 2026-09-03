@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { parseAbi } from "viem";
 import { api } from "@/lib/api.ts";
 import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 const ERC20 = parseAbi([
   "function allowance(address owner, address spender) view returns (uint256)",
@@ -46,7 +46,7 @@ interface Args {
  */
 export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabled }: Args) {
   const getWallet = useChainWalletClient();
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [phase, setPhase] = useState<TradePhase>({ kind: "idle" });
 
   // Debounced re-quote on any input change.

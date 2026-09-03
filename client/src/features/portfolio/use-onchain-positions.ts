@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api.ts";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 import type { FeeTier } from "@/features/liquidity/fee-tiers.ts";
 import type { LocalPosition } from "@/features/liquidity/local-positions.ts";
 import type { HookName } from "@/features/liquidity/use-create-pool.ts";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 /** One position as returned by `GET /api/positions/onchain`. */
 interface OnchainPositionWire {
@@ -46,7 +46,7 @@ interface State {
  * has no mint timestamp without a log scan).
  */
 export function useOnchainPositions(walletAddress?: string | null): State {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const [data, setData] = useState<LocalPosition[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

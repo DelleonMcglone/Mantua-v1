@@ -4,7 +4,6 @@ import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useConfirmedAction } from "@/hooks/use-confirmed-action.tsx";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
 import { getUserFacingTokenSymbols, TOKENS, type TokenSymbol } from "@/lib/tokens.ts";
 import { usePortfolio } from "@/features/portfolio/use-portfolio.ts";
 import { FEE_TIER_LABELS, type FeeTier } from "@/features/liquidity/fee-tiers.ts";
@@ -22,6 +21,7 @@ import { TokenSelector } from "./TokenSelector.tsx";
 import { formatTokenAmount, parseTokenAmount } from "./format.ts";
 import { useSwapMaxInput, useSwapQuote, useSwap } from "./use-swap.ts";
 import { EXPLORER_TX_URL, DEFAULT_SLIPPAGE_BPS } from "./constants.ts";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 /** Which venue the panel trades against: the pair's recommended hook pool,
  *  the no-hook pool, or the CCTP bridge (move USDC to another network). */
@@ -148,7 +148,7 @@ export function SwapPanel({
   const [tokenIn, setTokenIn] = useState<TokenSymbol>(seedIn);
   const [tokenOut, setTokenOut] = useState<TokenSymbol>(seedOut === seedIn ? "EURC" : seedOut);
   const [amount, setAmount] = useState(initialAmount ?? "");
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const pairHook = useMemo(
     () => recommendedHookForPair(tokenIn, tokenOut, chainId),
     [tokenIn, tokenOut, chainId],
@@ -489,8 +489,8 @@ export function SwapPanel({
 
         {isBridge ? (
           <p className="text-[11px] text-text-mute mt-3">
-            Via Circle CCTP + Forwarding Service — you sign approve and burn; Circle mints
-            USDC to your address on {destination.label}. No destination gas required.
+            Via Circle CCTP + Forwarding Service — you sign approve and burn; Circle mints USDC to
+            your address on {destination.label}. No destination gas required.
           </p>
         ) : (
           <div className="mt-3 flex items-center justify-between text-[13px]">

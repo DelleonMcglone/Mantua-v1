@@ -4,8 +4,7 @@ import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { useConfirmedAction } from "@/hooks/use-confirmed-action.tsx";
-import { useCurrentChainId } from "@/lib/chain-context.tsx";
-import { getExplorerTxUrl, type SupportedChainId } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerTxUrl, type SupportedChainId } from "@/lib/chains.ts";
 import { type TokenSymbol } from "@/lib/tokens.ts";
 import { TokenSelector } from "@/features/swap/TokenSelector.tsx";
 import { FEE_TIER_LABELS, type FeeTier } from "./fee-tiers.ts";
@@ -88,7 +87,7 @@ type ChartRange = (typeof CHART_RANGES)[number];
  * change is presentational; calldata + approvals path is unchanged.
  */
 export function AddLiquidityForm({ ctx, onBack, onClose }: Props) {
-  const chainId = useCurrentChainId();
+  const chainId = BASE_CHAIN_ID;
   const locked = ctx?.locked === true;
   const [defaultA, defaultB] = defaultPairForChain(chainId);
   const [tokenA, setTokenA] = useState<TokenSymbol>(ctx?.tokenA ?? defaultA);
