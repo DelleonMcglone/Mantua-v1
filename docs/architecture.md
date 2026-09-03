@@ -310,6 +310,138 @@ until a decision record formalizes it.
 7. `poolKeyHash` unification + position-discovery replacement (positions/earnings surfaces are otherwise empty or wrong on mainnet).
 8. Delete or port the orphaned `agent/` workspace — no raw hot key ships to mainnet.
 
+## Polymarket conventions survey (2026-09-03)
+
+End-to-end read of docs.polymarket.com (via its llms.txt page index; source
+URLs inline). Venue divergence from Mantua is total — Polygon / ERC-1155 CTF
+tokens / CLOB / pUSD collateral vs Base / ERC-20 outcome tokens / Uniswap v4
+AMM / native USDC — but the *economic* conventions transfer intact. Verdicts:
+**adopt** (use as-is), **adapt** (translate to the AMM design), **N/A**.
+
+### Market economics — the invariants worth adopting
+
+| Convention | Source | Verdict |
+| --- | --- | --- |
+| Every YES/NO pair is backed by exactly $1 of locked collateral; split ($1 → 1 YES + 1 NO), merge (pair → $1, "exit without trading"), redeem ($1 per winning share, pull-based, no deadline) | concepts/positions-tokens.md | **Adapt — highest-leverage item.** Two independent v4 pools can price YES+NO ≠ $1 with no correcting force; the split/merge arb path is the enforcement mechanism. Implement split/merge/redeem on Mantua's ERC-20 pairs even though the venue differs. Keep split/merge out of mainstream UI (Polymarket barely surfaces it). |
+| Price IS probability, $0.00–$1.00; YES + NO sum to $1 (enforced at match time by mint/merge, not decree) | concepts/prices-orderbook.md | **Adopt** for display; report spot probability normalized pYES/(pYES+pNO), raw pool prices separately. |
+| Invalid/void outcome: "market resolves 50/50 — each token redeems for $0.50" | concepts/resolution.md | **Adopt** — this is exactly what Mantua's INVALID state should pay (postponed/abandoned games); preserves the $1-per-pair invariant. |
+| One canonical display price with a documented fallback (midpoint; last trade when spread > $0.10; "0.5" placeholder for never-traded) | concepts/prices-orderbook.md | **Adapt** — AMM spot is the midpoint analogue; document the stale/empty-pool fallback; use the 0.5 placeholder for capture-less markets. |
+| Taker fee = C × rate × p × (1 − p), sports rate 0.05; symmetric, maximal at 50¢, vanishing at extremes | trading/fees.md | **Adapt** — a flat AMM fee is proportionally brutal on longshots (1¢ on a 3¢ share ≈ 33%). The p(1−p) curve is implementable as a v4 dynamic-fee hook; 0.05 is a documented sports calibration point. |
+| Sports in-play defense: outstanding orders cleared at game start (`clearBookOnStart`); live orders wait a configured `secondsDelay` before matching | concepts/markets-events.md, order-lifecycle.md | **Adapt** — validates Mantua's freeze-at-kickoff (the AMM analog of the delay window; you can't "delay" a swap). If live in-game trading ever ships, a disclosed commit delay is the trust mechanic. |
+| Resolution pipeline (UMA optimistic oracle: $750 bond, 2-hour challenge, escalating disputes) | concepts/resolution.md | **N/A on mechanism** (Mantua resolves server-signed), **adapt three conventions**: a sanity window between RESOLVED and SETTLED before redemptions open; a signer-enforced can't-resolve-before-gameStartTime check; user-visible pipeline states (Trading → Result in → Resolved → Claimable). |
+| Negative-risk groups for mutually exclusive outcomes ("exactly one resolves Yes"); NO-in-one ↔ YES-in-all-others conversion | concepts/negative-risk.md | **N/A for binary v1.** If 3-way soccer ships: three linked binary markets with the exactly-one-YES invariant enforced server-side; the conversion mechanic needs shared collateral and doesn't map to per-outcome AMM pools. |
+| Market lifecycle is flags (`active/closed/archived/acceptingOrders/restricted/live/ended`), and markets exist before trading opens and stay queryable after close | market-data/market-details.md | **Adapt** — Mantua's OPEN/FROZEN/RESOLVED/SETTLED/INVALID enum is cleaner; borrow: `gameStartTime` distinct from endDate, a per-market `restricted` geo flag, and decoupling API existence from pool deployment. |
+
+### API conventions
+
+- **Price history grammar (adopt verbatim for `/api/markets/:id/prices`):**
+  `interval` presets (`1h|6h|1d|1w|max`) XOR absolute `startTs`/`endTs`
+  (never combined), plus `fidelity` (sampling interval in minutes) for
+  server-side downsampling; compact response `{history: [{t, p}]}`. Maps
+  1:1 onto `market_prices` (t = captured_at, p = implied_probability).
+  (market-data/prices-order-books.md)
+- **Singular GET + plural POST batch** for hot reads (`/price` + `/prices`
+  with an id array → keyed map, batch cap ~500). Batch endpoints are also
+  Polymarket's de facto rate-limit relief valve. (same source)
+- **Ids and slugs:** every market object carries all of its identifiers
+  (numeric id, slug, on-chain id, per-outcome token refs) so clients never
+  need a mapping call; dedicated `/slug/{slug}` routes for every
+  discoverable entity; accept each id type as a list filter. Anti-pattern
+  to avoid: Polymarket reuses the param name `market` for different id
+  types across endpoints — one name per id kind, stable across REST and WS.
+- **Pagination:** offset + `order`/`ascending` for UI pages; keyset
+  (`limit`/`after_cursor` → `{next_cursor, hasMore}`) for feeds and
+  crawlers; `after`/`before` time filters on trade-like listings. Use
+  `next_cursor: null` as the terminal marker (skip Polymarket's magic
+  `LTE=` string) and standardize one envelope (they ship three).
+- **Filters vocabulary** (list-markets/list-events): `closed=false` by
+  default, min/max liquidity & volume thresholds, date ranges, id arrays,
+  `game_id`, `sports_market_types[]`. (api-reference/markets/list-markets)
+- **Errors:** `{error, code?, retry_after_seconds?}` envelope; 429 with
+  documented exponential-backoff guidance; 503 with a human operational
+  message for paused/degraded states. (resources/error-codes.md)
+- **WebSocket market channel (the pattern for real-time prices):** one
+  public socket; subscribe with an id array; dynamic
+  `{operation: subscribe|unsubscribe}` without reconnect; `event_type`-
+  discriminated messages; snapshot-on-subscribe then deltas; lifecycle
+  events (`new_market`, `market_resolved`); documented PING/PONG (10s).
+  User channel: separate socket, credentials in the first frame, same
+  subscription grammar. (market-data/realtime-data.md)
+- **Auth layering** (when authed endpoints ship): wallet EIP-712 signature
+  proves ownership once and mints revocable API credentials; hot paths
+  never touch the key; public market data stays unauthenticated. A signed
+  session token achieves the layering without their five-header HMAC.
+  (trading/wallets-auth.md)
+- **Tx-status ladder** for swap endpoints/WS: pending → mined → confirmed
+  (terminal) / failed, with terminal-ness documented per status.
+- **Publish an OpenAPI spec** (and llms.txt): Polymarket ships machine-
+  readable specs for every service and it materially eases integration.
+- Serialize money/prices as **decimal strings**; one timestamp format
+  (their ISO/unix-s/unix-ms mix is the thing not to copy).
+
+### Data-model conventions (Gamma)
+
+- **Event = game, markets nested under it** — event responses embed
+  `markets[]`; the single most load-bearing discovery ergonomic. Volume/
+  liquidity roll-ups (24h/1wk/1mo windows) and `commentCount` are
+  **denormalized onto the event** so list pages are one query. Live sports
+  state (`score, elapsed, period, gameStatus`) lives on the event, not the
+  market. (api-reference/events/list-events)
+- **Sports metadata endpoints:** `/sports` (league code, image, official
+  resolution-source URL, home/away display ordering), `/teams?league=`,
+  `/sports/market-types`; `game_id` joins events↔games — identical in
+  spirit to Mantua's provider-keyed events. Per-sport resolution-source URL
+  feeds the market page's Rules section. No player/injury endpoints exist —
+  Mantua's players/injuries tables go beyond Polymarket. (api-reference/sports/*)
+- **Comments:** polymorphic parent (`parent_entity_type` ∈ Event/Series/
+  market + id) — better than Mantua's current provider-event-id keying;
+  `parentCommentID` single-level threading; `holders_only` filter and
+  commenter-position badges ("skin in the game") are cheap, proven
+  engagement features. (api-reference/comments/list-comments)
+- **Positions API field set:** size, avgPrice, curPrice, initialValue,
+  currentValue, cashPnl, percentPnl, `redeemable`/`mergeable` flags;
+  closed positions carry realizedPnl. Adopt for Mantua's portfolio
+  endpoint. Activity: typed enum (TRADE/SPLIT/MERGE/REDEEM/DEPOSIT/…) —
+  matches the new `activity.kind`. Holders per outcome token; leaderboard
+  keyed (category, timePeriod, orderBy PNL|VOL) with a single-user rank
+  lookup. (market-data/public-analytics.md, trading/wallet-activity.md)
+- **Combos:** Polymarket prices parlays via an RFQ auction (maker quotes
+  in 400 ms, 10 s acceptance) — N/A for an AMM — but their combo *data
+  model* (combo id + `legs[]` each carrying market ref, outcome, price,
+  per-leg resolution; USDC amount/payout) matches Mantua's schema-only
+  `combos`/`combo_legs` tables. (trading/combos/overview.md)
+
+### UX conventions
+
+- Price-as-probability display with the $1-payout frame ("buy at 40¢ →
+  $1/share if right"); present YES/NO as complements summing to $1.
+- **Buy in dollars, sell in shares** — asymmetric on purpose; maps to
+  exact-input swaps. Surface price impact prominently (an AMM always
+  fills, at worsening prices — a hazard Polymarket's CLOB docs don't have).
+- **"Exit anytime"** framing on every position row — the differentiator
+  vs sportsbooks.
+- Market page: stats block (price, 24h volume + change, liquidity, end
+  date, game start time), **Rules/resolution-source section front and
+  center** ("the title describes the question, the rules define how it
+  resolves"), comments, top holders (as handles — never raw addresses,
+  per the chainless rule).
+- Portfolio: positions with avg cost / current value / $ and % P&L and a
+  "Claim winnings" state; typed activity feed (suppress tx hashes per
+  chainless branding — receipt-style entries instead).
+- Polymarket itself leans chainless (prices in dollars, "pUSD" branding,
+  no chain names in product copy) — external validation of Mantua's
+  chainless positioning.
+- Unverified in official docs (check the live app before treating as
+  convention): the "¢" glyph itself, chart timeframe set, comment/holder
+  tab layouts, related-markets module, disputed-state visuals, embeds.
+
+### Explicitly not copied
+
+Order-book machinery (order types, tick sizes, maker/taker split, resting
+orders, heartbeats), UMA oracle plumbing, pUSD wrapper (native USDC stays),
+ERC-1155 CTF (ERC-20 pairs stay), neg-risk adapter contracts, stringified-
+JSON array fields, mixed timestamp formats, three separate API base URLs.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.
