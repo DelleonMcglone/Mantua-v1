@@ -60,33 +60,95 @@ jobs:
       # submodules also gitignore their own `lib/` and the parent build
       # pulls submodule source in via the
       # `hooks/stable-protection/:` remapping.
+      #
+      # Wrapped in a 3-attempt retry (same pattern as the gating tests
+      # below): dependency clones off github.com flake with git exit
+      # 128 under fanout. A failed attempt can leave half-cloned dirs
+      # behind that a blind re-run of `forge install` would trip over,
+      # so retries clear them first.
       - name: Install Foundry deps (parent)
         run: |
-          forge install foundry-rs/forge-std --no-git
-          forge install OpenZeppelin/openzeppelin-contracts --no-git
-          forge install Uniswap/v4-core --no-git
-          forge install Uniswap/v4-periphery --no-git
-          forge install transmissions11/solmate --no-git
+          set -e
+          for attempt in 1 2 3; do
+            echo "::group::forge install attempt $attempt"
+            if [ "$attempt" -gt 1 ]; then
+              rm -rf lib/forge-std lib/openzeppelin-contracts lib/v4-core lib/v4-periphery lib/solmate
+            fi
+            if forge install foundry-rs/forge-std --no-git && \
+               forge install OpenZeppelin/openzeppelin-contracts --no-git && \
+               forge install Uniswap/v4-core --no-git && \
+               forge install Uniswap/v4-periphery --no-git && \
+               forge install transmissions11/solmate --no-git; then
+              echo "::endgroup::"
+              exit 0
+            fi
+            echo "::endgroup::"
+            echo "Attempt $attempt failed; sleeping 15s before retry…"
+            sleep 15
+          done
+          exit 1
 
       - name: Install Foundry deps (stable-protection submodule)
         working-directory: contracts/hooks/stable-protection
         run: |
           if [ -f foundry.toml ]; then
-            forge install foundry-rs/forge-std --no-git || true
-            forge install Uniswap/v4-core --no-git || true
-            forge install Uniswap/v4-periphery --no-git || true
-            forge install transmissions11/solmate --no-git || true
+            set -e
+            for attempt in 1 2 3; do
+              echo "::group::forge install (stable-protection) attempt $attempt"
+              if [ "$attempt" -gt 1 ]; then
+                rm -rf lib/forge-std lib/v4-core lib/v4-periphery lib/solmate
+              fi
+              if forge install foundry-rs/forge-std --no-git && \
+                 forge install Uniswap/v4-core --no-git && \
+                 forge install Uniswap/v4-periphery --no-git && \
+                 forge install transmissions11/solmate --no-git; then
+                echo "::endgroup::"
+                exit 0
+              fi
+              echo "::endgroup::"
+              echo "Attempt $attempt failed; sleeping 15s before retry…"
+              sleep 15
+            done
+            exit 1
           fi
 
       - name: Install Foundry deps (dynamic-fee submodule)
         working-directory: contracts/hooks/dynamic-fee
         run: |
           if [ -f foundry.toml ]; then
-            forge install foundry-rs/forge-std --no-git || true
-            forge install Uniswap/v4-core --no-git || true
-            forge install Uniswap/v4-periphery --no-git || true
-            forge install transmissions11/solmate --no-git || true
+            set -e
+            for attempt in 1 2 3; do
+              echo "::group::forge install (dynamic-fee) attempt $attempt"
+              if [ "$attempt" -gt 1 ]; then
+                rm -rf lib/forge-std lib/v4-core lib/v4-periphery lib/solmate
+              fi
+              if forge install foundry-rs/forge-std --no-git && \
+                 forge install Uniswap/v4-core --no-git && \
+                 forge install Uniswap/v4-periphery --no-git && \
+                 forge install transmissions11/solmate --no-git; then
+                echo "::endgroup::"
+                exit 0
+              fi
+              echo "::endgroup::"
+              echo "Attempt $attempt failed; sleeping 15s before retry…"
+              sleep 15
+            done
+            exit 1
           fi
+
+      # Fail fast before `forge build` if any dependency clone failed:
+      # a missing (or empty, i.e. partial) lib/ source otherwise
+      # surfaces as a confusing "Source not found" error deep in the
+      # build step instead of a clear install failure.
+      - name: Verify installed sources
+        run: |
+          set -e
+          for dep in forge-std openzeppelin-contracts v4-core v4-periphery solmate; do
+            if [ ! -d "lib/$dep" ] || [ -z "$(ls -A "lib/$dep")" ]; then
+              echo "::error::Missing or empty contracts/lib/$dep after forge install"
+              exit 1
+            fi
+          done
 
       - name: Build contracts
         run: forge build --sizes
