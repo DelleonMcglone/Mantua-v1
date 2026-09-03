@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { usd as formatUsd } from "@/lib/format.ts";
 import { usePortfolio } from "./use-portfolio.ts";
 import { type HistoryRange, usePortfolioHistory } from "./use-portfolio-history.ts";
 
@@ -138,10 +139,3 @@ function flatSeries(value: number): number[] {
   return Array<number>(FALLBACK_POINTS).fill(value);
 }
 
-function formatUsd(value: number): string {
-  if (!Number.isFinite(value)) return "$—";
-  return `$${value.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}

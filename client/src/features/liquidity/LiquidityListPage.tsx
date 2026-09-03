@@ -9,7 +9,9 @@ import { useTokenPrices } from "./use-token-prices.ts";
 import { TokenPairIcon } from "./TokenPairIcon.tsx";
 import { usePools } from "./use-pools.ts";
 import { FEE_TIER_LABELS } from "./fee-tiers.ts";
-import { formatPct, formatUsd, normalizePairSymbol } from "./format.ts";
+import { compact as formatUsd, pct as formatPct } from "@/lib/format.ts";
+import { HOOK_TINT } from "@/features/portfolio/hook-tint.ts";
+import { normalizePairSymbol } from "./format.ts";
 import { getLocalPools, type LocalPool } from "./local-pools.ts";
 import { getLocalPositions, type LocalPosition } from "./local-positions.ts";
 import type { PoolSummary } from "./types.ts";
@@ -393,25 +395,17 @@ function PoolRow({ pool, onSelect }: { pool: DerivedPool; onSelect: (id: string)
   );
 }
 
-/** Per-hook badge palette — mirrors the portfolio's HOOK_TINT so a hook
- *  reads the same color everywhere (Stable Protection green, Dynamic Fee
- *  yellow). Keyed by the HOOK_LABELS display strings. */
-const HOOK_BADGE_TINT: Record<string, { bg: string; fg: string; bd: string }> = {
-  "Stable Protection": {
-    bg: "rgba(61, 220, 151, 0.14)",
-    fg: "#3ddc97",
-    bd: "rgba(61, 220, 151, 0.35)",
-  },
-  "Dynamic Fee": { bg: "rgba(230, 199, 74, 0.14)", fg: "#e6c74a", bd: "rgba(230, 199, 74, 0.35)" },
-};
-
 function HookBadge({ hasHook, label }: { hasHook: boolean; label: string }) {
-  const tint = hasHook ? HOOK_BADGE_TINT[label] : undefined;
+  // Shared token-class palette (deduped with the portfolio's badge tints)
+  // so a hook reads the same color everywhere in both themes.
+  const tint =
+    hasHook && (label === "Stable Protection" || label === "Dynamic Fee")
+      ? HOOK_TINT[label]
+      : undefined;
   if (tint) {
     return (
       <span
-        className="px-1.5 py-px rounded-[6px] text-[10px] font-semibold tracking-[0.01em] border"
-        style={{ background: tint.bg, color: tint.fg, borderColor: tint.bd }}
+        className={`px-1.5 py-px rounded-[6px] text-[10px] font-semibold tracking-[0.01em] ${tint}`}
       >
         {label}
       </span>

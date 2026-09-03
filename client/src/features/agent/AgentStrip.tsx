@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { cn } from "@/lib/utils.ts";
 
 interface AgentStripProps {
   /** Top line — "Agent wallet" / "From agent wallet" / "Sending to" / etc. */
@@ -14,58 +15,36 @@ interface AgentStripProps {
   cap?: { text: string; tone?: "default" | "green" | "red" };
 }
 
-const STRIP_STYLE: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  padding: "10px 14px",
-  borderBottom: "1px solid var(--border-soft)",
-  background: "transparent",
+const CAP_TONES: Record<NonNullable<AgentStripProps["cap"]>["tone"] & string, string> = {
+  default: "bg-chip border-border-soft text-text-dim",
+  green: "bg-green/10 border-green/35 text-green",
+  red: "bg-red/10 border-red/35 text-red",
 };
-
-const CAP_BASE: React.CSSProperties = {
-  marginLeft: "auto",
-  fontSize: 10,
-  fontFamily: "JetBrains Mono, monospace",
-  padding: "3px 7px",
-  borderRadius: 6,
-};
-
-const CAP_TONES: Record<NonNullable<AgentStripProps["cap"]>["tone"] & string, React.CSSProperties> =
-  {
-    default: {
-      background: "var(--chip)",
-      border: "1px solid var(--border-soft)",
-      color: "var(--text-dim)",
-    },
-    green: {
-      background: "rgba(61,220,151,.10)",
-      border: "1px solid rgba(61,220,151,.35)",
-      color: "var(--green)",
-    },
-    red: {
-      background: "rgba(255,107,107,.10)",
-      border: "1px solid rgba(255,107,107,.35)",
-      color: "var(--red)",
-    },
-  };
 
 /**
- * AgentStrip — pixel port of `.agent-strip` from
- * `mantua-ai/project/Mantua Agent Flows.html`. Sits at the top of every
+ * AgentStrip — port of `.agent-strip` from `mantua-ai/project/Mantua
+ * Agent Flows.html`, rewritten on the token layer (B-015) so the cap
+ * pill renders correct hues in both themes. Sits at the top of every
  * agent-scoped panel so the agent's identity (wallet address + remaining
  * daily cap) is visible on every step.
  */
 export function AgentStrip({ label, addr, cap }: AgentStripProps) {
   return (
-    <div style={STRIP_STYLE}>
+    <div className="flex items-center gap-2.5 border-b border-border-soft bg-transparent px-3.5 py-2.5">
       <div>
-        <div style={{ fontSize: 11, color: "var(--text-dim)" }}>{label}</div>
-        <div className="mono" style={{ fontSize: 11, color: "var(--text)" }}>
-          {addr}
-        </div>
+        <div className="text-[11px] text-text-dim">{label}</div>
+        <div className="mono text-[11px] text-text">{addr}</div>
       </div>
-      {cap && <div style={{ ...CAP_BASE, ...CAP_TONES[cap.tone ?? "default"] }}>{cap.text}</div>}
+      {cap && (
+        <div
+          className={cn(
+            "ml-auto rounded-[6px] border px-[7px] py-[3px] font-mono text-[10px]",
+            CAP_TONES[cap.tone ?? "default"],
+          )}
+        >
+          {cap.text}
+        </div>
+      )}
     </div>
   );
 }

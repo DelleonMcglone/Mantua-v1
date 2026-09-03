@@ -2,12 +2,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
+import { token } from "@/lib/format.ts";
 import { useUnifiedBalance } from "./use-unified-balance.ts";
 
+/** USDC amount string → grouped display via the canonical `token` formatter. */
 function fmtUsdc(s: string | undefined): string {
   const n = Number(s ?? "0");
   if (!Number.isFinite(n)) return "0";
-  return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+  return token(n);
 }
 
 /** "Arbitrum_One" → "Arbitrum One". */

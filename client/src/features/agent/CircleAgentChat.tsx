@@ -1,27 +1,14 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
-import { ArrowLeft, Bot, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { ArrowLeft, Bot, Check, ExternalLink, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
+import { Banner } from "@/components/ui/banner.tsx";
+import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { Button } from "@/components/ui/button.tsx";
 import { useAgentPortfolio } from "./use-agent-portfolio.ts";
 import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
-import {
-  Banner,
-  DetailRows,
-  PANEL_HEAD,
-  PANEL_TITLE,
-  Spinner,
-  TxRow,
-  X_CLOSE,
-} from "./agent-primitives.tsx";
+import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 /**
  * "Your Circle Agent" — a free-form, autonomous conversational agent.
@@ -241,41 +228,39 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
     <>
       <PanelHeader onNewChat={newChat} />
 
-      <div style={PANEL_HEAD}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="flex items-center justify-between border-b border-border-soft bg-bg-elev px-4 py-3.5">
+        <div className="flex items-center gap-2">
           {messages.length > 0 && (
-            <button
-              type="button"
-              style={X_CLOSE}
+            <Button
+              variant="icon"
+              size="icon"
+              className="h-[26px] w-[26px] rounded-[7px]"
               onClick={newChat}
               aria-label="Back to suggestions"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           )}
-          <div style={PANEL_TITLE}>
+          <div className="flex items-center gap-2 text-[13px] font-semibold">
             <Bot className="h-4 w-4" aria-hidden /> Your Circle Agent
           </div>
         </div>
-        <button type="button" style={X_CLOSE} onClick={onClose} aria-label="Close">
+        <Button
+          variant="icon"
+          size="icon"
+          className="h-[26px] w-[26px] rounded-[7px]"
+          onClick={onClose}
+          aria-label="Close"
+        >
           <X className="h-3.5 w-3.5" />
-        </button>
+        </Button>
       </div>
 
       {agent.agentAddress && (
         <AgentWalletStrip agent={agent} label={`Agent · ${shortAddr(agent.agentAddress)}`} />
       )}
 
-      <div
-        style={{
-          flex: 1,
-          overflow: "auto",
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-        }}
-      >
+      <div className="flex flex-1 flex-col gap-3.5 overflow-auto p-4">
         {messages.length === 0 ? (
           <EmptyState onPick={send} disabled={busy} />
         ) : (
@@ -296,11 +281,11 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
 function AssistantBubble({ msg }: { msg: AssistantMsg }) {
   const showThinking = msg.streaming && msg.text === "" && msg.steps.length === 0;
   return (
-    <div style={{ alignSelf: "stretch", display: "flex", flexDirection: "column", gap: 10 }}>
+    <div className="flex flex-col gap-2.5 self-stretch">
       {showThinking && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="flex items-center gap-2">
           <Spinner agent />
-          <span style={{ fontSize: 13, color: "var(--text-dim)" }}>Thinking…</span>
+          <span className="text-[13px] text-text-dim">Thinking…</span>
         </div>
       )}
 
@@ -309,15 +294,7 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
       ))}
 
       {msg.text && (
-        <div
-          style={{
-            fontSize: 13,
-            color: "var(--text)",
-            lineHeight: 1.55,
-            whiteSpace: "pre-wrap",
-            maxWidth: "92%",
-          }}
-        >
+        <div className="max-w-[92%] whitespace-pre-wrap text-[13px] leading-[1.55] text-text">
           <RichText text={msg.text} />
           {msg.streaming && <Caret />}
         </div>
@@ -332,21 +309,12 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
   );
 }
 
-const CARD: CSSProperties = {
-  background: "var(--bg-elev)",
-  border: "1px solid var(--border-soft)",
-  borderRadius: 12,
-  padding: 14,
-};
-
 function StepCard({ step }: { step: ToolStep }) {
   if (step.status === "running") {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <div className="flex items-center gap-2">
         <Spinner agent />
-        <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
-          {TOOL_VERB[step.tool] ?? "Working"}…
-        </span>
+        <span className="text-[12px] text-text-dim">{TOOL_VERB[step.tool] ?? "Working"}…</span>
       </div>
     );
   }
@@ -361,7 +329,7 @@ function StepCard({ step }: { step: ToolStep }) {
   // text already narrates the outcome, so an empty "Done." card is noise.
   const content = renderResult(step);
   if (content === null) return null;
-  return <div style={CARD}>{content}</div>;
+  return <div className="rounded-md border border-border-soft bg-bg-elev p-3.5">{content}</div>;
 }
 
 // ── Result renderers (read-only views of the server tool results) ──
@@ -435,7 +403,7 @@ function renderResult(step: ToolStep): ReactNode {
     case "get_portfolio": {
       const d = step.data as PortfolioData;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Agent wallet balances</Heading>
           <DetailRows
             rows={d.balances.map((b) => ({
@@ -449,7 +417,7 @@ function renderResult(step: ToolStep): ReactNode {
     case "get_swap_quote": {
       const d = step.data as QuoteData;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Quote</Heading>
           <DetailRows
             rows={[
@@ -463,7 +431,7 @@ function renderResult(step: ToolStep): ReactNode {
     case "manage_wallet": {
       const d = step.data as WalletData;
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Agent wallet</Heading>
           <DetailRows
             rows={[
@@ -486,10 +454,10 @@ function renderResult(step: ToolStep): ReactNode {
         balances?: { symbol: string; balance: string; usdValue: number }[];
       };
       if (!d.connected) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No wallet connected.</span>;
+        return <span className="text-[12px] text-text-dim">No wallet connected.</span>;
       }
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Your wallet balances</Heading>
           <DetailRows
             rows={(d.balances ?? []).map((b) => ({
@@ -510,13 +478,16 @@ function renderResult(step: ToolStep): ReactNode {
       };
       const label = d.destinationChain.replace(/_/g, " ");
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <Banner tone="success" icon="✓" title={`Bridged ${fmtNum(d.amount)} USDC → ${label}`}>
+        <div className="flex flex-col gap-2.5">
+          <Banner tone="success" icon={<Check className="h-3.5 w-3.5" aria-hidden />} title={`Bridged ${fmtNum(d.amount)} USDC → ${label}`}>
             Recipient {shortAddr(d.recipient)} on {label}. Circle&apos;s forwarding fee is deducted
             from the minted amount.
           </Banner>
           {d.burnTxHash && (
-            <TxRow hash={d.burnTxHash} explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`} />
+            <TxRow
+              hash={d.burnTxHash}
+              explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`}
+            />
           )}
         </div>
       );
@@ -532,7 +503,7 @@ function renderResult(step: ToolStep): ReactNode {
       };
       if (d.alreadyExists) {
         return (
-          <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
+          <span className="text-[12px] text-text-dim">
             {d.tokenA}/{d.tokenB} pool already exists — adding liquidity instead.
           </span>
         );
@@ -544,7 +515,7 @@ function renderResult(step: ToolStep): ReactNode {
           explorerUrl={d.explorerUrl}
         />
       ) : (
-        <span style={{ fontSize: 12, color: "var(--text-dim)" }}>Pool created.</span>
+        <span className="text-[12px] text-text-dim">Pool created.</span>
       );
     }
     case "get_positions": {
@@ -552,10 +523,10 @@ function renderResult(step: ToolStep): ReactNode {
         positions: { id: string; pair: string; fee: number; liquidity: string }[];
       };
       if (d.positions.length === 0) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No open positions.</span>;
+        return <span className="text-[12px] text-text-dim">No open positions.</span>;
       }
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Agent LP positions</Heading>
           <DetailRows
             rows={d.positions.map((p) => ({
@@ -586,7 +557,7 @@ function renderResult(step: ToolStep): ReactNode {
       const pct = (v: number | null | undefined) =>
         typeof v === "number" ? `${v >= 0 ? "+" : ""}${v.toFixed(1)}%` : "—";
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {(d.trending?.length ?? 0) > 0 && (
             <>
               <Heading>Trending</Heading>
@@ -634,11 +605,11 @@ function renderResult(step: ToolStep): ReactNode {
         signals?: { notes: string[] };
       };
       if (!d.found) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No explorer data.</span>;
+        return <span className="text-[12px] text-text-dim">No explorer data.</span>;
       }
       const activity = (d.tokenTransfers ?? []).slice(0, 5);
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>
             {d.label ?? shortAddr(d.address ?? "")} {d.isContract ? "· contract" : "· wallet"}
           </Heading>
@@ -652,7 +623,7 @@ function renderResult(step: ToolStep): ReactNode {
             ]}
           />
           {(d.signals?.notes.length ?? 0) > 0 && (
-            <span style={{ fontSize: 12, color: "var(--text-dim)" }}>
+            <span className="text-[12px] text-text-dim">
               {d.signals?.notes.join(" ")}
             </span>
           )}
@@ -670,10 +641,10 @@ function renderResult(step: ToolStep): ReactNode {
         flags?: string[];
       };
       if (!d.found) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No token data.</span>;
+        return <span className="text-[12px] text-text-dim">No token data.</span>;
       }
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>
             {d.name} ({d.symbol})
           </Heading>
@@ -702,10 +673,10 @@ function renderResult(step: ToolStep): ReactNode {
         explorerUrl?: string;
       };
       if (!d.found) {
-        return <span style={{ fontSize: 12, color: "var(--text-dim)" }}>No tx data.</span>;
+        return <span className="text-[12px] text-text-dim">No tx data.</span>;
       }
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>
             Tx {d.status}
             {d.method ? ` · ${d.method}` : ""}
@@ -731,7 +702,7 @@ function renderResult(step: ToolStep): ReactNode {
         owner?: string;
       };
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           <Heading>Stable Protection guard · via Circle Contracts</Heading>
           <DetailRows
             rows={[
@@ -754,7 +725,7 @@ function renderResult(step: ToolStep): ReactNode {
 }
 
 function Heading({ children }: { children: ReactNode }) {
-  return <div style={{ fontSize: 13, fontWeight: 600 }}>{children}</div>;
+  return <div className="text-[13px] font-semibold">{children}</div>;
 }
 
 function Success({
@@ -769,8 +740,8 @@ function Success({
   explorerUrl: string;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <Banner tone="success" icon="✓" title={title}>
+    <div className="flex flex-col gap-2.5">
+      <Banner tone="success" icon={<Check className="h-3.5 w-3.5" aria-hidden />} title={title}>
         {detail ?? "Executed through your agent wallet."}
       </Banner>
       <TxRow hash={txHash} explorerUrl={explorerUrl} />
@@ -780,36 +751,23 @@ function Success({
 
 function AnalyzeView({ data }: { data: AnalyzeData }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="flex flex-col gap-3">
       <div>
-        <div style={{ fontSize: 15, fontWeight: 600 }}>{data.title}</div>
-        <p style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.55, marginTop: 6 }}>
-          {data.summary}
-        </p>
+        <div className="text-[15px] font-semibold">{data.title}</div>
+        <p className="mt-1.5 text-[13px] leading-[1.55] text-text-dim">{data.summary}</p>
       </div>
       {data.metrics && data.metrics.length > 0 && (
         <DetailRows rows={data.metrics.map((m) => ({ label: m.label, value: m.value }))} />
       )}
       {data.bullets && data.bullets.length > 0 && (
-        <ul
-          style={{
-            margin: 0,
-            paddingLeft: 18,
-            fontSize: 13,
-            color: "var(--text)",
-            lineHeight: 1.6,
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
+        <ul className="m-0 flex list-disc flex-col gap-1 pl-[18px] text-[13px] leading-[1.6] text-text">
           {data.bullets.map((b, i) => (
             <li key={i}>{b}</li>
           ))}
         </ul>
       )}
       {data.sources && data.sources.length > 0 && (
-        <div style={{ fontSize: 11, color: "var(--text-mute)" }}>
+        <div className="text-[11px] text-text-mute">
           Sources:{" "}
           {data.sources.map((s, i, arr) => (
             <span key={`${s.name}-${String(i)}`}>
@@ -818,9 +776,9 @@ function AnalyzeView({ data }: { data: AnalyzeData }) {
                   href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ color: "var(--text-dim)" }}
+                  className="inline-flex items-center gap-0.5 text-text-dim"
                 >
-                  {s.name} ↗
+                  {s.name} <ExternalLink className="h-2.5 w-2.5" aria-hidden />
                 </a>
               ) : (
                 s.name
@@ -836,15 +794,14 @@ function AnalyzeView({ data }: { data: AnalyzeData }) {
 
 function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disabled: boolean }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ fontSize: 13, color: "var(--text-dim)", lineHeight: 1.6 }}>
-        Hi — I'm your Circle agent. Tell me what to do in plain language and I'll handle it: check
-        balances, swap or send tokens, evaluate sports markets and place bets, or look up market
-        &amp; on-chain data. I act autonomously within your daily spending cap.
+    <div className="flex flex-col gap-3.5">
+      <div className="text-[13px] leading-[1.6] text-text-dim">
+        Hi — I'm your Circle agent. Tell
+        me what to do in plain language and I'll handle it: check balances, swap or send tokens,
+        evaluate sports markets and place bets, or look up market &amp; on-chain data. I act
+        autonomously within your daily spending cap.
       </div>
-      <div
-        style={{ display: "flex", flexWrap: "nowrap", gap: 8, overflowX: "auto", paddingBottom: 2 }}
-      >
+      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-0.5">
         {SUGGESTIONS.map((s) => (
           <button
             key={s.label}
@@ -853,19 +810,7 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
             onClick={() => {
               onPick(s.message);
             }}
-            style={{
-              fontSize: 12,
-              color: "var(--text-dim)",
-              background: "var(--chip)",
-              border: "1px solid var(--border-soft)",
-              borderRadius: 99,
-              padding: "6px 12px",
-              cursor: disabled ? "default" : "pointer",
-              fontFamily: "inherit",
-              opacity: disabled ? 0.5 : 1,
-              flexShrink: 0,
-              whiteSpace: "nowrap",
-            }}
+            className="flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-border-soft bg-chip px-3 py-1.5 text-[12px] text-text-dim disabled:cursor-default disabled:opacity-50"
           >
             {s.label}
           </button>

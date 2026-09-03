@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { ApiError, api } from "@/lib/api.ts";
+import { usd as formatUsd } from "@/lib/format.ts";
 import { getTokens, type Token, type TokenSymbol } from "@/lib/tokens.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
 
@@ -171,9 +172,3 @@ function formatQty(value: number, decimals: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: dp });
 }
 
-function formatUsd(value: number): string {
-  if (!Number.isFinite(value)) return "—";
-  if (value === 0) return "$0.00";
-  if (value < 0.01) return "<$0.01";
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}

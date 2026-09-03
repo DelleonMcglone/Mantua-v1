@@ -18,7 +18,9 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
-import { fmtToken, fmtUsd, shortenHash, type EarningPosition, type HookGroup } from "./earnings.ts";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
+import { token as fmtToken, usd as fmtUsd } from "@/lib/format.ts";
+import { shortenHash, type EarningPosition, type HookGroup } from "./earnings.ts";
 import type { UseEarnings } from "./use-earnings.ts";
 import { useSweep } from "./use-sweep.ts";
 
@@ -37,17 +39,13 @@ export function EarningsTabBody({
   const { data, loading, error, refetch } = earnings;
 
   if (!walletAddress) {
-    return (
-      <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-        Connect a wallet to see your fee earnings.
-      </div>
-    );
+    return <EmptyState>Connect a wallet to see your fee earnings.</EmptyState>;
   }
   if (loading && !data) {
-    return <div className="px-4 py-8 text-center text-[12px] text-text-dim">Reading fees…</div>;
+    return <EmptyState>Reading fees…</EmptyState>;
   }
   if (error) {
-    return <div className="px-4 py-8 text-center text-[12px] text-red">{error}</div>;
+    return <EmptyState tone="error">{error}</EmptyState>;
   }
 
   const total = data?.totalAccruedUsd ?? 0;
@@ -110,10 +108,10 @@ export function EarningsTabBody({
       )}
 
       {positions.length === 0 ? (
-        <div className="px-4 py-8 text-center text-[12px] text-text-dim">
+        <EmptyState>
           No positions yet. Add liquidity to a pool to start earning swap fees — they accrue here as
           others trade through it.
-        </div>
+        </EmptyState>
       ) : (
         <div className="px-2 py-2">
           {withFees.length === 0 && (

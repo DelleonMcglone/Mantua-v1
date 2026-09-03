@@ -1,16 +1,17 @@
 /**
  * Shared hook-badge palette (the "SHELL_HOOK_TINT" palette from the
- * prototype). Extracted so both `AssetsCard` and the Earnings tab render
- * hook badges from a single source without a circular import.
+ * prototype), deduped with the pools-list `HOOK_BADGE_TINT` copy and
+ * rewritten as Tailwind token classes so both themes render the correct
+ * hues (the old hardcoded dark-theme rgba/hex values washed out in
+ * light mode). A hook reads the same everywhere: Stable Protection
+ * green, Dynamic Fee amber. "Volatile" = a no-hook cbBTC pool
+ * (neutral chip).
  */
 
 export type HookName = "Stable Protection" | "Dynamic Fee" | "Volatile";
 
-// Colors match the pools-list HookBadge palette so a hook reads the same
-// everywhere: Stable Protection green, Dynamic Fee yellow. "Volatile" =
-// a no-hook cbBTC pool (neutral chip).
-export const HOOK_TINT: Record<HookName, { bg: string; fg: string; bd: string }> = {
-  "Dynamic Fee": { bg: "rgba(230,199,74,0.12)", fg: "#e6c74a", bd: "rgba(230,199,74,0.35)" },
-  "Stable Protection": { bg: "rgba(61,220,151,0.12)", fg: "#3ddc97", bd: "rgba(61,220,151,0.35)" },
-  Volatile: { bg: "var(--chip)", fg: "var(--text-mute)", bd: "var(--border-soft)" },
+export const HOOK_TINT: Record<HookName, string> = {
+  "Stable Protection": "bg-green/15 text-green border border-green/35",
+  "Dynamic Fee": "bg-amber/15 text-amber border border-amber/35",
+  Volatile: "bg-chip text-text-mute border border-border-soft",
 };

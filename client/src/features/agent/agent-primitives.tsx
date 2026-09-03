@@ -1,103 +1,19 @@
-/* eslint-disable react-refresh/only-export-components -- shared agent UI primitives co-located by design. */
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import { Check, Copy, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils.ts";
 import { TokenIcon } from "@/features/swap/TokenIcon.tsx";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 
 /**
- * Shared atoms for the agent flows — verbatim ports of the small
- * building blocks defined in `Mantua Agent Flows.html` (`.btn`,
- * `.banner`, `.tok`, `.tx-row`, `.bigval`, `.detail-rows`, `.x-close`).
- * Centralized so every flow renders the exact same pixels.
+ * Shared atoms for the agent flows — originally verbatim inline-style
+ * ports from `Mantua Agent Flows.html`, rewritten in B-015 as Tailwind
+ * classes over design tokens so both themes render correctly.
+ *
+ * The old `BTN_*` / `X_CLOSE` / `PANEL_*` CSSProperties constants are
+ * gone: buttons route through `@/components/ui/button.tsx`, banners
+ * through `@/components/ui/banner.tsx`, skeletons through
+ * `@/components/ui/skeleton.tsx`.
  */
-
-// ── Buttons ────────────────────────────────────────────────────────
-
-export const BTN_BASE: CSSProperties = {
-  borderRadius: 10,
-  cursor: "pointer",
-  fontSize: 13,
-  fontWeight: 500,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 6,
-  transition: "all .15s",
-  padding: "10px 14px",
-  border: "1px solid transparent",
-  fontFamily: "inherit",
-  color: "inherit",
-};
-
-export const BTN_PRIMARY: CSSProperties = {
-  ...BTN_BASE,
-  background: "var(--accent)",
-  color: "#fff",
-  border: "none",
-};
-
-export const BTN_GHOST: CSSProperties = {
-  ...BTN_BASE,
-  background: "transparent",
-  color: "var(--text-dim)",
-  border: "1px solid var(--border)",
-};
-
-export const BTN_DANGER: CSSProperties = {
-  ...BTN_BASE,
-  background: "rgba(255,107,107,0.10)",
-  color: "var(--red)",
-  border: "1px solid rgba(255,107,107,0.35)",
-};
-
-export const X_CLOSE: CSSProperties = {
-  width: 26,
-  height: 26,
-  borderRadius: 7,
-  background: "transparent",
-  border: "1px solid var(--border)",
-  color: "var(--text-dim)",
-  cursor: "pointer",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  fontFamily: "inherit",
-};
-
-// ── Panel chrome ───────────────────────────────────────────────────
-
-export const PANEL_HEAD: CSSProperties = {
-  padding: "14px 16px",
-  borderBottom: "1px solid var(--border-soft)",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  background: "var(--bg-elev)",
-};
-
-export const PANEL_TITLE: CSSProperties = {
-  fontSize: 13,
-  fontWeight: 600,
-  display: "flex",
-  alignItems: "center",
-  gap: 8,
-};
-
-export const PANEL_BODY: CSSProperties = {
-  padding: 18,
-  flex: 1,
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-  overflow: "auto",
-};
-
-/** Body container for a flow rendered inline inside a chat bubble — no
- *  panel padding / flex / scroll (the bubble owns those). */
-export const EMBED_BODY: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};
 
 // ── Token chip (.tok) ─────────────────────────────────────────────
 
@@ -137,87 +53,24 @@ export function CopyButton({
           setCopied(false);
         }, 1200);
       }}
-      style={{
-        background: "transparent",
-        border: "none",
-        color: copied ? "var(--green)" : "var(--text-dim)",
-        cursor: "pointer",
-        fontSize: size,
-        padding: 0,
-        fontFamily: "inherit",
-      }}
+      className={cn(
+        "inline-flex items-center gap-1 bg-transparent border-none p-0 cursor-pointer",
+        copied ? "text-green" : "text-text-dim",
+      )}
+      // Caller-tunable size — a dynamic value, so it stays inline.
+      style={{ fontSize: size }}
       aria-label={`${label} ${value}`}
     >
-      {copied ? "✓ Copied" : "⎘ Copy"}
-    </button>
-  );
-}
-
-// ── Banner (warn/error/success/info) ──────────────────────────────
-
-const BANNER_TONES: Record<
-  "warn" | "error" | "success" | "info",
-  { bg: string; border: string; ic: string }
-> = {
-  warn: {
-    bg: "rgba(245,165,36,0.10)",
-    border: "1px solid rgba(245,165,36,0.35)",
-    ic: "var(--amber)",
-  },
-  error: {
-    bg: "rgba(255,107,107,0.10)",
-    border: "1px solid rgba(255,107,107,0.35)",
-    ic: "var(--red)",
-  },
-  success: {
-    bg: "rgba(61,220,151,0.10)",
-    border: "1px solid rgba(61,220,151,0.35)",
-    ic: "var(--green)",
-  },
-  info: {
-    bg: "var(--bg-elev)",
-    border: "1px solid var(--border-soft)",
-    ic: "var(--text-dim)",
-  },
-};
-
-export function Banner({
-  tone,
-  icon,
-  title,
-  children,
-}: {
-  tone: "warn" | "error" | "success" | "info";
-  icon?: ReactNode;
-  title?: string;
-  children?: ReactNode;
-}) {
-  const t = BANNER_TONES[tone];
-  return (
-    <div
-      style={{
-        display: "flex",
-        gap: 10,
-        padding: "11px 12px",
-        borderRadius: 10,
-        alignItems: "flex-start",
-        fontSize: 12,
-        lineHeight: 1.55,
-        background: t.bg,
-        border: t.border,
-        color: "var(--text)",
-      }}
-    >
-      {icon && (
-        <span style={{ flexShrink: 0, marginTop: 1, color: t.ic, fontSize: 13 }}>{icon}</span>
+      {copied ? (
+        <>
+          <Check aria-hidden style={{ width: size, height: size }} /> Copied
+        </>
+      ) : (
+        <>
+          <Copy aria-hidden style={{ width: size, height: size }} /> Copy
+        </>
       )}
-      <div>
-        {title && (
-          <div style={{ fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>{title}</div>
-        )}
-        {children && <div style={{ color: "var(--text-dim)", fontSize: 12 }}>{children}</div>}
-      </div>
-    </div>
+    </button>
   );
 }
 
@@ -225,18 +78,13 @@ export function Banner({
 
 export function DetailRows({ rows }: { rows: { label: string; value: ReactNode }[] }) {
   return (
-    <div style={{ fontSize: 13 }}>
+    <div className="text-[13px]">
       {rows.map((row, i) => (
         <div
           key={i}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            padding: "7px 0",
-            borderBottom: i < rows.length - 1 ? "1px dashed var(--border-soft)" : "none",
-          }}
+          className="flex justify-between py-[7px] border-b border-dashed border-border-soft last:border-b-0"
         >
-          <span style={{ color: "var(--text-dim)" }}>{row.label}</span>
+          <span className="text-text-dim">{row.label}</span>
           <span className="mono">{row.value}</span>
         </div>
       ))}
@@ -256,39 +104,18 @@ export function TxRow({
   showCopy?: boolean;
 }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "8px 12px",
-        background: "var(--bg-elev)",
-        borderRadius: 10,
-        fontSize: 12,
-        border: "1px solid var(--border-soft)",
-        width: "100%",
-      }}
-    >
-      <span className="mono" style={{ color: "var(--text-dim)", flex: 1 }}>
-        {hash}
-      </span>
+    <div className="flex w-full items-center gap-2 rounded-sm border border-border-soft bg-bg-elev px-3 py-2 text-[12px]">
+      <span className="mono flex-1 text-text-dim">{hash}</span>
       {showCopy && (
         <button
           type="button"
           onClick={() => {
             void navigator.clipboard.writeText(hash);
           }}
-          style={{
-            background: "transparent",
-            border: "none",
-            color: "var(--text-dim)",
-            cursor: "pointer",
-            fontSize: 11,
-            padding: 0,
-          }}
+          className="bg-transparent border-none p-0 cursor-pointer text-text-dim"
           aria-label="Copy hash"
         >
-          ⎘
+          <Copy className="h-3 w-3" aria-hidden />
         </button>
       )}
       {explorerUrl && (
@@ -296,13 +123,9 @@ export function TxRow({
           href={explorerUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            color: "var(--text-dim)",
-            fontSize: 11,
-            textDecoration: "none",
-          }}
+          className="inline-flex items-center gap-1 text-[11px] text-text-dim no-underline"
         >
-          ↗ Explorer
+          <ExternalLink className="h-3 w-3" aria-hidden /> Explorer
         </a>
       )}
     </div>
@@ -324,35 +147,13 @@ export function BigVal({
 }) {
   return (
     <div
-      style={{
-        textAlign: "center",
-        padding,
-        background: "var(--bg-elev)",
-        borderRadius: 12,
-        border: "1px solid var(--border-soft)",
-      }}
+      className="text-center rounded-md border border-border-soft bg-bg-elev"
+      // Caller-tunable padding — a dynamic value, so it stays inline.
+      style={{ padding }}
     >
-      <div
-        style={{
-          fontSize: 11,
-          color: "var(--text-mute)",
-          letterSpacing: ".08em",
-        }}
-      >
-        {label}
-      </div>
-      <div
-        className="mono"
-        style={{
-          fontSize: 32,
-          fontWeight: 600,
-          letterSpacing: "-.02em",
-          marginTop: 6,
-        }}
-      >
-        {value}
-      </div>
-      {sub && <div style={{ fontSize: 11, color: "var(--text-dim)", marginTop: 4 }}>{sub}</div>}
+      <div className="text-[11px] text-text-mute tracking-[0.08em]">{label}</div>
+      <div className="mono mt-1.5 text-[32px] font-semibold -tracking-[0.02em]">{value}</div>
+      {sub && <div className="mt-1 text-[11px] text-text-dim">{sub}</div>}
     </div>
   );
 }
@@ -360,42 +161,14 @@ export function BigVal({
 // ── Spinner (.spinner / .spinner.lg / .spinner.agent) ─────────────
 
 export function Spinner({ size = "sm", agent = false }: { size?: "sm" | "lg"; agent?: boolean }) {
-  const px = size === "lg" ? 38 : 18;
-  const bw = size === "lg" ? 3 : 2;
   return (
     <div
-      style={{
-        width: px,
-        height: px,
-        borderRadius: 99,
-        border: `${String(bw)}px solid var(--border)`,
-        borderTopColor: agent ? "var(--agent)" : "var(--accent)",
-        animation: "spin .8s linear infinite",
-      }}
-    />
-  );
-}
-
-// ── Skeleton (shimmer bar) ────────────────────────────────────────
-
-export function Skel({
-  height = 10,
-  width = "100%",
-}: {
-  height?: number;
-  width?: string | number;
-}) {
-  return (
-    <div
-      style={{
-        width,
-        height,
-        background:
-          "linear-gradient(90deg, var(--bg-elev) 0%, var(--chip) 50%, var(--bg-elev) 100%)",
-        backgroundSize: "200% 100%",
-        animation: "shimmer 1.6s infinite linear",
-        borderRadius: 6,
-      }}
+      className={cn(
+        "rounded-full border-border animate-[spin_.8s_linear_infinite]",
+        size === "lg" ? "h-[38px] w-[38px] border-[3px]" : "h-[18px] w-[18px] border-2",
+        agent ? "border-t-agent" : "border-t-accent",
+      )}
+      aria-hidden
     />
   );
 }

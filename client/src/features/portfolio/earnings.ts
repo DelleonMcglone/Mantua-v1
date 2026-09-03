@@ -57,20 +57,9 @@ export function earningPoolCount(data: EarningsData | null): number {
   ).length;
 }
 
-export function fmtUsd(n: number): string {
-  if (!Number.isFinite(n)) return "$—";
-  if (n === 0) return "$0.00";
-  if (n > 0 && n < 0.01) return "<$0.01";
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-/** Compact token amount, e.g. 0.0042 → "0.0042", 1234.5 → "1,234.5". */
-export function fmtToken(n: number): string {
-  if (!Number.isFinite(n)) return "—";
-  if (n === 0) return "0";
-  if (n > 0 && n < 0.000001) return "<0.000001";
-  return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
-}
+// USD + token amounts render through the canonical `@/lib/format.ts`
+// (`usd` / `token`) — the local `fmtUsd` / `fmtToken` copies were deleted
+// in B-015's formatter unification.
 
 export function shortenHash(hash: string): string {
   if (hash.length <= 13) return hash;

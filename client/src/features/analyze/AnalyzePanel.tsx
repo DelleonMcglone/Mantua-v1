@@ -3,7 +3,8 @@ import { ExternalLink } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { ApiError, api } from "@/lib/api.ts";
-import { Banner, Spinner } from "@/features/agent/agent-primitives.tsx";
+import { Banner } from "@/components/ui/banner.tsx";
+import { Spinner } from "@/features/agent/agent-primitives.tsx";
 import { UserBubble, RichText, Caret } from "@/features/agent/chat-text.tsx";
 import {
   streamAnalyzeChat,

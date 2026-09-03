@@ -1,5 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- co-located formatters + strip component by design. */
 import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
+import { ExternalLink } from "lucide-react";
+import { address as shortAddr } from "@/lib/format.ts";
 import { AgentStrip } from "./AgentStrip.tsx";
 import { CopyButton } from "./agent-primitives.tsx";
 import type { AgentPortfolioState } from "./use-agent-portfolio.ts";
@@ -13,15 +15,10 @@ import type { AgentPortfolioState } from "./use-agent-portfolio.ts";
  * conversationally.
  */
 
-export function shortAddr(addr: string): string {
-  return addr.length <= 12 ? addr : `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
-export function fmtUsd(n: number): string {
-  if (!Number.isFinite(n) || n === 0) return "$0.00";
-  if (n > 0 && n < 0.01) return "<$0.01";
-  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+// Re-exported from the canonical formatter module so existing agent-surface
+// imports keep working; the local `fmtUsd` copy was deleted in B-015's
+// formatter unification (use `usd` from `@/lib/format.ts`).
+export { shortAddr };
 
 /** AgentStrip wired to the live agent wallet address + explorer link. */
 export function AgentWalletStrip({
@@ -38,15 +35,16 @@ export function AgentWalletStrip({
     <AgentStrip
       label={label}
       addr={
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+        <span className="inline-flex items-center gap-2">
           {shortAddr(agent.agentAddress)}
           <a
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: "var(--text-dim)", textDecoration: "none" }}
+            className="text-text-dim no-underline"
+            aria-label="View on explorer"
           >
-            ↗
+            <ExternalLink className="h-[11px] w-[11px]" aria-hidden />
           </a>
           <CopyButton value={agent.agentAddress} label="Copy agent address" />
         </span>

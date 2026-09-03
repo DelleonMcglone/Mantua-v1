@@ -28,24 +28,20 @@ interface IntentCardProps {
   actions?: ReactNode;
 }
 
-const TONE: Record<IntentConfidence, { border: string; bg: string; head: string; ring: string }> = {
+/** Token-class tone tables (B-015) — the old hardcoded dark-theme rgba
+ *  fills rendered the wrong hue in light mode. */
+const TONE: Record<IntentConfidence, { frame: string; head: string }> = {
   high: {
-    border: "var(--accent)",
-    bg: "rgba(139,108,240,0.10)",
-    head: "var(--accent)",
-    ring: "0 0 0 3px rgba(139,108,240,0.10)",
+    frame: "border-accent ring-[3px] ring-accent/10",
+    head: "bg-accent/10 text-accent border-b border-accent/25",
   },
   low: {
-    border: "var(--amber)",
-    bg: "rgba(245,165,36,0.10)",
-    head: "var(--amber)",
-    ring: "0 0 0 3px rgba(245,165,36,0.10)",
+    frame: "border-amber ring-[3px] ring-amber/10",
+    head: "bg-amber/10 text-amber border-b border-amber/25",
   },
   failed: {
-    border: "var(--red)",
-    bg: "rgba(255,107,107,0.10)",
-    head: "var(--red)",
-    ring: "0 0 0 3px rgba(255,107,107,0.10)",
+    frame: "border-red ring-[3px] ring-red/10",
+    head: "bg-red/10 text-red border-b border-red/25",
   },
 };
 
@@ -71,85 +67,30 @@ export function IntentCard({
 }: IntentCardProps) {
   const tone = TONE[confidence];
   return (
-    <div
-      style={{
-        border: `1px solid ${tone.border}`,
-        borderRadius: 12,
-        overflow: "hidden",
-        marginTop: 10,
-        boxShadow: tone.ring,
-      }}
-    >
+    <div className={`mt-2.5 overflow-hidden rounded-md border ${tone.frame}`}>
       <div
-        style={{
-          padding: "8px 12px",
-          background: tone.bg,
-          fontSize: 10,
-          letterSpacing: ".12em",
-          color: tone.head,
-          fontFamily: "JetBrains Mono, monospace",
-          fontWeight: 600,
-          borderBottom: `1px solid ${tone.border}40`,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
+        className={`flex items-center justify-between px-3 py-2 font-mono text-[10px] font-semibold tracking-[0.12em] ${tone.head}`}
       >
         <span>{headline ?? DEFAULT_HEADLINE[confidence]}</span>
         {headlineRight && (
-          <span
-            style={{
-              color: "var(--text-mute)",
-              letterSpacing: 0,
-              fontWeight: 400,
-            }}
-          >
-            {headlineRight}
-          </span>
+          <span className="font-normal tracking-normal text-text-mute">{headlineRight}</span>
         )}
       </div>
-      <div style={{ padding: "12px 14px" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            fontSize: 14,
-            fontWeight: 600,
-          }}
-        >
-          {what}
-        </div>
+      <div className="px-3.5 py-3">
+        <div className="flex items-center gap-2.5 text-[14px] font-semibold">{what}</div>
         {rows && rows.length > 0 && (
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 11,
-              color: "var(--text-dim)",
-              display: "grid",
-              gridTemplateColumns: "auto 1fr",
-              gap: "4px 14px",
-            }}
-          >
+          <div className="mt-2 grid grid-cols-[auto_1fr] gap-x-3.5 gap-y-1 text-[11px] text-text-dim">
             {rows.map((row, i) => (
-              <div key={i} style={{ display: "contents" }}>
-                <span style={{ color: "var(--text-mute)" }}>{row.label}</span>
-                <span style={{ textAlign: "right" }}>{row.value}</span>
+              <div key={i} className="contents">
+                <span className="text-text-mute">{row.label}</span>
+                <span className="text-right">{row.value}</span>
               </div>
             ))}
           </div>
         )}
       </div>
       {actions && (
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            padding: "10px 14px",
-            borderTop: "1px solid var(--border-soft)",
-            background: "var(--bg-elev)",
-          }}
-        >
+        <div className="flex gap-2 border-t border-border-soft bg-bg-elev px-3.5 py-2.5">
           {actions}
         </div>
       )}

@@ -12,21 +12,22 @@ PD-003 — for each pattern in the prototype, where it maps in the Shadcn primit
 | Modal / confirmation dialog | `dialog` (Radix) | Used as-is via `useConfirmedAction` hook | PD-005 (done) |
 | Onboarding / welcome modal | n/a — removed; v2 ships login direct | — | n/a |
 | Toast (transaction submitted, errors) | `sonner` (Shadcn ships sonner-based toast) | Add when first toast is needed | Phase 3 (P3-006) |
-| Token selector dropdown | `popover` + `command` (combobox) | Custom token row template | Phase 3 (P3-001) |
-| Network selector dropdown | `popover` + custom rows (single chain so list is trivial) | Reuse same pattern as token selector | Phase 3 (P3-001) |
+| Token selector dropdown | `dropdown-menu` (Radix) | ✅ — `client/src/components/ui/dropdown-menu.tsx`; token row template in `TokenSelector` | B-015 (done) |
+| Network selector dropdown | `dropdown-menu` (Radix) | ✅ — same primitive (`BridgeDestinationSelector`, `WalletMenu`, sort chips) | B-015 (done) |
 | Amount input with MAX button | `input` + suffix | Custom — wrap `input` with MAX button | Phase 3 (P3-001) |
 | Slippage input (percent) | `input` | Custom format + warning levels (P1-004) | Phase 3 (P3-003) |
-| Tabs (Portfolio: Balances / LP / History) | `tabs` (Radix) | Used as-is | Phase 8 (P8-005) |
+| Tabs (Portfolio: Balances / LP / History) | `tabs` (Radix) | ✅ — `client/src/components/ui/tabs.tsx` (AssetsCard, MarketDetail) | B-015 (done) |
+| Empty / loading / error state (in-card) | not a Shadcn primitive | ✅ — `client/src/components/ui/empty-state.tsx` | B-015 (done) |
 | Asset row (icon + name + qty + chevron) | not a primitive | Custom — `Card`-based row | Phase 8 (P8-003) |
 | Asset icon (token glyph) | not a primitive | Custom — typed by symbol; Phase 0 prototype already has SVGs | Phase 8 (P8-003) |
 | Toggle group (theme: dark/light) | `toggle-group` (Radix) | Used as-is | PD-006 (settings panel — defer to P2-013 settings) |
 | Slider (slippage, density, remove-liquidity %) | `slider` (Radix) | Used as-is | Phase 4 (P4-007) |
 | Sheet (mobile right-column collapse) | `sheet` (Radix) | Used as-is | PD-007 deviation; Phase D follow-up |
-| Skeleton loader | `skeleton` | Used as-is | Phase 7 (P7-004) |
+| Skeleton loader | `skeleton` | ✅ — `client/src/components/ui/skeleton.tsx` (promoted from agent `Skel`) | B-015 (done) |
 | OHLC chart | not a Shadcn primitive | `lightweight-charts` library per P4-002 | Phase 4 (P4-002) |
 | Code block / hash with copy | not a primitive | Custom — uses JetBrains Mono + lucide `Copy` icon | Phase 3 (P3-006) |
 | Settings rows (label / control) | not a primitive | Custom layout component | Phase 6 (settings restyle) |
-| Banner / inline notice (peg status, slippage warning) | not a primitive | Custom — colored `Card` variant | Phase 5 (P5-003) |
+| Banner / inline notice (peg status, slippage warning) | not a primitive | ✅ — `client/src/components/ui/banner.tsx` (`role="alert"` / `role="status"` per tone) | B-015 (done) |
 
 ## Convention
 
