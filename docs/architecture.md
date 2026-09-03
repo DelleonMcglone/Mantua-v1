@@ -54,36 +54,41 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 
 `req.walletAddress` is what `walletRateLimiter` (P1-007) keys on once auth is wired into write paths.
 
-## CDP agent wallet (Phase 6)
+## Circle agent wallet (Phase 6)
 
-### Wallet boundary (D-008 — confirmed P6-000, 2026-04-30)
+### Wallet boundary (D-008 — confirmed P6-000, 2026-04-30; provider updated by D-110, 2026-09-02)
 
 Mantua runs **two wallets per user**, owned by different actors:
 
-| Wallet                | Owner     | Holds                    | Signing rights               | Funded by                                  |
-| --------------------- | --------- | ------------------------ | ---------------------------- | ------------------------------------------ |
-| Privy embedded wallet | The user  | The user's primary funds | User only (Privy auth)       | User's existing on-ramp                    |
-| CDP agent wallet      | The agent | A user-set budget        | Agent only (CDP-managed key) | User explicitly transfers from Privy → CDP |
+| Wallet                | Owner     | Holds                    | Signing rights                                | Funded by                                     |
+| --------------------- | --------- | ------------------------ | --------------------------------------------- | --------------------------------------------- |
+| Privy embedded wallet | The user  | The user's primary funds | User only (Privy auth)                        | User's existing on-ramp                       |
+| Circle agent wallet   | The agent | A user-set budget        | Server via Circle DCW (entity-secret custody) | User explicitly transfers from Privy → Circle |
 
-**Hard rule:** the agent never holds, sees, or can sign with the Privy wallet's keys. There is no path in code that lets the agent move funds out of the Privy wallet. The user funds the agent by sending tokens from Privy to CDP — this is the only direction funds cross the boundary, and it always requires the user's signature on the Privy side.
+**Hard rule:** the agent never holds, sees, or can sign with the Privy wallet's keys. There is no path in code that lets the agent move funds out of the Privy wallet. The user funds the agent by sending tokens from Privy to the Circle wallet — this is the only direction funds cross the boundary, and it always requires the user's signature on the Privy side.
 
-**Why** (full rationale in `docs/decisions/v2-open-decisions.md` D-008): an autonomous LLM-driven actor must not have signing rights over the user's primary funds. Bounding the agent's blast radius to a separately-funded CDP wallet means the worst case from any agent bug, prompt injection, or misparsed instruction is loss of the agent's budget — not the user's main holdings. Mental model: Zapier doesn't get your Gmail password.
+**Why** (full rationale in `docs/decisions/v2-open-decisions.md` D-008): an autonomous LLM-driven actor must not have signing rights over the user's primary funds. Bounding the agent's blast radius to a separately-funded agent wallet means the worst case from any agent bug, prompt injection, or misparsed instruction is loss of the agent's budget — not the user's main holdings. Mental model: Zapier doesn't get your Gmail password.
 
-**Spending caps stack at the wallet, not the user.** The user's Privy wallet has its own daily cap (D-009 / P1-001). The agent's CDP wallet has its own, independent cap (P6-011) that the user sets when funding the agent. Caps are enforced server-side in `server/src/lib/spending-cap.ts` against `daily_wallet_spend` keyed on the wallet address — the cap doesn't know which wallet is "primary" and which is "agent," and that's intentional.
+**Spending caps stack at the wallet, not the user.** The user's Privy wallet has its own daily cap (D-009 / P1-001). The agent's Circle wallet has its own, independent cap (P6-011) that the user sets when funding the agent. Caps are enforced server-side in `server/src/lib/spending-cap.ts` against `daily_wallet_spend` keyed on the wallet address — the cap doesn't know which wallet is "primary" and which is "agent," and that's intentional.
 
-**Recovery.** If the user wants to "unfund" the agent, they sweep the CDP wallet back to their Privy wallet. The CDP wallet is not destroyed — it just sits empty, ready to be re-funded. There is no protocol-level concept of "deleting an agent."
+**Recovery.** If the user wants to "unfund" the agent, they sweep the Circle wallet back to their Privy wallet. The Circle wallet is not destroyed — it just sits empty, ready to be re-funded. There is no protocol-level concept of "deleting an agent."
 
 ### Implementation path
 
-The chosen implementation path for P6-003 (Create & Manage Agent Wallet) is **bare [`@coinbase/cdp-sdk`](https://www.npmjs.com/package/@coinbase/cdp-sdk)** in the server (`server/src/lib/cdp/`). This reverses the earlier preference for `create-onchain-agent` / `@coinbase/agentkit`, for three reasons surfaced when scoping P6-003:
-
-1. **`create-onchain-agent` is a project scaffolder, not a runtime dep** — you can't `npm install` it into an existing server. Following the original guidance literally would have meant running it once and copying its output, which is not a maintainable supply-chain story.
-2. **AgentKit pulls in ~30 transitive deps** including `ethers` (alongside our `viem`), `opensea-js`, `twitter-api-v2`, Solana SDKs, ZeroDev, Zora, Jupiter, vaultsfyi, sushi, ensofinance, clanker-sdk, etc. It is a kitchen-sink LLM-tools bundle aimed at autonomous agents that need every possible action. We only need EVM wallet provisioning; the bloat is unjustified.
-3. **The original justifications don't apply to our app:** AgentKit's spending policies are duplicated by our own `server/src/lib/spending-cap.ts` (P1-001); EIP-7702 delegation is not needed for P6-003; AgentKit's "end-user-management story" assumes a single-tenant agent, but we manage agents per-user via the `agent_wallets` Drizzle table.
-
-`@coinbase/cdp-sdk` itself has a small, sensible dep tree (viem, zod, axios, jose, plus Solana/SPL primitives we ignore) and exposes exactly the EVM-account-creation API we need. If a later Phase 6 ticket actually benefits from AgentKit primitives (e.g. autonomous-mode tool routing in P6-009/P6-010), that integration can be added incrementally and locally without retrofitting wallet creation.
-
-Phase 2 already stores the CDP API credentials in env (`CDP_PROJECT_ID`, `CDP_API_KEY_NAME`, `CDP_API_KEY_PRIVATE_KEY`, `CDP_WALLET_SECRET`); they remain `.optional()` in `server/src/env.ts` so the server still boots without them. Wallet provisioning happens in Phase 6 (P6-003).
+The implemented provider is **Circle Developer-Controlled Wallets**
+(`@circle-fin/developer-controlled-wallets`, `server/src/lib/circle/`) —
+SCA accounts on Base, blockchain id `"BASE"`, provisioned per user into a
+wallet set (`agent_wallets` Drizzle table). This supersedes the earlier
+CDP-SDK plan for P6-003; the wallet-boundary and cap design above are
+provider-independent and carried over unchanged (see D-110 for the
+reconciliation and migration path). Credentials live in env
+(`CIRCLE_API_KEY`, `CIRCLE_ENTITY_SECRET`, `CIRCLE_WALLET_SET_ID`); they are
+`.optional()` so the server boots without them and agent features 503.
+Every agent write funnels through `circle/execute.ts` and the
+`allowed-targets.ts` allowlist. Phase 1 hardening exit criteria (D-110 /
+reusability audit): confirm to mined receipt rather than Circle's `SENT`
+state, hard-fail on an unset `CIRCLE_WALLET_SET_ID` in production, verify
+the mainnet Gas Station sponsorship policy, and bound agent-side approvals.
 
 ## Mainnet safety rails (Phase 1)
 

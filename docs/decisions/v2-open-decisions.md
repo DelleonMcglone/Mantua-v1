@@ -23,6 +23,7 @@
 | D-012 | Legal review before fee collection        | YES — non-negotiable                                                          | Very high  | Crypto-native counsel             |
 | D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                            | Medium     | None                              |
 | D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                               | Medium     | Tune in beta                      |
+| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent  | High       | None                              |
 
 ---
 
@@ -286,6 +287,63 @@
 **Blocks:** Phase N (PN-004).
 
 **Decision:** ⬜ ACCEPTED / ⬜ REJECTED — _notes:_
+
+---
+
+## D-110 — Wallet-stack reconciliation: RainbowKit vs Privy vs Circle Wallets
+
+**Decision:** ✅ ACCEPTED — 2026-09-02.
+
+**Context.** The reconciliation request presumed an existing RainbowKit
+implementation carrying multiple testnets and a chain switcher, to be squared
+with the single-chain chainless product requirement and the Circle Wallets
+target for Phase 1.
+
+**Finding: there is no RainbowKit implementation in this codebase.** A full
+sweep found no `@rainbow-me/*` or `wagmi` dependency and no RainbowKit code —
+the only traces are bundled wallet brand-logo assets referenced in
+`LoginModal.tsx` and a stale roadmap row. The user wallet stack is
+**Privy only** (`@privy-io/react-auth`, embedded + external wallets). The
+multi-testnet configuration (Base Sepolia 84532 + Arc Testnet 5042002) and the
+chain-switcher UI **did** exist and were removed on 2026-09-02 in the Base
+Mainnet migration and the chainless-UI pass; the design prototype's network
+chip (`src/app.jsx:148-160`) is a hand-rolled lookalike, single-entry, never
+RainbowKit. Any RainbowKit implementation being remembered belongs to a
+predecessor repo (the 2026-03 `MantuaAI` era), not this tree.
+
+**Decisions.**
+
+1. **User custody: Privy stays. RainbowKit and wagmi will not be adopted.**
+   RainbowKit's core value is a wallet-picker plus a chain-switcher UI; the
+   chainless product decision forbids the switcher, and Privy already covers
+   the rest (external wallets + WalletConnect per D-005/D-007) while adding
+   embedded wallets RainbowKit does not have. wagmi would add a parallel hook
+   layer over the same viem clients `client/src/lib/privy/wallet-client.ts`
+   already builds directly.
+2. **Agent custody: Circle Developer-Controlled Wallets is the Phase 1
+   target — confirmed and already implemented** (`server/src/lib/circle/`).
+   This supersedes the *provider naming* of D-008 ("separate CDP wallet");
+   D-008's wallet-boundary rationale — the agent never touches the user's
+   keys, blast radius bounded to an explicitly funded wallet — carries over
+   to Circle unchanged.
+3. **Circle user-facing wallets (user-controlled / modular passkey) are
+   explicitly out of scope for Phase 1** user custody. Recorded as a future
+   option to revisit only if Privy becomes a constraint (pricing, passkey
+   requirements) — an evaluation, not a planned migration.
+
+**Migration path** (status as of 2026-09-02):
+
+| # | Step | Status |
+| --- | --- | --- |
+| 1 | Strip testnets; single chain Base Mainnet 8453 | ✅ done (mainnet migration) |
+| 2 | Remove chain switcher + all visible chain UI | ✅ done (chainless-UI pass) |
+| 3 | Strike wagmi from the roadmap; P2-013 is the direct Privy → viem bridge, shipped in `wallet-client.ts` | ✅ done (this decision) |
+| 4 | Delete residual chain-switch machinery (`chain-context.tsx` collapse, dead `NETWORK_OPTIONS`) | ⬜ per reusability audit |
+| 5 | Circle DCW Phase 1 hardening — exit criteria: execute-to-confirmed-receipt (not `SENT`), `CIRCLE_WALLET_SET_ID` pinned + hard-fail when unset, mainnet Gas Station policy verified, bounded agent approvals | ⬜ audit ship-blockers 1 & 6 |
+| 6 | Update `docs/architecture.md` wallet section from the stale CDP-SDK narrative to Circle DCW | ✅ done (this decision) |
+
+**Non-goals:** RainbowKit, wagmi, any multi-chain wallet UI, and Circle
+user-controlled wallets for user custody.
 
 ---
 
