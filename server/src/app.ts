@@ -22,6 +22,7 @@ import { marketDetailRouter } from "./routes/market-detail.ts";
 import { cronStrategiesRouter } from "./routes/cron-strategies.ts";
 import { cronResolutionRouter } from "./routes/cron-resolution.ts";
 import { cronIntentsRouter } from "./routes/cron-intents.ts";
+import { circleWebhookRouter } from "./routes/circle-webhook.ts";
 import { x402ServiceRouter } from "./routes/x402-service.ts";
 import { agentQueryRouter } from "./routes/agent-query.ts";
 import { agentSendRouter } from "./routes/agent-send.ts";
@@ -56,6 +57,9 @@ import { v4SwapRouter } from "./routes/v4-swap.ts";
 export const app = express();
 app.set("trust proxy", 1);
 app.use(pinoHttp({ logger }));
+// C-015 — Circle webhook finalizer. Mounted BEFORE express.json() so the
+// ECDSA signature is verified over the raw body bytes Circle signed.
+app.use(circleWebhookRouter);
 app.use(express.json());
 app.use(ipRateLimiter);
 app.use(killSwitch);

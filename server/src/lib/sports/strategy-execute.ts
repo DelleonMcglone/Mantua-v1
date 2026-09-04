@@ -28,7 +28,17 @@ import type { StrategyDecision } from "./strategies.ts";
 const BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export type ExecuteOutcome =
-  | { kind: "executed"; txHash: string; soldRaw: string; usdcOutRaw: string }
+  | {
+      kind: "executed";
+      txHash: string;
+      soldRaw: string;
+      usdcOutRaw: string;
+      /** Circle tx id of the close (finalization ledger key). */
+      circleTxId: string;
+      /** "poll" = this call finalized (caller closes position); "webhook" =
+       * the durable finalizer already closed + audited — do neither again. */
+      finalizedBy: "poll" | "webhook";
+    }
   | { kind: "held"; reason: string }
   | { kind: "failed"; error: string };
 
@@ -82,6 +92,19 @@ export async function executeTriggeredClose(
       outcomeIndex: market.outcomeIndex === 0 ? 0 : 1,
       direction: "sell",
       amountRaw: amount,
+      // C-015 — persist the pending close so the webhook finalizer can
+      // resolve it if this poll times out (frozen lambda, network split).
+      ledger: {
+        kind: "strategy_close",
+        userId: row.userId,
+        walletAddress: wallet.address,
+        circleWalletId: wallet.circleWalletId,
+        payload: {
+          strategyId: row.id,
+          action: decision.action,
+          marketId: decision.marketId,
+        },
+      },
     });
     logger.info(
       { strategyId: row.id, txHash: result.txHash, sold: amount.toString() },
@@ -92,6 +115,8 @@ export async function executeTriggeredClose(
       txHash: result.txHash,
       soldRaw: amount.toString(),
       usdcOutRaw: result.quote.amountOut,
+      circleTxId: result.circleTxId,
+      finalizedBy: result.finalizedBy,
     };
   } catch (err) {
     return { kind: "failed", error: err instanceof Error ? err.message : String(err) };

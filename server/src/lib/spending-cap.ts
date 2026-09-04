@@ -158,3 +158,27 @@ export async function recordSpending(address: string, usdAmount: number): Promis
       },
     });
 }
+
+/**
+ * C-015 — reverse a previously-recorded spend for the same wallet and UTC
+ * day (a provisional record the on-chain receipt later contradicted: the
+ * transaction reverted, so the ledger must show no spend). Floors both the
+ * accumulated USD and the tx count at zero so a double-reversal cannot
+ * produce negative ledger state.
+ */
+export async function reverseSpending(address: string, usdAmount: number): Promise<void> {
+  if (usdAmount < 0) throw new Error("reverseSpending: usdAmount must be non-negative");
+  const lower = address.toLowerCase();
+  const today = utcDate();
+  await db
+    .insert(dailyWalletSpend)
+    .values({ walletAddress: lower, spendDate: today, spentUsd: "0", txCount: 0 })
+    .onConflictDoUpdate({
+      target: [dailyWalletSpend.walletAddress, dailyWalletSpend.spendDate],
+      set: {
+        spentUsd: sql`GREATEST(${dailyWalletSpend.spentUsd} - ${usdAmount}, 0)`,
+        txCount: sql`GREATEST(${dailyWalletSpend.txCount} - 1, 0)`,
+        updatedAt: sql`now()`,
+      },
+    });
+}

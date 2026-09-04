@@ -1,12 +1,16 @@
 import { type Address, parseUnits } from "viem";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
+import { BASE_CHAIN_ID, getChainInfo, getExplorerTxUrl, type SupportedChainId } from "./chains.ts";
 import {
-  BASE_CHAIN_ID,
-  getChainInfo,
-  getExplorerTxUrl,
-  type SupportedChainId,
-} from "./chains.ts";
-import { executeAgentAbiCall } from "./circle/execute.ts";
+  awaitReceipt,
+  createAgentContractExecution,
+  type TransactionState,
+} from "./circle/execute.ts";
+import {
+  claimExecutionFinalization,
+  recordPendingExecution,
+  recordSendPortfolioTx,
+} from "./circle/finalize.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
 import { tokenAmountUsd } from "./usd-pricing.ts";
@@ -20,6 +24,14 @@ import { tokenAmountUsd } from "./usd-pricing.ts";
  * by the agent path). Spending cap is enforced via the Phase 1 rail in
  * spending-cap.ts, which keys on wallet address and treats agent wallets
  * transparently.
+ *
+ * C-015 — receipts, not broadcasts. The pending execution is persisted to
+ * `circle_executions` before the receipt wait, and this function resolves
+ * only on a CONFIRMED/COMPLETE receipt. A reverted transfer raises
+ * `CircleTransactionFailedError`; a bounded timeout raises
+ * `CircleReceiptTimeoutError` — a PENDING outcome the webhook finalizer
+ * (`routes/circle-webhook.ts`) resolves later. The spend is recorded only
+ * after confirmation, so a revert can never leave money counted as spent.
  */
 function agentNetworkName(chainId: SupportedChainId): string {
   return getChainInfo(chainId).displayName.toLowerCase().replace(/\s+/g, "-");
@@ -33,6 +45,8 @@ export interface AgentSendArgs {
   amount: string;
   /** Execution chain — defaults to Base. */
   chainId?: SupportedChainId;
+  /** Request context for the durable audit trail (optional). */
+  auditContext?: { ipAddress?: string; userAgent?: string };
 }
 
 export interface AgentSendResult {
@@ -47,12 +61,12 @@ export interface AgentSendResult {
   explorerUrl: string;
 }
 
-export function explorerTxUrl(
-  txHash: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
-): string {
+export function explorerTxUrl(txHash: string, chainId: SupportedChainId = BASE_CHAIN_ID): string {
   return getExplorerTxUrl(chainId, txHash);
 }
+
+/** The confirmed receipt state — exported so callers can branch on it. */
+export type SendReceiptState = TransactionState;
 
 export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSendResult> {
   const { privyUserId, to, symbol, amount } = args;
@@ -80,17 +94,63 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
   if (token.native) {
     throw new Error(`Native ${symbol} transfers are not supported via the agent wallet yet`);
   }
-  const { txHash } = await executeAgentAbiCall({
+
+  // C-015 — create the transaction (idempotency-keyed), persist the pending
+  // execution BEFORE waiting, then poll to a terminal state. If this lambda
+  // freezes mid-wait, the webhook finalizer still resolves the execution.
+  const created = await createAgentContractExecution({
     walletId: wallet.circleWalletId,
     to: token.address,
     abiFunctionSignature: "transfer(address,uint256)",
     abiParameters: [to, amountAtomic.toString()],
   });
+  await recordPendingExecution({
+    circleTxId: created.id,
+    kind: "agent_send",
+    action: "agent_send",
+    ...(wallet.userId ? { userId: wallet.userId } : {}),
+    walletAddress: wallet.address,
+    circleWalletId: wallet.circleWalletId,
+    payload: {
+      to,
+      symbol,
+      amountDecimal: amount,
+      amountAtomic: amountAtomic.toString(),
+      usdValue,
+      network: agentNetworkName(chainId),
+      agentAddress: wallet.address,
+      ...(args.auditContext?.ipAddress ? { ipAddress: args.auditContext.ipAddress } : {}),
+      ...(args.auditContext?.userAgent ? { userAgent: args.auditContext.userAgent } : {}),
+    },
+  });
 
-  await recordSpending(wallet.address, usdValue);
+  // Wait for the receipt — bounded. The webhook finalizer covers timeouts;
+  // a failed/reverted transfer raises before a single cent is recorded.
+  const receipt = await awaitReceipt(created.id);
+
+  // C-015 — exactly-once ledger finalization: if the webhook finalizer won
+  // the race, it already recorded (or reversed) the spend — do neither.
+  const claim = await claimExecutionFinalization(created.id, "poll", receipt.state);
+  if (claim !== "lost") {
+    await recordSpending(wallet.address, usdValue);
+    await recordSendPortfolioTx({
+      ...(wallet.userId ? { userId: wallet.userId } : {}),
+      walletAddress: wallet.address,
+      action: "send",
+      txHash: receipt.txHash,
+      params: {
+        to,
+        symbol,
+        amountDecimal: amount,
+        amountAtomic: amountAtomic.toString(),
+        network: agentNetworkName(chainId),
+      },
+      usdValue,
+    });
+  }
 
   return {
-    txHash,
+    txHash: receipt.txHash,
     amountAtomic: amountAtomic.toString(),
     amountDecimal: amount,
     symbol,
@@ -98,6 +158,6 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
     agentAddress: wallet.address,
     usdValue,
     network: agentNetworkName(chainId),
-    explorerUrl: explorerTxUrl(txHash, chainId),
+    explorerUrl: explorerTxUrl(receipt.txHash, chainId),
   };
 }

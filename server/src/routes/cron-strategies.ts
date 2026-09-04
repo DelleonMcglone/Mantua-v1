@@ -91,18 +91,23 @@ cronStrategiesRouter.get(
       } else if (decision.kind === "trigger") {
         const exec = await executeTriggeredClose(db, row, decision);
         if (exec.kind === "executed") {
-          await engineExecuted(
-            db,
-            row.id,
-            {
-              action: decision.action,
-              marketId: decision.marketId,
-              soldRaw: exec.soldRaw,
-              usdcOutRaw: exec.usdcOutRaw,
-              reason: decision.reason,
-            },
-            exec.txHash,
-          );
+          // C-015 — close the position only when the poll won finalization;
+          // the webhook finalizer already closed and audited if it won the
+          // poll/webhook race.
+          if (exec.finalizedBy === "poll") {
+            await engineExecuted(
+              db,
+              row.id,
+              {
+                action: decision.action,
+                marketId: decision.marketId,
+                soldRaw: exec.soldRaw,
+                usdcOutRaw: exec.usdcOutRaw,
+                reason: decision.reason,
+              },
+              exec.txHash,
+            );
+          }
         } else {
           await engineTrigger(
             db,
