@@ -1,9 +1,9 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-
 import { guardGatewaySpend } from "./unified-balance.ts";
 import type { SpendGuardIo } from "./spending-cap.ts";
 import { SafetyError } from "./errors.ts";
+
 
 const WALLET = "0xAbC0000000000000000000000000000000000001";
 const THIRD_PARTY = "0xdef0000000000000000000000000000000000002";
@@ -97,5 +97,80 @@ void describe("guardGatewaySpend (C-010 Gateway cap recording)", () => {
     );
     assert.equal(issued, false);
     assert.deepEqual(calls, []);
+  });
+});
+
+/**
+ * C-008 closeout — read-path tests for the unified USDC balance service's
+ * pure helpers. The consolidated balance itself is shaped inside
+ * `getUnifiedBalances` (SDK-bound, exercised end-to-end via the Portfolio
+ * trace in docs/tasks/026-x402-unified-balance-closeout.md); what IS pure and
+ * exported here is the Gateway destination-chain vocabulary the spend
+ * read-path (route schema + agent tool) validates against.
+ */
+
+process.env.NODE_ENV = "test";
+process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
+process.env.PRIVY_APP_ID ??= "test-stub";
+process.env.PRIVY_APP_SECRET ??= "test-stub";
+
+const { GATEWAY_SPEND_CHAINS, isGatewaySpendChain, resolveGatewaySpendChain } = await import(
+  "./unified-balance.ts"
+);
+
+void describe("gateway spend-chain vocabulary", () => {
+  void it("lists the five mainnet destinations, Base (the home chain) excluded", () => {
+    assert.deepEqual(
+      [...GATEWAY_SPEND_CHAINS],
+      ["Ethereum", "Avalanche", "Optimism", "Arbitrum", "Polygon"],
+    );
+    assert.equal(
+      (GATEWAY_SPEND_CHAINS as readonly string[]).includes("Base"),
+      false,
+      "deposits live on Base — it is never a spend destination",
+    );
+  });
+
+  void it("isGatewaySpendChain accepts exactly the canonical names", () => {
+    for (const chain of GATEWAY_SPEND_CHAINS) assert.equal(isGatewaySpendChain(chain), true);
+    assert.equal(isGatewaySpendChain("ethereum"), false, "case-sensitive by design");
+    assert.equal(isGatewaySpendChain("Base"), false);
+    assert.equal(isGatewaySpendChain(""), false);
+    assert.equal(isGatewaySpendChain(42), false);
+    assert.equal(isGatewaySpendChain(null), false);
+  });
+});
+
+void describe("resolveGatewaySpendChain (typed-command fuzzy matching)", () => {
+  void it("passes canonical names through unchanged", () => {
+    for (const chain of GATEWAY_SPEND_CHAINS) {
+      assert.equal(resolveGatewaySpendChain(chain), chain);
+    }
+  });
+
+  void it("resolves common aliases and tickers", () => {
+    assert.equal(resolveGatewaySpendChain("ethereum"), "Ethereum");
+    assert.equal(resolveGatewaySpendChain("eth"), "Ethereum");
+    assert.equal(resolveGatewaySpendChain("ETH"), "Ethereum");
+    assert.equal(resolveGatewaySpendChain("avax"), "Avalanche");
+    assert.equal(resolveGatewaySpendChain("op"), "Optimism");
+    assert.equal(resolveGatewaySpendChain("arb"), "Arbitrum");
+    assert.equal(resolveGatewaySpendChain("matic"), "Polygon");
+  });
+
+  void it("strips separators and mainnet/one suffixes the way users type them", () => {
+    assert.equal(resolveGatewaySpendChain("OP Mainnet"), "Optimism");
+    assert.equal(resolveGatewaySpendChain("arbitrum one"), "Arbitrum");
+    assert.equal(resolveGatewaySpendChain("Arbitrum_One"), "Arbitrum");
+    assert.equal(resolveGatewaySpendChain("polygon-mainnet"), "Polygon");
+    assert.equal(resolveGatewaySpendChain("  Avalanche  ".trim()), "Avalanche");
+  });
+
+  void it("returns null for non-destinations instead of guessing", () => {
+    assert.equal(resolveGatewaySpendChain("Base"), null, "home chain is not a destination");
+    assert.equal(resolveGatewaySpendChain("base"), null);
+    assert.equal(resolveGatewaySpendChain("solana"), null);
+    assert.equal(resolveGatewaySpendChain("dogechain"), null);
+    assert.equal(resolveGatewaySpendChain(""), null);
   });
 });
