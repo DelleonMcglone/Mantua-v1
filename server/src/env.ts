@@ -28,15 +28,46 @@ const schema = z.object({
     .min(1)
     .default("HNCFA9TyBqpo5qpe6QreQABAA1kV8g46mhkCcicu6v2R"),
 
-  // Circle Developer-Controlled Wallets — the agent-wallet provider on Base.
-  // CIRCLE_API_KEY: a Standard key from the Circle Developer Console.
-  // CIRCLE_ENTITY_SECRET: your registered 32-byte entity secret (hex).
-  // CIRCLE_WALLET_SET_ID: the wallet set agent wallets are created in — set
-  //   this after the first one is created (it's logged on creation) so we
-  //   don't spin up a new wallet set on each cold start.
-  CIRCLE_API_KEY: z.string().min(1).optional(),
-  CIRCLE_ENTITY_SECRET: z.string().min(1).optional(),
-  CIRCLE_WALLET_SET_ID: z.string().min(1).optional(),
+  // ── Circle credentials ───────────────────────────────────────────────
+  // Provisioned by hand in the Circle Developer Console — see
+  // docs/tasks/018-circle-credentials.md for the runbook. Never hardcode
+  // these; the entity secret is full custody of every agent wallet.
+  //
+  // All optional so the server boots without them (agent routes 503);
+  // `circleCredentialIssues()` below upgrades the important ones to hard
+  // failures in production.
+
+  /** Console API key, `PREFIX:ID:SECRET`. `LIVE_API_KEY:…` for mainnet;
+   *  a `TEST_API_KEY:…` here means the agent is pointed at testnet. */
+  CIRCLE_API_KEY: z
+    .string()
+    .regex(/^[A-Z_]+:[0-9a-f]+:[0-9a-f]+$/i, "expected Circle's PREFIX:ID:SECRET key format")
+    .optional(),
+  /** Registered 32-byte entity secret, hex (64 chars). Generated and
+   *  registered by the operator; Circle never stores it in plain text and
+   *  neither do we. Losing it without the recovery file is unrecoverable. */
+  CIRCLE_ENTITY_SECRET: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/i, "expected 64 hex chars (32 bytes)")
+    .optional(),
+  /** The wallet set agent wallets are provisioned into. Pin this: an unset
+   *  value makes every serverless cold start mint a NEW wallet set, outside
+   *  whatever Gas Station policy is bound to the intended one. */
+  CIRCLE_WALLET_SET_ID: z.uuid().optional(),
+
+  /** Gas Station (paymaster) policy id, from Console → Gas Station. There is
+   *  no API credential for Gas Station on Developer-Controlled Wallets — the
+   *  policy is console-side config bound to the wallet set + chain, and the
+   *  SDK sponsors SCA transactions automatically once it exists. We record
+   *  the id purely so the app can assert sponsorship was configured
+   *  deliberately (see the preflight) rather than discovering an unsponsored
+   *  wallet as a mystery timeout at execution time. */
+  CIRCLE_GAS_STATION_POLICY_ID: z.string().min(1).optional(),
+
+  /** Webhook signature key id for Circle transaction notifications. Circle
+   *  recommends webhooks over polling for terminal transaction state; absent
+   *  → the poller stays the only completion signal. */
+  CIRCLE_WEBHOOK_KEY_ID: z.string().min(1).optional(),
 
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
@@ -170,12 +201,63 @@ function blankEnvToUndefined(env: NodeJS.ProcessEnv): Record<string, string | un
   return out;
 }
 
+/**
+ * Cross-field checks on the Circle credential set that zod can't express
+ * per-field. Returns human-readable problems; empty means the set is
+ * coherent. Exported for the preflight script (`npm run circle:preflight`).
+ *
+ * The shape of the rule matters: Circle stays entirely optional (the server
+ * must boot without it and 503 the agent routes), but once it IS configured
+ * in production the half-configured states below are deploy hazards rather
+ * than degradations, so they fail the boot instead of warning into a log
+ * nobody reads.
+ */
+export function circleCredentialIssues(e: Env): string[] {
+  const configured = Boolean(e.CIRCLE_API_KEY && e.CIRCLE_ENTITY_SECRET);
+  if (!configured) {
+    // Half a credential pair is always a mistake, even outside production.
+    if (e.CIRCLE_API_KEY || e.CIRCLE_ENTITY_SECRET) {
+      return [
+        "CIRCLE_API_KEY and CIRCLE_ENTITY_SECRET must be set together — one without the other leaves every agent route disabled.",
+      ];
+    }
+    return [];
+  }
+
+  const issues: string[] = [];
+  if (!e.CIRCLE_WALLET_SET_ID) {
+    issues.push(
+      "CIRCLE_WALLET_SET_ID is unset: each cold start would mint a NEW wallet set, scattering user wallets outside the Gas Station policy bound to the intended set. Create one, then pin its id.",
+    );
+  }
+  if (!e.CIRCLE_GAS_STATION_POLICY_ID) {
+    issues.push(
+      "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored, so they fail on an SCA wallet holding no ETH — and surface as an opaque timeout. Configure a Gas Station policy for this wallet set on Base, then record its id.",
+    );
+  }
+  if (/^TEST_API_KEY:/i.test(e.CIRCLE_API_KEY ?? "")) {
+    issues.push(
+      "CIRCLE_API_KEY is a TEST key — the agent would be operating on testnet while the rest of the app is on Base Mainnet. Use a LIVE key.",
+    );
+  }
+  return issues;
+}
+
 export function loadEnv(): Env {
   const parsed = schema.safeParse(blankEnvToUndefined(process.env));
   if (!parsed.success) {
     console.error("Invalid environment configuration:");
     console.error(z.treeifyError(parsed.error));
     process.exit(1);
+  }
+  const issues = circleCredentialIssues(parsed.data);
+  if (issues.length > 0) {
+    const fatal = parsed.data.NODE_ENV === "production";
+    console[fatal ? "error" : "warn"](
+      `Circle credential configuration ${fatal ? "is invalid" : "is incomplete"}:`,
+    );
+    for (const issue of issues) console[fatal ? "error" : "warn"](`  - ${issue}`);
+    if (fatal) process.exit(1);
   }
   return parsed.data;
 }

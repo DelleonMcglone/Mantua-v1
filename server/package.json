@@ -10,6 +10,7 @@
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint . --max-warnings 0",
     "test": "find src -name '*.test.ts' | xargs tsx --env-file-if-exists=.env --test",
+    "circle:preflight": "tsx --env-file-if-exists=.env src/scripts/circle-preflight.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
