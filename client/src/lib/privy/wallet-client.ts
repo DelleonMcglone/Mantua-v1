@@ -1,6 +1,8 @@
 import { useCallback } from "react";
 import { useWallets } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, custom } from "viem";
+// C-005 gasless hook point (D-111): resolves to a no-op unless VITE_GASLESS_ENABLED.
+import { useGaslessWalletClient } from "../gasless/use-gasless-wallet-client.ts";
 import { BASE_CHAIN_ID, CHAIN_INFO, getRpcTransport, type SupportedChainId } from "../chains.ts";
 
 /**
@@ -165,9 +167,17 @@ export function hardenProvider(
  */
 export function useChainWalletClient() {
   const { wallets } = useWallets();
+  // C-005 gasless hook point (D-111): when the gasless flag is on and the
+  // user has a provisioned smart wallet, writes route through the sponsored
+  // smart-account client (same viem WalletClient shape); otherwise the
+  // getter resolves null and the EOA path below stays the default.
+  const getGaslessClient = useGaslessWalletClient();
   const chainId = BASE_CHAIN_ID;
 
   return useCallback(async () => {
+    const gasless = await getGaslessClient();
+    if (gasless) return gasless;
+
     const active = wallets.find((w) => w.walletClientType === "privy") ?? wallets.at(0);
     if (!active) return null;
 
@@ -188,5 +198,5 @@ export function useChainWalletClient() {
       chain: info.viemChain,
       transport: custom(hardenProvider(provider, chainId)),
     });
-  }, [wallets, chainId]);
+  }, [wallets, chainId, getGaslessClient]);
 }
