@@ -182,3 +182,44 @@ export async function reverseSpending(address: string, usdAmount: number): Promi
       },
     });
 }
+
+/**
+ * IO seam for `guardSpend` — defaults to the real daily-ledger functions;
+ * tests inject fakes to assert the check-then-issue-then-record order.
+ */
+export interface SpendGuardIo {
+  check: typeof checkSpendingCap;
+  record: typeof recordSpending;
+}
+
+const defaultSpendGuardIo: SpendGuardIo = {
+  check: checkSpendingCap,
+  record: recordSpending,
+};
+
+/**
+ * C-019 — the sequence every money-moving path runs: price the spend, assert
+ * cap headroom, issue the thing that moves money (executable calldata, a
+ * swap tx), then record the spend on the daily ledger. Each step only runs
+ * when the previous one succeeded — a failed check or a failed issuance
+ * leaves no ink, and a pricing failure blocks the whole sequence.
+ *
+ * For user-signed calldata routes the record is a provisional INTENT: the
+ * user submits the transaction themselves, so the server inks the ledger at
+ * the moment it hands out executable calldata. Abandoned calldata consumes
+ * headroom until the UTC reset — conservative by design (an intent that
+ * overcounts is safe; one that undercounts is the bug this guard exists
+ * to close).
+ */
+export async function guardSpend<T>(
+  resolveUsd: () => Promise<number>,
+  address: string,
+  issue: (usd: number) => Promise<T>,
+  io: SpendGuardIo = defaultSpendGuardIo,
+): Promise<T> {
+  const usd = await resolveUsd();
+  await io.check(address, usd);
+  const result = await issue(usd);
+  await io.record(address, usd);
+  return result;
+}

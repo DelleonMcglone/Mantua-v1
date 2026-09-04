@@ -48,6 +48,18 @@ export class MarketClosedError extends Error {
   }
 }
 
+/**
+ * C-019 — the USD magnitude a market trade consumes from the daily spending
+ * cap: buys spend USDC, and USDC is the cap's unit of account, so the exact
+ * input amount IS the USD value (no price feed involved — the same convention
+ * the chat tool's `trade_market` uses). Sells are exits — they return USDC —
+ * so they consume nothing and the route must not check or record them.
+ * Returns null for a sell (no cap touch), the USD value for a buy.
+ */
+export function marketTradeSpendUsd(direction: "buy" | "sell", amountRaw: bigint): number | null {
+  return direction === "buy" ? Number(amountRaw) / 1e6 : null;
+}
+
 export interface BuiltMarketTrade {
   to: `0x${string}`;
   data: `0x${string}`;

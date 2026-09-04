@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "../db/client.ts";
+import { logger } from "../lib/logger.ts";
 import { portfolioTransactions } from "../db/schema/trading.ts";
 import { users } from "../db/schema/users.ts";
 import { eq } from "drizzle-orm";
@@ -9,9 +10,15 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { logAudit } from "../lib/audit.ts";
 import { ACTIVE_CHAIN_ID } from "../lib/constants.ts";
 import { getRequestContext } from "../lib/request-context.ts";
-import { recordSpending } from "../lib/spending-cap.ts";
+import { guardSpend, reverseSpending } from "../lib/spending-cap.ts";
+import { SafetyError } from "../lib/errors.ts";
 import { isTokenSymbol } from "../lib/tokens.ts";
-import { fetchSwapTx, type UniswapQuote } from "../lib/uniswap.ts";
+import {
+  UnreadableQuoteError,
+  fetchSwapTx,
+  quoteSpendLeg,
+  type UniswapQuote,
+} from "../lib/uniswap.ts";
 import { tokenAmountUsd } from "../lib/usd-pricing.ts";
 
 export const swapRouter = Router();
@@ -20,6 +27,13 @@ export const swapRouter = Router();
  * POST /api/swap/calldata — given a quote object the client got from
  * /api/quote (and optionally the user's permit signature), returns the
  * { to, data, value, gasLimit? } the wallet should submit.
+ *
+ * C-019 — this route can move the user's money once they sign, so the spend
+ * is priced server-side from the quote's input leg, checked against the
+ * daily cap, and recorded as a ledger intent before any calldata is
+ * returned (guardSpend). The old shape — no check, ledger ink only if the
+ * client later self-reported — is closed: the record route now only REVERSES
+ * the intent on a reported failure.
  */
 swapRouter.post(
   "/api/swap/calldata",
@@ -35,10 +49,29 @@ swapRouter.post(
       res.status(400).json({ error: "Invalid request", code: "BAD_REQUEST" });
       return;
     }
+    const wallet = getRequestContext(req).walletAddress;
+    if (!wallet) {
+      res.status(401).json({ error: "Wallet not linked", code: "WALLET_REQUIRED" });
+      return;
+    }
     try {
-      const swap = await fetchSwapTx(parsed.data.quote as UniswapQuote, parsed.data.signature);
+      const { symbol, amountRaw } = quoteSpendLeg(parsed.data.quote);
+      const swap = await guardSpend(
+        () => tokenAmountUsd(symbol, amountRaw),
+        wallet,
+        () => fetchSwapTx(parsed.data.quote as UniswapQuote, parsed.data.signature),
+      );
       res.json({ swap });
     } catch (err) {
+      if (err instanceof UnreadableQuoteError) {
+        res.status(400).json({ error: err.message, code: "QUOTE_UNREADABLE" });
+        return;
+      }
+      if (err instanceof SafetyError) {
+        logger.warn({ err, wallet }, "swap calldata: blocked by the spending cap");
+        res.status(400).json({ error: err.message, code: err.code, details: err.details });
+        return;
+      }
       const message = err instanceof Error ? err.message : "calldata failed";
       res
         .status(502)
@@ -49,8 +82,11 @@ swapRouter.post(
 
 /**
  * POST /api/swap/record — client calls this after the on-chain receipt
- * resolves. Inserts into portfolio_transactions and increments the daily
- * spend ledger (P1-001 recordSpending).
+ * resolves. Inserts into portfolio_transactions. The daily spend ledger is
+ * NOT written here: C-019 moved that ink to calldata issuance (guardSpend in
+ * /api/swap/calldata), so a success report is a no-op for the ledger (a
+ * second write would double-count one trade) and a FAILURE report reverses
+ * the recorded intent.
  */
 swapRouter.post(
   "/api/swap/record",
@@ -114,8 +150,12 @@ swapRouter.post(
       usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
     });
 
-    if (outcome === "success" && usdValue > 0) {
-      await recordSpending(wallet, usdValue);
+    // C-019 — the intent was already recorded at issuance; a failed trade
+    // releases it. Repricing uses the same tokenIn/amountInRaw the ledger
+    // saw at issuance; a reversal can only ever reduce headroom error
+    // toward zero (reverseSpending floors at 0).
+    if (outcome === "failure" && usdValue > 0) {
+      await reverseSpending(wallet, usdValue);
     }
     await logAudit({ ...ctx, action: "swap", outcome, txHash, params });
     res.json({ ok: true });

@@ -7,8 +7,12 @@ import {
   MarketClosedError,
   NoMarketError,
   buildMarketTrade,
+  marketTradeSpendUsd,
 } from "../lib/sports/market-trade-build.ts";
 import { isSupportedChainId } from "../lib/chains.ts";
+import { SafetyError } from "../lib/errors.ts";
+import { getRequestContext } from "../lib/request-context.ts";
+import { guardSpend } from "../lib/spending-cap.ts";
 
 export const marketTradeRouter = Router();
 
@@ -36,6 +40,10 @@ const bodySchema = z.object({
  * The server builds, the USER signs: this route holds no keys and moves no
  * funds. The shared `buildMarketTrade` also powers the strategy executor
  * and the agent, so every path trades identically.
+ *
+ * C-019 — signed calldata still moves the user's money, so buys now pass
+ * the daily spending cap and record the spend intent server-side
+ * (guardSpend) before any calldata is returned; the previous skip is closed.
  */
 marketTradeRouter.post(
   "/api/markets/trade/calldata",
@@ -49,16 +57,40 @@ marketTradeRouter.post(
         .json({ error: "Invalid trade", code: "BAD_REQUEST", details: parsed.error.issues });
       return;
     }
+    const wallet = getRequestContext(req).walletAddress;
+    if (!wallet) {
+      res.status(401).json({ error: "Wallet not linked", code: "WALLET_REQUIRED" });
+      return;
+    }
+    const amountRaw = BigInt(parsed.data.amountRaw);
     try {
-      const built = await buildMarketTrade({
+      const tradeArgs = {
         providerEventId: parsed.data.providerEventId,
         outcomeIndex: parsed.data.outcomeIndex,
         direction: parsed.data.direction,
-        amountRaw: BigInt(parsed.data.amountRaw),
+        amountRaw,
         ...(parsed.data.chainId !== undefined ? { chainId: parsed.data.chainId } : {}),
-      });
+      };
+      // C-019 — buys check the daily cap and record the spend intent on the
+      // ledger before calldata leaves the server (guardSpend): a failed check
+      // or a failed quote leaves no ink. Sells are exits — they return USDC —
+      // so they touch no cap, matching the chat tool's trade_market.
+      const spendUsd = marketTradeSpendUsd(parsed.data.direction, amountRaw);
+      const built =
+        spendUsd === null
+          ? await buildMarketTrade(tradeArgs)
+          : await guardSpend(
+              () => Promise.resolve(spendUsd),
+              wallet,
+              () => buildMarketTrade(tradeArgs),
+            );
       res.json(built);
     } catch (err) {
+      if (err instanceof SafetyError) {
+        logger.warn({ err, wallet }, "market-trade: blocked by the spending cap");
+        res.status(400).json({ error: err.message, code: err.code, details: err.details });
+        return;
+      }
       if (err instanceof NoMarketError) {
         res.status(404).json({ error: "No market for this game yet", code: "NO_MARKET" });
         return;

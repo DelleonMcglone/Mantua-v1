@@ -1,11 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { logger } from "../lib/logger.ts";
-import {
-  DEFAULT_CHAIN_ID,
-  isSupportedChainId,
-  type SupportedChainId,
-} from "../lib/chains.ts";
+import { DEFAULT_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
 import { isTokenSymbol } from "../lib/tokens.ts";
 import {
   buildPoolSwapTestCalldata,
@@ -16,6 +12,11 @@ import {
 import { HOOK_NAMES, isFeeTier } from "../lib/v4-contracts.ts";
 import { HookPairNotAllowedError } from "../lib/hook-pair-gating.ts";
 import { isTransientRpcError } from "../lib/rpc-client.ts";
+import { logAudit } from "../lib/audit.ts";
+import { SafetyError } from "../lib/errors.ts";
+import { getRequestContext } from "../lib/request-context.ts";
+import { guardSpend } from "../lib/spending-cap.ts";
+import { tokenAmountUsd } from "../lib/usd-pricing.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 
@@ -218,39 +219,68 @@ v4SwapRouter.post(
       res.status(400).json({ error: "tokenIn and tokenOut must differ", code: "BAD_REQUEST" });
       return;
     }
+    const ctx = getRequestContext(req);
+    const wallet = ctx.walletAddress;
+    if (!wallet) {
+      res.status(401).json({ error: "Wallet not linked", code: "WALLET_REQUIRED" });
+      return;
+    }
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- BYPASS_HOOK_FOR_DEMO is a togglable flag
     const effectiveHook = BYPASS_HOOK_FOR_DEMO ? null : (hook ?? null);
     try {
-      const quote = await quoteExactInputV4({
-        tokenIn,
-        tokenOut,
-        fee,
-        hook: effectiveHook,
-        amountInRaw: BigInt(amountInRaw),
-        chainId,
-      });
-      const swap = buildPoolSwapTestCalldata({
-        poolKey: quote.poolKey,
-        zeroForOne: quote.zeroForOne,
-        amountInRaw: BigInt(amountInRaw),
-        chainId,
-      });
-      // amountOutMinimum: amountOut * (1 - slippage)
-      const slippageDenom = 10_000n;
-      const minOut =
-        (BigInt(quote.amountOut) * (slippageDenom - BigInt(slippageBps))) / slippageDenom;
+      // C-019 — this calldata moves the user's money once signed, so the
+      // spend is priced from tokenIn (a registry symbol, not client-reported
+      // USD), checked against the daily cap, and recorded as a ledger intent
+      // before anything is returned (guardSpend). Quote and calldata build
+      // run only after the check passes.
+      const built = await guardSpend(
+        () => tokenAmountUsd(tokenIn, BigInt(amountInRaw)),
+        wallet,
+        async () => {
+          const quote = await quoteExactInputV4({
+            tokenIn,
+            tokenOut,
+            fee,
+            hook: effectiveHook,
+            amountInRaw: BigInt(amountInRaw),
+            chainId,
+          });
+          const swap = buildPoolSwapTestCalldata({
+            poolKey: quote.poolKey,
+            zeroForOne: quote.zeroForOne,
+            amountInRaw: BigInt(amountInRaw),
+            chainId,
+          });
+          // amountOutMinimum: amountOut * (1 - slippage)
+          const slippageDenom = 10_000n;
+          const minOut =
+            (BigInt(quote.amountOut) * (slippageDenom - BigInt(slippageBps))) / slippageDenom;
+          return { swap, quote, minOut };
+        },
+      );
       res.json({
-        ...swap,
+        ...built.swap,
         quote: {
-          amountIn: quote.amountIn,
-          amountOut: quote.amountOut,
-          amountOutMinimum: minOut.toString(),
-          gasEstimate: quote.gasEstimate,
-          poolKey: quote.poolKey,
-          zeroForOne: quote.zeroForOne,
+          amountIn: built.quote.amountIn,
+          amountOut: built.quote.amountOut,
+          amountOutMinimum: built.minOut.toString(),
+          gasEstimate: built.quote.gasEstimate,
+          poolKey: built.quote.poolKey,
+          zeroForOne: built.quote.zeroForOne,
         },
       });
     } catch (err) {
+      if (err instanceof SafetyError) {
+        logger.warn({ err, wallet }, "v4 swap calldata: blocked by the spending cap");
+        await logAudit({
+          ...ctx,
+          action: "swap",
+          outcome: "rejected_cap",
+          params: { tokenIn, tokenOut, amountRaw: amountInRaw },
+        });
+        res.status(400).json({ error: err.message, code: err.code, details: err.details });
+        return;
+      }
       if (err instanceof HookPairNotAllowedError) {
         res.status(400).json({ error: err.message, code: "HOOK_PAIR_NOT_ALLOWED" });
         return;

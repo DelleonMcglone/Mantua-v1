@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { env } from "../env.ts";
 import { logger } from "./logger.ts";
+import { getTokenByAddress, type TokenSymbol } from "./tokens.ts";
 
 const TRADING_API = "https://trade-api.gateway.uniswap.org/v1";
 
@@ -138,4 +139,46 @@ export async function fetchSwapTx(quote: UniswapQuote, signature?: string): Prom
   }
   const json: unknown = await res.json();
   return swapResponseSchema.parse(json).swap;
+}
+
+/** Raised when a client-supplied quote cannot be read as a priced spend. */
+export class UnreadableQuoteError extends Error {
+  constructor(reason: string) {
+    super(`Quote cannot be priced: ${reason}`);
+    this.name = "UnreadableQuoteError";
+  }
+}
+
+/**
+ * C-019 — the (token symbol, raw amount) this quote will spend, read
+ * server-side from the Trading API quote's input leg. The calldata route
+ * prices the daily-cap check from this, so a quote the server cannot parse
+ * or resolve to a registry token raises rather than issuing unpriced spend
+ * (fail-closed: no readable quote, no calldata).
+ *
+ * `input.amount` is the raw base-unit string the Trading API echoes from
+ * the original quote request (the same value `/api/quote` posted).
+ */
+export function quoteSpendLeg(quote: unknown): { symbol: TokenSymbol; amountRaw: bigint } {
+  const parsedResult = quoteResponseSchema.safeParse(quote);
+  if (!parsedResult.success) {
+    throw new UnreadableQuoteError("quote does not match the Trading API shape");
+  }
+  const parsed = parsedResult.data;
+  const token = getTokenByAddress(parsed.quote.input.token);
+  if (!token) {
+    throw new UnreadableQuoteError(
+      `input token ${parsed.quote.input.token} is not in the registry`,
+    );
+  }
+  let amountRaw: bigint;
+  try {
+    amountRaw = BigInt(parsed.quote.input.amount);
+  } catch {
+    throw new UnreadableQuoteError(`input amount "${parsed.quote.input.amount}" is not an integer`);
+  }
+  if (amountRaw <= 0n) {
+    throw new UnreadableQuoteError(`input amount ${String(amountRaw)} must be positive`);
+  }
+  return { symbol: token.symbol as TokenSymbol, amountRaw };
 }

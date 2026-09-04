@@ -103,6 +103,19 @@ export function isAnyChainTokenSymbol(s: string): s is TokenSymbol {
   return Object.prototype.hasOwnProperty.call(TOKENS_BASE, s);
 }
 
+/**
+ * Resolve a registry token by its contract address (case-insensitive).
+ * Returns undefined for addresses outside the registry — native ETH is
+ * not a tradeable registry entry, so its zero address resolves to nothing.
+ */
+export function getTokenByAddress(
+  address: string,
+  chainId: SupportedChainId = DEFAULT_CHAIN_ID,
+): Token | undefined {
+  const lower = address.toLowerCase();
+  return Object.values(getTokens(chainId)).find((t) => t.address.toLowerCase() === lower);
+}
+
 /** Legacy single-chain export. Prefer `getTokens(chainId)`. */
 export const TOKENS: Record<string, Token> = TOKENS_BASE;
 
