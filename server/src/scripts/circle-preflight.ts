@@ -40,6 +40,15 @@ async function main(): Promise<number> {
     return 1;
   }
   ok(`CIRCLE_API_KEY present (${keyShape(env.CIRCLE_API_KEY)})`);
+  const parts = env.CIRCLE_API_KEY.split(":").length;
+  if (parts !== 3) {
+    bad(
+      `Key has ${String(parts)} colon-separated parts; Circle's console format is 3 ` +
+        `(PREFIX:ID:SECRET). If you pasted the key AND a separate "ID" field, drop the ` +
+        `extra — the id is already the middle segment. Copy the key verbatim from the ` +
+        `console. The live check below is authoritative either way.`,
+    );
+  }
   ok("CIRCLE_ENTITY_SECRET present (64 hex chars, value never logged)");
   if (/^TEST_API_KEY:/i.test(env.CIRCLE_API_KEY)) {
     bad("This is a TEST key — the agent would run on testnet, not Base Mainnet.");

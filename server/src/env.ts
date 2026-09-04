@@ -41,7 +41,13 @@ const schema = z.object({
    *  a `TEST_API_KEY:…` here means the agent is pointed at testnet. */
   CIRCLE_API_KEY: z
     .string()
-    .regex(/^[A-Z_]+:[0-9a-f]+:[0-9a-f]+$/i, "expected Circle's PREFIX:ID:SECRET key format")
+    .min(1)
+    // Deliberately NOT shape-validated. The SDK accepts any string and
+    // Circle is the only authority on what a valid key looks like; a strict
+    // regex here would brick the boot if Circle ever changes the format.
+    // We only reject whitespace, which is always a paste error. The
+    // 3-part shape is surfaced as advice by `circle:preflight`.
+    .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
     .optional(),
   /** Registered 32-byte entity secret, hex (64 chars). Generated and
    *  registered by the operator; Circle never stores it in plain text and
