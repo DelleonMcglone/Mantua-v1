@@ -13,6 +13,8 @@
     "circle:generate-secret": "tsx src/scripts/circle-generate-secret.ts",
     "circle:register-secret": "tsx --env-file-if-exists=.env src/scripts/circle-register-secret.ts",
     "circle:preflight": "tsx --env-file-if-exists=.env src/scripts/circle-preflight.ts",
+    "circle:id-smoke": "tsx --env-file-if-exists=.env src/scripts/circle-id-smoke.ts",
+    "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

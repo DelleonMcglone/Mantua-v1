@@ -112,6 +112,59 @@ describe("pollReceipt", () => {
     );
   });
 
+  it("raises a typed error on DENIED — compliance denial is a failure, not a retry", async () => {
+    try {
+      await pollReceipt(
+        "tx-denied",
+        returning(() => txResponse("DENIED", { errorReason: "transaction screening denial" })),
+        { intervalMs: 1, timeoutMs: 1_000 },
+      );
+      assert.fail("expected CircleTransactionFailedError");
+    } catch (err) {
+      assert.ok(err instanceof CircleTransactionFailedError);
+      assert.equal(err.state, "DENIED");
+      assert.equal(err.errorReason, "transaction screening denial");
+    }
+  });
+
+  it("never surfaces a terminal failure as success even when a txHash exists", async () => {
+    // A reverted transaction HAS a hash — the hash proves broadcast, not
+    // outcome. The poll must still raise the typed failure.
+    try {
+      await pollReceipt(
+        "tx-reverted",
+        returning(() => txResponse("FAILED", { txHash: HASH, errorReason: "out of gas" })),
+        { intervalMs: 1, timeoutMs: 1_000 },
+      );
+      assert.fail("expected CircleTransactionFailedError");
+    } catch (err) {
+      assert.ok(err instanceof CircleTransactionFailedError);
+      assert.equal(err.circleTxId, "tx-reverted");
+    }
+  });
+
+  it("timeout surfaces the typed INDETERMINATE outcome, distinct from failure", async () => {
+    // C-012 — a bounded poll ending without a terminal state is PENDING:
+    // callers may report neither success nor a definite failure. The error
+    // type carries everything a caller needs to hand off to the finalizer.
+    try {
+      await pollReceipt(
+        "tx-pending",
+        returning(() => txResponse("QUEUED", { txHash: undefined })),
+        { intervalMs: 1, timeoutMs: 30 },
+      );
+      assert.fail("expected CircleReceiptTimeoutError");
+    } catch (err) {
+      assert.ok(err instanceof CircleReceiptTimeoutError);
+      assert.ok(!(err instanceof CircleTransactionFailedError));
+      assert.equal(err.circleTxId, "tx-pending");
+      assert.equal(err.timeoutMs, 30);
+      // Never got as far as SENT — no hash to hand the finalizer.
+      assert.equal(err.txHash, null);
+      assert.match(err.message, /outcome pending, not success/);
+    }
+  });
+
   it("carries the last observed broadcast hash on timeout", async () => {
     try {
       await pollReceipt(
