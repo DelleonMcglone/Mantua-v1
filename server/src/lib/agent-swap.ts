@@ -9,7 +9,7 @@ import { executeAgentAbiCall, executeAgentCalldata } from "./circle/execute.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
-import { tokenAmountUsd } from "./usd-pricing.ts";
+import { tokenAmountUsdStrict } from "./usd-pricing.ts";
 import { buildPoolSwapTestCalldata, quoteExactInputV4 } from "./v4-onchain-swap.ts";
 import type { FeeTier } from "./v4-contracts.ts";
 
@@ -103,7 +103,9 @@ export async function swapFromAgentWallet(args: AgentSwapArgs): Promise<AgentSwa
   const amountAtomic = parseUnits(amountIn, inDef.decimals);
   if (amountAtomic <= 0n) throw new Error("amountIn must be positive");
 
-  const usdValue = await tokenAmountUsd(tokenIn, amountAtomic);
+  // C-019 — strict pricing: a dead feed throws instead of valuing the spend
+  // at $0, so the cap cannot be priced around.
+  const usdValue = await tokenAmountUsdStrict(tokenIn, amountAtomic);
   await checkSpendingCap(wallet.address, usdValue);
 
   // Quote the no-hook pool on the execution chain; the tier is

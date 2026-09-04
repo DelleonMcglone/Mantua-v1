@@ -16,7 +16,7 @@ import { logAudit } from "../lib/audit.ts";
 import { SafetyError } from "../lib/errors.ts";
 import { getRequestContext } from "../lib/request-context.ts";
 import { guardSpend } from "../lib/spending-cap.ts";
-import { tokenAmountUsd } from "../lib/usd-pricing.ts";
+import { PriceUnavailableError, tokenAmountUsdStrict } from "../lib/usd-pricing.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 
@@ -234,7 +234,9 @@ v4SwapRouter.post(
       // before anything is returned (guardSpend). Quote and calldata build
       // run only after the check passes.
       const built = await guardSpend(
-        () => tokenAmountUsd(tokenIn, BigInt(amountInRaw)),
+        // C-019 — strict pricing: a dead feed throws instead of valuing the
+        // spend at $0, so the cap cannot be priced around.
+        () => tokenAmountUsdStrict(tokenIn, BigInt(amountInRaw)),
         wallet,
         async () => {
           const quote = await quoteExactInputV4({
@@ -270,6 +272,11 @@ v4SwapRouter.post(
         },
       });
     } catch (err) {
+      if (err instanceof PriceUnavailableError) {
+        // Fail-closed: no price, no calldata that could be signed into a trade.
+        res.status(503).json({ error: err.message, code: "PRICE_UNAVAILABLE" });
+        return;
+      }
       if (err instanceof SafetyError) {
         logger.warn({ err, wallet }, "v4 swap calldata: blocked by the spending cap");
         await logAudit({

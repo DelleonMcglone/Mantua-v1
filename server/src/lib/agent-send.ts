@@ -13,7 +13,7 @@ import {
 } from "./circle/finalize.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
-import { tokenAmountUsd } from "./usd-pricing.ts";
+import { tokenAmountUsdStrict } from "./usd-pricing.ts";
 
 /**
  * P6-004 — send tokens from the agent wallet.
@@ -81,12 +81,9 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
     throw new Error("amount must be positive");
   }
 
-  // USD value for the cap rail. tokenAmountUsd returns 0 if pricing is
-  // unavailable, so a 0 value
-  // there is fine. On mainnet, a price of 0 means we couldn't reach
-  // CoinGecko — checkSpendingCap will treat that as a $0 spend, which is
-  // the same fail-open behavior the existing user paths use.
-  const usdValue = await tokenAmountUsd(symbol, amountAtomic);
+  // C-019 — strict pricing for the cap rail: a dead feed throws instead of
+  // valuing the send at $0, so the cap cannot be priced around.
+  const usdValue = await tokenAmountUsdStrict(symbol, amountAtomic);
   await checkSpendingCap(wallet.address, usdValue);
 
   // All app tokens (USDC/EURC/cbBTC) are read as ERC-20s, so a send is an

@@ -7,7 +7,7 @@ import { logger } from "./logger.ts";
 import { logAudit } from "./audit.ts";
 import { getAgentWallet, AgentWalletNotFoundError } from "./agent-wallet.ts";
 import { quoteAgentSwap, swapFromAgentWallet } from "./agent-swap.ts";
-import { getDailyCap, getDailySpend, isSpendingCapEnforced } from "./spending-cap.ts";
+import { getDailyCap, getDailySpend } from "./spending-cap.ts";
 import { SafetyError } from "./errors.ts";
 import {
   getTradeSignals,
@@ -17,7 +17,7 @@ import {
 } from "./agent-signals.ts";
 import { baseRpcClient } from "./rpc-client.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
-import { tokenAmountUsd } from "./usd-pricing.ts";
+import { PriceUnavailableError, tokenAmountUsd, tokenAmountUsdStrict } from "./usd-pricing.ts";
 
 /**
  * Resolve path for guard-blocked swaps — the swap tool no longer dead-ends
@@ -464,6 +464,8 @@ async function processClaimedIntent(
   const balance = await balanceOf(tokenIn, claimed.walletAddress as Address);
   let targetRaw = remainingRaw < balance ? remainingRaw : balance;
   if (targetRaw > 0n) {
+    // Lenient pricing here is intentional — this only skips a size
+    // optimization; the cap preflight below is strict and fail-closed.
     const targetUsd = await tokenAmountUsd(tokenIn, targetRaw);
     if (targetUsd > MAX_INTENT_USD_PER_SWEEP) {
       const fracPpm = BigInt(Math.floor((MAX_INTENT_USD_PER_SWEEP / targetUsd) * 1_000_000));
@@ -476,36 +478,44 @@ async function processClaimedIntent(
     return { intentId: claimed.id, pair, outcome: "skipped", reason };
   }
 
-  // Spending-cap preflight: clamp to today's remaining headroom; when the
-  // wallet is capped out, shelve until the UTC-midnight reset WITHOUT
-  // counting an attempt (nothing about the trade itself was wrong).
-  if (isSpendingCapEnforced()) {
-    const [cap, spent] = await Promise.all([
-      getDailyCap(claimed.walletAddress),
-      getDailySpend(claimed.walletAddress),
-    ]);
-    const headroomUsd = cap - spent;
-    if (headroomUsd < MIN_CLIP_USD) {
-      const reason = `daily spending cap reached ($${spent.toFixed(2)}/$${String(cap)})`;
-      await releaseSkipped(claimed, reason, {
-        nextCheckAt: nextUtcMidnight(new Date()),
-        countAttempt: false,
-      });
-      return { intentId: claimed.id, pair, outcome: "skipped", reason };
-    }
-    const targetUsd = await tokenAmountUsd(tokenIn, targetRaw);
-    if (targetUsd > headroomUsd) {
-      const fracPpm = BigInt(Math.floor((headroomUsd / targetUsd) * 1_000_000));
-      targetRaw = (targetRaw * fracPpm) / 1_000_000n;
-    }
-    if (targetRaw <= 0n) {
-      const reason = "daily spending cap headroom below dust";
-      await releaseSkipped(claimed, reason, {
-        nextCheckAt: nextUtcMidnight(new Date()),
-        countAttempt: false,
-      });
-      return { intentId: claimed.id, pair, outcome: "skipped", reason };
-    }
+  // Spending-cap preflight (C-019 — unconditional, the toggle is gone):
+  // clamp to today's remaining headroom; when the wallet is capped out,
+  // shelve until the UTC-midnight reset WITHOUT counting an attempt
+  // (nothing about the trade itself was wrong). Pricing is strict — a feed
+  // outage parks the intent on backoff instead of valuing the sweep at $0.
+  const [cap, spent] = await Promise.all([
+    getDailyCap(claimed.walletAddress),
+    getDailySpend(claimed.walletAddress),
+  ]);
+  const headroomUsd = cap - spent;
+  if (headroomUsd < MIN_CLIP_USD) {
+    const reason = `daily spending cap reached (${spent.toFixed(2)}/${String(cap)})`;
+    await releaseSkipped(claimed, reason, {
+      nextCheckAt: nextUtcMidnight(new Date()),
+      countAttempt: false,
+    });
+    return { intentId: claimed.id, pair, outcome: "skipped", reason };
+  }
+  let targetUsd: number;
+  try {
+    targetUsd = await tokenAmountUsdStrict(tokenIn, targetRaw);
+  } catch (err) {
+    if (!(err instanceof PriceUnavailableError)) throw err;
+    const reason = `USD price unavailable — spending-cap preflight is fail-closed (${err.symbol})`;
+    await releaseSkipped(claimed, reason, { nextCheckAt: backoffAt(), countAttempt: false });
+    return { intentId: claimed.id, pair, outcome: "skipped", reason };
+  }
+  if (targetUsd > headroomUsd) {
+    const fracPpm = BigInt(Math.floor((headroomUsd / targetUsd) * 1_000_000));
+    targetRaw = (targetRaw * fracPpm) / 1_000_000n;
+  }
+  if (targetRaw <= 0n) {
+    const reason = "daily spending cap headroom below dust";
+    await releaseSkipped(claimed, reason, {
+      nextCheckAt: nextUtcMidnight(new Date()),
+      countAttempt: false,
+    });
+    return { intentId: claimed.id, pair, outcome: "skipped", reason };
   }
 
   const targetAmount = formatUnits(targetRaw, inDef.decimals);

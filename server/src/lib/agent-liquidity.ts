@@ -11,7 +11,7 @@ import { buildPoolKey } from "./pool-key.ts";
 import { getRpcClient } from "./rpc-client.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, getTokens, type TokenSymbol, ZERO_ADDRESS } from "./tokens.ts";
-import { getUsdPrice, tokenAmountUsd } from "./usd-pricing.ts";
+import { getUsdPrice, tokenAmountUsdStrict } from "./usd-pricing.ts";
 import { encodeSqrtPriceX96 } from "./sqrt-price.ts";
 import { buildAddLiquidityCalldata } from "./v4-add-liquidity.ts";
 import {
@@ -247,8 +247,11 @@ export async function addLiquidityFromAgentWallet(
   const amountBRaw = parseUnits(amountB, tB.decimals);
   if (amountARaw <= 0n || amountBRaw <= 0n) throw new Error("Both amounts must be positive");
 
+  // C-019 — strict pricing: a dead feed throws instead of valuing the spend
+  // at $0, so the cap cannot be priced around.
   const usdValue =
-    (await tokenAmountUsd(tokenA, amountARaw)) + (await tokenAmountUsd(tokenB, amountBRaw));
+    (await tokenAmountUsdStrict(tokenA, amountARaw)) +
+    (await tokenAmountUsdStrict(tokenB, amountBRaw));
   await checkSpendingCap(wallet.address, usdValue);
 
   const hookAddress = hook ? (getHookAddress(hook, chainId) ?? ZERO_ADDRESS) : ZERO_ADDRESS;

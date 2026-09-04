@@ -19,7 +19,7 @@ import {
   quoteSpendLeg,
   type UniswapQuote,
 } from "../lib/uniswap.ts";
-import { tokenAmountUsd } from "../lib/usd-pricing.ts";
+import { PriceUnavailableError, tokenAmountUsd, tokenAmountUsdStrict } from "../lib/usd-pricing.ts";
 
 export const swapRouter = Router();
 
@@ -57,7 +57,9 @@ swapRouter.post(
     try {
       const { symbol, amountRaw } = quoteSpendLeg(parsed.data.quote);
       const swap = await guardSpend(
-        () => tokenAmountUsd(symbol, amountRaw),
+        // C-019 — strict pricing: a dead feed throws instead of valuing the
+        // spend at $0, so the cap cannot be priced around.
+        () => tokenAmountUsdStrict(symbol, amountRaw),
         wallet,
         () => fetchSwapTx(parsed.data.quote as UniswapQuote, parsed.data.signature),
       );
@@ -65,6 +67,11 @@ swapRouter.post(
     } catch (err) {
       if (err instanceof UnreadableQuoteError) {
         res.status(400).json({ error: err.message, code: "QUOTE_UNREADABLE" });
+        return;
+      }
+      if (err instanceof PriceUnavailableError) {
+        // Fail-closed: no price, no calldata that could be signed into a trade.
+        res.status(503).json({ error: err.message, code: "PRICE_UNAVAILABLE" });
         return;
       }
       if (err instanceof SafetyError) {
@@ -151,9 +158,10 @@ swapRouter.post(
     });
 
     // C-019 — the intent was already recorded at issuance; a failed trade
-    // releases it. Repricing uses the same tokenIn/amountInRaw the ledger
-    // saw at issuance; a reversal can only ever reduce headroom error
-    // toward zero (reverseSpending floors at 0).
+    // releases it. Repricing deliberately uses the LENIENT helper: a failure
+    // report during a feed outage must still bookkeep (reverse(0) is a safe
+    // no-op), and a reversal can only ever reduce headroom error toward
+    // zero (reverseSpending floors at 0).
     if (outcome === "failure" && usdValue > 0) {
       await reverseSpending(wallet, usdValue);
     }

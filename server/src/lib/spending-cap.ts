@@ -6,27 +6,21 @@ import { userPreferences } from "../db/schema/users.ts";
 import { users } from "../db/schema/users.ts";
 import { DEFAULT_DAILY_CAP_USD, HARD_DAILY_CAP_USD } from "./constants.ts";
 import { SafetyError } from "./errors.ts";
-import { logger } from "./logger.ts";
 
 /**
- * Cap enforcement is ON by default on every network. Phase 5b-2 originally
- * keyed this off MANTUA_NETWORK (no-op unless mainnet), but the cap is the
- * guardrail the agent's own system prompt promises users, and the autonomy
- * loops (chat swaps, rebalance sweep, intent sweep) all route through it —
- * a rail that only binds in prod is a rail that never gets exercised.
- * USD equivalents come from live price feeds,
- * so the semantics hold; only the tokens are play money.
+ * Cap enforcement is ON, unconditionally, on every network. Phase 5b-2
+ * originally keyed this off MANTUA_NETWORK (no-op unless mainnet), but the
+ * cap is the guardrail the agent's own system prompt promises users, and the
+ * autonomy loops (chat swaps, rebalance sweep, intent sweep) all route
+ * through it — a rail that only binds in prod is a rail that never gets
+ * exercised. USD equivalents come from live price feeds, so the semantics
+ * hold; only the tokens are play money.
  *
- * Set SPENDING_CAP_ENFORCEMENT=off to restore the no-op explicitly (e.g.
- * for a high-volume demo). Read at import time, intentionally — flipping
- * requires a server restart, matching the rest of the chain-config rollover.
+ * C-019 — the SPENDING_CAP_ENFORCEMENT=off escape hatch is gone: a safety
+ * rail an env var can silently no-op is a rail waiting to be off when it
+ * matters, and the cap now fails CLOSED when pricing is unavailable (see
+ * usd-pricing's strict helpers — no feed, no trade).
  */
-const SPENDING_CAP_ENFORCED = process.env.SPENDING_CAP_ENFORCEMENT !== "off";
-
-/** Whether the daily cap binds (callers can preflight-clamp instead of erroring). */
-export function isSpendingCapEnforced(): boolean {
-  return SPENDING_CAP_ENFORCED;
-}
 
 function utcDate(d: Date = new Date()): string {
   return d.toISOString().slice(0, 10);
@@ -108,13 +102,9 @@ async function capAddressGroup(lower: string): Promise<string[]> {
  * For agent wallets the spend aggregates across every chain's wallet of
  * the same user — one shared daily cap, not one per chain.
  *
- * Enforced on every network unless SPENDING_CAP_ENFORCEMENT=off.
+ * Enforced on every network, unconditionally (C-019 — no env off-switch).
  */
 export async function checkSpendingCap(address: string, usdAmount: number): Promise<void> {
-  if (!SPENDING_CAP_ENFORCED) {
-    logger.debug({ address, usdAmount }, "spending cap skipped (SPENDING_CAP_ENFORCEMENT=off)");
-    return;
-  }
   if (usdAmount < 0) throw new Error("checkSpendingCap: usdAmount must be non-negative");
   if (usdAmount > HARD_DAILY_CAP_USD) {
     throw new SafetyError(

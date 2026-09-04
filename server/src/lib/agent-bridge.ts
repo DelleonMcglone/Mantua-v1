@@ -6,7 +6,7 @@ import { logger } from "./logger.ts";
 import { CircleUnavailableError } from "./circle/client.ts";
 import { getAgentWallet, AgentWalletNotFoundError } from "./agent-wallet.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
-import { getUsdPrice } from "./usd-pricing.ts";
+import { getUsdPriceStrict } from "./usd-pricing.ts";
 import { logAudit } from "./audit.ts";
 
 /**
@@ -140,7 +140,10 @@ export async function bridgeFromAgentWallet(args: AgentBridgeArgs): Promise<Agen
     throw new BridgeUnavailableError();
   }
 
-  const usdValue = amountNum * ((await getUsdPrice("USDC")) || 1);
+  // C-019 — strict pricing: the old `|| 1` fallback valued unpriced USDC at
+  // $1 (and anything else unpriced at $1 too — a $0-valuation escape in
+  // disguise). A dead feed now blocks the transfer.
+  const usdValue = amountNum * (await getUsdPriceStrict("USDC"));
   await checkSpendingCap(wallet.address, usdValue);
 
   const adapter = createCircleWalletsAdapter({ apiKey, entitySecret });

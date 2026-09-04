@@ -10,7 +10,7 @@ import { classifySlippage } from "../lib/slippage.ts";
 import { checkSpendingCap } from "../lib/spending-cap.ts";
 import { getToken, isTokenSymbol, ZERO_ADDRESS } from "../lib/tokens.ts";
 import { fetchQuote } from "../lib/uniswap.ts";
-import { tokenAmountUsd } from "../lib/usd-pricing.ts";
+import { PriceUnavailableError, tokenAmountUsdStrict } from "../lib/usd-pricing.ts";
 
 export const quoteRouter = Router();
 
@@ -50,8 +50,10 @@ quoteRouter.post(
       const slippageWarning = slippageBps !== undefined ? classifySlippage(slippageBps) : "ok";
 
       if (type === "EXACT_INPUT") {
-        const usd = await tokenAmountUsd(tokenIn, BigInt(amountRaw));
-        if (usd > 0) await checkSpendingCap(wallet, usd);
+        // C-019 — strict pricing: a dead feed throws instead of valuing the
+        // spend at $0, so the cap cannot be priced around.
+        const usd = await tokenAmountUsdStrict(tokenIn, BigInt(amountRaw));
+        await checkSpendingCap(wallet, usd);
       }
 
       const tokenInAddr = getToken(tokenIn).native ? ZERO_ADDRESS : getToken(tokenIn).address;
@@ -70,6 +72,11 @@ quoteRouter.post(
 
       res.json({ quote, slippageWarning });
     } catch (err) {
+      if (err instanceof PriceUnavailableError) {
+        // Fail-closed: no price, no quote that could be executed into a trade.
+        res.status(503).json({ error: err.message, code: "PRICE_UNAVAILABLE" });
+        return;
+      }
       if (err instanceof SafetyError) {
         await logAudit({
           ...ctx,

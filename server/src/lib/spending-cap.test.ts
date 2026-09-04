@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { guardSpend, type SpendGuardIo } from "./spending-cap.ts";
+import { PriceUnavailableError } from "./usd-pricing.ts";
 
 const WALLET = "0xabc0000000000000000000000000000000000001";
 
@@ -87,7 +88,7 @@ describe("guardSpend (C-019 calldata cap sequence)", () => {
     const { io, calls } = makeIo();
     await assert.rejects(
       guardSpend(
-        () => Promise.reject(new Error("PriceUnavailableError: no feed")),
+        () => Promise.reject(new PriceUnavailableError("WETH")),
         WALLET,
         () => {
           calls.push("issue");
@@ -95,7 +96,7 @@ describe("guardSpend (C-019 calldata cap sequence)", () => {
         },
         io,
       ),
-      /no feed/,
+      /No USD price available for WETH/,
     );
     assert.deepEqual(calls, [], "no price, no check, no issue, no record");
   });
