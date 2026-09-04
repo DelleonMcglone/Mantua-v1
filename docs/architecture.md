@@ -450,6 +450,45 @@ orders, heartbeats), UMA oracle plumbing, pUSD wrapper (native USDC stays),
 ERC-1155 CTF (ERC-20 pairs stay), neg-risk adapter contracts, stringified-
 JSON array fields, mixed timestamp formats, three separate API base URLs.
 
+## Deposit → Trade → Withdraw (C-011)
+
+The only mental model a user needs: **USDC in, tradeable balance, USDC
+out.** Everything is denominated in USDC — balances, positions, stakes,
+payouts, fees, caps (C-004; audit: `docs/tasks/023-usdc-denomination-flow.md`).
+Each leg of the story, mapped to the code that implements it:
+
+**Deposit.** The user funds a wallet with USDC. Two receiving wallets
+exist: the user's own wallet (address on the profile page,
+`client/src/features/portfolio/ProfilePage.tsx`) and the agent's wallet
+(address handed out by the agent chat and shown in the Agent panel with a
+copy button — funding guidance lives in the `agent-chat.ts` system
+prompt). Both are funded the same way: send USDC to the address. The
+agent can further consolidate its USDC into a unified treasury balance
+(`POST /api/agent/unified-balance/deposit`).
+
+**Trade.** Buys spend USDC for outcome tokens; sells return USDC. One
+builder serves every caller
+(`server/src/lib/sports/market-trade-build.ts`): the market page's trade
+sidebar (`use-market-trade.ts` → `POST /api/markets/trade/calldata`,
+signed by the user's wallet) and the agent's `trade_market` tool plus the
+strategy executor (`server/src/lib/sports/market-agent-trade.ts`, signed
+by the agent's wallet, cap-checked, fees sponsored). A winning position
+redeems 1 USDC per token; a void settles at 0.50. Open positions are
+marked in USDC (`/api/markets/positions`, portfolio "Market positions").
+
+**Withdraw.** USDC leaves the same way it came in. From the agent
+wallet: the chat's `send` tool or `POST /api/agent/send` transfers USDC
+to any address the user names — their own wallet included — cap-checked
+and confirmed on a receipt; the treasury balance can also settle out via
+`POST /api/agent/unified-balance/spend` or the bridge tool. From the
+user's own wallet there is currently no in-app send (GAP-4 in the task
+doc), and post-resolution redemption has no user-facing path (GAP-3) —
+the two named holes in the arc; the remaining legs exist end-to-end.
+
+Gas is the one non-USDC residue (user-signed trades pay it natively;
+agent-side operations are already sponsored) and is being removed by the
+gasless task, after which the model above is exact.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.

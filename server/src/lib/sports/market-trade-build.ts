@@ -21,6 +21,29 @@ import {
   MARKET_FACTORY_ABI,
 } from "../markets-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
+import { getToken } from "../tokens.ts";
+
+/**
+ * C-004 — the platform currency is the chain's canonical USDC (on Base
+ * Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913). Every market's
+ * collateral, quote, fee accrual, and redemption is denominated in it, so a
+ * markets deployment wired to any other token is a config error that would
+ * silently misdenominate balances, spending-cap accounting (which treats
+ * the exact USDC input as the USD value), and settlement. Fail loudly at
+ * the trade/seed choke points instead.
+ */
+export function assertUsdcCollateral(
+  chainId: SupportedChainId,
+  collateral: `0x${string}`,
+): void {
+  const usdc = getToken("USDC", chainId).address;
+  if (collateral.toLowerCase() !== usdc.toLowerCase()) {
+    throw new Error(
+      `Markets deployment on chain ${String(chainId)} declares collateral ${collateral}, ` +
+        `not the canonical USDC ${usdc} — refusing to build the trade`,
+    );
+  }
+}
 
 const V4_QUOTER_ABI = parseAbi([
   "struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }",
@@ -90,6 +113,7 @@ export async function buildMarketTrade(args: {
   if (!markets || !periphery || !dm) {
     throw new Error(`Sports markets are not deployed on chain ${String(chainId)}`);
   }
+  assertUsdcCollateral(chainId, markets.collateral);
   const client = getRpcClient(chainId);
   const marketId = computeMarketId({
     providerEventId: args.providerEventId,

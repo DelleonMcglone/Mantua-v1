@@ -32,6 +32,7 @@ import {
 } from "../markets-contracts.ts";
 import { DYNAMIC_MARKET_BY_CHAIN, POOL_SWAP_TEST_ABI } from "../v4-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
+import { assertUsdcCollateral } from "./market-trade-build.ts";
 import { planRebandSwap } from "./reband.ts";
 import type { PlannedMarket } from "./ingest.ts";
 import type { ResolutionPlan, ResolutionSubmitter } from "./resolution.ts";
@@ -75,6 +76,10 @@ function marketsCfg(chainId: SupportedChainId) {
   if (!poolSwapTest || !poolModifyLiquidityTest) {
     throw new Error(`Sports-market routers are not deployed on chain ${String(chainId)}`);
   }
+  // C-004 — every seed/reclaim/reband leg splits, LPs, and merges the
+  // deployment's collateral; refuse a deployment not denominated in the
+  // chain's canonical USDC.
+  assertUsdcCollateral(chainId, markets.collateral);
   return { markets, periphery: { ...periphery, poolSwapTest, poolModifyLiquidityTest }, dm };
 }
 
