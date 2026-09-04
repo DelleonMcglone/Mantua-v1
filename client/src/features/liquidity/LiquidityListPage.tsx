@@ -1,8 +1,14 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
 import { networkKeyForChain } from "@/lib/chains.ts";
 import { useTokenPrices } from "./use-token-prices.ts";
@@ -77,8 +83,6 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
   const { data, error, loading } = usePools();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("All");
-  const [openCat, setOpenCat] = useState(false);
-  const catRef = useRef<HTMLDivElement | null>(null);
   const [localPools, setLocalPools] = useState<LocalPool[]>(() =>
     IS_MAINNET ? [] : getLocalPools(),
   );
@@ -142,17 +146,6 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
     }
     return out;
   }, [onchainPositions.data, localPositions, tokenPrices.prices]);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (!catRef.current) return;
-      if (!catRef.current.contains(e.target as Node)) setOpenCat(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", onClickOutside);
-    };
-  }, []);
 
   // Re-read localStorage when the panel mounts so freshly-created
   // pools (and the positions that drive their TVL) show up without
@@ -273,40 +266,31 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
             />
           </div>
 
-          <div className="relative" ref={catRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setOpenCat((v) => !v);
-              }}
-              className="px-3 py-2 rounded-md bg-bg-elev border border-border-soft text-[13px] text-text inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {category}
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            {openCat && (
-              <div className="absolute right-0 top-full mt-1 z-30 min-w-[170px] bg-panel-solid border border-border rounded-md p-1 shadow-xl">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setCategory(c);
-                      setOpenCat(false);
-                    }}
-                    className={`flex items-center justify-between w-full px-2.5 py-2 rounded-xs text-left text-[13px] cursor-pointer ${
-                      category === c
-                        ? "bg-chip text-text"
-                        : "bg-transparent text-text hover:bg-row-hover"
-                    }`}
-                  >
-                    <span>{c}</span>
-                    <span className="text-[11px] text-text-mute">{counts[c]}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md bg-bg-elev border border-border-soft text-[13px] text-text inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {category}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[170px]">
+              {CATEGORIES.map((c) => (
+                <DropdownMenuItem
+                  key={c}
+                  onSelect={() => {
+                    setCategory(c);
+                  }}
+                  className={`justify-between ${category === c ? "bg-chip" : ""}`}
+                >
+                  <span>{c}</span>
+                  <span className="text-[11px] text-text-mute">{counts[c]}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button variant="primary" size="md" onClick={onCreate}>
             <Plus className="h-3.5 w-3.5" /> Create Pool
