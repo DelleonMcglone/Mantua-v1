@@ -57,13 +57,24 @@ export async function getCircleClient(): Promise<CircleClient> {
 }
 
 /**
- * The wallet set agent wallets are created in. Prefer `CIRCLE_WALLET_SET_ID`
- * from env (set it once you've created one). If unset, create a wallet set on
- * first use and cache it for the process lifetime — and log the id loudly so
- * the operator can persist it to env and avoid a fresh set per cold start.
+ * The wallet set agent wallets are created in — always `CIRCLE_WALLET_SET_ID`
+ * in production.
+ *
+ * The on-the-fly fallback below is a DEV convenience only. The cache is
+ * process-local, so on serverless every cold start would create a *new*
+ * wallet set: users' wallets scatter across orphaned sets, and — because a
+ * Gas Station policy is bound to a specific set — those wallets are
+ * unsponsored and fail with no clear reason. Production refuses rather than
+ * silently doing that (boot-time validation in env.ts catches it earlier;
+ * this is the second line of defence for a runtime env mutation).
  */
 export async function getAgentWalletSetId(): Promise<string> {
   if (env.CIRCLE_WALLET_SET_ID) return env.CIRCLE_WALLET_SET_ID;
+  if (env.NODE_ENV === "production") {
+    throw new Error(
+      "CIRCLE_WALLET_SET_ID is not set. Refusing to create a wallet set implicitly in production — a per-cold-start set would leave agent wallets outside the Gas Station policy. Create one wallet set, pin its id in env, and redeploy.",
+    );
+  }
   if (cachedWalletSetId) return cachedWalletSetId;
   const res = await (await getCircleClient()).createWalletSet({ name: "Mantua Agent Wallets" });
   const id = res.data?.walletSet.id;
