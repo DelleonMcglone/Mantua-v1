@@ -92,15 +92,16 @@ while data is unconfirmed.
 
 ## 5. Escalation quick reference
 
-| Situation              | First move                                                                                    |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| Strategy misbehaving   | that strategy's Disarm button / endpoint                                                      |
-| All strategies suspect | `STRATEGIES_KILL_SWITCH=1`                                                                    |
-| Bad data suspected     | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                           |
-| Signer key leaked      | `setSigner` rotation + pull env key                                                           |
-| Operator key leaked    | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise |
-| Raw agent/ key (C-018) | §6 — sweep + retire; the key is burned in git history                                         |
-| App-wide emergency     | `MANTUA_KILL_SWITCH=1`                                                                        |
+| Situation                       | First move                                                                                    |
+| ------------------------------- | --------------------------------------------------------------------------------------------- |
+| Strategy misbehaving            | that strategy's Disarm button / endpoint                                                      |
+| All strategies suspect          | `STRATEGIES_KILL_SWITCH=1`                                                                    |
+| Bad data suspected              | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                           |
+| Rate limit blocking legit users | §7 — delete the `mantua:rl:*` key in Upstash                                                  |
+| Signer key leaked               | `setSigner` rotation + pull env key                                                           |
+| Operator key leaked             | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise |
+| Raw agent/ key (C-018)          | §6 — sweep + retire; the key is burned in git history                                         |
+| App-wide emergency              | `MANTUA_KILL_SWITCH=1`                                                                        |
 
 ## 6. Raw agent/ key — MANDATORY revocation (C-018)
 
@@ -140,3 +141,42 @@ Circle-managed agent wallets are unaffected — they never shared key
 material with this workspace. If the operator certifies no key was ever
 generated or funded for it, record that determination in the postmortem
 log; the default assumption is that a key existed.
+
+## 7. Shared rate-limit store (C-021)
+
+API rate limits (free-analyst quota, auth, oracle, trades) are shared
+across all server instances via Upstash Redis. A lambda recycle no
+longer resets anyone's counters: the limits live in Redis keys
+`mantua:rl:*` with per-window TTLs, not in instance memory.
+
+**Configuration.** Provision a REST database in the Upstash console
+(Vercel → Storage → Upstash also works and fills both values in), then
+set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in
+Vercel env, in the region close to the lambdas (e.g. `iad1`). Pick a
+name you will recognize later — the same database is where the C-020
+kill-switch state will live. Half-configured credentials stop the boot:
+the server refuses to start with exactly one of the two set.
+
+**Fallback behavior.** With neither variable set, the limiters fall
+back to the old per-instance memory store: limits reset on every lambda
+recycle (the pre-C-021 behavior) — treat this as unprotected. With the
+variables set and Redis unreachable, requests pass **uncounted** —
+limits fail open for availability, and every store error is logged with
+the `[rate-limit]` prefix. A Redis outage degrades protection, not
+uptime; watch for that log prefix rather than page on 5xx.
+
+**Verification.** Hit any limited endpoint five times from one IP; the
+`RateLimit` response header (draft-7 combined form,
+`limit=N, remaining=K, reset=S`) counts down across restarts and
+different instances. In the Upstash console's data browser, `mantua:rl:*`
+keys appear during traffic and expire on their own.
+
+**Resetting a blocked client.** Rate-limit state is disposable. If an
+incident or a shared office NAT blocks legitimate users, delete the
+offending `mantua:rl:*` key in the Upstash data browser — no redeploy
+needed. Keys untouched inside one window expire by themselves.
+
+**Sizing.** Counters are small strings with TTLs bounded by the window
+(15 min worst case). The free Upstash tier handles this write load;
+there is nothing to tune unless request volume grows by orders of
+magnitude.
