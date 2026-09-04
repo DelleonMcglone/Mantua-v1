@@ -114,6 +114,15 @@ const schema = z.object({
    *  the same header. Absent → the endpoint is disabled (503). */
   CRON_SECRET: z.string().min(1).optional(),
 
+  // ── Shared rate-limit store (C-021) ─────────────────────────────────
+  // Upstash Redis REST credentials. With both set, every express-rate-limit
+  // counter lives in Redis — shared across lambda instances and immune to
+  // recycles. With neither set, limiters fall back to per-instance memory
+  // (effective limits multiply by active instances). Provisioning steps:
+  // docs/ops/incident-runbook.md §6.
+  UPSTASH_REDIS_REST_URL: z.url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+
   /** x402 nanopayments — the agent pays small USDC fees per call to the x402
    *  agent marketplace over plain HTTP (v2 protocol; settles on Base Mainnet
    *  via the public facilitator, no CLI and no gas needed). Off by default;
@@ -249,6 +258,20 @@ export function circleCredentialIssues(e: Env): string[] {
   return issues;
 }
 
+/**
+ * Cross-field check for the shared rate-limit store (C-021): the Upstash
+ * REST URL and token are a pair. Half a pair silently degrades every limiter
+ * to per-instance counting — the exact behavior C-021 removes — so like any
+ * half-configured deploy hazard (see circleCredentialIssues) it warns in
+ * development and fails the production boot.
+ */
+export function rateLimitStoreIssues(e: Env): string[] {
+  if (Boolean(e.UPSTASH_REDIS_REST_URL) === Boolean(e.UPSTASH_REDIS_REST_TOKEN)) return [];
+  return [
+    "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set together — one without the other silently degrades rate limiting to per-instance memory (see docs/ops/incident-runbook.md).",
+  ];
+}
+
 export function loadEnv(): Env {
   const parsed = schema.safeParse(blankEnvToUndefined(process.env));
   if (!parsed.success) {
@@ -256,12 +279,10 @@ export function loadEnv(): Env {
     console.error(z.treeifyError(parsed.error));
     process.exit(1);
   }
-  const issues = circleCredentialIssues(parsed.data);
+  const issues = [...circleCredentialIssues(parsed.data), ...rateLimitStoreIssues(parsed.data)];
   if (issues.length > 0) {
     const fatal = parsed.data.NODE_ENV === "production";
-    console[fatal ? "error" : "warn"](
-      `Circle credential configuration ${fatal ? "is invalid" : "is incomplete"}:`,
-    );
+    console[fatal ? "error" : "warn"](`Configuration ${fatal ? "errors" : "warnings"}:`);
     for (const issue of issues) console[fatal ? "error" : "warn"](`  - ${issue}`);
     if (fatal) process.exit(1);
   }
