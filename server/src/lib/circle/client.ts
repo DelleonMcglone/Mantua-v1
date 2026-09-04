@@ -52,6 +52,10 @@ export async function getCircleClient(): Promise<CircleClient> {
   cached = dcw.initiateDeveloperControlledWalletsClient({
     apiKey: CIRCLE_API_KEY,
     entitySecret: CIRCLE_ENTITY_SECRET,
+    // C-017 — local-testing override so the preflight (and fixtures) can run
+    // against a stub server. Never set in production: it redirects ALL
+    // Circle traffic.
+    ...(env.CIRCLE_API_BASE_URL ? { baseUrl: env.CIRCLE_API_BASE_URL } : {}),
   });
   return cached;
 }
