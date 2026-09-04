@@ -2,8 +2,8 @@ name: CI
 
 # B-012 / 012-ci-baseline — lint + typecheck + tests must be GREEN on every
 # PR and on pushes to main. The repo carries no known-baseline escapes any
-# more: typecheck is 0 errors, lint runs with --max-warnings 0, and all
-# three workspaces' test suites pass, so every step here is strict.
+# more: typecheck is 0 errors, lint runs with --max-warnings 0, and both
+# workspaces' test suites pass, so every step here is strict.
 # Foundry contract tests live in contracts.yml (different toolchain).
 
 on:
@@ -28,7 +28,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
 
-      # Root install covers all three workspaces (client, server, agent).
+      # Root install covers both workspaces (client, server).
       # .npmrc's legacy-peer-deps applies to npm ci as well.
       - name: Install
         run: npm ci
@@ -54,5 +54,3 @@ jobs:
           PRIVY_APP_SECRET: ci-stub
         run: npm test --workspace=@mantua/server
 
-      - name: Agent tests
-        run: npm test --workspace=@mantua/agent

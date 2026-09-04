@@ -33,7 +33,8 @@ const ZERO_BYTES32 = `0x${"0".repeat(64)}` as const;
 /** Default job expiry: 7 days. */
 const DEFAULT_EXPIRES_IN_SECONDS = 604_800;
 
-// Mirror of agent/src/abis/erc8183.ts — keep both in sync.
+// Local copy of the ERC-8183 ABI. Was a mirror of the standalone agent/
+// workspace, which was deleted before it ever shipped (C-018).
 const AGENTIC_COMMERCE_ABI = [
   {
     type: "function",

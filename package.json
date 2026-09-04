@@ -6,8 +6,7 @@
   "type": "module",
   "workspaces": [
     "client",
-    "server",
-    "agent"
+    "server"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",

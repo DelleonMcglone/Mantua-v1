@@ -72,17 +72,6 @@ export default tseslint.config(
       },
     },
   },
-  {
-    files: ["agent/**/*.ts"],
-    languageOptions: {
-      ecmaVersion: 2023,
-      globals: globals.node,
-      parserOptions: {
-        project: ["./agent/tsconfig.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
-    },
-  },
   // Test files use node:test's test()/describe()/it(), which intentionally
   // return un-awaited promises (the runner tracks them). Don't flag those.
   {
