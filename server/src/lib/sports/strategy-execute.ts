@@ -18,14 +18,35 @@ import { eq } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { agentWallets } from "../../db/schema/index.ts";
 import { events, markets } from "../../db/schema/index.ts";
+import { SafetyError } from "../errors.ts";
 import { logger } from "../logger.ts";
 import { baseRpcClient } from "../rpc-client.ts";
 import { parseAbi } from "viem";
+import { checkSpendingCap } from "../spending-cap.ts";
 import { agentMarketTrade } from "./market-agent-trade.ts";
 import type { HedgeStrategy } from "../../db/schema/markets.ts";
 import type { StrategyDecision } from "./strategies.ts";
 
 const BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
+
+/**
+ * USD magnitude of the close leg. YES tokens redeem for at most 1 USDC, so
+ * the raw token amount bounds the leg's dollar value from above — the same
+ * convention the strategy cap itself uses for sizing.
+ */
+export function closeLegUsd(amountRaw: bigint): number {
+  return Number(amountRaw) / 1e6;
+}
+
+/**
+ * Injectable seams for tests — defaults wire the real cap ledger, YES-token
+ * balance read, and market-trade executor.
+ */
+export interface ExecuteCloseDeps {
+  checkSpendingCap?: typeof checkSpendingCap;
+  agentMarketTrade?: typeof agentMarketTrade;
+  balanceOf?: (token: string, owner: string) => Promise<bigint>;
+}
 
 export type ExecuteOutcome =
   | {
@@ -46,6 +67,7 @@ export async function executeTriggeredClose(
   db: DB,
   row: HedgeStrategy,
   decision: Extract<StrategyDecision, { kind: "trigger" }>,
+  deps: ExecuteCloseDeps = {},
 ): Promise<ExecuteOutcome> {
   if (decision.action !== "close-position") {
     return { kind: "held", reason: "rebalance execution not yet supported" };
@@ -71,12 +93,16 @@ export async function executeTriggeredClose(
   const wallet = walletRows.at(0);
   if (!wallet) return { kind: "held", reason: "no agent wallet provisioned" };
 
-  const balance = await baseRpcClient.readContract({
-    address: market.yesToken as `0x${string}`,
-    abi: BALANCE_ABI,
-    functionName: "balanceOf",
-    args: [wallet.address as `0x${string}`],
-  });
+  const readBalance =
+    deps.balanceOf ??
+    ((token: string, owner: string) =>
+      baseRpcClient.readContract({
+        address: token as `0x${string}`,
+        abi: BALANCE_ABI,
+        functionName: "balanceOf",
+        args: [owner as `0x${string}`],
+      }));
+  const balance = await readBalance(market.yesToken, wallet.address);
   if (balance === 0n) {
     return { kind: "held", reason: "agent wallet holds no position in this market" };
   }
@@ -85,8 +111,27 @@ export async function executeTriggeredClose(
   const capTokens = BigInt(Math.round(Number(row.capUsd) * 1e6));
   const amount = balance < capTokens ? balance : capTokens;
 
+  // C-019 — the cron close moves money, so it honors the wallet's daily
+  // spending cap like every other trade path. A capped-out wallet HOLDS
+  // the close (no attempt counted on the strategy): the cron re-fires on
+  // a later tick, and the cap resets at UTC midnight.
+  const checkCap = deps.checkSpendingCap ?? checkSpendingCap;
+  const executeTrade = deps.agentMarketTrade ?? agentMarketTrade;
   try {
-    const result = await agentMarketTrade({
+    await checkCap(wallet.address, closeLegUsd(amount));
+  } catch (err) {
+    if (err instanceof SafetyError) {
+      logger.warn(
+        { strategyId: row.id, wallet: wallet.address, err },
+        "strategy: close held by the daily spending cap",
+      );
+      return { kind: "held", reason: "daily spending cap reached — close retried on a later tick" };
+    }
+    throw err; // ledger outage is not a strategy decision — let the cron's error handling see it
+  }
+
+  try {
+    const result = await executeTrade({
       walletId: wallet.circleWalletId,
       providerEventId: market.providerEventId,
       outcomeIndex: market.outcomeIndex === 0 ? 0 : 1,
