@@ -15,7 +15,17 @@ There is no responsive design — mobile layouts, tablet breakpoints, and resize
 **v2 responsive rules** (deviation from prototype):
 - ≥1280px: prototype layout (2-column grid, 340px-1fr / 460px-1.3fr).
 - 768–1279px: 2-column collapses to single column; right-panel becomes a slide-in sheet.
-- <768px: full mobile — bottom navigation, slide-up panels, stacked Portfolio + Assets.
+- <768px: full mobile — ~~bottom navigation~~, slide-up panels, stacked Portfolio + Assets.
+
+> **Superseded (B-014, 2026-09-04):** the "bottom navigation" rule above is
+> replaced by **hidden sidebar + hamburger navigation**, with action layouts
+> collapsing to a single column below 768px. The nav destinations and quick
+> actions now live in a Radix-backed slide-in sheet opened from a hamburger
+> in the header (`components/ui/sheet.tsx` + `shell/MobileNavSheet.tsx`)
+> rather than a persistent bottom bar. Rationale: one nav surface shared with
+> desktop instead of a parallel mobile-only stack, and the sheet primitive is
+> reused for the 768–1279px right-panel slide-in above. See
+> `docs/tasks/014-navigation-reconciliation.md`.
 
 ## Theme switching
 

@@ -112,3 +112,19 @@ an interrupted-install state during this task; the worktree was given a local
 `client/node_modules` assembled from the intact package contents — no installs
 run, main checkout untouched — so the gates above ran against real
 dependencies.)
+
+## Wave-spec reconciliation (2026-09-04)
+
+Reconciled against `docs/tasks/design-debt-wave.md`, which landed on main
+after this branch was cut:
+
+- **Coverage-driven MarketNav (DM-105).** `NAV_ITEMS` now reads
+  `SPORTS[].coverage`: `launch` sports (NFL, WNBA) are tradable; `soon`
+  sports render disabled with a "Coming soon" affordance in the sheet and a
+  title hint in the row layout. Previously all six rendered identically —
+  the spec's failure condition *"a 'Coming soon' sport renders as tradable"*.
+  Nav stays data-driven: flipping `coverage` in `sports.ts` lights a sport up
+  with no nav edit.
+- **Supersession recorded.** `docs/design/notes.md` L18's "bottom navigation"
+  rule is struck through with a dated note pointing at the hamburger + sheet
+  decision and its rationale, as the spec requires.

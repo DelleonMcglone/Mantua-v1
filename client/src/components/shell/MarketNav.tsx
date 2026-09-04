@@ -13,14 +13,21 @@ interface NavItem {
   icon?: ComponentType<{ className?: string }>;
   /** Renders a hairline divider before this item. */
   divider?: boolean;
+  /** Listed but not yet tradable (`coverage: "soon"`, DM-105). Rendered
+   *  disabled with a "Coming soon" affordance — never as a live market. */
+  comingSoon?: boolean;
 }
 
+// Nav is DATA-DRIVEN off `SPORTS.coverage` (DM-105): flipping a sport to
+// `launch` in sports.ts lights it up here with no nav edit. A `soon` sport
+// must never render as tradable — it is listed, disabled, and labelled.
 const NAV_ITEMS: NavItem[] = [
   ...SPORTS.map(
     (s): NavItem => ({
       label: s.label,
       icon: s.icon,
       destination: { kind: "market", sport: s.id },
+      ...(s.coverage === "soon" ? { comingSoon: true } : {}),
     }),
   ),
   { label: "Agent", destination: { kind: "agent" }, divider: true },
@@ -61,13 +68,17 @@ export function MarketNav({
                 {item.divider && <div className="my-2 h-px bg-border-soft" aria-hidden="true" />}
                 <button
                   type="button"
+                  disabled={item.comingSoon}
                   onClick={() => {
                     onNavigate(item.destination);
                   }}
-                  className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left text-text hover:bg-row-hover hover:text-accent transition-colors cursor-pointer"
+                  className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left text-text hover:bg-row-hover hover:text-accent transition-colors cursor-pointer disabled:cursor-default disabled:text-text-mute disabled:hover:bg-transparent disabled:hover:text-text-mute"
                 >
                   {Icon && <Icon className="h-[18px] w-[18px]" />}
                   {item.label}
+                  {item.comingSoon && (
+                    <span className="ml-auto text-[11px] text-text-mute">Coming soon</span>
+                  )}
                 </button>
               </li>
             );
@@ -89,10 +100,12 @@ export function MarketNav({
               {item.divider && <span className="h-4 w-px bg-text-mute" aria-hidden="true" />}
               <button
                 type="button"
+                disabled={item.comingSoon}
+                {...(item.comingSoon ? { title: `${item.label} — coming soon` } : {})}
                 onClick={() => {
                   onNavigate(item.destination);
                 }}
-                className="inline-flex items-center gap-1.5 text-text hover:text-accent transition-colors cursor-pointer whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 text-text hover:text-accent transition-colors cursor-pointer whitespace-nowrap disabled:cursor-default disabled:text-text-mute disabled:hover:text-text-mute"
               >
                 {Icon && <Icon className="h-[18px] w-[18px]" />}
                 {item.label}
