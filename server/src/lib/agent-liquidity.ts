@@ -26,11 +26,13 @@ import { buildRemoveLiquidityCalldata } from "./v4-remove-liquidity.ts";
 import { readSlot0 } from "./v4-state-view.ts";
 
 const AGENT_NETWORK = "base" as const;
-const MAX_UINT256 = (1n << 256n) - 1n;
-const MAX_UINT160 = (1n << 160n) - 1n;
-const MAX_UINT48 = (1n << 48n) - 1n;
-/** Treat an allowance at/above this as "already approved" (same heuristic as the client). */
-const FRESH_APPROVAL_THRESHOLD = 1n << 159n;
+/**
+ * Bounded-approval policy (D-110): every grant is sized to the current trade
+ * and short-lived — never a max allowance, never a far-future expiry.
+ */
+const PERMIT2_ALLOWANCE_EXPIRATION_SECONDS = 3600;
+/** Re-grant when an existing Permit2 allowance expires within this window. */
+const PERMIT2_VALIDITY_BUFFER_SECONDS = 600;
 
 const ERC20_ABI = parseAbi([
   "function allowance(address owner, address spender) view returns (uint256)",
@@ -83,51 +85,107 @@ function extractMintedTokenId(
   return null;
 }
 
+export interface MintAllowanceState {
+  /** Current ERC20 allowance from the owner to the Permit2 contract. */
+  erc20Allowance: bigint;
+  /** Current Permit2 allowance amount (uint160) from the owner to the spender. */
+  permit2Allowance: bigint;
+  /** Unix-seconds expiry of the Permit2 allowance. */
+  permit2Expiration: number;
+}
+
+/** One approval to execute from the agent wallet, in `executeAgentAbiCall` shape. */
+export interface PlannedMintApproval {
+  to: Address;
+  abiFunctionSignature: string;
+  abiParameters: string[];
+}
+
 /**
- * One-time on-chain approvals so the agent's Circle wallet can mint without a
- * per-tx Permit2 signature (which developer-controlled wallets can't sign
- * inline): grant ERC20→Permit2 (max) and Permit2→PositionManager (max, far
- * expiry). Both are idempotent — read the current allowance and skip if it's
- * already sufficient. No-op for native (zero address).
+ * Bounded-approval decision for one token (D-110): which approvals a mint
+ * needs so allowances never exceed what the current trade can pull. The mint
+ * pulls at most `requiredRaw` (the max amount incl. slippage buffer), so each
+ * grant is exactly that — never a max allowance. Allowances that already
+ * cover the mint are reused; expired / soon-to-expire Permit2 grants are
+ * re-issued with a bounded one-hour expiry. Pure so it stays unit-testable.
+ */
+export function planMintApprovals(params: {
+  token: Address;
+  positionManager: Address;
+  /** Raw max amount this mint can pull for this token (incl. slippage buffer). */
+  requiredRaw: bigint;
+  state: MintAllowanceState;
+  /** Unix seconds now — injected so the decision is pure and testable. */
+  nowSeconds: number;
+}): PlannedMintApproval[] {
+  const { token, positionManager, requiredRaw, state, nowSeconds } = params;
+  const calls: PlannedMintApproval[] = [];
+
+  if (state.erc20Allowance < requiredRaw) {
+    calls.push({
+      to: token,
+      abiFunctionSignature: "approve(address,uint256)",
+      abiParameters: [PERMIT2, requiredRaw.toString()],
+    });
+  }
+
+  const expiredSoon = state.permit2Expiration <= nowSeconds + PERMIT2_VALIDITY_BUFFER_SECONDS;
+  if (state.permit2Allowance < requiredRaw || expiredSoon) {
+    calls.push({
+      to: PERMIT2,
+      abiFunctionSignature: "approve(address,address,uint160,uint48)",
+      abiParameters: [
+        token,
+        positionManager,
+        requiredRaw.toString(),
+        (nowSeconds + PERMIT2_ALLOWANCE_EXPIRATION_SECONDS).toString(),
+      ],
+    });
+  }
+
+  return calls;
+}
+
+/**
+ * On-chain approvals so the agent's Circle wallet can mint without a per-tx
+ * Permit2 signature (which developer-controlled wallets can't sign inline):
+ * ERC20→Permit2 and Permit2→PositionManager allowances, bounded to exactly
+ * this trade's max pull — see planMintApprovals. Idempotent: allowances that
+ * already cover the mint are reused. No-op for native (zero address).
  */
 async function ensureMintApprovals(
   walletId: string,
   owner: Address,
   token: Address,
   positionManager: Address,
+  requiredRaw: bigint,
   chainId: SupportedChainId,
 ): Promise<void> {
   if (token === ZERO_ADDRESS) return;
 
-  const erc20Allowance = await getRpcClient(chainId).readContract({
+  const rpc = getRpcClient(chainId);
+  const erc20Allowance = await rpc.readContract({
     address: token,
     abi: ERC20_ABI,
     functionName: "allowance",
     args: [owner, PERMIT2],
   });
-  if (erc20Allowance < FRESH_APPROVAL_THRESHOLD) {
-    await executeAgentAbiCall({
-      walletId,
-      to: token,
-      abiFunctionSignature: "approve(address,uint256)",
-      abiParameters: [PERMIT2, MAX_UINT256.toString()],
-    });
-  }
-
-  const [permit2Amount, permit2Expiration] = await getRpcClient(chainId).readContract({
+  const [permit2Amount, permit2Expiration] = await rpc.readContract({
     address: PERMIT2,
     abi: PERMIT2_ALLOWANCE_ABI,
     functionName: "allowance",
     args: [owner, token, positionManager],
   });
-  const nowSeconds = Math.floor(Date.now() / 1000);
-  if (permit2Amount < FRESH_APPROVAL_THRESHOLD || permit2Expiration <= nowSeconds + 3600) {
-    await executeAgentAbiCall({
-      walletId,
-      to: PERMIT2,
-      abiFunctionSignature: "approve(address,address,uint160,uint48)",
-      abiParameters: [token, positionManager, MAX_UINT160.toString(), MAX_UINT48.toString()],
-    });
+
+  const calls = planMintApprovals({
+    token,
+    positionManager,
+    requiredRaw,
+    state: { erc20Allowance, permit2Allowance: permit2Amount, permit2Expiration },
+    nowSeconds: Math.floor(Date.now() / 1000),
+  });
+  for (const call of calls) {
+    await executeAgentAbiCall({ walletId, ...call });
   }
 }
 
@@ -165,8 +223,9 @@ export interface AgentAddLiquidityResult {
  *   1. Lookup wallet, parseUnits, USD-value cap check.
  *   2. Read sqrtPriceX96 (pool must already be initialized).
  *   3. Build the v4 mint calldata.
- *   4. One-time Permit2 approvals (ERC20→Permit2, Permit2→PositionManager) for
- *      each pool token, so the mint needs no per-tx signature.
+ *   4. Bounded Permit2 approvals (ERC20→Permit2, Permit2→PositionManager) for
+ *      each pool token, sized to the mint's max pull for that token, so the
+ *      mint needs no per-tx signature.
  *   5. Execute the modifyLiquidities calldata via the Circle wallet.
  *   6. Fetch the receipt from Base, extract the minted tokenId.
  *   7. recordSpending + persist the position (mirrors the user add-record path).
@@ -216,12 +275,15 @@ export async function addLiquidityFromAgentWallet(
     throw new Error("Native-value adds are not supported via the agent wallet yet");
   }
 
-  // calldata.to is the per-hook PositionManager — the Permit2 spender.
+  // calldata.to is the per-hook PositionManager — the Permit2 spender. Approvals
+  // are bounded per token to the mint's max pull (amount0Max/1Max include the
+  // slippage buffer) — never a max allowance (D-110).
   await ensureMintApprovals(
     wallet.circleWalletId,
     wallet.address as Address,
     calldata.currency0,
     calldata.to,
+    BigInt(calldata.amount0Max),
     chainId,
   );
   await ensureMintApprovals(
@@ -229,6 +291,7 @@ export async function addLiquidityFromAgentWallet(
     wallet.address as Address,
     calldata.currency1,
     calldata.to,
+    BigInt(calldata.amount1Max),
     chainId,
   );
 
