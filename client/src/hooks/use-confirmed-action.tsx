@@ -94,7 +94,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             {pending?.description && <DialogDescription>{pending.description}</DialogDescription>}
           </DialogHeader>
           {pending?.doubleConfirm && doubleConfirmed && (
-            <p className="text-sm text-amber">Are you sure? Click confirm again to proceed.</p>
+            <p role="alert" className="text-sm text-amber">
+              Are you sure? Click confirm again to proceed.
+            </p>
           )}
           <DialogFooter>
             <Button
@@ -109,7 +111,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               variant={pending?.severity === "danger" ? "destructive" : "primary"}
               onClick={handleConfirm}
             >
-              {pending?.confirmLabel ?? "Confirm"}
+              {/* Second stage of a double-confirm gets a distinct visible label so a
+                  fast double-click can't sail through two identical buttons. */}
+              {pending?.doubleConfirm && doubleConfirmed
+                ? `${pending.confirmLabel ?? "Confirm"} — click again`
+                : (pending?.confirmLabel ?? "Confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -22,7 +22,10 @@ interface SlateListProps {
 export function SlateList({ sport, slate, loading, onAnalyze, onTrade }: SlateListProps) {
   if (loading && !slate) {
     return (
-      <div className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim">
+      <div
+        role="status"
+        className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim"
+      >
         Loading {sport.label} games…
       </div>
     );

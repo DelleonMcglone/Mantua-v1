@@ -48,8 +48,16 @@ export function UnifiedBalanceTab({ ub }: { ub: ReturnType<typeof useUnifiedBala
         treasury · Circle Gateway)
       </div>
 
-      {ub.loading && !ub.data && <div className="text-[12px] text-text-dim">Loading balance…</div>}
-      {ub.error && <div className="text-[12px] text-red">{ub.error}</div>}
+      {ub.loading && !ub.data && (
+        <div role="status" className="text-[12px] text-text-dim">
+          Loading balance…
+        </div>
+      )}
+      {ub.error && (
+        <div role="alert" className="text-[12px] text-red">
+          {ub.error}
+        </div>
+      )}
 
       {ub.data && !ub.data.provisioned && (
         <div className="text-[12px] text-text-dim">
@@ -97,6 +105,8 @@ export function UnifiedBalanceTab({ ub }: { ub: ReturnType<typeof useUnifiedBala
             <Button
               variant="primary"
               size="md"
+              aria-live="polite"
+              aria-atomic="true"
               disabled={!canDeposit}
               onClick={() => {
                 void ub.deposit(amount).then(() => {
@@ -109,17 +119,21 @@ export function UnifiedBalanceTab({ ub }: { ub: ReturnType<typeof useUnifiedBala
           </div>
 
           {ub.depositState.status === "error" && ub.depositState.error && (
-            <div className="text-[12px] text-red">{ub.depositState.error}</div>
+            <div role="alert" className="text-[12px] text-red">
+              {ub.depositState.error}
+            </div>
           )}
           {ub.depositState.status === "success" && explorerUrl && (
-            <a
-              href={explorerUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-[12px] text-accent hover:text-accent-2 font-mono"
-            >
-              Deposit confirmed ↗
-            </a>
+            <div role="status">
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[12px] text-accent hover:text-accent-2 font-mono"
+              >
+                Deposit confirmed ↗
+              </a>
+            </div>
           )}
 
           <div className="text-[11px] text-text-mute pt-1 border-t border-border-soft">

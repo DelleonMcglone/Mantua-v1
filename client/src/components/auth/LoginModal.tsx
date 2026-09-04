@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLoginWithEmail, useLoginWithOAuth, usePrivy } from "@privy-io/react-auth";
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import metamaskLogo from "@/assets/wallets/metamask.svg";
 import coinbaseLogo from "@/assets/wallets/coinbase.svg";
@@ -16,6 +16,10 @@ import walletConnectLogo from "@/assets/wallets/walletconnect.svg";
  * so Google and email run fully in this UI, while the wallet tiles hand
  * off to Privy's wallet selector (the flow that needs injected-provider
  * plumbing we'd rather not own).
+ *
+ * Shell is the shared Radix `Dialog` wrapper (B-016): focus trap,
+ * `role="dialog"` / `aria-modal`, Escape + overlay dismissal, and the
+ * standard close button all come from `components/ui/dialog.tsx`.
  */
 
 /** Brand logos bundled locally (official brand repos + rainbowkit's
@@ -50,19 +54,6 @@ export function LoginModal({ open, onClose }: Props) {
   useEffect(() => {
     if (authenticated && open) onClose();
   }, [authenticated, open, onClose]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, onClose]);
-
-  if (!open) return null;
 
   const handleGoogle = async () => {
     setError(null);
@@ -107,30 +98,14 @@ export function LoginModal({ open, onClose }: Props) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Log in or sign up"
-      onClick={onClose}
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
     >
-      <div
-        className="w-full max-w-sm rounded-md border border-border bg-panel-solid p-6"
-        onClick={(e) => {
-          e.stopPropagation();
-        }}
-      >
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-[16px] font-semibold">Log in or sign up</h2>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            className="text-text-mute hover:text-text cursor-pointer"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+      <DialogContent className="max-w-sm" aria-describedby={undefined}>
+        <DialogTitle className="text-[16px] tracking-normal mb-5">Log in or sign up</DialogTitle>
 
         {step === "start" ? (
           <>
@@ -163,6 +138,7 @@ export function LoginModal({ open, onClose }: Props) {
                   if (e.key === "Enter" && email.includes("@")) void handleSendCode();
                 }}
                 type="email"
+                aria-label="Email address"
                 placeholder="Email address"
                 className="h-10 min-w-0 flex-1 rounded-sm border border-border bg-transparent px-3 text-[13px] outline-none placeholder:text-text-mute"
               />
@@ -213,12 +189,15 @@ export function LoginModal({ open, onClose }: Props) {
               }}
               inputMode="numeric"
               autoFocus
+              aria-label="6-digit code"
               placeholder="123456"
               className="mt-3 h-11 w-full rounded-sm border border-border bg-transparent px-3 text-center font-mono text-[18px] tracking-[0.4em] outline-none placeholder:text-text-mute"
             />
             <Button
               variant="primary"
               size="lg"
+              aria-live="polite"
+              aria-atomic="true"
               className="mt-3 w-full"
               disabled={busy || code.length !== 6}
               onClick={() => {
@@ -240,13 +219,17 @@ export function LoginModal({ open, onClose }: Props) {
           </>
         )}
 
-        {error && <p className="mt-3 text-[12px] text-yellow">{error}</p>}
+        {error && (
+          <p role="alert" className="mt-3 text-[12px] text-yellow">
+            {error}
+          </p>
+        )}
 
         <p className="mt-5 text-center text-[10.5px] text-text-mute">
           Protected by Privy · By continuing you agree to the Terms of Use.
         </p>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

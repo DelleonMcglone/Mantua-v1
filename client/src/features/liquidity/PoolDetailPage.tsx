@@ -145,9 +145,13 @@ export function PoolDetailPage({ poolId, onBack, onAddLiquidity, onClose }: Prop
         {...(onClose ? { onClose } : {})}
       />
 
-      {loading && <p className="px-5 py-8 text-xs text-text-dim text-center">Loading pool…</p>}
+      {loading && (
+        <p role="status" className="px-5 py-8 text-xs text-text-dim text-center">
+          Loading pool…
+        </p>
+      )}
       {error && (
-        <p className="px-5 py-8 text-xs text-red text-center">
+        <p role="alert" className="px-5 py-8 text-xs text-red text-center">
           Failed to load pool: {error.message}
         </p>
       )}

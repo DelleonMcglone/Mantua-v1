@@ -35,6 +35,7 @@ export function InputBar({ onSubmit, placeholder }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter") submit();
           }}
+          aria-label="Ask Mantua anything or type a trade command"
           placeholder={placeholder ?? "Ask Mantua anything or type a trade command..."}
           className="flex-1 bg-transparent border-none outline-none text-[13px] text-text"
         />

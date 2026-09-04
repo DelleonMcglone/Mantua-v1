@@ -105,7 +105,7 @@ export function RemoveLiquidityModal({ position, onClose, onSuccess }: Props) {
           </p>
 
           {!ready && (
-            <p className="text-xs text-amber">
+            <p role="alert" className="text-xs text-amber">
               This position was created before tokenId capture — remove not available.
             </p>
           )}
@@ -121,7 +121,9 @@ export function RemoveLiquidityModal({ position, onClose, onSuccess }: Props) {
             </a>
           )}
           {remove.state.status === "error" && remove.state.error && (
-            <p className="text-xs text-red">{remove.state.error.message}</p>
+            <p role="alert" className="text-xs text-red">
+              {remove.state.error.message}
+            </p>
           )}
         </div>
 
@@ -131,6 +133,8 @@ export function RemoveLiquidityModal({ position, onClose, onSuccess }: Props) {
           </Button>
           <Button
             variant={isFull ? "destructive" : "primary"}
+            aria-live="polite"
+            aria-atomic="true"
             disabled={!ready || remove.state.status !== "idle"}
             onClick={() => {
               void onSubmit();

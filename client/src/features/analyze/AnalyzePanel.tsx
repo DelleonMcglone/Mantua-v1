@@ -416,7 +416,10 @@ function ResultBody({
 }) {
   if (loading) {
     return (
-      <div className="bg-bg-elev border border-border-soft rounded-md p-5 text-[13px] text-text-dim">
+      <div
+        role="status"
+        className="bg-bg-elev border border-border-soft rounded-md p-5 text-[13px] text-text-dim"
+      >
         Pulling live data…
       </div>
     );
@@ -424,7 +427,10 @@ function ResultBody({
   if (error) {
     const isRateLimit = /429|rate.?limit/i.test(error);
     return (
-      <div className="bg-bg-elev border border-red/40 rounded-md p-5 text-[13px] text-red space-y-2">
+      <div
+        role="alert"
+        className="bg-bg-elev border border-red/40 rounded-md p-5 text-[13px] text-red space-y-2"
+      >
         <div>{error}</div>
         {isRateLimit && (
           <div className="text-text-dim text-[12px]">

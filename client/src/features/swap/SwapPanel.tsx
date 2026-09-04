@@ -503,13 +503,15 @@ export function SwapPanel({
           <p className="text-xs text-amber text-center mt-3">{hookIncompatible}</p>
         )}
         {!isBridge && !hookIncompatible && quote.loading && (
-          <p className="text-xs text-text-dim text-center mt-3">Fetching quote…</p>
+          <p role="status" className="text-xs text-text-dim text-center mt-3">
+            Fetching quote…
+          </p>
         )}
         {/* Humanize the quote failure to a specific, actionable reason. Skip it
             when the under-Sell banner already shows the same diagnosis (the
             max-input probe trips at cappedMax === 0). */}
         {!isBridge && !hookIncompatible && quote.error && !(amountEntered && cappedMax === 0n) && (
-          <p className="text-xs text-red text-center mt-3">
+          <p role="alert" className="text-xs text-red text-center mt-3">
             {humanizeRevertReason(quote.error.message)}
           </p>
         )}
@@ -524,6 +526,8 @@ export function SwapPanel({
           <Button
             variant="primary"
             size="lg"
+            aria-live="polite"
+            aria-atomic="true"
             disabled={!canBridge || bridgeStatus === "success"}
             onClick={() => {
               void onBridge();
@@ -538,6 +542,8 @@ export function SwapPanel({
           <Button
             variant="primary"
             size="lg"
+            aria-live="polite"
+            aria-atomic="true"
             disabled={
               hookIncompatible !== null ||
               !quote.data ||
@@ -569,10 +575,14 @@ export function SwapPanel({
           bridge.state.message &&
           bridgeStatus !== "success" &&
           bridgeStatus !== "error" && (
-            <p className="text-xs text-text-dim text-center mt-2">{bridge.state.message}</p>
+            <p role="status" className="text-xs text-text-dim text-center mt-2">
+              {bridge.state.message}
+            </p>
           )}
         {isBridge && bridgeStatus === "error" && bridge.state.error && (
-          <p className="text-xs text-red text-center mt-3">{bridge.state.error}</p>
+          <p role="alert" className="text-xs text-red text-center mt-3">
+            {bridge.state.error}
+          </p>
         )}
         {isBridge && bridge.state.burnTx && (
           <a
@@ -612,7 +622,9 @@ export function SwapPanel({
           swap.state.message &&
           swap.state.status !== "idle" &&
           swap.state.status !== "error" && (
-            <p className="text-xs text-text-mute text-center mt-2">{swap.state.message}</p>
+            <p role="status" className="text-xs text-text-mute text-center mt-2">
+              {swap.state.message}
+            </p>
           )}
         {!isBridge && swap.state.approvalTx && (
           <a
@@ -647,7 +659,9 @@ export function SwapPanel({
           </button>
         )}
         {!isBridge && swap.state.status === "error" && swap.state.error && (
-          <p className="text-xs text-red text-center mt-3">{swap.state.error.message}</p>
+          <p role="alert" className="text-xs text-red text-center mt-3">
+            {swap.state.error.message}
+          </p>
         )}
       </div>
     </div>
