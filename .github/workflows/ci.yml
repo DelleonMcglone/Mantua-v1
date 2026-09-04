@@ -1,8 +1,10 @@
 name: CI
 
-# P9-005 — runs typecheck + unit tests + lint on every PR and on
-# pushes to main. Foundry contract tests live in a separate workflow
-# (see contracts.yml when it lands) since they need a different setup.
+# B-012 / 012-ci-baseline — lint + typecheck + tests must be GREEN on every
+# PR and on pushes to main. The repo carries no known-baseline escapes any
+# more: typecheck is 0 errors, lint runs with --max-warnings 0, and all
+# three workspaces' test suites pass, so every step here is strict.
+# Foundry contract tests live in contracts.yml (different toolchain).
 
 on:
   pull_request:
@@ -14,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck-test-lint:
-    name: typecheck + test + lint
+  typecheck-lint-test:
+    name: typecheck + lint + test
     runs-on: ubuntu-latest
 
     steps:
@@ -23,37 +25,34 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.x
+          node-version-file: .nvmrc
           cache: npm
 
-      - name: Install root deps
+      # Root install covers all three workspaces (client, server, agent).
+      # .npmrc's legacy-peer-deps applies to npm ci as well.
+      - name: Install
         run: npm ci
 
-      # `npm ci` at the root installs both workspaces. The scripts
-      # below use `--workspace=...` so each step is targeted.
+      # Runs tsc -b --noEmit in every workspace.
+      - name: Typecheck
+        run: npm run typecheck
 
-      - name: Server typecheck
-        run: npm run typecheck --workspace=@mantua/server
+      # Repo-wide eslint with --max-warnings 0.
+      - name: Lint
+        run: npm run lint
 
+      - name: Client tests
+        run: npm test --workspace=@mantua/client
+
+      # server/src/env.ts parses required vars at module load, so test
+      # files that transitively import it need stubs. These satisfy the
+      # zod schema only — no external service is contacted.
       - name: Server tests
-        # `env.ts` parses required vars at module load; tests that
-        # import any chain into `tokens.ts` need stubs. Real values
-        # only matter for runtime — these satisfy the zod schema
-        # without hitting any external service.
         env:
           DATABASE_URL: postgres://stub:stub@localhost:5432/stub
           PRIVY_APP_ID: ci-stub
           PRIVY_APP_SECRET: ci-stub
         run: npm test --workspace=@mantua/server
 
-      - name: Server lint
-        run: npm run lint --workspace=@mantua/server
-
-      - name: Client typecheck
-        run: npm run typecheck --workspace=@mantua/client
-
-      - name: Client tests
-        run: npm test --workspace=@mantua/client
-
-      - name: Client lint
-        run: npm run lint --workspace=@mantua/client
+      - name: Agent tests
+        run: npm test --workspace=@mantua/agent
