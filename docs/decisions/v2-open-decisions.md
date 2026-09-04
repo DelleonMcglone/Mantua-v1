@@ -8,23 +8,24 @@
 
 ## Summary table
 
-| ID    | Decision                                  | Recommendation                                                                                                                    | Confidence                             | Needs external input?                                     |
-| ----- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------- |
-| D-002 | Promote DynamicFee / RWAGate / ALO hooks  | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                     | High                                   | Audit firm (D-003) for DynamicFee                         |
-| D-003 | External security audit                   | YES — mandatory                                                                                                                   | Very high                              | Audit firm engagement                                     |
-| D-004 | Hosting target                            | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                     | High                                   | None                                                      |
-| D-005 | Privy login methods                       | email + Google + Apple + passkey + external wallet (skip SMS)                                                                     | High                                   | None                                                      |
-| D-006 | Embedded wallet auto-create               | `users-without-wallets`                                                                                                           | High                                   | None                                                      |
-| D-007 | WalletConnect                             | YES — enable                                                                                                                      | High                                   | None                                                      |
-| D-008 | Privy wallet vs separate CDP agent wallet | Separate CDP wallet                                                                                                               | High                                   | None                                                      |
-| D-009 | Per-wallet daily spending cap             | YES — keep, $500 default, tiered raise                                                                                            | High                                   | None                                                      |
-| D-010 | Mantua fee rate                           | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                   | Medium                                 | None (legal weighs on D-012)                              |
-| D-011 | Fee recipient                             | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                   | Very high                              | Choose signers                                            |
-| D-012 | Legal review before fee collection        | YES — non-negotiable                                                                                                              | Very high                              | Crypto-native counsel                                     |
-| D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                                                                                | Medium                                 | None                                                      |
-| D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                   | Medium                                 | Tune in beta                                              |
-| D-106 | x402 payments — scope, non-goals, gate    | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review | High (facts); open questions undecided | Counsel (open question: D-012 posture for seller revenue) |
-| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                      | High                                   | None                                                      |
+| ID    | Decision                                  | Recommendation                                                                                                                                              | Confidence                                | Needs external input?                                     |
+| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| D-002 | Promote DynamicFee / RWAGate / ALO hooks  | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                                               | High                                      | Audit firm (D-003) for DynamicFee                         |
+| D-003 | External security audit                   | YES — mandatory                                                                                                                                             | Very high                                 | Audit firm engagement                                     |
+| D-004 | Hosting target                            | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                                               | High                                      | None                                                      |
+| D-005 | Privy login methods                       | email + Google + Apple + passkey + external wallet (skip SMS)                                                                                               | High                                      | None                                                      |
+| D-006 | Embedded wallet auto-create               | `users-without-wallets`                                                                                                                                     | High                                      | None                                                      |
+| D-007 | WalletConnect                             | YES — enable                                                                                                                                                | High                                      | None                                                      |
+| D-008 | Privy wallet vs separate CDP agent wallet | Separate CDP wallet                                                                                                                                         | High                                      | None                                                      |
+| D-009 | Per-wallet daily spending cap             | YES — keep, $500 default, tiered raise                                                                                                                      | High                                      | None                                                      |
+| D-010 | Mantua fee rate                           | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                                             | Medium                                    | None (legal weighs on D-012)                              |
+| D-011 | Fee recipient                             | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                                             | Very high                                 | Choose signers                                            |
+| D-012 | Legal review before fee collection        | YES — non-negotiable                                                                                                                                        | Very high                                 | Crypto-native counsel                                     |
+| D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                                                                                                          | Medium                                    | None                                                      |
+| D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                             | Medium                                    | Tune in beta                                              |
+| D-106 | x402 payments — scope, non-goals, gate    | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                           | High (facts); open questions undecided    | Counsel (open question: D-012 posture for seller revenue) |
+| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                | High                                      | None                                                      |
+| D-111 | Gasless user transactions (C-005/C-006)   | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning | High (architecture); live path unverified | None (operator provisions the paymaster policy)           |
 
 ---
 
@@ -412,6 +413,90 @@ predecessor repo (the 2026-03 `MantuaAI` era), not this tree.
 
 **Non-goals:** RainbowKit, wagmi, any multi-chain wallet UI, and Circle
 user-controlled wallets for user custody.
+
+---
+
+## D-111 — Gasless user transactions: Privy smart wallets + sponsoring paymaster
+
+**Decision:** ✅ ACCEPTED — 2026-09-04. Implemented behind `VITE_GASLESS_ENABLED`
+(OFF by default) in branch `027-gasless-user-transactions`; see
+`docs/tasks/027-gasless-user-transactions.md` for status and operator steps.
+
+**Context.** C-005 requires that users never acquire, hold, or manage ETH.
+The AGENT side is already gasless: Circle Gas Station sponsors the agent's
+Circle SCA wallets (C-017 wave). The USER side is not — user writes come from
+Privy wallets (embedded EOAs or external wallets), which pay their own ETH
+gas on Base. Every user trade today silently assumes the user holds ETH.
+
+**Options evaluated.**
+
+**(a) Privy smart wallets (ERC-4337) + a sponsoring paymaster — CHOSEN.**
+Grounded against the installed `@privy-io/react-auth@3.22.2` (not docs from
+memory): the package ships a `./smart-wallets` entrypoint exporting
+`SmartWalletsProvider` and `useSmartWallets`, whose `getClientForChain`
+returns a permissionless-based `SmartAccountClient` wrapping the user's
+**embedded** signer — `sendTransaction` submits a sponsored user operation
+through the bundler + paymaster configured **per chain in the Privy
+Dashboard** (the client optionally forwards a `paymasterContext` object).
+The entrypoint needs the optional peer dep `permissionless` (now pinned
+`0.2.57` in `client/package.json`). Paymaster choices that slot into the
+dashboard's paymaster-URL field, in preference order:
+
+1. **Circle Paymaster** (ERC-4337 verifying paymaster on Base) — gas paid
+   in USDC, which matches the USDC-native platform posture (C-004) and the
+   Circle stack already operating the agent side. Users would spend cents of
+   USDC per trade rather than the operator sponsoring outright.
+2. **A bundler provider's sponsoring paymaster** (Pimlico / Alchemy Gas
+   Manager / Coinbase Developer Platform) — operator-funded sponsorship
+   policy; simplest "user pays nothing at all" experience, with policy caps
+   as the abuse rail.
+
+The final pick is an **operator/dashboard decision**, not a code fork — the
+client code is identical for both (that is much of why (a) wins).
+
+Honest caveats, which are why the flag ships OFF:
+
+- **Embedded wallets only.** Privy provisions smart wallets over the
+  embedded signer. External-wallet logins (MetaMask, WalletConnect…) stay on
+  the EOA path and keep paying their own gas. Acceptable: the "never touch
+  ETH" persona is precisely the embedded-wallet (email/Google) user;
+  external-wallet users self-custody by choice.
+- **New address.** The smart account's address differs from the embedded
+  EOA's. USDC balances, allowances, YES-token positions, and the
+  deposit/receive surfaces all key on the active address — existing users
+  with funds on the EOA need a one-time sweep, and portfolio/receive UI
+  needs an address-reconciliation pass before the flag can default ON.
+  Flag-ON behavior is self-consistent (trades, allowance checks, and
+  position reads all go through the same smart-account address) but a user
+  who traded before the flip would see their prior balances "missing".
+- **Unverifiable offline.** Sponsorship requires a funded paymaster policy
+  and dashboard config; no offline test can prove the end-to-end flow
+  (C-006). The wired code path is verified by unit tests only.
+
+**(b) Circle Modular Wallets (passkey SCA + Gas Station) for users —
+REJECTED.** It would deliver the same gasless outcome, and it is the one
+option that unifies user+agent sponsorship under Circle Gas Station. But it
+directly conflicts with D-110 ("Privy stays for user custody"; Circle
+user-facing wallets "explicitly out of scope for Phase 1 … revisit only if
+Privy becomes a constraint"). Adopting it means replacing the login stack
+(email/Google → passkey WebAuthn), running two user-wallet systems through a
+migration, and rebuilding the Privy-keyed auth/session plumbing — a full
+custody migration to solve a gas-sponsorship problem that (a) solves inside
+the incumbent stack. Privy has not become a constraint; D-110's revisit
+trigger has not fired.
+
+**(c) Status quo + ETH funding UX — REJECTED.** A "top up ETH for network
+fees" flow fails C-005 verbatim (users must acquire/hold/manage ETH) and
+cannot be built without violating the chainless rule — funding UX has to
+name ETH, gas, and a chain. It is the only option that is worse than doing
+nothing, because it enshrines the problem in UI.
+
+**Blocks:** C-006 (live verification), flag default-ON rollout.
+
+**Non-goals:** changing the agent-side sponsorship (Circle Gas Station,
+C-017); batching approve+trade into one user operation (a natural follow-up
+once the path is live — the smart-account client supports call batching);
+any chain- or gas-naming UI copy.
 
 ---
 

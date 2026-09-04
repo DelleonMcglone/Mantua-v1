@@ -26,6 +26,7 @@
     "clsx": "2.1.1",
     "lightweight-charts": "5.2.0",
     "lucide-react": "1.11.0",
+    "permissionless": "0.2.57",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "tailwind-merge": "3.5.0",

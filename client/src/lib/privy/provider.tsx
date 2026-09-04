@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
+// C-005 gasless hook point (D-111): pass-through unless VITE_GASLESS_ENABLED.
+import { GaslessProvider } from "../gasless/provider.tsx";
 import { PRIVY_APP_ID, privyConfig } from "./config.ts";
 
 export function MantuaPrivyProvider({ children }: { children: ReactNode }) {
@@ -8,7 +10,7 @@ export function MantuaPrivyProvider({ children }: { children: ReactNode }) {
   if (!PRIVY_APP_ID) return <MissingPrivyConfig />;
   return (
     <PrivyProvider appId={PRIVY_APP_ID} config={privyConfig}>
-      {children}
+      <GaslessProvider>{children}</GaslessProvider>
     </PrivyProvider>
   );
 }
