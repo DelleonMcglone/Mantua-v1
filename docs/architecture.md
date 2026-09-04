@@ -93,6 +93,47 @@ reusability audit): confirm to mined receipt rather than Circle's `SENT`
 state, hard-fail on an unset `CIRCLE_WALLET_SET_ID` in production, verify
 the mainnet Gas Station sponsorship policy, and bound agent-side approvals.
 
+### Custody posture (C-009)
+
+Who holds which key, stated from the code:
+
+1. **User custody — Privy, non-custodial.** Users sign with Privy embedded
+   wallets (auto-created for `users-without-wallets`) or their own external
+   wallets, incl. WalletConnect (`client/src/lib/privy/config.ts`,
+   `provider.tsx`). Keys live with Privy's client-side key management and the
+   user's wallet — never on Mantua's server. The server only ever receives
+   signed transactions/messages; signing happens in the browser through the
+   wallet's EIP-1193 provider, bridged to viem in
+   `client/src/lib/privy/wallet-client.ts`. Privy is chain-locked to Base
+   Mainnet 8453 (`defaultChain`/`supportedChains` = `[base]` from
+   `client/src/lib/chains.ts`).
+2. **Agent custody — Circle Developer-Controlled Wallets.** SCA accounts on
+   blockchain `"BASE"` (`server/src/lib/agent-wallet.ts`). The custody root is
+   the Circle **entity secret** (`CIRCLE_ENTITY_SECRET`,
+   `server/src/lib/circle/client.ts`), held only in the operator's
+   env/secrets manager — never in code or the repo. Agent wallets are pinned
+   to one wallet set (`CIRCLE_WALLET_SET_ID`; production refuses to create a
+   set implicitly, `client.ts`) and gas is sponsored by a pinned Gas Station
+   policy (`CIRCLE_GAS_STATION_POLICY_ID`,
+   `server/src/lib/circle/sponsorship.ts`; production refuses unsponsored
+   transactions).
+3. **Segregation — the D-008 two-wallet boundary** (table above). No code
+   path signs with or moves funds from the Privy wallet on the agent's
+   behalf; funds cross the boundary only user → agent, and only with the
+   user's signature on the Privy side. Each wallet carries its own
+   server-enforced daily cap (`server/src/lib/spending-cap.ts`,
+   `agent_wallets.daily_cap_usd`), and every agent write passes
+   `server/src/lib/circle/execute.ts` + the `allowed-targets.ts` allowlist.
+4. **x402 buyer EOA — a third, deliberately separate key** (D-106).
+   `X402_BUYER_PRIVATE_KEY` (falling back to `MANTUA_ADMIN_PRIVATE_KEY`,
+   `server/src/lib/x402-buyer.ts`) signs EIP-3009 payment authorizations
+   only. It is neither the user's Privy wallet nor the Circle agent wallet,
+   and x402 spend is bounded by its own caps (`X402_MAX_CALL_USD`,
+   `X402_DAILY_CAP_USD`), not the agent wallet's.
+5. **What Mantua never holds:** user private keys (Privy custody, item 1);
+   a plaintext entity secret in code or the repo (env-only, item 2); any key
+   that can cross the user→agent boundary in reverse.
+
 ## Mainnet safety rails (Phase 1)
 
 Server-side enforcement primitives. Every Phase 3+ write path goes through these BEFORE any Trading API or PoolManager call.
