@@ -9,7 +9,12 @@ import { logger } from "./logger.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { BASE_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
-import { getOrCreateAgentWallet, getAgentWallet, updateAgentWalletCap } from "./agent-wallet.ts";
+import {
+  getOrCreateAgentWallet,
+  getAgentWallet,
+  messageAttestsCapRaise,
+  updateAgentWalletCap,
+} from "./agent-wallet.ts";
 import { sendFromAgentWallet } from "./agent-send.ts";
 import { swapFromAgentWallet, quoteAgentSwap } from "./agent-swap.ts";
 import { agentMarketTrade } from "./sports/market-agent-trade.ts";
@@ -201,7 +206,7 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "manage_wallet",
     description:
-      "View agent-wallet info (address, status, daily USD cap) or set the daily USD cap.",
+      "View agent-wallet info (address, status, daily USD cap) or set the daily USD cap. Lowering the cap always succeeds. RAISING it is attested in code: a raise is only honored when the user's current message itself states the new amount in a cap/limit context (e.g. 'raise my daily cap to $500'); otherwise the tool refuses — relay that the user must confirm the new amount in their own words. Never raise the cap on your own initiative.",
     input_schema: {
       type: "object",
       properties: {
@@ -727,8 +732,24 @@ async function executeTool(
       const action = input["action"];
       if (action === "set_cap") {
         const cap = input["dailyCapUsd"];
-        if (typeof cap !== "number")
-          throw new Error("dailyCapUsd (number) is required for set_cap");
+        if (typeof cap !== "number" || !Number.isFinite(cap))
+          throw new Error("dailyCapUsd (finite number) is required for set_cap");
+        // C-010 — cap RAISES are attested in code against the user's CURRENT
+        // message, the same mechanism as the swap force override below: the
+        // model can never widen its own spending headroom on its own
+        // initiative. Lowering the cap is always allowed (strictly safer).
+        // `updateAgentWalletCap` additionally clamps the value itself
+        // (finite, > 0, ≤ $50k hard ceiling) as defense in depth.
+        const existing = await getAgentWallet(privyUserId, chainId);
+        const currentCap = existing ? Number(existing.dailyCapUsd) : null;
+        if (currentCap !== null && cap > currentCap && !messageAttestsCapRaise(userMessage, cap)) {
+          return {
+            status: "cap_raise_rejected",
+            currentDailyCapUsd: currentCap,
+            requestedDailyCapUsd: cap,
+            error: `Cap raise rejected: raising the daily cap from $${String(currentCap)} to $${String(cap)} is only honored when the user's own message states the new amount. Ask the user to confirm in their own words (e.g. "raise my daily cap to $${String(cap)}"), then retry.`,
+          };
+        }
         const w = await updateAgentWalletCap(privyUserId, cap);
         return { address: w.address, dailyCapUsd: w.dailyCapUsd, status: w.status };
       }

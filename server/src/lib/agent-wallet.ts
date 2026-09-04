@@ -9,6 +9,7 @@ import { recordFirstSeen } from "./wallet-age.ts";
 export { deriveAgentAccountName };
 
 import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { HARD_DAILY_CAP_USD } from "./constants.ts";
 
 /** Circle blockchain ids per supported chain. */
 export type CircleBlockchain = "BASE";
@@ -26,6 +27,13 @@ export class UserNotFoundError extends Error {
       `No user record found for Privy user ${privyUserId}. The user must connect their primary wallet (recordFirstSeen) before an agent wallet can be provisioned.`,
     );
     this.name = "UserNotFoundError";
+  }
+}
+
+export class InvalidDailyCapError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidDailyCapError";
   }
 }
 
@@ -173,6 +181,68 @@ export async function getAgentWallets(privyUserId: string): Promise<AgentWallet[
 }
 
 /**
+ * C-010 — validate a daily-cap value at the LIBRARY layer, so every caller
+ * (HTTP route, agent tool, future scripts) hits the same bound. The HTTP
+ * route's zod schema already bounds the value; this is defense in depth for
+ * paths (like the agent's own `manage_wallet` tool) that reach
+ * `updateAgentWalletCap` without passing through that schema.
+ *
+ * Rules: finite number, strictly positive, at most HARD_DAILY_CAP_USD.
+ * Throws `InvalidDailyCapError` with a message safe to surface to the model
+ * or the user.
+ */
+export function assertValidDailyCap(dailyCapUsd: number): void {
+  if (!Number.isFinite(dailyCapUsd)) {
+    throw new InvalidDailyCapError("dailyCapUsd must be a finite number.");
+  }
+  if (dailyCapUsd <= 0) {
+    throw new InvalidDailyCapError("dailyCapUsd must be greater than zero.");
+  }
+  if (dailyCapUsd > HARD_DAILY_CAP_USD) {
+    throw new InvalidDailyCapError(
+      `dailyCapUsd must not exceed the absolute ceiling of $${String(HARD_DAILY_CAP_USD)}.`,
+    );
+  }
+}
+
+/**
+ * C-010 — code-level attestation for agent-initiated cap RAISES, the same
+ * mechanism as the swap tool's `force` override (`lib/force-attestation.ts`):
+ * the model may only widen its own spending headroom when the user's CURRENT
+ * message itself states the new amount in a cap/limit context. Checked
+ * against the raw message text server-side — never model-decided.
+ *
+ * Deliberately conservative, like `messageAuthorizesForce`: generic consent
+ * ("yes", "go ahead") does NOT attest a raise, and neither does a message
+ * that mentions the amount without talking about the cap ("send 500 USDC").
+ * The message must (a) mention the cap/limit and (b) contain the exact new
+ * amount ("raise my daily cap to $500", "set my spending limit to 5k").
+ * A false negative costs one clarifying round-trip; a false positive lets
+ * the agent raise its own blast radius.
+ */
+const CAP_CONTEXT_RE = /\b(cap|limit)\b/i;
+/** Dollar amounts in free text: "$500", "5,000", "500.00", "5k". */
+const AMOUNT_RE = /\$?\s?(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)\s*([kK])?\b/g;
+
+function messageUsdAmounts(message: string): number[] {
+  const amounts: number[] = [];
+  for (const m of message.matchAll(AMOUNT_RE)) {
+    // Group 1 always participates in a match (it is the whole alternation).
+    const value = Number(m[1].replace(/,/g, ""));
+    if (!Number.isFinite(value)) continue;
+    amounts.push(m[2] ? value * 1000 : value);
+  }
+  return amounts;
+}
+
+/** True when the user's own message attests the new (raised) cap amount. */
+export function messageAttestsCapRaise(message: string, newCapUsd: number): boolean {
+  if (!Number.isFinite(newCapUsd) || newCapUsd <= 0) return false;
+  if (!CAP_CONTEXT_RE.test(message)) return false;
+  return messageUsdAmounts(message).some((v) => Math.abs(v - newCapUsd) < 0.005);
+}
+
+/**
  * P6-011 — set the agent wallet's daily USD spending cap.
  *
  * The spending-cap infrastructure in `server/src/lib/spending-cap.ts`
@@ -182,17 +252,20 @@ export async function getAgentWallets(privyUserId: string): Promise<AgentWallet[
  * were created with the schema default ($100) and there was no path to
  * change it. P6-011 adds that path.
  *
- * Cap range is enforced in the route layer (zod schema in
- * `server/src/routes/agent-wallets.ts`): non-negative number,
- * ≤ HARD_DAILY_CAP_USD ($50k). Values are stored as strings in the
- * `numeric(20,2)` column. Throws `UserNotFoundError` if the user has
- * no record yet, `AgentWalletNotFoundError` if no agent wallet is
- * provisioned for them.
+ * Cap range is enforced HERE (`assertValidDailyCap` — C-010 defense in
+ * depth: finite, > 0, ≤ HARD_DAILY_CAP_USD $50k) as well as in the HTTP
+ * route layer (zod schema in `server/src/routes/agent-wallets.ts`), so a
+ * caller that bypasses the route — the agent's own `manage_wallet` tool —
+ * can never write an unbounded cap. Values are stored as strings in the
+ * `numeric(20,2)` column. Throws `InvalidDailyCapError` on an out-of-range
+ * value, `UserNotFoundError` if the user has no record yet,
+ * `AgentWalletNotFoundError` if no agent wallet is provisioned for them.
  */
 export async function updateAgentWalletCap(
   privyUserId: string,
   dailyCapUsd: number,
 ): Promise<AgentWallet> {
+  assertValidDailyCap(dailyCapUsd);
   const userRows = await db
     .select({ id: users.id })
     .from(users)
