@@ -8,22 +8,23 @@
 
 ## Summary table
 
-| ID    | Decision                                  | Recommendation                                                                | Confidence | Needs external input?             |
-| ----- | ----------------------------------------- | ----------------------------------------------------------------------------- | ---------- | --------------------------------- |
-| D-002 | Promote DynamicFee / RWAGate / ALO hooks  | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred | High       | Audit firm (D-003) for DynamicFee |
-| D-003 | External security audit                   | YES — mandatory                                                               | Very high  | Audit firm engagement             |
-| D-004 | Hosting target                            | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                 | High       | None                              |
-| D-005 | Privy login methods                       | email + Google + Apple + passkey + external wallet (skip SMS)                 | High       | None                              |
-| D-006 | Embedded wallet auto-create               | `users-without-wallets`                                                       | High       | None                              |
-| D-007 | WalletConnect                             | YES — enable                                                                  | High       | None                              |
-| D-008 | Privy wallet vs separate CDP agent wallet | Separate CDP wallet                                                           | High       | None                              |
-| D-009 | Per-wallet daily spending cap             | YES — keep, $500 default, tiered raise                                        | High       | None                              |
-| D-010 | Mantua fee rate                           | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                               | Medium     | None (legal weighs on D-012)      |
-| D-011 | Fee recipient                             | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                               | Very high  | Choose signers                    |
-| D-012 | Legal review before fee collection        | YES — non-negotiable                                                          | Very high  | Crypto-native counsel             |
-| D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                            | Medium     | None                              |
-| D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                               | Medium     | Tune in beta                      |
-| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent  | High       | None                              |
+| ID    | Decision                                  | Recommendation                                                                                                                    | Confidence                             | Needs external input?                                     |
+| ----- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------- |
+| D-002 | Promote DynamicFee / RWAGate / ALO hooks  | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                     | High                                   | Audit firm (D-003) for DynamicFee                         |
+| D-003 | External security audit                   | YES — mandatory                                                                                                                   | Very high                              | Audit firm engagement                                     |
+| D-004 | Hosting target                            | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                     | High                                   | None                                                      |
+| D-005 | Privy login methods                       | email + Google + Apple + passkey + external wallet (skip SMS)                                                                     | High                                   | None                                                      |
+| D-006 | Embedded wallet auto-create               | `users-without-wallets`                                                                                                           | High                                   | None                                                      |
+| D-007 | WalletConnect                             | YES — enable                                                                                                                      | High                                   | None                                                      |
+| D-008 | Privy wallet vs separate CDP agent wallet | Separate CDP wallet                                                                                                               | High                                   | None                                                      |
+| D-009 | Per-wallet daily spending cap             | YES — keep, $500 default, tiered raise                                                                                            | High                                   | None                                                      |
+| D-010 | Mantua fee rate                           | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                   | Medium                                 | None (legal weighs on D-012)                              |
+| D-011 | Fee recipient                             | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                   | Very high                              | Choose signers                                            |
+| D-012 | Legal review before fee collection        | YES — non-negotiable                                                                                                              | Very high                              | Crypto-native counsel                                     |
+| D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                                                                                | Medium                                 | None                                                      |
+| D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                   | Medium                                 | Tune in beta                                              |
+| D-106 | x402 payments — scope, non-goals, gate    | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review | High (facts); open questions undecided | Counsel (open question: D-012 posture for seller revenue) |
+| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                      | High                                   | None                                                      |
 
 ---
 
@@ -290,6 +291,73 @@
 
 ---
 
+## D-106 — x402 payments: scope, non-goals, and the build gate
+
+**Decision:** ✅ ACCEPTED — 2026-09-04 (owner lock): **no x402 build starts before
+the C-wave hardening lands**, and this record — not the C-007 ledger row — is
+x402's scope source of truth. The forward scope below is grounded in what the
+tree actually ships; genuinely open product questions are marked ⬜ and are NOT
+decided here — review is requested on those before any build spec is written.
+
+**What exists today (verified in the tree at `a52e2b8`).** Two shipped surfaces,
+both env-gated off by default, with no roadmap rows and no tests:
+
+- **Buyer** (`server/src/lib/x402-buyer.ts`) — HTTP-native x402 v2: discovery via
+  the Bazaar index (`withBazaar` over the public facilitator); payment via
+  `wrapFetchWithPayment` (`@x402/fetch`) signing an **EIP-3009
+  `transferWithAuthorization`** with the buyer EOA — the facilitator settles
+  USDC on Base (`eip155:8453`), so the buyer needs USDC only, no gas. Rails:
+  `X402_MAX_CALL_USD` per-call ceiling (default $0.10), `X402_DAILY_CAP_USD`
+  daily ceiling (default $1.00) summed from the `agent_x402` audit rows, one
+  audit row per payment. Surfaces as two chat tools in `agent-chat.ts`
+  (`search_paid_services`, `call_paid_service`). Buyer key:
+  `X402_BUYER_PRIVATE_KEY`, falling back to `MANTUA_ADMIN_PRIVATE_KEY`.
+- **Seller** (`server/src/routes/x402-service.ts`) — Mantua sells
+  `GET /api/x402/analyst-brief` for **$0.01 USDC** via
+  `paymentMiddlewareFromConfig` (`@x402/express`), scheme `exact`, settled by
+  the default public facilitator to `X402_SELLER_ADDRESS`. "Payment IS the
+  auth" — no Privy session; an unset address reports 503 `X402_SELLER_DISABLED`
+  (the same graceful-dark pattern as the other opt-in features).
+- **Key separation** — the buyer EOA is separate from the Circle agent wallet;
+  x402 spend never touches the agent wallet's balances or its daily cap
+  (`docs/x402-setup.md`).
+
+**Scope — what "building x402" means going forward.** Any new x402 surface
+beyond the two shipped ones: additional paid endpoints, new buyer integrations
+or surfaces, changes to keys/settlement/facilitator, or flipping x402 from
+env-gated-off to default-on. Each such build needs its own spec'd work with
+roadmap rows and tests (today's surfaces have neither), and each waits for the
+C-wave: the hardening wave defines what "success" and "settled" mean on the
+money rails x402 pays through.
+
+**Non-goals.**
+
+- x402 never signs with, or funds from, the user's Privy wallet — the D-008/D-110
+  wallet boundary applies unchanged; the only x402 key is the separate,
+  operator-configured buyer EOA.
+- x402 spend never draws on the Circle agent wallet's budget or its daily cap —
+  the caps that bound x402 are its own (`X402_MAX_CALL_USD` /
+  `X402_DAILY_CAP_USD`).
+- This wave does not build x402 — it authors this record (C-007's missing source
+  of truth) and reconciles the ledger.
+
+**Genuinely open (⬜ — not decided here):**
+
+- Dedicated buyer key vs. the `MANTUA_ADMIN_PRIVATE_KEY` default (operational;
+  the env already supports `X402_BUYER_PRIVATE_KEY`).
+- Whether Mantua lists more of its own services on the Bazaar marketplace beyond
+  the analyst brief (product).
+- Whether the D-012 legal-review posture extends to x402 seller revenue (counsel
+  input; not assumed either way).
+- Production cap defaults ($0.10 / $1.00 are dev-era values), and whether the
+  shipped surfaces get roadmap rows + tests or stay acknowledged-and-deferred
+  under TD-005.
+
+**Blocks:** C-007 (x402 integration) — and is itself gated by the C-wave
+hardening items (owner lock, 2026-09-04).
+
+---
+
 ## D-110 — Wallet-stack reconciliation: RainbowKit vs Privy vs Circle Wallets
 
 **Decision:** ✅ ACCEPTED — 2026-09-02.
@@ -322,7 +390,7 @@ predecessor repo (the 2026-03 `MantuaAI` era), not this tree.
    already builds directly.
 2. **Agent custody: Circle Developer-Controlled Wallets is the Phase 1
    target — confirmed and already implemented** (`server/src/lib/circle/`).
-   This supersedes the *provider naming* of D-008 ("separate CDP wallet");
+   This supersedes the _provider naming_ of D-008 ("separate CDP wallet");
    D-008's wallet-boundary rationale — the agent never touches the user's
    keys, blast radius bounded to an explicitly funded wallet — carries over
    to Circle unchanged.
@@ -333,14 +401,14 @@ predecessor repo (the 2026-03 `MantuaAI` era), not this tree.
 
 **Migration path** (status as of 2026-09-02):
 
-| # | Step | Status |
-| --- | --- | --- |
-| 1 | Strip testnets; single chain Base Mainnet 8453 | ✅ done (mainnet migration) |
-| 2 | Remove chain switcher + all visible chain UI | ✅ done (chainless-UI pass) |
-| 3 | Strike wagmi from the roadmap; P2-013 is the direct Privy → viem bridge, shipped in `wallet-client.ts` | ✅ done (this decision) |
-| 4 | Delete residual chain-switch machinery (`chain-context.tsx` collapse, dead `NETWORK_OPTIONS`) | ⬜ per reusability audit |
-| 5 | Circle DCW Phase 1 hardening — exit criteria: execute-to-confirmed-receipt (not `SENT`), `CIRCLE_WALLET_SET_ID` pinned + hard-fail when unset, mainnet Gas Station policy verified, bounded agent approvals | ⬜ audit ship-blockers 1 & 6 |
-| 6 | Update `docs/architecture.md` wallet section from the stale CDP-SDK narrative to Circle DCW | ✅ done (this decision) |
+| #   | Step                                                                                                                                                                                                        | Status                                                                                                                                                                                                  |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | Strip testnets; single chain Base Mainnet 8453                                                                                                                                                              | ✅ done (mainnet migration)                                                                                                                                                                             |
+| 2   | Remove chain switcher + all visible chain UI                                                                                                                                                                | ✅ done (chainless-UI pass)                                                                                                                                                                             |
+| 3   | Strike wagmi from the roadmap; P2-013 is the direct Privy → viem bridge, shipped in `wallet-client.ts`                                                                                                      | ✅ done (this decision)                                                                                                                                                                                 |
+| 4   | Delete residual chain-switch machinery (`chain-context.tsx` collapse, dead `NETWORK_OPTIONS`)                                                                                                               | ⬜ per reusability audit                                                                                                                                                                                |
+| 5   | Circle DCW Phase 1 hardening — exit criteria: execute-to-confirmed-receipt (not `SENT`), `CIRCLE_WALLET_SET_ID` pinned + hard-fail when unset, mainnet Gas Station policy verified, bounded agent approvals | 🟡 in progress — C-wave (`docs/tasks/circle-custody-wave.md`): receipt → C-015, Gas Station → C-017, bounded approvals ✅ code-side (PR #18), wallet-set ✅ code-side (PR #13) pending the operator pin |
+| 6   | Update `docs/architecture.md` wallet section from the stale CDP-SDK narrative to Circle DCW                                                                                                                 | ✅ done (this decision)                                                                                                                                                                                 |
 
 **Non-goals:** RainbowKit, wagmi, any multi-chain wallet UI, and Circle
 user-controlled wallets for user custody.
@@ -370,4 +438,4 @@ Recommendation: Option 2, but only if any of those constraints actually exist. O
 
 ---
 
-_Last updated: 2026-04-26_
+_Last updated: 2026-09-04_
