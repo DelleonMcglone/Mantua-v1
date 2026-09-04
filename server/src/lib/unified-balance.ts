@@ -7,7 +7,7 @@ import { env } from "../env.ts";
 import { logger } from "./logger.ts";
 import { CircleUnavailableError } from "./circle/client.ts";
 import { getAgentWallet, getOrCreateAgentWallet } from "./agent-wallet.ts";
-import { checkSpendingCap } from "./spending-cap.ts";
+import { checkSpendingCap, guardSpend, type SpendGuardIo } from "./spending-cap.ts";
 
 /**
  * Circle Gateway unified balance for the agent wallet ("treasury management" —
@@ -396,6 +396,44 @@ export async function ensureGatewayDelegate(
 }
 
 /**
+ * C-010 — USD value of a Gateway spend amount (USDC ≈ USD). Fails CLOSED on
+ * unparseable or negative input: a spend the cap machinery can't price is a
+ * spend that doesn't happen.
+ */
+function gatewaySpendUsd(amount: string): number {
+  const usd = Number(amount);
+  if (!Number.isFinite(usd) || usd < 0) {
+    throw new Error(`Invalid Gateway spend amount: ${JSON.stringify(amount)}`);
+  }
+  return usd;
+}
+
+/**
+ * C-010 — run a Gateway spend through the same check → issue → record
+ * sequence every other money path uses (`guardSpend`, C-019). Previously
+ * this path only CHECKED the cap and never recorded the spend, so N
+ * sequential Gateway spends each passed a cap none of them consumed.
+ *
+ * Settling to the agent's OWN address is a treasury move (funds stay
+ * agent-owned — same rationale as deposit) and bypasses the cap entirely;
+ * paying a third party is a spend and both counts against and CONSUMES the
+ * daily cap. Exported with an injectable `io` seam for unit tests.
+ */
+export async function guardGatewaySpend<T>(
+  walletAddress: string,
+  recipientAddress: string,
+  amount: string,
+  issue: () => Promise<T>,
+  io?: SpendGuardIo,
+): Promise<T> {
+  if (recipientAddress.toLowerCase() === walletAddress.toLowerCase()) return issue();
+  const resolveUsd = () => Promise.resolve(gatewaySpendUsd(amount));
+  return io
+    ? guardSpend(resolveUsd, walletAddress, issue, io)
+    : guardSpend(resolveUsd, walletAddress, issue);
+}
+
+/**
  * Spend USDC from the agent wallet's unified balance to `destinationChain`
  * (burn on Base, mint on the destination) — Base as the settlement hub. The
  * admin-EOA delegate signs the burn intent; `sourceAccount` keeps the funds
@@ -420,8 +458,11 @@ export async function spendUnifiedBalance(
   // Settling to the agent's OWN address on another chain is a treasury move
   // (funds stay agent-owned — same rationale as deposit); paying a third
   // party is a spend and counts against the daily cap (USDC ≈ USD).
+  // This early read-only check fails fast BEFORE any delegate-registration
+  // work; the authoritative sequence (check → issue → record) runs in
+  // `guardGatewaySpend` around the burn below (C-010).
   if (recipientAddress.toLowerCase() !== wallet.address.toLowerCase()) {
-    await checkSpendingCap(wallet.address, Number(amount));
+    await checkSpendingCap(wallet.address, gatewaySpendUsd(amount));
   }
 
   const delegate = await ensureGatewayDelegate(privyUserId);
@@ -448,11 +489,17 @@ export async function spendUnifiedBalance(
     sourceAccount: wallet.address,
     allocations: { amount, chain: HOME_CHAIN },
   } as unknown as UBK.SpendSource;
-  const res = (await kit.spend({
-    from,
-    to: { chain: destinationChain, recipientAddress, useForwarder: true },
-    amount,
-  })) as unknown as SpendResultLike;
+  const issueSpend = async () =>
+    (await kit.spend({
+      from,
+      to: { chain: destinationChain, recipientAddress, useForwarder: true },
+      amount,
+    })) as unknown as SpendResultLike;
+  // C-010 — third-party spends run check → issue → record (guardSpend): the
+  // daily ledger is inked once the burn is submitted, so the NEXT spend sees
+  // this one's headroom reduction. Self-recipient treasury moves bypass the
+  // cap, as before (guardGatewaySpend handles both branches).
+  const res = await guardGatewaySpend(wallet.address, recipientAddress, amount, issueSpend);
 
   return {
     status: "spent",
