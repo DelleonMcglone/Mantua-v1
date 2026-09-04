@@ -114,14 +114,24 @@ Sponsorship is console-side policy, not a key:
 1. Console → **Gas Station** → create a policy.
 2. Scope it to **Base (mainnet)** and to the wallet set from step 3.
 3. Fund / configure the spend limits per your risk appetite.
-4. Copy the policy id into `CIRCLE_GAS_STATION_POLICY_ID`.
+4. **Activate the policy** and make it the **default policy for Base** —
+   transactions use only the network's default policy; an inactive or
+   non-default policy sponsors nothing (and deactivating one later stops
+   sponsorship the same way).
+5. Copy the policy id into `CIRCLE_GAS_STATION_POLICY_ID`.
 
-The app never sends that id to Circle — the SDK sponsors SCA transactions
-automatically once the policy exists. We record it so the code can assert
-sponsorship was configured _deliberately_: without it, an agent wallet holding
-no ETH fails as an opaque `timed out waiting for a tx hash`, which the wallet
-audit flagged as indistinguishable from a network fault. Agent wallets are
-provisioned as `SCA` (required for sponsorship, and correct on an L2).
+Sponsorship itself is applied by Circle automatically once that policy exists
+— the DCW transaction API has no sponsorship argument. The recorded id is
+consumed two ways (C-017): production refuses to create a transaction that
+Gas Station cannot sponsor, and every transaction carries the id as Circle's
+`refId`. Circle's console lists sponsored transactions per policy, so that
+`gas-station:<id>` provenance is the operator's closed loop: if a transaction
+created by the server does not appear under the recorded policy, the recorded
+id is not the one actually sponsoring the code. Without a recorded id, an
+agent wallet holding no ETH fails as an opaque `timed out waiting for a tx
+hash`, which the wallet audit flagged as indistinguishable from a network
+fault. Agent wallets are provisioned as `SCA` (required for sponsorship, and
+correct on an L2).
 
 ### 5. USDC flows
 
@@ -149,14 +159,18 @@ npm run circle:preflight -w @mantua/server
 ```
 
 Checks credential shapes (never printing values), authenticates to Circle,
-confirms the wallet set is reachable and holds `BASE` wallets, and reports
-whether Gas Station was recorded. Exit 0 = usable.
+confirms the wallet set is reachable and holds `BASE` wallets, and verifies
+the Gas Station policy's live dependencies (wallet set reachable, `BASE`
+wallets present). Circle exposes no policy-read API — active/default status
+is console-only — so the script prints that confirmation step explicitly
+alongside the `refId` provenance note. Exit 0 = usable.
 
 ## What the code now enforces
 
 - **Format validation** — API key must match `PREFIX:ID:SECRET`; entity secret
-  must be 64 hex chars; wallet set id must be a UUID. A typo fails at boot
-  with a named field instead of a confusing 401 at first agent use.
+  must be 64 hex chars; wallet set id and Gas Station policy id must be UUIDs.
+  A typo fails at boot with a named field instead of a confusing 401 at first
+  agent use.
 - **Coherence checks** (`circleCredentialIssues` in `server/src/env.ts`) —
   warn in dev, **hard-fail the boot in production**: API key without entity
   secret (or vice versa), missing wallet set id, missing Gas Station policy,
@@ -165,7 +179,10 @@ whether Gas Station was recorded. Exit 0 = usable.
   normally and agent routes return 503 — the deliberate degradation path.
   The rules above only apply once credentials are present.
 - **Runtime second line of defence** — `getAgentWalletSetId()` throws in
-  production rather than implicitly creating a set.
+  production rather than implicitly creating a set, and
+  `createAgentContractExecution` refuses in production when the Gas Station
+  policy id went missing after boot (C-017), stamping `gas-station:<policy
+id>` as the Circle `refId` on every transaction otherwise.
 
 ## Follow-ups (not in this task)
 
