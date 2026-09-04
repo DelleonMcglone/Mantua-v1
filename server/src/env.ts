@@ -61,14 +61,20 @@ const schema = z.object({
    *  whatever Gas Station policy is bound to the intended one. */
   CIRCLE_WALLET_SET_ID: z.uuid().optional(),
 
-  /** Gas Station (paymaster) policy id, from Console → Gas Station. There is
-   *  no API credential for Gas Station on Developer-Controlled Wallets — the
-   *  policy is console-side config bound to the wallet set + chain, and the
-   *  SDK sponsors SCA transactions automatically once it exists. We record
-   *  the id purely so the app can assert sponsorship was configured
-   *  deliberately (see the preflight) rather than discovering an unsponsored
-   *  wallet as a mystery timeout at execution time. */
-  CIRCLE_GAS_STATION_POLICY_ID: z.string().min(1).optional(),
+  /** Gas Station (paymaster) policy id, from Console → Gas Station. Circle
+   *  sponsors DCW SCA transactions automatically from the policy that is
+   *  ACTIVE and default for the chain — the DCW transaction API has no
+   *  sponsorship argument — so consuming this id means: stamping it onto
+   *  every transaction as Circle's refId (sponsorship.ts), refusing an
+   *  unsponsored create in production, and asserting here (UUID shape; the
+   *  issue list below) that sponsorship was configured deliberately rather
+   *  than discovering an unsponsored wallet as a mystery timeout. */
+  CIRCLE_GAS_STATION_POLICY_ID: z.uuid().optional(),
+
+  /** Local-testing only: point the Circle SDK at a stub server (for
+   *  preflight evidence or fixtures). Never set this in production — the
+   *  override redirects ALL Circle traffic. */
+  CIRCLE_API_BASE_URL: z.url().optional(),
 
   /** Webhook signature key id for Circle transaction notifications. Circle
    *  recommends webhooks over polling for terminal transaction state; absent
@@ -247,7 +253,7 @@ export function circleCredentialIssues(e: Env): string[] {
   }
   if (!e.CIRCLE_GAS_STATION_POLICY_ID) {
     issues.push(
-      "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored, so they fail on an SCA wallet holding no ETH — and surface as an opaque timeout. Configure a Gas Station policy for this wallet set on Base, then record its id.",
+      "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored, so they fail on an SCA wallet holding no ETH — and surface as an opaque timeout. In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base (transactions use only the network's default policy) — then record its id.",
     );
   }
   if (/^TEST_API_KEY:/i.test(e.CIRCLE_API_KEY ?? "")) {

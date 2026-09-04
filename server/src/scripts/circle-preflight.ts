@@ -15,6 +15,7 @@ import {
   getAgentWalletSetId,
   CircleUnavailableError,
 } from "../lib/circle/client.ts";
+import { getGasStationPolicyId } from "../lib/circle/sponsorship.ts";
 
 /** Redact to a shape, never a value: `LIVE_API_KEY:1a2b…:••••`. */
 function keyShape(key: string): string {
@@ -64,6 +65,10 @@ async function main(): Promise<number> {
   }
 
   console.log("\nLive checks");
+  // C-017 — captured for the Gas Station section: a policy can only sponsor
+  // transactions whose wallet set is live and holds BASE wallets.
+  let walletSetLive = false;
+  let baseWallets = false;
   try {
     const client = await getCircleClient();
     ok("SDK client constructed (entity secret accepted locally)");
@@ -72,6 +77,7 @@ async function main(): Promise<number> {
     // the registered entity secret ciphertext are valid together.
     const setId = await getAgentWalletSetId();
     ok(`Wallet set reachable: ${setId}`);
+    walletSetLive = true;
 
     const wallets = await client.listWallets({ walletSetId: setId, pageSize: 10 });
     const count = wallets.data?.wallets.length ?? 0;
@@ -80,9 +86,10 @@ async function main(): Promise<number> {
     const blockchains = new Set(
       (wallets.data?.wallets ?? []).map((w) => w.blockchain).filter(Boolean),
     );
+    baseWallets = blockchains.has("BASE");
     if (blockchains.size > 0) {
       const list = [...blockchains].join(", ");
-      if (blockchains.has("BASE")) ok(`Wallets on BASE (also: ${list})`);
+      if (baseWallets) ok(`Wallets on BASE (also: ${list})`);
       else bad(`No BASE wallets — found ${list}. The app provisions on BASE.`);
     }
   } catch (err) {
@@ -92,15 +99,32 @@ async function main(): Promise<number> {
   }
 
   console.log("\nGas Station (paymaster)");
-  if (env.CIRCLE_GAS_STATION_POLICY_ID) {
-    ok(`Policy id recorded: ${env.CIRCLE_GAS_STATION_POLICY_ID}`);
+  const policyId = getGasStationPolicyId();
+  if (policyId) {
+    ok(`Policy id recorded (UUID, boot-validated): ${policyId}`);
+    if (walletSetLive && baseWallets) {
+      ok(
+        "Sponsorship dependencies verified live: wallet set reachable and holds BASE wallets — " +
+          "Gas Station auto-sponsors those SCA transactions from the policy that is ACTIVE " +
+          "and default for Base.",
+      );
+    } else {
+      bad("Policy's live dependencies unverified — wallet set / BASE wallet checks above failed.");
+      failed = true;
+    }
     console.log(
-      "    Note: Developer-Controlled Wallets has no paymaster API credential — sponsorship\n" +
-        "    is console-side policy. This id documents that it was configured deliberately;\n" +
-        "    confirm in Console → Gas Station that the policy covers this wallet set on Base.",
+      "    Provenance: every transaction the server creates carries refId `gas-station:<id>`.\n" +
+        "    Circle's console lists sponsored transactions per policy, so a transaction that\n" +
+        "    does NOT appear under this policy means the recorded id is not the one actually\n" +
+        "    sponsoring the code. Circle exposes no policy-read API (management is\n" +
+        "    console-only), so also confirm in Console → Gas Station that the policy is\n" +
+        "    ACTIVE and is the default policy for Base — transactions use only the\n" +
+        "    network's default policy.",
     );
   } else {
-    bad("No CIRCLE_GAS_STATION_POLICY_ID — agent transactions are unsponsored.");
+    bad(
+      "No CIRCLE_GAS_STATION_POLICY_ID — agent transactions are unsponsored (production refuses to create them). In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base — then record its id.",
+    );
     failed = true;
   }
 
