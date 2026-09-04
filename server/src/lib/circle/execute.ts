@@ -5,6 +5,7 @@ import type {
 } from "@circle-fin/developer-controlled-wallets";
 import { getCircleClient } from "./client.ts";
 import { assertAllowedTarget } from "./allowed-targets.ts";
+import { assertSponsorshipConfigured, sponsorshipRefId } from "./sponsorship.ts";
 
 export type { TransactionState };
 /** The receipt states — Circle's terminal success values. */
@@ -193,6 +194,13 @@ export async function createAgentContractExecution(
   // B8-006 — single choke point: the agent's wallet only calls contracts
   // the server explicitly trusts, no matter what upstream produced `to`.
   assertAllowedTarget(args.to);
+  // C-017 — sponsorship is console-side policy. Production refuses an
+  // unsponsored create (the runtime backstop to boot validation), and every
+  // transaction carries the operator's policy id as its Circle refId so the
+  // console's per-policy sponsored-transactions table can confirm the
+  // recorded id is the policy actually sponsoring the code.
+  assertSponsorshipConfigured();
+  const refId = sponsorshipRefId();
   // The SDK input is a discriminated union: raw callData XOR the ABI form —
   // mixing the two shapes cannot typecheck, so build exactly one arm.
   let input: CreateContractExecutionTransactionInput;
@@ -204,6 +212,7 @@ export async function createAgentContractExecution(
       // of minting a second transaction (018 follow-up).
       idempotencyKey: randomUUID(),
       fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+      ...(refId ? { refId } : {}),
       ...(args.value ? { amount: args.value } : {}),
       callData: args.callData,
     };
@@ -213,6 +222,7 @@ export async function createAgentContractExecution(
       contractAddress: args.to,
       idempotencyKey: randomUUID(),
       fee: { type: "level", config: { feeLevel: "MEDIUM" } },
+      ...(refId ? { refId } : {}),
       ...(args.value ? { amount: args.value } : {}),
       abiFunctionSignature: args.abiFunctionSignature,
       abiParameters: args.abiParameters ?? [],
