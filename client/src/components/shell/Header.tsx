@@ -1,9 +1,12 @@
-import { Sun, Moon } from "lucide-react";
+import { useState } from "react";
+import { Sun, Moon, Menu } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
 import { WalletMenu } from "./WalletMenu.tsx";
 import { MarketNav, type NavDestination } from "./MarketNav.tsx";
+import { MobileNavSheet } from "./MobileNavSheet.tsx";
+import type { HomePromptId } from "./HomeMenu.tsx";
 
 interface HeaderProps {
   walletAddress?: string | undefined;
@@ -22,13 +25,16 @@ interface HeaderProps {
   /** League / section nav handler. The same nav the landing header
    *  shows, so a league is one click away from anywhere in the app. */
   onNavigate: (destination: NavDestination) => void;
+  /** Quick-action handler for the mobile nav sheet (the home prompt
+   *  cards). Optional so the header works without it. */
+  onQuickAction?: ((id: HomePromptId) => void) | undefined;
 }
 
 /**
  * Top bar — logo left, league nav centred, theme toggle + Connect Wallet
  * right. Mirrors the landing header so the nav is continuous across both
- * surfaces; below `md` the nav drops to its own strip, where there isn't
- * room to share the row.
+ * surfaces; below `md` the nav hides behind a hamburger that opens the
+ * `MobileNavSheet` (B-014 mobile guidance: hidden sidebar + hamburger).
  */
 export function Header({
   walletAddress,
@@ -39,13 +45,26 @@ export function Header({
   onOpenAgent,
   onLogoClick,
   onNavigate,
+  onQuickAction,
 }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const Icon = theme === "dark" ? Sun : Moon;
+  const [navOpen, setNavOpen] = useState(false);
 
   return (
     <header className="border-b border-border-soft">
-      <div className="flex items-center gap-4 lg:gap-6 px-8 py-4">
+      <div className="flex items-center gap-4 lg:gap-6 px-5 py-4 md:px-8">
+        <Button
+          variant="icon"
+          size="icon"
+          aria-label="Menu"
+          className="md:hidden"
+          onClick={() => {
+            setNavOpen(true);
+          }}
+        >
+          <Menu className="h-[18px] w-[18px]" />
+        </Button>
         <button
           type="button"
           onClick={onLogoClick}
@@ -80,8 +99,14 @@ export function Header({
           )}
         </div>
       </div>
-      {/* Too narrow to share the row — the nav gets its own strip. */}
-      <MarketNav onNavigate={onNavigate} className="px-5 pb-3 md:hidden" />
+      {/* Below `md` the nav lives behind the hamburger, per the mobile
+          design guidance — no more double-rendered strip. */}
+      <MobileNavSheet
+        open={navOpen}
+        onOpenChange={setNavOpen}
+        onNavigate={onNavigate}
+        onQuickAction={onQuickAction}
+      />
     </header>
   );
 }

@@ -76,6 +76,23 @@
     opacity: 0;
   }
 }
+/* Slide-in for `ui/sheet.tsx` (mobile hamburger nav, side panels). */
+@keyframes sheet-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes sheet-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
 @keyframes fadeIn {
   from {
     opacity: 0;

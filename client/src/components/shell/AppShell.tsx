@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Header } from "./Header.tsx";
 import type { NavDestination } from "./MarketNav.tsx";
+import type { HomePromptId } from "./HomeMenu.tsx";
 
 interface AppShellProps {
   walletAddress?: string | undefined;
@@ -14,6 +15,9 @@ interface AppShellProps {
   onLogoClick?: (() => void) | undefined;
   /** League / section nav handler, forwarded to the header. */
   onNavigate: (destination: NavDestination) => void;
+  /** Quick-action handler for the mobile nav sheet, forwarded to the
+   *  header (B-014). */
+  onQuickAction?: ((id: HomePromptId) => void) | undefined;
   left: ReactNode;
   right: ReactNode;
   /** When set, replaces the two-column grid with a full-width page
@@ -38,6 +42,7 @@ export function AppShell({
   onOpenAgent,
   onLogoClick,
   onNavigate,
+  onQuickAction,
   left,
   right,
   full,
@@ -54,6 +59,7 @@ export function AppShell({
         onOpenAgent={onOpenAgent}
         onLogoClick={onLogoClick}
         onNavigate={onNavigate}
+        onQuickAction={onQuickAction}
       />
       {full ? (
         <main className="flex-1 min-h-0 overflow-auto">{full}</main>
