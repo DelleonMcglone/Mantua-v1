@@ -45,27 +45,42 @@ work to the operator as the runbook below.
 ### 2. Entity secret (custody root)
 
 The entity secret is a 32-byte key that secures every developer-controlled
-wallet. **Generate and register it yourself:**
+wallet. **Generate and register it yourself** — two scripts, in this order:
 
 ```bash
-node -e "console.log(require('@circle-fin/developer-controlled-wallets').generateEntitySecret())"
+npm run circle:generate-secret -w @mantua/server
 ```
 
-Then register the ciphertext and save the recovery file **outside the repo**:
+Prints a fresh 64-hex-char secret to your terminal only — nothing is written
+to disk or sent anywhere. Copy it into `server/.env`:
 
-```ts
-import { registerEntitySecretCiphertext } from "@circle-fin/developer-controlled-wallets";
-import os from "node:os";
-import path from "node:path";
-
-await registerEntitySecretCiphertext({
-  apiKey: process.env.CIRCLE_API_KEY!,
-  entitySecret: process.env.CIRCLE_ENTITY_SECRET!,
-  recoveryFileDownloadPath: path.join(os.homedir(), ".circle", "recovery-file.json"),
-});
 ```
+CIRCLE_ENTITY_SECRET=<the printed value>
+```
+
+Then register it (needs `CIRCLE_API_KEY` in `.env` too):
+
+```bash
+npm run circle:register-secret -w @mantua/server
+```
+
+This registers the ciphertext with Circle and writes the recovery file to
+`~/.circle/mantua-recovery-file.dat` (mode 600) — deliberately **outside the
+repo**, since a committed recovery file is the same disclosure as the secret.
+Override the location with `CIRCLE_RECOVERY_FILE_PATH`.
+
+**Registration is not idempotent.** Re-running rotates the entity secret and
+invalidates the previous one, orphaning every wallet created under it — so
+the script refuses to overwrite an existing recovery file unless you pass
+`--force`.
 
 Docs: <https://developers.circle.com/wallets/dev-controlled/register-entity-secret>
+
+> Implementation note: the SDK's `generateEntitySecret()` returns `void` — it
+> prints the value itself, so there is nothing to capture. And because the SDK
+> is CJS while this workspace is ESM, its named exports resolve under
+> `default`; both scripts unwrap that the same way `lib/circle/client.ts`
+> does. A static `import { generateEntitySecret }` fails at runtime.
 
 - Store the secret in a secrets manager (1Password, Vercel env, AWS Secrets
   Manager) — never in the repo, never in a chat.

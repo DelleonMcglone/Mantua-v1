@@ -35,6 +35,8 @@ pnpm-debug.log*
 # wallet is gone. Keep it in a password manager / secrets vault, not here.
 circle-entity-secret-recovery.dat
 **/circle-entity-secret-recovery.dat
+recovery_file.dat
+**/recovery_file.dat
 recovery_file_*.dat
 **/recovery_file_*.dat
 recovery-file.json
