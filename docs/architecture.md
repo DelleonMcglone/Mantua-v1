@@ -57,6 +57,63 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 
 `req.walletAddress` is what `walletRateLimiter` (P1-007) keys on once auth is wired into write paths.
 
+## Fiat rails — Deposit → Trade → Withdraw (Phase F)
+
+### D-101: selected provider and integration boundary
+
+**Selected ramp: Zero Hash, subject to execution of its platform agreement and
+production approval.** Zero Hash is the regulated financial counterparty for
+USD ↔ USDC conversion, ACH/RTP money movement, customer KYC/AML and transaction
+monitoring. Mantua is an orchestration and trading application; it does not
+accept customer deposits, hold a fiat balance, custody the customer’s primary
+wallet keys, or make compliance eligibility decisions.
+
+**Bank link: Plaid.** Mantua obtains a Plaid Link token server-side and receives
+only the short-lived public token callback. It exchanges that token server-side
+and creates a Zero Hash processor token/external account. Raw account/routing
+numbers and Plaid access tokens must never reach the browser, app database,
+logs, analytics, or LLM context. Plaid products required before production are
+Auth, Balance, Identity, and Identity Match.
+
+| Product surface      | Behind the scenes                                                               | Owner / boundary                                            |
+| -------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Connect bank account | Plaid Link → processor token → Zero Hash external account                       | Plaid + Zero Hash                                           |
+| Deposit dollars      | ACH/RTP debit → Zero Hash conversion → USDC delivered to the user’s Base wallet | Zero Hash; Circle provides wallet infrastructure where used |
+| Trade                | User signs a Base transaction through Privy; Mantua routes market activity      | User / Privy / Base                                         |
+| Withdraw dollars     | USDC conversion → ACH/RTP credit to the linked account                          | Zero Hash                                                   |
+| Direct USDC          | User trades from their connected Base wallet without a bank link                | User / Privy / Base                                         |
+
+The product wording intentionally excludes wallets, bridges, private keys,
+network names, and gas from cash screens. It says only **Deposit**, **Trade**,
+and **Withdraw**. The existing Circle agent wallet remains a separately funded,
+bounded agent budget; it is never a hidden destination for a user’s fiat
+deposit and cannot initiate a user withdrawal.
+
+### Current implementation and production gate
+
+`server/src/routes/fiat-rails.ts` provides the authenticated product contract:
+state, sandbox bank-link initiation, deposits, withdrawals, and audit events.
+`FIAT_RAILS_MODE=disabled` is the production-safe default. A deterministic
+`sandbox` adapter supports the user flow and E2E-style state transitions without
+contacting a bank or minting USDC. `live` deliberately fails closed until all of
+the following are completed:
+
+1. Zero Hash agreement, participant/platform code, production API access, and
+   explicit Base-USDC availability are confirmed.
+2. Plaid production approval and the Zero Hash processor integration are
+   enabled; credentials are stored in the deployment secrets manager.
+3. Provider request signing, webhook signature verification, idempotency keys,
+   persisted transfer/external-account records, reconciliation, and support
+   recovery runbook are implemented and independently tested.
+4. A sandbox test proves: link bank → initiate deposit → completed status →
+   credited wallet balance → withdrawal → provider receipt. No simulated result
+   counts as fiat movement evidence.
+
+Zero Hash may reject, hold, return, or reverse a transfer; UI states therefore
+remain `pending`, `complete`, or `needs attention` and never optimistically
+credit a user balance. Pending cash activity is refreshed automatically and the
+provider’s final receipt is the source of truth in live mode.
+
 ## Circle agent wallet (Phase 6)
 
 ### Wallet boundary (D-008 — confirmed P6-000, 2026-04-30; provider updated by D-110, 2026-09-02)

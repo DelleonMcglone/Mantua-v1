@@ -10,6 +10,22 @@ const schema = z.object({
 
   UNISWAP_TRADING_API_KEY: z.string().min(1).optional(),
 
+  // ── Fiat rails (D-101) ───────────────────────────────────────────────
+  // Zero Hash is the regulated on/off-ramp of record.  It owns KYC/AML,
+  // custody during conversion, ACH/RTP movement, and transaction monitoring.
+  // Until commercial credentials are provisioned we only expose the local
+  // deterministic sandbox; production defaults to disabled.
+  FIAT_RAILS_MODE: z.enum(["disabled", "sandbox", "live"]).default("disabled"),
+  ZERO_HASH_API_KEY: z.string().min(1).optional(),
+  ZERO_HASH_PASSPHRASE: z.string().min(1).optional(),
+  ZERO_HASH_SECRET: z.string().min(1).optional(),
+  ZERO_HASH_PLATFORM_CODE: z.string().min(1).optional(),
+  PLAID_CLIENT_ID: z.string().min(1).optional(),
+  PLAID_SECRET: z.string().min(1).optional(),
+  PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),
+  /** Zero Hash's Plaid processor id, issued during commercial onboarding. */
+  ZERO_HASH_PLAID_PROCESSOR_ID: z.string().min(1).optional(),
+
   /** Network gate. Mantua runs on Base Mainnet — defaults to `mainnet`;
    *  the `testnet` option is retained for the shared IS_MAINNET guard. */
   MANTUA_NETWORK: z.enum(["mainnet", "testnet"]).default("mainnet"),

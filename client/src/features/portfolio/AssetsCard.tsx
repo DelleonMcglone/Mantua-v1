@@ -25,6 +25,7 @@ import { earningPoolCount } from "./earnings.ts";
 import { useOnchainPositions } from "./use-onchain-positions.ts";
 import { UnifiedBalanceTab } from "./UnifiedBalanceTab.tsx";
 import { useUnifiedBalance } from "./use-unified-balance.ts";
+import { FiatRailsTab } from "./FiatRailsTab.tsx";
 
 interface PortfolioPosition {
   a: AssetSymbol;
@@ -98,9 +99,9 @@ interface AssetsCardProps {
 
 export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}) {
   const chainId = BASE_CHAIN_ID;
-  const [tab, setTab] = useState<"assets" | "positions" | "agent" | "unified" | "earnings">(
-    "assets",
-  );
+  const [tab, setTab] = useState<
+    "assets" | "cash" | "positions" | "agent" | "unified" | "earnings"
+  >("assets");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("Descending");
   // Re-read localStorage on each tab change so a fresh mint shows up
@@ -177,6 +178,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
 
   const tabs = [
     { k: "assets" as const, label: "Assets", count: assets.length },
+    { k: "cash" as const, label: "Cash", count: 0 },
     { k: "positions" as const, label: "Positions", count: positionsAvailable.length },
     {
       k: "agent" as const,
@@ -222,192 +224,194 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
       </div>
 
       <TabsContent value="assets">
-          <div className="px-4 py-3.5 border-b border-border-soft flex items-center gap-2.5">
-            <Search className="h-4 w-4 text-text-dim" />
-            <div className="flex-1">
-              <div className="text-[13px] font-medium">Assets</div>
-              <input
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                }}
-                placeholder="Search assets"
-                className="border-none bg-transparent outline-none text-[12px] text-text-dim w-full p-0 mt-0.5"
-              />
-            </div>
+        <div className="px-4 py-3.5 border-b border-border-soft flex items-center gap-2.5">
+          <Search className="h-4 w-4 text-text-dim" />
+          <div className="flex-1">
+            <div className="text-[13px] font-medium">Assets</div>
+            <input
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+              }}
+              placeholder="Search assets"
+              className="border-none bg-transparent outline-none text-[12px] text-text-dim w-full p-0 mt-0.5"
+            />
           </div>
+        </div>
 
-          <div className="px-3.5 py-2.5 flex gap-2 items-center border-b border-border-soft relative">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="px-2.5 py-1 rounded-full border border-border bg-bg-elev text-text-dim text-[12px] inline-flex items-center gap-1"
+        <div className="px-3.5 py-2.5 flex gap-2 items-center border-b border-border-soft relative">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="px-2.5 py-1 rounded-full border border-border bg-bg-elev text-text-dim text-[12px] inline-flex items-center gap-1"
+              >
+                {sort}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-[140px] rounded-sm shadow-lg">
+              {SORTS.map((s) => (
+                <DropdownMenuItem
+                  key={s}
+                  className={sort === s ? "bg-chip" : ""}
+                  onSelect={() => {
+                    setSort(s);
+                  }}
                 >
-                  {sort}
-                  <ChevronDown className="h-3 w-3" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[140px] rounded-sm shadow-lg">
-                {SORTS.map((s) => (
-                  <DropdownMenuItem
-                    key={s}
-                    className={sort === s ? "bg-chip" : ""}
-                    onSelect={() => {
-                      setSort(s);
-                    }}
-                  >
-                    {s}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <div className="flex-1" />
-            <div className="text-[12px] text-text-dim">PnL</div>
-          </div>
+                  {s}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <div className="flex-1" />
+          <div className="text-[12px] text-text-dim">PnL</div>
+        </div>
 
-          <div className="max-h-[320px] overflow-auto">
-            {!portfolio.walletAddress && (
-              <EmptyState>Connect a wallet to see your balances.</EmptyState>
-            )}
-            {portfolio.walletAddress && portfolio.loading && filtered.length === 0 && (
-              <EmptyState>Loading balances…</EmptyState>
-            )}
-            {portfolio.walletAddress && portfolio.error && filtered.length === 0 && (
-              <EmptyState tone="error">{portfolio.error}</EmptyState>
-            )}
-            {portfolio.walletAddress &&
-              !portfolio.loading &&
-              !portfolio.error &&
-              filtered.length === 0 && <EmptyState>No matching balances.</EmptyState>}
-            {filtered.map((a) => (
-              <div
-                key={a.symbol}
-                onClick={
-                  onSelectAsset
-                    ? () => {
+        <div className="max-h-[320px] overflow-auto">
+          {!portfolio.walletAddress && (
+            <EmptyState>Connect a wallet to see your balances.</EmptyState>
+          )}
+          {portfolio.walletAddress && portfolio.loading && filtered.length === 0 && (
+            <EmptyState>Loading balances…</EmptyState>
+          )}
+          {portfolio.walletAddress && portfolio.error && filtered.length === 0 && (
+            <EmptyState tone="error">{portfolio.error}</EmptyState>
+          )}
+          {portfolio.walletAddress &&
+            !portfolio.loading &&
+            !portfolio.error &&
+            filtered.length === 0 && <EmptyState>No matching balances.</EmptyState>}
+          {filtered.map((a) => (
+            <div
+              key={a.symbol}
+              onClick={
+                onSelectAsset
+                  ? () => {
+                      onSelectAsset(a.symbol);
+                    }
+                  : undefined
+              }
+              role={onSelectAsset ? "button" : undefined}
+              tabIndex={onSelectAsset ? 0 : undefined}
+              onKeyDown={
+                onSelectAsset
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
                         onSelectAsset(a.symbol);
                       }
-                    : undefined
-                }
-                role={onSelectAsset ? "button" : undefined}
-                tabIndex={onSelectAsset ? 0 : undefined}
-                onKeyDown={
-                  onSelectAsset
-                    ? (e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelectAsset(a.symbol);
-                        }
-                      }
-                    : undefined
-                }
-                className="flex items-center gap-3 px-4 py-3 border-b border-border-soft cursor-pointer transition-colors hover:bg-row-hover"
-              >
-                <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex">
-                  <AssetRowIcon symbol={a.symbol} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-medium text-[14px]">{a.name}</span>
-                  </div>
-                  <div className="text-[12px] text-text-dim mt-0.5">
-                    {a.symbol} · {a.price}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[14px] font-medium font-mono">{a.qty}</div>
-                  <div className="text-[12px] text-text-dim font-mono">{a.val}</div>
-                </div>
-                <ChevronRight className="h-3.5 w-3.5 text-text-mute" />
+                    }
+                  : undefined
+              }
+              className="flex items-center gap-3 px-4 py-3 border-b border-border-soft cursor-pointer transition-colors hover:bg-row-hover"
+            >
+              <div className="w-7 h-7 rounded-full overflow-hidden flex-shrink-0 flex">
+                <AssetRowIcon symbol={a.symbol} />
               </div>
-            ))}
-          </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-medium text-[14px]">{a.name}</span>
+                </div>
+                <div className="text-[12px] text-text-dim mt-0.5">
+                  {a.symbol} · {a.price}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[14px] font-medium font-mono">{a.qty}</div>
+                <div className="text-[12px] text-text-dim font-mono">{a.val}</div>
+              </div>
+              <ChevronRight className="h-3.5 w-3.5 text-text-mute" />
+            </div>
+          ))}
+        </div>
+      </TabsContent>
+
+      <TabsContent value="cash">
+        <FiatRailsTab />
       </TabsContent>
 
       <TabsContent value="positions">
-          <div className="max-h-[360px] overflow-auto">
-            {!portfolio.walletAddress && (
-              <EmptyState>Connect a wallet to see your liquidity positions.</EmptyState>
-            )}
-            {portfolio.walletAddress && visiblePositions.length === 0 && (
-              <EmptyState className="px-3.5">No positions in this view.</EmptyState>
-            )}
-            {portfolio.walletAddress &&
-              visiblePositions.map((p, i) => {
-                const tint = HOOK_TINT[p.hook];
-                const handleClick = p.src
-                  ? () => {
-                      const src = p.src;
-                      if (!src) return;
-                      const key = localPoolKey(
-                        src.chainId,
-                        src.tokenA,
-                        src.tokenB,
-                        src.fee,
-                        src.hook,
-                      );
-                      onSelectPool?.(`local:${key}`);
-                    }
-                  : undefined;
-                return (
-                  <div
-                    key={i}
-                    onClick={handleClick}
-                    role={handleClick ? "button" : undefined}
-                    tabIndex={handleClick ? 0 : undefined}
-                    onKeyDown={
-                      handleClick
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleClick();
-                            }
+        <div className="max-h-[360px] overflow-auto">
+          {!portfolio.walletAddress && (
+            <EmptyState>Connect a wallet to see your liquidity positions.</EmptyState>
+          )}
+          {portfolio.walletAddress && visiblePositions.length === 0 && (
+            <EmptyState className="px-3.5">No positions in this view.</EmptyState>
+          )}
+          {portfolio.walletAddress &&
+            visiblePositions.map((p, i) => {
+              const tint = HOOK_TINT[p.hook];
+              const handleClick = p.src
+                ? () => {
+                    const src = p.src;
+                    if (!src) return;
+                    const key = localPoolKey(
+                      src.chainId,
+                      src.tokenA,
+                      src.tokenB,
+                      src.fee,
+                      src.hook,
+                    );
+                    onSelectPool?.(`local:${key}`);
+                  }
+                : undefined;
+              return (
+                <div
+                  key={i}
+                  onClick={handleClick}
+                  role={handleClick ? "button" : undefined}
+                  tabIndex={handleClick ? 0 : undefined}
+                  onKeyDown={
+                    handleClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleClick();
                           }
-                        : undefined
-                    }
-                    className="flex items-center gap-3 px-4 py-3 border-b border-border-soft cursor-pointer transition-colors hover:bg-row-hover"
-                  >
-                    <div className="flex flex-shrink-0">
-                      <AssetIcon symbol={p.a} size={26} />
-                      <div className="-ml-2">
-                        <AssetIcon symbol={p.b} size={26} />
-                      </div>
+                        }
+                      : undefined
+                  }
+                  className="flex items-center gap-3 px-4 py-3 border-b border-border-soft cursor-pointer transition-colors hover:bg-row-hover"
+                >
+                  <div className="flex flex-shrink-0">
+                    <AssetIcon symbol={p.a} size={26} />
+                    <div className="-ml-2">
+                      <AssetIcon symbol={p.b} size={26} />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-medium text-[14px]">
-                          {p.a} / {p.b}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-chip text-text-mute border border-border-soft font-mono">
-                          {p.fee}
-                        </span>
-                      </div>
-                      <div className="mt-1">
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block ${tint}`}
-                        >
-                          {p.hook}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[14px] font-medium font-mono">{p.value}</div>
-                      {p.fees ? (
-                        <div className="text-[12px] font-mono text-green">Fees: {p.fees}</div>
-                      ) : (
-                        <div
-                          className={`text-[12px] font-mono ${p.up ? "text-green" : "text-red"}`}
-                        >
-                          {p.pnl} · {p.pct}
-                        </div>
-                      )}
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-text-mute" />
                   </div>
-                );
-              })}
-          </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-[14px]">
+                        {p.a} / {p.b}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-chip text-text-mute border border-border-soft font-mono">
+                        {p.fee}
+                      </span>
+                    </div>
+                    <div className="mt-1">
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block ${tint}`}
+                      >
+                        {p.hook}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[14px] font-medium font-mono">{p.value}</div>
+                    {p.fees ? (
+                      <div className="text-[12px] font-mono text-green">Fees: {p.fees}</div>
+                    ) : (
+                      <div className={`text-[12px] font-mono ${p.up ? "text-green" : "text-red"}`}>
+                        {p.pnl} · {p.pct}
+                      </div>
+                    )}
+                  </div>
+                  <ChevronRight className="h-3.5 w-3.5 text-text-mute" />
+                </div>
+              );
+            })}
+        </div>
       </TabsContent>
 
       <TabsContent value="agent">

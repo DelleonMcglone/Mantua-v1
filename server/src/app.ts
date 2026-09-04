@@ -47,6 +47,7 @@ import { swapRouter } from "./routes/swap.ts";
 import { tokenPricesRouter } from "./routes/token-prices.ts";
 import { pairPriceChartRouter } from "./routes/pair-price-chart.ts";
 import { v4SwapRouter } from "./routes/v4-swap.ts";
+import { fiatRailsRouter } from "./routes/fiat-rails.ts";
 
 /**
  * Express app factory, shared by the standalone server (`index.ts`,
@@ -80,6 +81,7 @@ app.use(swapRouter);
 app.use(tokenPricesRouter);
 app.use(pairPriceChartRouter);
 app.use(v4SwapRouter);
+app.use(fiatRailsRouter);
 app.use(agentWalletsRouter);
 app.use(agentSendRouter);
 app.use(agentSwapRouter);
