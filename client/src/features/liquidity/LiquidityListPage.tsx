@@ -1,15 +1,23 @@
-import { useMemo, useRef, useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ChevronDown, Plus, Search } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
 import { networkKeyForChain } from "@/lib/chains.ts";
 import { useTokenPrices } from "./use-token-prices.ts";
 import { TokenPairIcon } from "./TokenPairIcon.tsx";
 import { usePools } from "./use-pools.ts";
 import { FEE_TIER_LABELS } from "./fee-tiers.ts";
-import { formatPct, formatUsd, normalizePairSymbol } from "./format.ts";
+import { compact as formatUsd, pct as formatPct } from "@/lib/format.ts";
+import { HOOK_TINT } from "@/features/portfolio/hook-tint.ts";
+import { normalizePairSymbol } from "./format.ts";
 import { getLocalPools, type LocalPool } from "./local-pools.ts";
 import { getLocalPositions, type LocalPosition } from "./local-positions.ts";
 import type { PoolSummary } from "./types.ts";
@@ -75,8 +83,6 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
   const { data, error, loading } = usePools();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("All");
-  const [openCat, setOpenCat] = useState(false);
-  const catRef = useRef<HTMLDivElement | null>(null);
   const [localPools, setLocalPools] = useState<LocalPool[]>(() =>
     IS_MAINNET ? [] : getLocalPools(),
   );
@@ -140,17 +146,6 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
     }
     return out;
   }, [onchainPositions.data, localPositions, tokenPrices.prices]);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (!catRef.current) return;
-      if (!catRef.current.contains(e.target as Node)) setOpenCat(false);
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", onClickOutside);
-    };
-  }, []);
 
   // Re-read localStorage when the panel mounts so freshly-created
   // pools (and the positions that drive their TVL) show up without
@@ -271,40 +266,31 @@ export function LiquidityListPage({ onSelectPool, onCreate, onClose }: Props) {
             />
           </div>
 
-          <div className="relative" ref={catRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setOpenCat((v) => !v);
-              }}
-              className="px-3 py-2 rounded-md bg-bg-elev border border-border-soft text-[13px] text-text inline-flex items-center gap-1.5 cursor-pointer"
-            >
-              {category}
-              <ChevronDown className="h-3 w-3" />
-            </button>
-            {openCat && (
-              <div className="absolute right-0 top-full mt-1 z-30 min-w-[170px] bg-panel-solid border border-border rounded-md p-1 shadow-xl">
-                {CATEGORIES.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => {
-                      setCategory(c);
-                      setOpenCat(false);
-                    }}
-                    className={`flex items-center justify-between w-full px-2.5 py-2 rounded-xs text-left text-[13px] cursor-pointer ${
-                      category === c
-                        ? "bg-chip text-text"
-                        : "bg-transparent text-text hover:bg-row-hover"
-                    }`}
-                  >
-                    <span>{c}</span>
-                    <span className="text-[11px] text-text-mute">{counts[c]}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="px-3 py-2 rounded-md bg-bg-elev border border-border-soft text-[13px] text-text inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                {category}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[170px]">
+              {CATEGORIES.map((c) => (
+                <DropdownMenuItem
+                  key={c}
+                  onSelect={() => {
+                    setCategory(c);
+                  }}
+                  className={`justify-between ${category === c ? "bg-chip" : ""}`}
+                >
+                  <span>{c}</span>
+                  <span className="text-[11px] text-text-mute">{counts[c]}</span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           <Button variant="primary" size="md" onClick={onCreate}>
             <Plus className="h-3.5 w-3.5" /> Create Pool
@@ -393,25 +379,17 @@ function PoolRow({ pool, onSelect }: { pool: DerivedPool; onSelect: (id: string)
   );
 }
 
-/** Per-hook badge palette — mirrors the portfolio's HOOK_TINT so a hook
- *  reads the same color everywhere (Stable Protection green, Dynamic Fee
- *  yellow). Keyed by the HOOK_LABELS display strings. */
-const HOOK_BADGE_TINT: Record<string, { bg: string; fg: string; bd: string }> = {
-  "Stable Protection": {
-    bg: "rgba(61, 220, 151, 0.14)",
-    fg: "#3ddc97",
-    bd: "rgba(61, 220, 151, 0.35)",
-  },
-  "Dynamic Fee": { bg: "rgba(230, 199, 74, 0.14)", fg: "#e6c74a", bd: "rgba(230, 199, 74, 0.35)" },
-};
-
 function HookBadge({ hasHook, label }: { hasHook: boolean; label: string }) {
-  const tint = hasHook ? HOOK_BADGE_TINT[label] : undefined;
+  // Shared token-class palette (deduped with the portfolio's badge tints)
+  // so a hook reads the same color everywhere in both themes.
+  const tint =
+    hasHook && (label === "Stable Protection" || label === "Dynamic Fee")
+      ? HOOK_TINT[label]
+      : undefined;
   if (tint) {
     return (
       <span
-        className="px-1.5 py-px rounded-[6px] text-[10px] font-semibold tracking-[0.01em] border"
-        style={{ background: tint.bg, color: tint.fg, borderColor: tint.bd }}
+        className={`px-1.5 py-px rounded-[6px] text-[10px] font-semibold tracking-[0.01em] ${tint}`}
       >
         {label}
       </span>

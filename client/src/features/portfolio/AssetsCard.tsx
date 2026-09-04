@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
+import { EmptyState } from "@/components/ui/empty-state.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
 import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 import { IS_MAINNET, type TokenSymbol } from "@/lib/tokens.ts";
@@ -95,7 +103,6 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
   );
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("Descending");
-  const [openSort, setOpenSort] = useState(false);
   // Re-read localStorage on each tab change so a fresh mint shows up
   // without a manual page refresh.
   const localPositions = useMemo<LocalPosition[]>(
@@ -190,38 +197,31 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
   ];
 
   return (
-    <div className="bg-panel-solid border border-border-soft rounded-md p-0">
+    <Tabs
+      value={tab}
+      onValueChange={(v) => {
+        setTab(v as typeof tab);
+      }}
+      className="bg-panel-solid border border-border-soft rounded-md p-0"
+    >
       <div className="px-3.5 pt-2.5 border-b border-border-soft">
-        <div className="flex gap-0.5">
-          {tabs.map((t) => {
-            const active = tab === t.k;
-            return (
-              <button
-                key={t.k}
-                type="button"
-                onClick={() => {
-                  setTab(t.k);
-                }}
-                className={`-mb-px px-3.5 py-2 bg-transparent border-none cursor-pointer text-[13px] font-medium inline-flex items-center gap-1.5 border-b-2 ${
-                  active ? "text-text border-accent" : "text-text-dim border-transparent"
-                }`}
-              >
-                {t.label}
-                <span
-                  className={`text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute ${
-                    active ? "bg-chip" : "bg-transparent"
-                  }`}
-                >
-                  {t.count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <TabsList className="flex gap-0.5">
+          {tabs.map((t) => (
+            <TabsTrigger
+              key={t.k}
+              value={t.k}
+              className="group -mb-px px-3.5 py-2 bg-transparent border-none cursor-pointer text-[13px] font-medium inline-flex items-center gap-1.5 border-b-2 text-text-dim border-transparent data-[state=active]:text-text data-[state=active]:border-accent"
+            >
+              {t.label}
+              <span className="text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute bg-transparent group-data-[state=active]:bg-chip">
+                {t.count}
+              </span>
+            </TabsTrigger>
+          ))}
+        </TabsList>
       </div>
 
-      {tab === "assets" && (
-        <>
+      <TabsContent value="assets">
           <div className="px-4 py-3.5 border-b border-border-soft flex items-center gap-2.5">
             <Search className="h-4 w-4 text-text-dim" />
             <div className="flex-1">
@@ -238,63 +238,48 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
           </div>
 
           <div className="px-3.5 py-2.5 flex gap-2 items-center border-b border-border-soft relative">
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  setOpenSort((v) => !v);
-                }}
-                className="px-2.5 py-1 rounded-full border border-border bg-bg-elev text-text-dim text-[12px] inline-flex items-center gap-1"
-              >
-                {sort}
-                <ChevronDown className="h-3 w-3" />
-              </button>
-              {openSort && (
-                <div className="absolute top-[calc(100%+4px)] left-0 z-20 bg-panel-solid border border-border rounded-sm p-1 min-w-[140px] shadow-lg">
-                  {SORTS.map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => {
-                        setSort(s);
-                        setOpenSort(false);
-                      }}
-                      className={`block w-full px-2.5 py-2 border-none rounded-xs cursor-pointer text-text text-[13px] text-left ${
-                        sort === s ? "bg-chip" : "bg-transparent"
-                      }`}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="px-2.5 py-1 rounded-full border border-border bg-bg-elev text-text-dim text-[12px] inline-flex items-center gap-1"
+                >
+                  {sort}
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="min-w-[140px] rounded-sm shadow-lg">
+                {SORTS.map((s) => (
+                  <DropdownMenuItem
+                    key={s}
+                    className={sort === s ? "bg-chip" : ""}
+                    onSelect={() => {
+                      setSort(s);
+                    }}
+                  >
+                    {s}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div className="flex-1" />
             <div className="text-[12px] text-text-dim">PnL</div>
           </div>
 
           <div className="max-h-[320px] overflow-auto">
             {!portfolio.walletAddress && (
-              <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                Connect a wallet to see your balances.
-              </div>
+              <EmptyState>Connect a wallet to see your balances.</EmptyState>
             )}
             {portfolio.walletAddress && portfolio.loading && filtered.length === 0 && (
-              <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                Loading balances…
-              </div>
+              <EmptyState>Loading balances…</EmptyState>
             )}
             {portfolio.walletAddress && portfolio.error && filtered.length === 0 && (
-              <div className="px-4 py-8 text-center text-[12px] text-red">{portfolio.error}</div>
+              <EmptyState tone="error">{portfolio.error}</EmptyState>
             )}
             {portfolio.walletAddress &&
               !portfolio.loading &&
               !portfolio.error &&
-              filtered.length === 0 && (
-                <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                  No matching balances.
-                </div>
-              )}
+              filtered.length === 0 && <EmptyState>No matching balances.</EmptyState>}
             {filtered.map((a) => (
               <div
                 key={a.symbol}
@@ -338,21 +323,15 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
               </div>
             ))}
           </div>
-        </>
-      )}
+      </TabsContent>
 
-      {tab === "positions" && (
-        <>
+      <TabsContent value="positions">
           <div className="max-h-[360px] overflow-auto">
             {!portfolio.walletAddress && (
-              <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-                Connect a wallet to see your liquidity positions.
-              </div>
+              <EmptyState>Connect a wallet to see your liquidity positions.</EmptyState>
             )}
             {portfolio.walletAddress && visiblePositions.length === 0 && (
-              <div className="px-3.5 py-8 text-center text-[12px] text-text-dim">
-                No positions in this view.
-              </div>
+              <EmptyState className="px-3.5">No positions in this view.</EmptyState>
             )}
             {portfolio.walletAddress &&
               visiblePositions.map((p, i) => {
@@ -406,12 +385,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
                       </div>
                       <div className="mt-1">
                         <span
-                          className="text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block"
-                          style={{
-                            background: tint.bg,
-                            color: tint.fg,
-                            border: `1px solid ${tint.bd}`,
-                          }}
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block ${tint}`}
                         >
                           {p.hook}
                         </span>
@@ -434,23 +408,24 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
                 );
               })}
           </div>
-        </>
-      )}
+      </TabsContent>
 
-      {tab === "agent" && (
+      <TabsContent value="agent">
         <AgentTabBody
           agent={agent}
           agentAssets={agentAssets}
           agentPositionRows={agentPositionRows}
         />
-      )}
+      </TabsContent>
 
-      {tab === "unified" && <UnifiedBalanceTab ub={unifiedBalance} />}
+      <TabsContent value="unified">
+        <UnifiedBalanceTab ub={unifiedBalance} />
+      </TabsContent>
 
-      {tab === "earnings" && (
+      <TabsContent value="earnings">
         <EarningsTabBody earnings={earnings} walletAddress={portfolio.walletAddress} />
-      )}
-    </div>
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -464,26 +439,16 @@ function AgentTabBody({
   agentPositionRows: PortfolioPosition[];
 }) {
   if (!agent.agentAddress && agent.loading) {
-    return (
-      <div className="px-4 py-8 text-center text-[12px] text-text-dim">Loading agent wallet…</div>
-    );
+    return <EmptyState>Loading agent wallet…</EmptyState>;
   }
   if (agent.notProvisioned) {
-    return (
-      <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-        No agent wallet yet. Open the Agent panel to create one.
-      </div>
-    );
+    return <EmptyState>No agent wallet yet. Open the Agent panel to create one.</EmptyState>;
   }
   if (agent.error) {
-    return <div className="px-4 py-8 text-center text-[12px] text-red">{agent.error}</div>;
+    return <EmptyState tone="error">{agent.error}</EmptyState>;
   }
   if (!agent.agentAddress) {
-    return (
-      <div className="px-4 py-8 text-center text-[12px] text-text-dim">
-        Connect a wallet to view your agent.
-      </div>
-    );
+    return <EmptyState>Connect a wallet to view your agent.</EmptyState>;
   }
 
   return (
@@ -499,9 +464,9 @@ function AgentTabBody({
         Balances
       </div>
       {agentAssets.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[12px] text-text-dim">
+        <EmptyState className="py-6">
           Agent has no balances yet. Send funds to the address above.
-        </div>
+        </EmptyState>
       ) : (
         agentAssets.map((a) => (
           <div
@@ -529,9 +494,7 @@ function AgentTabBody({
         LP Positions
       </div>
       {agentPositionRows.length === 0 ? (
-        <div className="px-4 py-6 text-center text-[12px] text-text-dim">
-          Agent has no LP positions yet.
-        </div>
+        <EmptyState className="py-6">Agent has no LP positions yet.</EmptyState>
       ) : (
         agentPositionRows.map((p, i) => {
           const tint = HOOK_TINT[p.hook];
@@ -554,12 +517,7 @@ function AgentTabBody({
                 </div>
                 <div className="mt-1">
                   <span
-                    className="text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block"
-                    style={{
-                      background: tint.bg,
-                      color: tint.fg,
-                      border: `1px solid ${tint.bd}`,
-                    }}
+                    className={`text-[10px] px-1.5 py-0.5 rounded font-medium tracking-[0.02em] inline-block ${tint}`}
                   >
                     {p.hook}
                   </span>

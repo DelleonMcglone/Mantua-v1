@@ -14,23 +14,29 @@ import { cn } from "@/lib/utils.ts";
  *  - destructive: filled red — irreversible actions
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50",
+  // Radius lives in the base (not per-size) so every size renders rounded
+  // and variants can override it cleanly — `size="sm"` used to ship square
+  // corners, and per-size radii collided with the `chip` pill.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         primary: "bg-accent text-white hover:bg-accent/90 active:bg-accent/95",
         ghost: "bg-transparent border border-border text-text-dim hover:bg-bg-elev hover:text-text",
         chip: "bg-bg-elev border border-border text-text-dim hover:text-text rounded-full",
-        icon: "bg-transparent border border-border text-text-dim hover:text-text rounded-sm",
+        icon: "bg-transparent border border-border text-text-dim hover:text-text",
         destructive: "bg-red text-white hover:bg-red/90",
       },
       size: {
         sm: "h-8 px-3 text-xs",
-        md: "h-10 px-4 text-sm rounded-sm",
+        md: "h-10 px-4 text-sm",
         lg: "h-11 px-6 text-base rounded-md",
         icon: "h-9 w-9 p-0",
       },
+      // `chip` must render a pill at every size: the compound entries below
+      // re-assert rounded-full so a size override can never square it.
     },
+    compoundVariants: [{ variant: "chip", className: "rounded-full" }],
     defaultVariants: { variant: "primary", size: "md" },
   },
 );

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { ArrowLeft, Bot, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
 import type { SlateEvent } from "./use-slate.ts";
 
@@ -152,32 +153,40 @@ export function MarketDetail({ event, onBack, onAgent }: Props) {
 
       <PriceChart event={event} detail={detail} failed={failed} />
 
-      <div className="mt-5 flex gap-4 border-b border-border-soft text-[13px]">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => {
-              setTab(t.id);
-            }}
-            className={`pb-2 cursor-pointer ${
-              tab === t.id
-                ? "border-b-2 border-text font-semibold text-text"
-                : "text-text-dim hover:text-text"
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          setTab(v as Tab);
+        }}
+      >
+        <TabsList className="mt-5 flex gap-4 border-b border-border-soft text-[13px]">
+          {TABS.map((t) => (
+            <TabsTrigger
+              key={t.id}
+              value={t.id}
+              className="pb-2 cursor-pointer text-text-dim hover:text-text data-[state=active]:border-b-2 data-[state=active]:border-text data-[state=active]:font-semibold data-[state=active]:text-text"
+            >
+              {t.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
 
-      <div className="mt-4">
-        {tab === "comments" && <CommentsTab providerEventId={event.providerEventId} />}
-        {tab === "holders" && <HoldersTab event={event} detail={detail} />}
-        {tab === "positions" && <PositionsTab event={event} />}
-        {tab === "activity" && <ActivityTab event={event} detail={detail} />}
-        {tab === "agent" && <AgentTab event={event} onAgent={onAgent} />}
-      </div>
+        <TabsContent value="comments" className="mt-4">
+          <CommentsTab providerEventId={event.providerEventId} />
+        </TabsContent>
+        <TabsContent value="holders" className="mt-4">
+          <HoldersTab event={event} detail={detail} />
+        </TabsContent>
+        <TabsContent value="positions" className="mt-4">
+          <PositionsTab event={event} />
+        </TabsContent>
+        <TabsContent value="activity" className="mt-4">
+          <ActivityTab event={event} detail={detail} />
+        </TabsContent>
+        <TabsContent value="agent" className="mt-4">
+          <AgentTab event={event} onAgent={onAgent} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

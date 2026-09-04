@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowUp, ExternalLink, RefreshCw } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { usd as formatUsd } from "@/lib/format.ts";
 import { useConfirmedAction } from "@/hooks/use-confirmed-action.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl, type SupportedChainId } from "@/lib/chains.ts";
 import { type TokenSymbol } from "@/lib/tokens.ts";
@@ -474,12 +475,9 @@ interface TokenInputCardProps {
 function formatUsdApprox(amount: string, price: number | undefined): string {
   const n = parseFloat(amount);
   if (!price || !Number.isFinite(n) || n <= 0) return "≈ $0.00";
-  const usd = n * price;
-  const formatted =
-    usd >= 1
-      ? usd.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })
-      : usd.toLocaleString("en-US", { maximumFractionDigits: 4, minimumFractionDigits: 2 });
-  return `≈ $${formatted}`;
+  // The 7th USD site (B-015): formats through lib/format.ts like the rest,
+  // so the missing-value sentinel and grouping can't drift from it.
+  return `≈ ${formatUsd(n * price)}`;
 }
 
 function TokenInputCard({

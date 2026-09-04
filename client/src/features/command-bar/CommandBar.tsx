@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Command } from "lucide-react";
+import { Button } from "@/components/ui/button.tsx";
 import { api, ApiError } from "@/lib/api.ts";
+import { cn } from "@/lib/utils.ts";
 import { IntentCard } from "@/features/agent/IntentCard.tsx";
 
 /**
@@ -214,39 +217,18 @@ export function CommandBar({ page, poolId, onIntent }: CommandBarProps) {
   };
 
   return (
-    <div
-      style={{
-        padding: "10px 32px",
-        borderBottom: "1px solid var(--border-soft)",
-        background: "var(--bg)",
-        position: "sticky",
-        top: 0,
-        zIndex: 50,
-      }}
-    >
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
+    <div className="sticky top-0 z-50 border-b border-border-soft bg-bg px-8 py-2.5">
+      <div className="mx-auto max-w-[980px]">
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "10px 14px",
-            background: "var(--bg-elev)",
-            border: focused ? "1px solid var(--accent)" : "1px solid var(--border-soft)",
-            borderRadius: 12,
-            boxShadow: focused ? "0 0 0 3px rgba(139,108,240,0.10)" : "none",
-            transition: "all .15s",
-          }}
+          className={cn(
+            "flex items-center gap-2.5 rounded-md border bg-bg-elev px-3.5 py-2.5 transition-all",
+            focused ? "border-accent ring-[3px] ring-accent/10" : "border-border-soft",
+          )}
         >
-          <span
-            style={{
-              color: focused ? "var(--accent)" : "var(--text-mute)",
-              fontSize: 14,
-              fontWeight: 600,
-            }}
-          >
-            ⌘
-          </span>
+          <Command
+            className={cn("h-3.5 w-3.5", focused ? "text-accent" : "text-text-mute")}
+            aria-hidden
+          />
           <input
             ref={inputRef}
             value={val}
@@ -264,43 +246,18 @@ export function CommandBar({ page, poolId, onIntent }: CommandBarProps) {
             }}
             onKeyDown={onKeyDown}
             placeholder={PLACEHOLDER}
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: "var(--text)",
-              fontSize: 13,
-            }}
+            className="flex-1 border-none bg-transparent text-[13px] text-text outline-none"
           />
           {state.status === "parsing" && (
-            <span style={{ fontSize: 11, color: "var(--text-mute)" }}>parsing…</span>
+            <span className="text-[11px] text-text-mute">parsing…</span>
           )}
           {state.status !== "parsing" && !val && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 10,
-                padding: "2px 6px",
-                borderRadius: 6,
-                background: "var(--chip)",
-                color: "var(--text-mute)",
-                border: "1px solid var(--border-soft)",
-              }}
-            >
-              ⌘K
+            <span className="mono inline-flex items-center gap-0.5 rounded-[6px] border border-border-soft bg-chip px-1.5 py-0.5 text-[10px] text-text-mute">
+              <Command className="h-2.5 w-2.5" aria-hidden />K
             </span>
           )}
           {val && state.status === "idle" && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 10,
-                color: "var(--text-mute)",
-              }}
-            >
-              ↵ to parse
-            </span>
+            <span className="mono text-[10px] text-text-mute">↵ to parse</span>
           )}
         </div>
 
@@ -314,59 +271,35 @@ export function CommandBar({ page, poolId, onIntent }: CommandBarProps) {
             }
             what={summarizeIntent(state.result.intent)}
             actions={
-              <div style={{ display: "flex", gap: 8, padding: "0 14px 14px" }}>
-                <button
-                  type="button"
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 border-border-soft text-[12px]"
                   onClick={dismiss}
-                  style={{
-                    flex: 1,
-                    padding: "7px 12px",
-                    borderRadius: 8,
-                    border: "1px solid var(--border-soft)",
-                    background: "transparent",
-                    color: "var(--text-dim)",
-                    cursor: "pointer",
-                    fontSize: 12,
-                  }}
                 >
                   Cancel
-                </button>
+                </Button>
                 {state.result.intent.action !== "reject" &&
                   state.result.intent.action !== "clarification_needed" && (
-                    <button
-                      type="button"
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="flex-[2] text-[12px]"
                       onClick={confirm}
-                      style={{
-                        flex: 2,
-                        padding: "7px 12px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "var(--accent)",
-                        color: "#fff",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontWeight: 500,
-                      }}
                     >
                       Confirm &amp; open
-                    </button>
+                    </Button>
                   )}
-              </div>
+              </>
             }
           />
         )}
 
         {state.status === "parsed" && state.result.intent.action === "reject" && (
-          <div
-            style={{
-              marginTop: 8,
-              padding: "10px 14px",
-              fontSize: 11,
-              color: "var(--text-mute)",
-            }}
-          >
-            <div style={{ marginBottom: 6 }}>Try one of these:</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="mt-2 px-3.5 py-2.5 text-[11px] text-text-mute">
+            <div className="mb-1.5">Try one of these:</div>
+            <div className="flex flex-wrap gap-1.5">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
@@ -375,15 +308,7 @@ export function CommandBar({ page, poolId, onIntent }: CommandBarProps) {
                     setVal(s);
                     void parse(s);
                   }}
-                  style={{
-                    padding: "4px 10px",
-                    fontSize: 11,
-                    borderRadius: 99,
-                    background: "var(--chip)",
-                    color: "var(--text-dim)",
-                    border: "1px solid var(--border-soft)",
-                    cursor: "pointer",
-                  }}
+                  className="cursor-pointer rounded-full border border-border-soft bg-chip px-2.5 py-1 text-[11px] text-text-dim"
                 >
                   {s}
                 </button>
@@ -393,17 +318,7 @@ export function CommandBar({ page, poolId, onIntent }: CommandBarProps) {
         )}
 
         {state.status === "error" && (
-          <div
-            style={{
-              marginTop: 8,
-              padding: "10px 14px",
-              fontSize: 11,
-              color: "var(--red)",
-              background: "rgba(255,107,107,0.08)",
-              border: "1px solid rgba(255,107,107,0.30)",
-              borderRadius: 12,
-            }}
-          >
+          <div className="mt-2 rounded-md border border-red/30 bg-red/10 px-3.5 py-2.5 text-[11px] text-red">
             {state.message}
           </div>
         )}

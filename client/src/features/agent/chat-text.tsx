@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
+import { ExternalLink } from "lucide-react";
 import { shortAddr } from "./agent-gate.tsx";
 import { CopyButton } from "./agent-primitives.tsx";
 
@@ -12,17 +13,8 @@ import { CopyButton } from "./agent-primitives.tsx";
 
 export function UserBubble({ text }: { text: string }) {
   return (
-    <div style={{ alignSelf: "flex-end", maxWidth: "85%" }}>
-      <div
-        style={{
-          background: "var(--accent)",
-          color: "#fff",
-          borderRadius: 12,
-          padding: "8px 12px",
-          fontSize: 13,
-          whiteSpace: "pre-wrap",
-        }}
-      >
+    <div className="self-end max-w-[85%]">
+      <div className="whitespace-pre-wrap rounded-md bg-accent px-3 py-2 text-[13px] text-white">
         {text}
       </div>
     </div>
@@ -34,30 +26,17 @@ export function AddressInline({ addr }: { addr: string }) {
   const chainId = BASE_CHAIN_ID;
   const url = getExplorerAddressUrl(chainId, addr);
   return (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "1px 7px",
-        borderRadius: 7,
-        background: "var(--bg-elev)",
-        border: "1px solid var(--border-soft)",
-        verticalAlign: "baseline",
-      }}
-    >
-      <span className="mono" style={{ fontSize: 12 }}>
-        {shortAddr(addr)}
-      </span>
+    <span className="inline-flex items-center gap-1.5 rounded-[7px] border border-border-soft bg-bg-elev px-[7px] py-px align-baseline">
+      <span className="mono text-[12px]">{shortAddr(addr)}</span>
       <CopyButton value={addr} label="Copy address" />
       <a
         href={url}
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: "var(--text-dim)", textDecoration: "none", fontSize: 11 }}
+        className="text-text-dim no-underline"
         aria-label="View on explorer"
       >
-        ↗
+        <ExternalLink className="h-[11px] w-[11px]" aria-hidden />
       </a>
     </span>
   );
@@ -97,7 +76,7 @@ export function RichText({ text }: { text: string }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ color: "var(--accent)", textDecoration: "none" }}
+          className="text-accent no-underline"
         >
           {url}
         </a>,
@@ -112,16 +91,6 @@ export function RichText({ text }: { text: string }) {
 
 export function Caret() {
   return (
-    <span
-      style={{
-        display: "inline-block",
-        width: 7,
-        height: 14,
-        marginLeft: 2,
-        verticalAlign: "text-bottom",
-        background: "var(--text-dim)",
-        animation: "blink 1s steps(2) infinite",
-      }}
-    />
+    <span className="ml-0.5 inline-block h-3.5 w-[7px] animate-[blink_1s_steps(2)_infinite] bg-text-dim align-text-bottom" />
   );
 }
