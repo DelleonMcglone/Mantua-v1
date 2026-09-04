@@ -15,12 +15,32 @@ Contract addresses live in `deploy/dynamic-market/README.md` and
 2. Verify: `GET /api/cron/strategies` shows `"killed": true` and every armed
    strategy transitions to `disarmed / kill-switch` (audit rows written).
 
-**Stop all app writes** (trades, arming, agent actions — reads stay up):
+**Stop all app writes and the money crons** (trades, arming, agent
+actions — reads and the read-only crons stay up):
 
-1. Set `MANTUA_KILL_SWITCH=1` → redeploy.
-2. Note: this also blocks user-initiated disarms through the API; the
-   strategies engine still auto-disarms, so prefer the narrower switch
+Engage with either lever; they compose (either one kills):
+
+1. **Runtime (preferred — no redeploy):** in the Upstash console's data
+   browser (or redis-cli), set the key `mantua:kill-switch` to `1`.
+   Every server instance reads it within ~15s of its next request (the
+   flag is cached 15s per instance). Disengage by setting it back to `0`
+   or deleting the key — also effective without a deploy.
+2. **Deploy-time baseline:** set `MANTUA_KILL_SWITCH=1` → redeploy.
+   Static and one-directional: the runtime flag can engage on top of it
+   but can never lift it.
+3. While engaged (either lever), the three trading crons —
+   `/api/cron/rebalance`, `/api/cron/intents`, `/api/cron/strategies` —
+   refuse with `503 KILL_SWITCH_ACTIVE` alongside every write endpoint
+   (C-020); the read-only crons (peg-sync, resolution, sports-sync) keep
+   running. Note the strategies nuance: gated behind the global switch
+   the strategies cron stops evaluating entirely (armed strategies stay
+   armed but cannot fire), whereas `STRATEGIES_KILL_SWITCH=1` actively
+   disarms every strategy with audit rows — prefer the narrower switch
    unless the app itself is the problem.
+4. Verify: any write endpoint and any money cron must return
+   `503 {"code":"KILL_SWITCH_ACTIVE"}` (for a cron: `curl -i
+https://<host>/api/cron/rebalance` — expect the same 503 before any
+   sweep runs).
 
 **Stop settlement** (suspected bad data or signer compromise):
 
@@ -101,7 +121,7 @@ while data is unconfirmed.
 | Signer key leaked               | `setSigner` rotation + pull env key                                                           |
 | Operator key leaked             | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise |
 | Raw agent/ key (C-018)          | §6 — sweep + retire; the key is burned in git history                                         |
-| App-wide emergency              | `MANTUA_KILL_SWITCH=1`                                                                        |
+| App-wide emergency              | runtime: `SET mantua:kill-switch 1` in Upstash (§1); or `MANTUA_KILL_SWITCH=1` + redeploy     |
 
 ## 6. Raw agent/ key — MANDATORY revocation (C-018)
 
@@ -153,9 +173,10 @@ longer resets anyone's counters: the limits live in Redis keys
 (Vercel → Storage → Upstash also works and fills both values in), then
 set both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` in
 Vercel env, in the region close to the lambdas (e.g. `iad1`). Pick a
-name you will recognize later — the same database is where the C-020
-kill-switch state will live. Half-configured credentials stop the boot:
-the server refuses to start with exactly one of the two set.
+name you will recognize later — the same database also holds the C-020
+runtime kill-switch flag, key `mantua:kill-switch` (§1). Half-configured
+credentials stop the boot: the server refuses to start with exactly one
+of the two set.
 
 **Fallback behavior.** With neither variable set, the limiters fall
 back to the old per-instance memory store: limits reset on every lambda
