@@ -47,6 +47,25 @@ async function main(): Promise<number> {
     console.error("CIRCLE_ENTITY_SECRET must be 64 hex characters (32 bytes).");
     return 1;
   }
+  // Check the key's shape locally first. Circle rejects a malformed key with
+  // a generic "malformed API key" message that doesn't say WHICH part is
+  // wrong, so a local check with specific guidance saves a round trip and a
+  // lot of guessing.
+  if (!/^(TEST|LIVE)_API_KEY:[0-9a-f]{32}:[0-9a-f]{32}$/i.test(apiKey)) {
+    const parts = apiKey.split(":");
+    console.error(
+      `CIRCLE_API_KEY is not the shape Circle accepts.\n\n` +
+        `  expected:  LIVE_API_KEY:<32 hex>:<32 hex>   (3 parts, 2 colons)\n` +
+        `  yours:     ${String(parts.length)} part(s), ${String(apiKey.length)} chars, ` +
+        `starts with ${/^(TEST|LIVE)_API_KEY:/i.test(apiKey) ? "a valid prefix" : "no TEST_/LIVE_API_KEY prefix"}\n\n` +
+        `The full key is shown ONCE, when you create it. The API Keys LIST page\n` +
+        `shows only the key's ID — the secret half is not recoverable from it.\n` +
+        `If you no longer have the original line, create a new key:\n` +
+        `  https://console.circle.com  ->  API Keys  ->  Create key\n` +
+        `and copy the single line it displays, whole and unmodified.\n`,
+    );
+    return 1;
+  }
   if (/^TEST_API_KEY:/i.test(apiKey)) {
     console.warn("Note: this is a TEST key — registering against Circle's testnet entity.\n");
   }
