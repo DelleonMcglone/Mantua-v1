@@ -99,4 +99,44 @@ while data is unconfirmed.
 | Bad data suspected     | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                           |
 | Signer key leaked      | `setSigner` rotation + pull env key                                                           |
 | Operator key leaked    | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise |
+| Raw agent/ key (C-018) | §6 — sweep + retire; the key is burned in git history                                         |
 | App-wide emergency     | `MANTUA_KILL_SWITCH=1`                                                                        |
+
+## 6. Raw agent/ key — MANDATORY revocation (C-018)
+
+The standalone `agent/` workspace (deleted in C-018) signed with a raw
+`AGENT_PRIVATE_KEY` EOA outside every safety rail. Its own funding
+runbook instructed operators to fund that address with real ETH + USDC
+on mainnet.
+
+**The key is burned in git history.** Deleting the directory does not
+un-leak it: the full workspace — including the funding runbook, the
+`AGENT_PRIVATE_KEY` env slot, and `agent/.env.example` — remains
+recoverable from git history (introduced in `ef37ef9`). Anyone with read
+access to this repository can reconstruct the entire setup. History is
+not being rewritten; treat the exposure as permanent.
+
+**MANDATORY: any private key that was ever generated for, loaded into,
+or funded in the `agent/` workspace must be treated as permanently
+compromised.** Revocation is an operator action, not a code change. For
+an EOA the address is the key — there is no on-chain rotation. The
+revocation procedure is sweep and retire:
+
+1. **Sweep.** If the address ever held funds, move every remaining ETH
+   and USDC balance to a fresh, never-before-used operator address.
+   Verify the sweep on-chain via the explorer before continuing.
+2. **Revoke approvals.** If any ERC-20 allowances remain active from
+   that address to any spender contract, revoke them before abandoning
+   the key (the sweep in step 1 does not clear approvals).
+3. **Retire the address.** Never fund it, never sign with it again, and
+   remove it from any allowlist, monitoring, or funding script.
+4. **Purge copies.** Remove the key material from every store it
+   touched — Vercel env, CI secrets, local `.env` files.
+5. **Monitor.** Watch the retired address on the explorer. Any outbound
+   transfer not made in step 1 means someone else holds the key: treat
+   as an incident (§4 comms, postmortem within 48h).
+
+Circle-managed agent wallets are unaffected — they never shared key
+material with this workspace. If the operator certifies no key was ever
+generated or funded for it, record that determination in the postmortem
+log; the default assumption is that a key existed.
