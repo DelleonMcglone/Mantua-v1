@@ -20,10 +20,11 @@ import { quoteAgentSwap } from "./agent-swap.ts";
  * `maxPriceImpactPct`, is held. Price impact also captures thin-liquidity /
  * stale-pool risk (a shallow pool fills far from spot).
  *
- * The impact limit is network-aware (same switch as the spending cap):
- * 1% is calibrated for mainnet-depth pools; the `testnet` gate loosens it
- * to 10% for thin dev books. The peg guard (the actual safety property)
- * stays identical on both.
+ * The impact limit is network-aware: 1% is calibrated for mainnet-depth
+ * pools; the `testnet` gate loosens it to 10% for thin dev books. (Unlike
+ * this dial, the spending cap is no longer network-gated — C-019 removed
+ * its switch.) The peg guard (the actual safety property) stays identical
+ * on both.
  */
 
 const MAINNET = process.env.MANTUA_NETWORK === "mainnet";

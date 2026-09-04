@@ -19,6 +19,11 @@ const cache = new Map<string, CacheEntry>();
  * token's `pythFeedId`. Falls back to DefiLlama Coins (`coins.llama.fi`, keyed by
  * `coingecko:<id>`) when Pyth is unavailable, then to the last cached value, then
  * 0. An outage on either source degrades gracefully.
+ *
+ * C-019 — cap-enforcement callers must NOT consume this lenient contract:
+ * a $0 valuation from a dead feed turns the spending cap into a no-op
+ * exactly when prices are least trustworthy. Enforcement uses
+ * `getUsdPriceStrict` / `tokenAmountUsdStrict`, which fail closed.
  */
 export async function getUsdPrice(symbol: TokenSymbol): Promise<number> {
   const token = TOKENS[symbol];
@@ -48,6 +53,49 @@ async function getUsdPriceForToken(token: Token | undefined): Promise<number> {
 
   cache.set(cacheKey, { usd, fetchedAt: Date.now() });
   return usd;
+}
+
+/**
+ * C-019 — no feed, no trade. Raised by the strict pricing helpers when no
+ * live-or-cached USD price is available, so cap enforcement can fail closed
+ * instead of valuing the spend at $0.
+ */
+export class PriceUnavailableError extends Error {
+  readonly symbol: string;
+
+  constructor(symbol: string) {
+    super(
+      `No USD price available for ${symbol} — spending-cap pricing is fail-closed, blocking the trade`,
+    );
+    this.name = "PriceUnavailableError";
+    this.symbol = symbol;
+  }
+}
+
+/** Fail-closed guard around a resolved price — the pure core of the strict helpers. */
+export function requirePositivePrice(price: number, symbol: string): number {
+  if (!(price > 0)) throw new PriceUnavailableError(symbol);
+  return price;
+}
+
+/** Strict price for `symbol`: throws `PriceUnavailableError` when no positive
+ *  price can be resolved. Cap enforcement uses this, never `getUsdPrice`. */
+export async function getUsdPriceStrict(symbol: TokenSymbol): Promise<number> {
+  return requirePositivePrice(await getUsdPrice(symbol), symbol);
+}
+
+/** USD value of `amount` (raw base units) for `symbol`, resolved against the
+ *  registry — fail-closed: an unpriced token or a dead feed throws instead of
+ *  valuing the spend at $0. Cap enforcement uses this, never `tokenAmountUsd`. */
+export async function tokenAmountUsdStrict(
+  symbol: TokenSymbol,
+  amountRaw: bigint,
+): Promise<number> {
+  const token = TOKENS[symbol] as Token | undefined;
+  if (!token) throw new PriceUnavailableError(symbol);
+  const price = await getUsdPriceStrict(symbol);
+  const denom = 10 ** token.decimals;
+  return (Number(amountRaw) / denom) * price;
 }
 
 /** USD value of `amount` (raw base units) for a known token object. Use
