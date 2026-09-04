@@ -4,6 +4,7 @@ import { AgentWalletNotFoundError } from "../lib/agent-wallet.ts";
 import { sendFromAgentWallet } from "../lib/agent-send.ts";
 import { logAudit } from "../lib/audit.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
+import { CircleReceiptTimeoutError } from "../lib/circle/execute.ts";
 import { SafetyError } from "../lib/errors.ts";
 import { logger } from "../lib/logger.ts";
 import { getRequestContext } from "../lib/request-context.ts";
@@ -46,6 +47,10 @@ agentSendRouter.post(
         to: to as `0x${string}`,
         symbol: token,
         amount,
+        auditContext: {
+          ...(ctx.ipAddress ? { ipAddress: ctx.ipAddress } : {}),
+          ...(ctx.userAgent ? { userAgent: ctx.userAgent } : {}),
+        },
       });
       await logAudit({
         ...ctx,
@@ -74,6 +79,22 @@ agentSendRouter.post(
       }
       if (err instanceof CircleUnavailableError) {
         res.status(503).json({ error: err.message, code: "CIRCLE_UNAVAILABLE" });
+        return;
+      }
+      if (err instanceof CircleReceiptTimeoutError) {
+        // C-015 — PENDING: the transfer is still driving on Base. Not a
+        // success (no receipt) and not a failure (no revert); the durable
+        // webhook finalizer records the real outcome. No audit row here —
+        // the finalizer writes exactly one.
+        logger.warn(
+          { circleTxId: err.circleTxId },
+          "agent send: receipt wait timed out — finalization moves to the webhook",
+        );
+        res.status(202).json({
+          error: "Send is still pending on-chain; outcome will be finalized asynchronously.",
+          code: "SEND_PENDING",
+          circleTxId: err.circleTxId,
+        });
         return;
       }
       logger.error({ err }, "agent send failed");

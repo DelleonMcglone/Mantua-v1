@@ -4,4 +4,5 @@ export * from "./trading.ts";
 export * from "./agent.ts";
 export * from "./safety.ts";
 export * from "./markets.ts";
+export * from "./circle.ts";
 export * from "./activity.ts";
