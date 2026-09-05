@@ -164,3 +164,25 @@ available here):
 - Behavior when a Permit2 allowance expires between plan and execution
   (the 300 s validity buffer should prevent it; only a live race can
   confirm).
+
+## Fork verification (2026-09-05, post-merge — the "needs fork/live" list)
+
+Executed on the P9-013 rehearsal fork (Anvil @ Base block 50,914,524, real
+mainnet pool state) against the REAL deployed UniversalRouter:
+
+- Quote: 10 USDC → 8,608,815 raw EURC via the live USDC/EURC 0.05% v4 pool
+  (V4Quoter on-chain).
+- Built with `buildUniversalRouterSwap`: 2 bounded approvals + execute,
+  `amountOutMinimum = 8,565,770` (quote − 50 bps), 10-min deadline.
+- All three transactions **succeeded**: ERC20→Permit2 approve,
+  Permit2→router approve, `execute(0x3593564c)`.
+- Received **exactly 8,608,815 EURC** (≥ min-out — the on-chain
+  `V4TooLittleReceived` guard was live in the calldata).
+- Post-swap allowances: ERC20→Permit2 **0**, Permit2→router amount **0**
+  (only the short expiry timestamp remains) — per-trade approvals fully
+  consumed, no standing allowance of any size.
+
+Still untested (no vehicle on the fork): Circle DCW executing the Permit2
+approve ABI call (agent path — exercised by unit tests; live check rides on
+the next testnet agent swap), and the native-ETH input branch (no native
+registry token exists).
