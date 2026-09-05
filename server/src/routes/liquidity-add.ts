@@ -11,12 +11,25 @@ import { getRequestContext } from "../lib/request-context.ts";
 import { resolveHookForPool } from "../lib/hook-pair-gating.ts";
 import { getToken } from "../lib/tokens.ts";
 import { tokenAmountUsd } from "../lib/usd-pricing.ts";
-import { buildAddLiquidityCalldata } from "../lib/v4-add-liquidity.ts";
+import {
+  buildAddLiquidityCalldata,
+  buildAddLiquidityCalldataForKey,
+} from "../lib/v4-add-liquidity.ts";
+import {
+  MarketLiquidityGatedError,
+  MarketLiquidityNotFoundError,
+  resolveMarketPoolLiquidity,
+} from "../lib/market-pool-liquidity.ts";
 import { readSlot0 } from "../lib/v4-state-view.ts";
 import { PERMIT2 } from "../lib/v4-contracts.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
-import { calldataSchema, recordSchema } from "./liquidity-add-schemas.ts";
+import {
+  calldataSchema,
+  marketCalldataSchema,
+  marketRecordSchema,
+  recordSchema,
+} from "./liquidity-add-schemas.ts";
 
 import type { PermitBatchInput, PermitBatchTypedData } from "../lib/permit2.ts";
 
@@ -50,11 +63,116 @@ function serializeTypedData(t: PermitBatchTypedData) {
 
 export const liquidityAddRouter = Router();
 
+/** True when the body addresses a market pool (B7-004) vs. a base pair. */
+function isMarketBody(body: unknown): boolean {
+  return typeof body === "object" && body !== null && "market" in body;
+}
+
+/**
+ * B7-004 — add liquidity to one market's YES/USDC pool on the Dynamic
+ * Market stack. `getV4StackForHook` (via the resolver + key-addressed
+ * builder) picks the DM PoolManager/PositionManager, per DM-112.
+ *
+ * Gated state (a named B7 failure condition): when the DM stack isn't
+ * deployed — or the pool isn't initialized on-chain — the response is a
+ * structured 409 with `gated: true`, never a success and never an opaque
+ * error against the wrong stack.
+ */
+async function handleMarketAddCalldata(req: Request, res: Response): Promise<void> {
+  const parsed = marketCalldataSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid request",
+      code: "BAD_REQUEST",
+      details: parsed.error.issues,
+    });
+    return;
+  }
+  const ctx = getRequestContext(req);
+  if (!ctx.walletAddress) {
+    res.status(401).json({ error: "Wallet not linked", code: "WALLET_REQUIRED" });
+    return;
+  }
+  const { chainId } = parsed.data;
+  try {
+    const pool = await resolveMarketPoolLiquidity({
+      providerEventId: parsed.data.market.providerEventId,
+      outcomeIndex: parsed.data.market.outcomeIndex,
+      chainId,
+    });
+    const slot0 = await readSlot0(pool.key, chainId);
+    if (!slot0) {
+      res.status(409).json({
+        error: "This market's pool is not live on-chain yet — liquidity opens once it is seeded.",
+        code: "MARKET_POOL_NOT_LIVE",
+        gated: true,
+      });
+      return;
+    }
+    const amountYesRaw = BigInt(parsed.data.amountYesRaw);
+    const amountUsdcRaw = BigInt(parsed.data.amountUsdcRaw);
+    const result = buildAddLiquidityCalldataForKey({
+      key: pool.key,
+      amount0Raw: pool.yesIsToken0 ? amountYesRaw : amountUsdcRaw,
+      amount1Raw: pool.yesIsToken0 ? amountUsdcRaw : amountYesRaw,
+      sqrtPriceX96: slot0.sqrtPriceX96,
+      slippageBps: parsed.data.slippageBps,
+      owner: ctx.walletAddress as `0x${string}`,
+      deadlineSeconds: parsed.data.deadlineSeconds,
+      chainId,
+    });
+    const permit2Build = await buildPermit2BatchTypedData({
+      owner: ctx.walletAddress as `0x${string}`,
+      chainId,
+      // result.to is the DM stack's PositionManager — approve THAT.
+      positionManager: result.to,
+      tokens: [
+        { address: result.currency0, amountNeeded: BigInt(result.amount0Max) },
+        { address: result.currency1, amountNeeded: BigInt(result.amount1Max) },
+      ],
+      nowSeconds: Math.floor(Date.now() / 1000),
+    });
+    res.json({
+      ...result,
+      sqrtPriceX96: slot0.sqrtPriceX96.toString(),
+      market: {
+        marketId: pool.marketId,
+        yesToken: pool.yesToken,
+        collateral: pool.collateral,
+        yesIsToken0: pool.yesIsToken0,
+      },
+      permit2: permit2Build
+        ? {
+            permit2Address: PERMIT2,
+            typedData: serializeTypedData(permit2Build.typedData),
+            permitBatch: serializePermitBatch(permit2Build.permitBatch),
+          }
+        : null,
+    });
+  } catch (err) {
+    if (err instanceof MarketLiquidityGatedError) {
+      res.status(409).json({ error: err.message, code: err.code, gated: true });
+      return;
+    }
+    if (err instanceof MarketLiquidityNotFoundError) {
+      res.status(404).json({ error: err.message, code: err.code });
+      return;
+    }
+    const message = err instanceof Error ? err.message : "calldata failed";
+    logger.warn({ err }, "POST /api/liquidity/add/calldata (market) failed");
+    res.status(400).json({ error: message, code: "ADD_LIQUIDITY_INVALID" });
+  }
+}
+
 liquidityAddRouter.post(
   "/api/liquidity/add/calldata",
   writeRateLimiter,
   requireAuth,
   async (req: Request, res: Response) => {
+    if (isMarketBody(req.body)) {
+      await handleMarketAddCalldata(req, res);
+      return;
+    }
     const parsed = calldataSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
@@ -151,11 +269,76 @@ liquidityAddRouter.post(
   },
 );
 
+/**
+ * Record a market-pool add. No `pools`/`positions` rows exist for market
+ * pools (they're not Mantua-created base pools), so this writes only the
+ * portfolio-transaction + audit trail. USDC is the cap's unit of account,
+ * so the USDC side IS the USD value (same convention as market trades).
+ */
+async function handleMarketAddRecord(req: Request, res: Response): Promise<void> {
+  const parsed = marketRecordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid request", code: "BAD_REQUEST" });
+    return;
+  }
+  const ctx = getRequestContext(req);
+  if (!ctx.walletAddress || !req.privyUserId) {
+    res.status(401).json({ error: "Auth required", code: "UNAUTHENTICATED" });
+    return;
+  }
+  const v = parsed.data;
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.privyUserId, req.privyUserId))
+    .limit(1);
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- drizzle types the row as defined, but the array is empty for an unknown user.
+  if (!user) {
+    res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+    return;
+  }
+  const usdValue = Number(BigInt(v.amountUsdcRaw)) / 1e6;
+  const params = {
+    chainId: v.chainId,
+    marketId: v.marketId,
+    amountYesRaw: v.amountYesRaw,
+    amountUsdcRaw: v.amountUsdcRaw,
+    liquidity: v.liquidity,
+    tickLower: v.tickLower,
+    tickUpper: v.tickUpper,
+    poolKeyHash: v.poolKeyHash,
+    ...(v.tokenId ? { tokenId: v.tokenId } : {}),
+  };
+  await db.insert(portfolioTransactions).values({
+    userId: user.id,
+    walletAddress: ctx.walletAddress,
+    action: "add_liquidity",
+    txHash: v.txHash,
+    chainId: v.chainId,
+    params,
+    outcome: v.outcome,
+    usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
+  });
+  await logAudit({
+    ...ctx,
+    chainId: v.chainId,
+    action: "add_liquidity",
+    outcome: v.outcome,
+    txHash: v.txHash,
+    params,
+  });
+  res.json({ ok: true });
+}
+
 liquidityAddRouter.post(
   "/api/liquidity/add/record",
   writeRateLimiter,
   requireAuth,
   async (req: Request, res: Response) => {
+    if (typeof req.body === "object" && req.body !== null && "marketId" in req.body) {
+      await handleMarketAddRecord(req, res);
+      return;
+    }
     const parsed = recordSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid request", code: "BAD_REQUEST" });

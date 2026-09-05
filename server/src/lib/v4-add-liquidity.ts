@@ -1,7 +1,7 @@
 import { encodeFunctionData, keccak256, toHex } from "viem";
 import { DEFAULT_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { getLiquidityForAmounts } from "./liquidity-math.ts";
-import { buildPoolKey } from "./pool-key.ts";
+import { buildPoolKey, type PoolKey } from "./pool-key.ts";
 import { getMaxUsableTick, getMinUsableTick, getSqrtRatioAtTick } from "./tick-math.ts";
 import { type TokenSymbol } from "./tokens.ts";
 import {
@@ -61,6 +61,24 @@ export interface BuildAddLiquidityResult {
 }
 
 /**
+ * Key-addressed variant of {@link BuildAddLiquidityArgs} — for pools whose
+ * currencies aren't registry symbols (market YES/USDC pools, B7-004). The
+ * caller supplies the exact on-chain PoolKey and the amounts already in
+ * currency0/currency1 order.
+ */
+export interface BuildAddLiquidityForKeyArgs {
+  key: PoolKey;
+  amount0Raw: bigint;
+  amount1Raw: bigint;
+  sqrtPriceX96: bigint;
+  slippageBps: number;
+  owner: `0x${string}`;
+  /** ABSOLUTE unix deadline (seconds since epoch) — see above. */
+  deadlineSeconds: number;
+  chainId?: SupportedChainId;
+}
+
+/**
  * Build a full-range MINT_POSITION + SETTLE_PAIR (+ SWEEP for native-ETH
  * sides) unlockData for the v4 PositionManager. Liquidity is computed
  * from the user's max amounts at the current sqrtPrice; on-chain the
@@ -76,13 +94,36 @@ export function buildAddLiquidityCalldata(args: BuildAddLiquidityArgs): BuildAdd
     args.hookName ?? null,
     chainId,
   );
+  return buildAddLiquidityCalldataForKey({
+    key,
+    amount0Raw: flipped ? args.amountBRaw : args.amountARaw,
+    amount1Raw: flipped ? args.amountARaw : args.amountBRaw,
+    sqrtPriceX96: args.sqrtPriceX96,
+    slippageBps: args.slippageBps,
+    owner: args.owner,
+    deadlineSeconds: args.deadlineSeconds,
+    chainId,
+  });
+}
+
+/**
+ * The calldata core, addressed by an exact PoolKey. `to` resolves through
+ * `getV4StackForHook(key.hooks)`, so a market pool (Dynamic Market hook)
+ * routes to the DM stack's PositionManager, per DM-112 — same routing
+ * contract as the remove builder.
+ */
+export function buildAddLiquidityCalldataForKey(
+  args: BuildAddLiquidityForKeyArgs,
+): BuildAddLiquidityResult {
+  const chainId = args.chainId ?? DEFAULT_CHAIN_ID;
+  const key = args.key;
   const tickLower = getMinUsableTick(key.tickSpacing);
   const tickUpper = getMaxUsableTick(key.tickSpacing);
   const sqrtLower = getSqrtRatioAtTick(tickLower);
   const sqrtUpper = getSqrtRatioAtTick(tickUpper);
 
-  const amount0Raw = flipped ? args.amountBRaw : args.amountARaw;
-  const amount1Raw = flipped ? args.amountARaw : args.amountBRaw;
+  const amount0Raw = args.amount0Raw;
+  const amount1Raw = args.amount1Raw;
   const liquidity = getLiquidityForAmounts({
     sqrtPriceCurrentX96: args.sqrtPriceX96,
     sqrtPriceLowerX96: sqrtLower,

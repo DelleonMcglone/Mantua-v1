@@ -26,7 +26,7 @@ import { AssetsCard } from "./features/portfolio/AssetsCard.tsx";
 import { AssetDetailPanel } from "./features/portfolio/AssetDetailPanel.tsx";
 import { SwapPanel } from "./features/swap/SwapPanel.tsx";
 import { AddLiquidityForm } from "./features/liquidity/AddLiquidityForm.tsx";
-import type { PoolKeyContext } from "./features/liquidity/AddLiquidityForm.tsx";
+import type { AddLiquidityContext } from "./features/liquidity/AddLiquidityForm.tsx";
 import type { HookName } from "./features/liquidity/use-create-pool.ts";
 import { LiquidityListPage } from "./features/liquidity/LiquidityListPage.tsx";
 import { PoolDetailPage } from "./features/liquidity/PoolDetailPage.tsx";
@@ -75,7 +75,7 @@ type Route =
   | { kind: "trading" }
   | { kind: "pools" }
   | { kind: "pool"; id: string }
-  | { kind: "add-liquidity"; ctx?: PoolKeyContext }
+  | { kind: "add-liquidity"; ctx?: AddLiquidityContext }
   | { kind: "positions" }
   | { kind: "asset"; symbol: TokenSymbol }
   | {
@@ -573,6 +573,9 @@ function fullPage(route: Route, setRoute: (r: Route) => void): React.ReactNode |
             onCreate={() => {
               setRoute({ kind: "add-liquidity" });
             }}
+            onSelectMarketPool={(market) => {
+              setRoute({ kind: "add-liquidity", ctx: { market } });
+            }}
             onClose={home}
           />
         </PanelPage>
@@ -679,6 +682,9 @@ function TradingFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
           }}
           onCreate={() => {
             setRoute({ kind: "add-liquidity" });
+          }}
+          onSelectMarketPool={(market) => {
+            setRoute({ kind: "add-liquidity", ctx: { market } });
           }}
         />
       </Card>

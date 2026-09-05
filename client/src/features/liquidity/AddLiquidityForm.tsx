@@ -24,6 +24,19 @@ import {
 import { useTokenPrices } from "./use-token-prices.ts";
 import { usePairPriceChart } from "./use-pair-price-chart.ts";
 import { PairRateChart } from "./PairRateChart.tsx";
+import { MarketAddLiquidityPanel } from "./MarketAddLiquidityPanel.tsx";
+import type { MarketLiquidityTarget } from "./market-pools.ts";
+
+/**
+ * The add-liquidity surface accepts either addressing mode (B7-004):
+ * a base-pair PoolKey context, or a market-pool target (one game
+ * outcome's YES/USDC pool on the Dynamic Market stack).
+ */
+export type AddLiquidityContext = PoolKeyContext | MarketAddContext;
+
+export interface MarketAddContext {
+  market: MarketLiquidityTarget;
+}
 
 export interface PoolKeyContext {
   tokenA: TokenSymbol;
@@ -47,12 +60,42 @@ export interface PoolKeyContext {
 }
 
 interface Props {
-  /** Initial pair / fee / hook to pre-fill. Omit to start from defaults
-   *  (USDC/EURC + 0.01% + Stable Protection) — the form will then act
-   *  as a unified "create or add" surface. */
-  ctx?: PoolKeyContext;
+  /** Initial pair / fee / hook to pre-fill, or a market-pool target.
+   *  Omit to start from defaults (USDC/EURC + 0.01% + Stable
+   *  Protection) — the form then acts as a unified "create or add"
+   *  surface. */
+  ctx?: AddLiquidityContext;
   onBack: () => void;
   onClose?: () => void;
+}
+
+interface BasePairProps extends Omit<Props, "ctx"> {
+  ctx?: PoolKeyContext;
+}
+
+/**
+ * Entry point for the liquidity surface — dispatches on the context's
+ * addressing mode. Market contexts render the Dynamic Market panel
+ * (gated while market pools aren't deployed, B7-004); everything else
+ * is the base-pair form below. No hooks here, so the branch is safe.
+ */
+export function AddLiquidityForm({ ctx, onBack, onClose }: Props) {
+  if (ctx && "market" in ctx) {
+    return (
+      <MarketAddLiquidityPanel
+        market={ctx.market}
+        onBack={onBack}
+        {...(onClose ? { onClose } : {})}
+      />
+    );
+  }
+  return (
+    <BasePairAddLiquidityForm
+      {...(ctx ? { ctx } : {})}
+      onBack={onBack}
+      {...(onClose ? { onClose } : {})}
+    />
+  );
 }
 
 function defaultPairForChain(chainId: SupportedChainId): [TokenSymbol, TokenSymbol] {
@@ -87,7 +130,7 @@ type ChartRange = (typeof CHART_RANGES)[number];
  * Backed by the same `useAddLiquidity` wiring as before — the layout
  * change is presentational; calldata + approvals path is unchanged.
  */
-export function AddLiquidityForm({ ctx, onBack, onClose }: Props) {
+function BasePairAddLiquidityForm({ ctx, onBack, onClose }: BasePairProps) {
   const chainId = BASE_CHAIN_ID;
   const locked = ctx?.locked === true;
   const [defaultA, defaultB] = defaultPairForChain(chainId);

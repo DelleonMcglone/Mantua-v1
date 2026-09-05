@@ -26,6 +26,17 @@ export const calldataSchema = z
       .regex(/^0x[a-fA-F0-9]{40}$/)
       .nullable()
       .optional(),
+    /** B7-004 — set when the position lives in a market's YES/USDC pool
+     *  on the Dynamic Market stack. The route then resolves the DM hook
+     *  itself (ignoring `hookAddress`) so the right PositionManager is
+     *  picked, and surfaces the gated state when the DM stack isn't
+     *  deployed instead of probing the wrong stack. */
+    market: z
+      .object({
+        providerEventId: z.string().min(1).max(32),
+        outcomeIndex: z.union([z.literal(0), z.literal(1)]),
+      })
+      .optional(),
     /** Target chain — omitted means Base (back-compat). */
     chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
     /** Percentage 1..100 (whole numbers). */

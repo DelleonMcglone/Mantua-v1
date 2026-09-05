@@ -36,6 +36,44 @@ export const calldataSchema = z.object({
   deadlineSeconds: z.number().int().positive(),
 });
 
+/**
+ * B7-004 — market-pool addressing. A market pool (one game outcome's
+ * YES/USDC pool on the Dynamic Market stack) is keyed by the game +
+ * outcome, exactly like /api/markets/trade/calldata — its currencies are
+ * per-market ERC-20s, not registry symbols, so the base-pair shape above
+ * can't express it. Amounts are in YES/USDC terms; the server maps them
+ * onto currency0/currency1 by the pool's actual token ordering.
+ */
+export const marketCalldataSchema = z.object({
+  chainId: chainIdSchema,
+  market: z.object({
+    providerEventId: z.string().min(1).max(32),
+    /** 0 = home market, 1 = away market — whose YES pool to LP into. */
+    outcomeIndex: z.union([z.literal(0), z.literal(1)]),
+  }),
+  /** YES-token side, raw 6dp units. */
+  amountYesRaw: z.string().regex(/^\d+$/),
+  /** USDC side, raw 6dp units. */
+  amountUsdcRaw: z.string().regex(/^\d+$/),
+  slippageBps: z.number().int().min(0).max(500).default(50),
+  deadlineSeconds: z.number().int().positive(),
+});
+
+/** Record variant for market-pool adds — no registry symbols to name. */
+export const marketRecordSchema = z.object({
+  chainId: chainIdSchema,
+  txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  marketId: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  amountYesRaw: z.string().regex(/^\d+$/),
+  amountUsdcRaw: z.string().regex(/^\d+$/),
+  liquidity: z.string().regex(/^\d+$/),
+  tickLower: z.number().int(),
+  tickUpper: z.number().int(),
+  poolKeyHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
+  tokenId: z.string().regex(/^\d+$/).nullable().optional(),
+  outcome: z.enum(["success", "failure"]),
+});
+
 export const recordSchema = z.object({
   chainId: chainIdSchema,
   txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
