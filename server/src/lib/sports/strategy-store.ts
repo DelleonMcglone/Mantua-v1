@@ -6,7 +6,7 @@
  * from the DB — the dashboard reads the rows, support reads the audit.
  */
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { hedgeStrategies, type HedgeStrategy } from "../../db/schema/markets.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
@@ -112,30 +112,54 @@ export async function engineDisarm(db: DB, strategyId: string, reason: string): 
   await audit(db, "strategy_auto_disarm", "disarmed", { strategyId }, reason);
 }
 
-export async function engineTrigger(
+/**
+ * B9-005 — atomic armed→triggered CLAIM (the agent-intents `executing`
+ * precedent). Exactly one caller wins the guarded update; a second
+ * overlapping cron gets null back and must not execute. `triggeredAt` is
+ * COALESCEd so the FIRST trigger time survives a release/re-claim cycle —
+ * the timestamp is set exactly once.
+ */
+export async function claimTriggered(
   db: DB,
   strategyId: string,
   detail: Record<string, unknown>,
   reason: string,
-): Promise<void> {
-  await db
+): Promise<HedgeStrategy | null> {
+  const rows = await db
     .update(hedgeStrategies)
-    .set({ status: "triggered", triggeredAt: new Date(), updatedAt: new Date() })
-    .where(and(eq(hedgeStrategies.id, strategyId), eq(hedgeStrategies.status, "armed")));
-  await audit(db, "strategy_trigger", "triggered", { strategyId, ...detail }, reason);
+    .set({
+      status: "triggered",
+      triggeredAt: sql`coalesce(${hedgeStrategies.triggeredAt}, now())`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(hedgeStrategies.id, strategyId), eq(hedgeStrategies.status, "armed")))
+    .returning();
+  const row = rows.at(0) ?? null;
+  if (row) await audit(db, "strategy_trigger", "triggered", { strategyId, ...detail }, reason);
+  return row;
 }
 
-/** B9-005 — a trigger that actually closed on-chain. */
+/**
+ * B9-005 — a trigger that actually closed on-chain. Guarded so the executed
+ * timestamp and audit row are written exactly once, whichever of the poll /
+ * webhook finalizers gets here first (C-015). Returns whether this call won.
+ */
 export async function engineExecuted(
   db: DB,
   strategyId: string,
   detail: Record<string, unknown>,
   txHash: string,
-): Promise<void> {
-  await db
+): Promise<boolean> {
+  const rows = await db
     .update(hedgeStrategies)
-    .set({ status: "executed", executedAt: new Date(), updatedAt: new Date() })
-    .where(eq(hedgeStrategies.id, strategyId));
+    .set({
+      status: "executed",
+      executedAt: sql`coalesce(${hedgeStrategies.executedAt}, now())`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(hedgeStrategies.id, strategyId), ne(hedgeStrategies.status, "executed")))
+    .returning();
+  if (rows.length === 0) return false;
   await db.insert(mantuaAuditLog).values({
     action: "strategy_execute",
     outcome: "executed",
@@ -143,4 +167,79 @@ export async function engineExecuted(
     txHash,
     chainId: BASE_CHAIN_ID,
   });
+  return true;
+}
+
+/** Executions attempted before the engine gives up and auto-disarms. */
+export const MAX_EXECUTE_ATTEMPTS = 3;
+
+/**
+ * Pure retry-bound decision for a released claim: a counted attempt that
+ * reaches the bound disarms; anything else re-arms for a later tick. A
+ * cap-hold never counts an attempt (the daily cap resets at UTC midnight —
+ * same doctrine as the intents sweep's cap-exhausted skip).
+ */
+export function releaseDisposition(
+  priorAttempts: number,
+  countAttempt: boolean,
+  maxAttempts: number = MAX_EXECUTE_ATTEMPTS,
+): { next: "armed" | "disarmed"; attempts: number } {
+  const attempts = priorAttempts + (countAttempt ? 1 : 0);
+  return attempts >= maxAttempts ? { next: "disarmed", attempts } : { next: "armed", attempts };
+}
+
+/**
+ * B9-005 — release a claimed (triggered) strategy whose execution did not
+ * complete: back to `armed` for a later tick, or auto-disarmed once counted
+ * failures reach the bound. Guarded on `triggered` so a stale release can
+ * never stomp a row another path already settled.
+ */
+export async function engineRelease(
+  db: DB,
+  claimed: HedgeStrategy,
+  reason: string,
+  opts: { countAttempt: boolean },
+): Promise<"released" | "disarmed" | "lost"> {
+  const d = releaseDisposition(claimed.executeAttempts, opts.countAttempt);
+  const rows = await db
+    .update(hedgeStrategies)
+    .set(
+      d.next === "disarmed"
+        ? {
+            status: "disarmed",
+            disarmedReason: "execute-failed",
+            executeAttempts: d.attempts,
+            updatedAt: new Date(),
+          }
+        : { status: "armed", executeAttempts: d.attempts, updatedAt: new Date() },
+    )
+    .where(and(eq(hedgeStrategies.id, claimed.id), eq(hedgeStrategies.status, "triggered")))
+    .returning();
+  if (rows.length === 0) return "lost";
+  if (d.next === "disarmed") {
+    await audit(
+      db,
+      "strategy_auto_disarm",
+      "disarmed",
+      { strategyId: claimed.id, attempts: d.attempts },
+      `execute-failed after ${String(d.attempts)} attempts — ${reason}`.slice(0, 256),
+    );
+    return "disarmed";
+  }
+  await audit(db, "strategy_execute", "released", { strategyId: claimed.id, attempts: d.attempts }, reason);
+  return "released";
+}
+
+/**
+ * B9-005 — record why a triggered strategy is waiting instead of executing
+ * (user-wallet position, unprovisioned wallet, unsupported action). The row
+ * stays `triggered`; this audit is what the dashboard answers "why" with.
+ */
+export async function auditExecutionHeld(
+  db: DB,
+  strategyId: string,
+  detail: Record<string, unknown>,
+  reason: string,
+): Promise<void> {
+  await audit(db, "strategy_execute", "held", { strategyId, ...detail }, reason);
 }

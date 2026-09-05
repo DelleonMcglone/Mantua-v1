@@ -1,7 +1,7 @@
 # Phase B9 — Automated Hedging
 
 > Master: `docs/tasks/sports-pivot.md` — PHASE B9 (W4, 🟠 P1)
-> Snapshot: 2026-09-03 · 6 ✅ · 1 ⏸ · 1 ⬜
+> Snapshot: 2026-09-05 · 7 ✅ · 1 ⬜
 
 ## Success Criteria
 
@@ -37,7 +37,7 @@
 - [x] B9-002 — Strategy 1 — take-profit / stop: close a position when implied probability crosses a threshold
 - [x] B9-003 — Strategy 2 — delta hedge: keep net exposure across correlated markets within a user-set band
 - [x] B9-004 — Natural-language → strategy config, with structured preview before arming
-- [ ] B9-005 — Execution engine: evaluate on price and game-state ticks, execute inside the agent wallet's policy caps ⏸
+- [x] B9-005 — Execution engine: evaluate on price and game-state ticks, execute inside the agent wallet's policy caps — `docs/tasks/035-b9-execution-engine.md`: pool-price ticks overlaid onto the slate's game-state ticks (`strategy-engine.ts`), atomic armed→triggered claim before execution (no double-execute across overlapping crons), strategy `capUsd` + wallet daily cap both bind with C-015 receipt before `executed`, retryable holds released / failures bounded (`execute_attempts`, max 3 → auto-disarm); proven in `strategy-engine.test.ts`, `strategies.test.ts`, `strategy-execute.test.ts`
 - [x] B9-006 — Strategy dashboard: armed / triggered / executed / expired, full audit trail
 - [x] B9-007 — Kill switch per strategy and globally; strategies auto-disarm on market freeze
 - [ ] B9-008 — Market-maker mode with inventory skew ⬜

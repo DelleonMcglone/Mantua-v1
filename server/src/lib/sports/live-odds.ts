@@ -25,9 +25,16 @@ const CACHE_TTL_MS = 15_000;
 const cache = new Map<string, { at: number; value: PublicSlate }>();
 
 /** Chains probed for a live pool price, in order — single chain today. */
-const LIVE_ODDS_CHAINS: readonly SupportedChainId[] = [BASE_CHAIN_ID];
+export const LIVE_ODDS_CHAINS: readonly SupportedChainId[] = [BASE_CHAIN_ID];
 
-async function chainHomeProbabilityBps(
+/**
+ * The home market's pool price on one chain, as YES-implied bps. Null when
+ * the market or pool does not exist there (the provider seed remains the
+ * price of record); THROWS on a chain read failure so callers that must not
+ * act on stale data (the strategy engine) can tell "no pool" from "read
+ * failed". Also consumed by `withLiveOdds`, which fails open per chain.
+ */
+export async function chainHomeProbabilityBps(
   providerEventId: string,
   chainId: SupportedChainId,
 ): Promise<number | null> {
