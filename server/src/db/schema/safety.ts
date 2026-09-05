@@ -104,6 +104,7 @@ export type AuditAction =
   | "agent_bridge"
   | "agent_x402"
   | "command_parse"
+  | "market_redeem"
   | "fiat_bank_link"
   | "fiat_deposit"
   | "fiat_withdraw"
