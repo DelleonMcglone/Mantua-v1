@@ -7,10 +7,18 @@ import { explorerTxUrl } from "./agent-send.ts";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
 import { executeAgentAbiCall, executeAgentCalldata } from "./circle/execute.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { DEFAULT_SLIPPAGE_BPS } from "./constants.ts";
+import { assertSlippageBounds } from "./slippage.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
 import { tokenAmountUsdStrict } from "./usd-pricing.ts";
-import { buildPoolSwapTestCalldata, quoteExactInputV4 } from "./v4-onchain-swap.ts";
+import { quoteExactInputV4 } from "./v4-onchain-swap.ts";
+import {
+  buildUniversalRouterSwapCalldata,
+  minOutFromQuote,
+  planSwapApprovals,
+  readSwapAllowanceState,
+} from "./v4-universal-router.ts";
 import type { FeeTier } from "./v4-contracts.ts";
 
 /**
@@ -20,10 +28,26 @@ import type { FeeTier } from "./v4-contracts.ts";
  * Agent swaps run against the no-hook pool for the pair (the Stable Protection
  * hook's circuit breaker blocks USDC/EURC, so no-hook is the reliable agent
  * path). The on-chain v4 quote auto-resolves whichever fee tier the pool was
- * actually created at. Two gas-sponsored Circle txs: approve the input ERC-20
- * to the swap router, then execute the swap calldata.
+ * actually created at. Execution goes through the UniversalRouter with the
+ * min-out and deadline enforced on-chain: bounded per-trade approvals
+ * (ERC-20→Permit2, Permit2→router — never MaxUint, C-022), then the
+ * `execute` calldata, all gas-sponsored Circle txs.
  */
 const AGENT_NETWORK = "base";
+
+/**
+ * Convert the route-level fractional-percent `slippageTolerance`
+ * (0.5 = 0.5%) into bps, defaulting to DEFAULT_SLIPPAGE_BPS and
+ * re-asserting the MAX_SLIPPAGE_BPS hard cap at the lib layer so
+ * non-route callers (chat tool, intents, rebalance) get the same
+ * bound. Throws SafetyError above the cap.
+ */
+export function agentSlippageBps(slippageTolerance?: number): number {
+  if (slippageTolerance === undefined) return DEFAULT_SLIPPAGE_BPS;
+  const bps = Math.round(slippageTolerance * 100);
+  assertSlippageBounds(bps);
+  return bps;
+}
 
 // No-hook pools: the quoter auto-resolves to the tier the pool was created at,
 // so this is just the starting probe.
@@ -35,6 +59,10 @@ export interface AgentSwapArgs {
   tokenOut: TokenSymbol;
   /** Decimal-string amount in the human-readable units of `tokenIn`. */
   amountIn: string;
+  /** Fractional-percent slippage tolerance (0.5 = 0.5%). Defaults to
+   *  DEFAULT_SLIPPAGE_BPS; hard-capped at MAX_SLIPPAGE_BPS. Drives the
+   *  on-chain `amountOutMinimum` in the router calldata. */
+  slippageTolerance?: number;
   /** Execution chain — defaults to Base. */
   chainId?: SupportedChainId;
 }
@@ -95,6 +123,8 @@ export async function swapFromAgentWallet(args: AgentSwapArgs): Promise<AgentSwa
   const { privyUserId, tokenIn, tokenOut, amountIn } = args;
   const chainId = args.chainId ?? BASE_CHAIN_ID;
   if (tokenIn === tokenOut) throw new Error("tokenIn and tokenOut must differ");
+  // Validate slippage BEFORE any money movement — throws above the hard cap.
+  const slippageBps = agentSlippageBps(args.slippageTolerance);
 
   const wallet = await getAgentWallet(privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(privyUserId);
@@ -118,22 +148,45 @@ export async function swapFromAgentWallet(args: AgentSwapArgs): Promise<AgentSwa
     amountInRaw: amountAtomic,
     chainId,
   });
-  const swap = buildPoolSwapTestCalldata({
+  // Min-out derived from the fresh quote — enforced ON-CHAIN by the
+  // router calldata (V4TooLittleReceived), closing the gap where agent
+  // swaps had no slippage protection at all.
+  const minOut = minOutFromQuote(BigInt(quote.amountOut), slippageBps);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const swap = buildUniversalRouterSwapCalldata({
     poolKey: quote.poolKey,
     zeroForOne: quote.zeroForOne,
     amountInRaw: amountAtomic,
+    amountOutMinimum: minOut,
+    nowSeconds,
     chainId,
   });
 
-  // Approve the input ERC-20 to the swap router, then execute the swap. Native
-  // input has no approvalTarget (value is carried on the call instead).
-  if (swap.approvalTarget && !inDef.native) {
-    await executeAgentAbiCall({
-      walletId: wallet.circleWalletId,
-      to: inDef.address,
-      abiFunctionSignature: "approve(address,uint256)",
-      abiParameters: [swap.approvalTarget, amountAtomic.toString()],
+  // Bounded per-trade approvals (ERC-20→Permit2, Permit2→router) — only
+  // the calls the current allowance state still needs, capped to exactly
+  // this trade's input (planSwapApprovals; C-022 — never MaxUint).
+  // Native input needs none (value rides on the execute call).
+  if (!inDef.native) {
+    const state = await readSwapAllowanceState(
+      wallet.address as `0x${string}`,
+      inDef.address,
+      chainId,
+    );
+    const approvals = planSwapApprovals({
+      token: inDef.address,
+      requiredRaw: amountAtomic,
+      state,
+      nowSeconds,
+      chainId,
     });
+    for (const call of approvals) {
+      await executeAgentAbiCall({
+        walletId: wallet.circleWalletId,
+        to: call.to,
+        abiFunctionSignature: call.abiFunctionSignature,
+        abiParameters: call.abiParameters,
+      });
+    }
   }
 
   const { txHash } = await executeAgentCalldata({

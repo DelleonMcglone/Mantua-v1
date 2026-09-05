@@ -2,26 +2,22 @@
 import { hardenProvider } from "@/lib/privy/wallet-client.ts";
 /**
  * Base Mainnet swap path — swaps quote and execute on-chain: this hook
- * talks to our `/api/v4/quote` and `/api/v4/swap/calldata` endpoints
- * (which call `V4Quoter` and build v4 swap calldata respectively) and
- * runs the approve-if-needed → swap sequence in the user's wallet.
+ * talks to our `/api/v4/quote` and `/api/v4/swap/calldata` endpoints.
+ * The server builds UniversalRouter `execute` calldata with the min-out
+ * and deadline enforced ON-CHAIN, plus the bounded approval plan
+ * (ERC-20→Permit2, Permit2→router — per-trade amounts, never MaxUint);
+ * this hook just sends the approvals it was handed, then the swap. No
+ * client-side re-derivation — the signed transaction already carries
+ * the slippage protection.
  */
 import { useEffect, useMemo, useState } from "react";
 import { useWallets } from "@privy-io/react-auth";
-import { createPublicClient, createWalletClient, custom, parseAbi } from "viem";
+import { createPublicClient, createWalletClient, custom } from "viem";
 import { BASE_CHAIN_ID, getChainInfo, getRpcTransport } from "@/lib/chains.ts";
 import { ApiError, api } from "@/lib/api.ts";
-import { getToken, type TokenSymbol } from "@/lib/tokens.ts";
+import { type TokenSymbol } from "@/lib/tokens.ts";
 import { type FeeTier } from "@/features/liquidity/fee-tiers.ts";
 import type { HookName } from "@/features/liquidity/use-create-pool.ts";
-
-const MAX_UINT = (1n << 256n) - 1n;
-const FRESH_APPROVAL_THRESHOLD = 1n << 255n;
-
-const erc20 = parseAbi([
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-]);
 
 interface QuoteRes {
   amountOut: string;
@@ -36,11 +32,23 @@ interface QuoteRes {
   zeroForOne: boolean;
 }
 
+interface ApprovalTx {
+  to: `0x${string}`;
+  data: `0x${string}`;
+  value: string;
+  description: string;
+}
+
 interface CalldataRes {
   to: `0x${string}`;
   data: `0x${string}`;
   value: string;
-  approvalTarget: `0x${string}` | null;
+  /** Unix-seconds deadline baked into the router calldata. */
+  deadline: string;
+  /** Bounded approval txs to send (in order) before the swap. Empty when
+   *  standing allowances already cover the trade. */
+  approvals: ApprovalTx[];
+  amountOutMinimum: string;
   quote: QuoteRes & { amountIn: string; amountOutMinimum: string };
 }
 
@@ -234,38 +242,33 @@ export function useSwap() {
         message: "Building swap…",
       });
 
-      // Approve input ERC-20 if needed (skip for native ETH input).
-      const tokenIn = getToken(args.tokenIn, chainId);
-      if (calldata.approvalTarget && !tokenIn.native) {
-        const tokenAddr = tokenIn.address;
-        const allowance = await publicClient.readContract({
-          address: tokenAddr,
-          abi: erc20,
-          functionName: "allowance",
-          args: [owner, calldata.approvalTarget],
+      // Send the server-planned approvals (bounded to this trade — the
+      // server already skipped any the standing allowances cover). Each
+      // must confirm before the next: Permit2's allowance read depends
+      // on the ERC-20 approval landing first, and the router tx on both.
+      let lastApprovalTx: `0x${string}` | undefined;
+      for (const approval of calldata.approvals) {
+        setState({
+          status: "approving",
+          ...(lastApprovalTx ? { approvalTx: lastApprovalTx } : {}),
+          amountOut: calldata.quote.amountOut,
+          message: `Approve ${args.tokenIn} in wallet…`,
         });
-        if (allowance < FRESH_APPROVAL_THRESHOLD) {
-          setState({
-            status: "approving",
-            amountOut: calldata.quote.amountOut,
-            message: `Approve ${args.tokenIn} in wallet…`,
-          });
-          const approvalTx: `0x${string}` = await walletClient.writeContract({
-            address: tokenAddr,
-            abi: erc20,
-            functionName: "approve",
-            args: [calldata.approvalTarget, MAX_UINT],
-            account: owner,
-            chain: viemChain,
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approvalTx });
-          setState({
-            status: "approving",
-            approvalTx,
-            amountOut: calldata.quote.amountOut,
-            message: "Approval confirmed",
-          });
-        }
+        const approvalTx: `0x${string}` = await walletClient.sendTransaction({
+          account: owner,
+          chain: viemChain,
+          to: approval.to,
+          data: approval.data,
+          value: BigInt(approval.value),
+        });
+        await publicClient.waitForTransactionReceipt({ hash: approvalTx });
+        lastApprovalTx = approvalTx;
+        setState({
+          status: "approving",
+          approvalTx,
+          amountOut: calldata.quote.amountOut,
+          message: "Approval confirmed",
+        });
       }
 
       setState({

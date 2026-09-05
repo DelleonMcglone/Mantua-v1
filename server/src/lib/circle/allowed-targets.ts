@@ -24,7 +24,13 @@ import { env } from "../../env.ts";
 import { SUPPORTED_CHAIN_IDS } from "../chains.ts";
 import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN } from "../markets-contracts.ts";
 import { getTokens } from "../tokens.ts";
-import { HOOK_NAMES, PERMIT2, getHookAddress, getV4Addresses } from "../v4-contracts.ts";
+import {
+  HOOK_NAMES,
+  PERMIT2,
+  UNIVERSAL_ROUTER,
+  getHookAddress,
+  getV4Addresses,
+} from "../v4-contracts.ts";
 
 export class TargetNotAllowedError extends Error {
   constructor(target: string) {
@@ -43,6 +49,8 @@ function buildAllowlist(): Set<string> {
   };
 
   add(PERMIT2);
+  // UniversalRouter — the agent swap execution path (031).
+  add(UNIVERSAL_ROUTER);
   for (const chainId of SUPPORTED_CHAIN_IDS) {
     for (const token of Object.values(getTokens(chainId))) add(token.address);
     const v4 = getV4Addresses(chainId);

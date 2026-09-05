@@ -4,11 +4,13 @@ import { logger } from "../lib/logger.ts";
 import { DEFAULT_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
 import { isTokenSymbol } from "../lib/tokens.ts";
 import {
-  buildPoolSwapTestCalldata,
+  HookNotDeployedError,
   decodeSwapRevertReason,
   findMaxQuotableInputV4,
   quoteExactInputV4,
 } from "../lib/v4-onchain-swap.ts";
+import { buildUniversalRouterSwap, minOutFromQuote } from "../lib/v4-universal-router.ts";
+import { MAX_SLIPPAGE_BPS } from "../lib/constants.ts";
 import { HOOK_NAMES, isFeeTier } from "../lib/v4-contracts.ts";
 import { HookPairNotAllowedError } from "../lib/hook-pair-gating.ts";
 import { isTransientRpcError } from "../lib/rpc-client.ts";
@@ -108,6 +110,10 @@ v4SwapRouter.post(
         res.status(400).json({ error: err.message, code: "HOOK_PAIR_NOT_ALLOWED" });
         return;
       }
+      if (err instanceof HookNotDeployedError) {
+        res.status(400).json({ error: err.message, code: "HOOK_NOT_DEPLOYED" });
+        return;
+      }
       logger.warn({ err, tokenIn, tokenOut, hook, chainId }, "v4 onchain quote failed");
       // Surface the specific decoded revert (PoolNotConfigured / NotWhitelisted
       // / NotEnoughLiquidity / …) so the UI stops showing a misleading generic
@@ -187,18 +193,21 @@ v4SwapRouter.post(
 );
 
 const calldataSchema = baseSwapSchema.extend({
-  /** Slippage tolerance in bps. Used to derive `amountOutMinimum` for
-   *  the client to enforce. */
-  slippageBps: z.number().int().min(0).max(10_000).default(50),
+  /** Slippage tolerance in bps — derives the on-chain `amountOutMinimum`.
+   *  Hard-capped at MAX_SLIPPAGE_BPS (server/src/lib/constants.ts); above
+   *  it the request is a 400, never a swap with a hollow min-out. */
+  slippageBps: z.number().int().min(0).max(MAX_SLIPPAGE_BPS).default(50),
 });
 
 /**
- * Swap calldata — re-runs the quote (so the response
- * carries an `amountOutMinimum` derived from the same on-chain
- * simulation, not stale client state) and returns the
- * `PoolSwapTest.swap` calldata. The client either approves the input
- * ERC-20 to `approvalTarget` first or, for native-ETH input, attaches
- * `value` and skips the approval.
+ * Swap calldata — re-runs the quote (so `amountOutMinimum` derives from
+ * a fresh on-chain simulation, not stale client state) and returns
+ * UniversalRouter `execute` calldata for a v4 exact-in single swap.
+ * Slippage protection is IN the transaction: the router enforces
+ * `amountOutMinimum` (V4TooLittleReceived) and the deadline
+ * (TransactionDeadlinePassed) on-chain. The response also carries
+ * `approvals` — the bounded ERC-20→Permit2 / Permit2→router approval
+ * transactions (if any) the wallet must send before the swap.
  */
 v4SwapRouter.post(
   "/api/v4/swap/calldata",
@@ -247,21 +256,32 @@ v4SwapRouter.post(
             amountInRaw: BigInt(amountInRaw),
             chainId,
           });
-          const swap = buildPoolSwapTestCalldata({
+          // amountOutMinimum: amountOut * (1 - slippage), enforced ON-CHAIN
+          // by the UniversalRouter calldata below.
+          const minOut = minOutFromQuote(BigInt(quote.amountOut), slippageBps);
+          const swap = await buildUniversalRouterSwap({
             poolKey: quote.poolKey,
             zeroForOne: quote.zeroForOne,
             amountInRaw: BigInt(amountInRaw),
+            amountOutMinimum: minOut,
+            owner: wallet as `0x${string}`,
             chainId,
           });
-          // amountOutMinimum: amountOut * (1 - slippage)
-          const slippageDenom = 10_000n;
-          const minOut =
-            (BigInt(quote.amountOut) * (slippageDenom - BigInt(slippageBps))) / slippageDenom;
           return { swap, quote, minOut };
         },
       );
       res.json({
-        ...built.swap,
+        to: built.swap.to,
+        data: built.swap.data,
+        value: built.swap.value,
+        deadline: built.swap.deadline,
+        approvals: built.swap.approvals.map((a) => ({
+          to: a.to,
+          data: a.data,
+          value: a.value,
+          description: a.description,
+        })),
+        amountOutMinimum: built.minOut.toString(),
         quote: {
           amountIn: built.quote.amountIn,
           amountOut: built.quote.amountOut,
@@ -290,6 +310,10 @@ v4SwapRouter.post(
       }
       if (err instanceof HookPairNotAllowedError) {
         res.status(400).json({ error: err.message, code: "HOOK_PAIR_NOT_ALLOWED" });
+        return;
+      }
+      if (err instanceof HookNotDeployedError) {
+        res.status(400).json({ error: err.message, code: "HOOK_NOT_DEPLOYED" });
         return;
       }
       logger.warn({ err, tokenIn, tokenOut, hook, chainId }, "v4 swap calldata failed");
