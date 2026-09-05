@@ -24,6 +24,7 @@
 | D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                                                                                                          | Medium                                    | None                                                      |
 | D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                             | Medium                                    | Tune in beta                                              |
 | D-106 | x402 payments — scope, non-goals, gate    | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                           | High (facts); open questions undecided    | Counsel (open question: D-012 posture for seller revenue) |
+| D-112 | Launch chain: Base vs Arc mainnet          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then           | High (process) | Owner decision after 2026-09-17    |
 | D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                | High                                      | None                                                      |
 | D-111 | Gasless user transactions (C-005/C-006)   | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning | High (architecture); live path unverified | None (operator provisions the paymaster policy)           |
 
@@ -497,6 +498,37 @@ nothing, because it enshrines the problem in UI.
 C-017); batching approve+trade into one user operation (a natural follow-up
 once the path is live — the smart-account client supports call batching);
 any chain- or gas-naming UI copy.
+
+---
+
+## D-112 — Launch chain: Base vs Arc mainnet (decision window)
+
+**Status:** ⏳ OPEN — owner decides after **2026-09-17**. Base remains the
+working assumption; Arc mainnet is a live alternative.
+
+**What is PAUSED until the decision** (owner call, 2026-09-05):
+- C-001 mainnet half (Circle LIVE entitlement chase, mainnet entity secret,
+  Gas Station billing) — the testnet half stays done and valid either way.
+- C-006 (both the interactive zero-ETH test and the full walkthrough).
+- P9-013 real deployment (the fork rehearsal stands; it exercises scripts,
+  not the chain choice).
+
+**Pivot-cost inventory** (what an Arc launch would change — kept current so
+the decision is priced, not guessed):
+
+| Area | Base → Arc impact |
+| --- | --- |
+| Chain constants/registries (`chains.ts` ×2, tokens, RPC, explorer) | Config swap — the per-chain map shapes were kept schema-stable in the migration for exactly this |
+| Uniswap v4 | **No canonical deployment on Arc** — every pool stack becomes self-deployed (the DM stack already is; base-pair pools and the UniversalRouter/Permit2 swap path would need Arc equivalents or the PoolSwapTest-style periphery) |
+| DM-112 routing | Trading API (Uniswap-hosted) is Base-only — base-pair routing collapses onto self-deployed stacks on Arc |
+| Gas / gasless | Arc uses **USDC as native gas** — C-005's Privy+Pimlico work is Base-specific; on Arc the ETH problem doesn't exist (fees are USDC), so C-005/C-006 restate rather than port |
+| Circle agent stack | Ports cleanly — DCW supports Arc blockchains natively (the June wallets were ARC-TESTNET); Gas Station/e2e re-run with Arc ids |
+| CCTP bridge / unified balance | Arc-mainnet availability to be verified at decision time |
+| Chainless UI | Unaffected by design — no user-facing chain references exist |
+
+**Meanwhile:** work proceeds only on chain-agnostic phases (B7 trading page,
+B9-005 execution engine, B10 E2Es, design-debt follow-ups). Nothing merged
+before 2026-09-17 may hard-commit the chain beyond existing config.
 
 ---
 
