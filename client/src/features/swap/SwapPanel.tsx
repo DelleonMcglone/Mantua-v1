@@ -9,6 +9,7 @@ import { usePortfolio } from "@/features/portfolio/use-portfolio.ts";
 import { FEE_TIER_LABELS, type FeeTier } from "@/features/liquidity/fee-tiers.ts";
 import {
   HOOK_LABELS,
+  getHookAddress,
   hookCompatibilityError,
   recommendedHookForPair,
 } from "@/features/liquidity/hook-recommendations.ts";
@@ -149,10 +150,15 @@ export function SwapPanel({
   const [tokenOut, setTokenOut] = useState<TokenSymbol>(seedOut === seedIn ? "EURC" : seedOut);
   const [amount, setAmount] = useState(initialAmount ?? "");
   const chainId = BASE_CHAIN_ID;
-  const pairHook = useMemo(
-    () => recommendedHookForPair(tokenIn, tokenOut, chainId),
-    [tokenIn, tokenOut, chainId],
-  );
+  // 031 — the hook venue is offered only when the recommended hook is
+  // actually DEPLOYED on this chain. The server fails closed on an
+  // undeployed hook (HOOK_NOT_DEPLOYED) instead of silently detouring to
+  // the no-hook pool, so an undeployed hook must not be selectable here;
+  // the switcher degrades to No Hook | Bridge.
+  const pairHook = useMemo(() => {
+    const rec = recommendedHookForPair(tokenIn, tokenOut, chainId);
+    return rec && getHookAddress(rec, chainId) !== null ? rec : null;
+  }, [tokenIn, tokenOut, chainId]);
   const [venue, setVenue] = useState<SwapVenue>(initialVenue ?? "hook");
   const [destination, setDestination] = useState<BridgeDestination>(
     () =>

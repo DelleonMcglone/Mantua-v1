@@ -237,13 +237,33 @@ export interface OnchainQuoteResult {
   gasEstimate: string;
 }
 
-function resolveHookAddress(
+/** A named hook was requested but has no deployment on the target chain. */
+export class HookNotDeployedError extends Error {
+  constructor(hook: string, chainId: SupportedChainId) {
+    super(
+      `The "${hook}" hook is not deployed on chain ${String(chainId)}. ` +
+        `Choose the No Hook venue for this pair until the hook deployment lands.`,
+    );
+    this.name = "HookNotDeployedError";
+  }
+}
+
+/**
+ * Resolve a hook name to its on-chain address. Fails CLOSED: a named
+ * hook without a live deployment throws instead of silently
+ * substituting the no-hook pool (which would quote — and swap — a
+ * different pool than the user selected). Only `hook = null` maps to
+ * the zero (no-hook) address.
+ */
+export function resolveHookAddress(
   hook: HookName | null,
   chainId: SupportedChainId,
 ): `0x${string}` {
   if (!hook) return "0x0000000000000000000000000000000000000000";
-  if (!HOOK_NAMES.includes(hook)) return "0x0000000000000000000000000000000000000000";
-  return getHookAddress(hook, chainId) ?? "0x0000000000000000000000000000000000000000";
+  if (!HOOK_NAMES.includes(hook)) throw new HookNotDeployedError(hook, chainId);
+  const addr = getHookAddress(hook, chainId);
+  if (!addr) throw new HookNotDeployedError(hook, chainId);
+  return addr;
 }
 
 /** Standard static fee tiers, probed when the requested tier has no pool. */
@@ -532,7 +552,9 @@ async function findMaxQuotableInputV4Uncached(
 /**
  * Build the v4 PoolKey and call `V4Quoter.quoteExactInputSingle` via
  * `eth_call`. Returns the simulated `amountOut` plus the constructed
- * `poolKey` (caller will reuse it to build PoolSwapTest calldata).
+ * `poolKey` (caller reuses it to build the swap calldata — the
+ * UniversalRouter path for token swaps, PoolSwapTest for the market
+ * periphery).
  */
 export async function quoteExactInputV4(args: OnchainQuoteArgs): Promise<OnchainQuoteResult> {
   // Reject hook/pair combos the hook is known to reject on-chain
@@ -607,9 +629,19 @@ export interface SwapCalldataResult {
 }
 
 /**
- * Build calldata for `PoolSwapTest.swap`. Caller (the client) must
- * either approve the input ERC-20 to `approvalTarget` first or — for
- * native ETH input — pass the right `value` and skip the approval.
+ * Build calldata for `PoolSwapTest.swap`.
+ *
+ * NOT the token-swap path: the canonical mainnet v4 stack ships no
+ * PoolSwapTest (`poolSwapTest: null` on 8453) — token swaps go through
+ * the UniversalRouter (`v4-universal-router.ts`, task 031), which
+ * enforces min-out and a deadline on-chain. This builder remains for
+ * stacks that ship their own router — today the sports-market periphery
+ * (`getV4StackForHook` → market periphery's poolSwapTest; see
+ * `sports/market-trade-build.ts`).
+ *
+ * Caller must either approve the input ERC-20 to `approvalTarget`
+ * first or — for native ETH input — pass the right `value` and skip
+ * the approval.
  *
  * `sqrtPriceLimitX96` is set to the absolute extremes so the
  * PoolManager doesn't reject on price-bound — the user's effective
