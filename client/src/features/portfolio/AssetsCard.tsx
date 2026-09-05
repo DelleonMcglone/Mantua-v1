@@ -16,6 +16,7 @@ import { formatFeesEarned } from "@/features/liquidity/position-adapters.ts";
 import { getUserLocalPositions, type LocalPosition } from "@/features/liquidity/local-positions.ts";
 import { localPoolKey } from "@/features/liquidity/local-pools.ts";
 import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
+import { ClaimWinnings } from "@/features/markets/ClaimWinnings.tsx";
 import { AssetIcon, type AssetSymbol } from "./asset-icons.tsx";
 import { toDisplayAssets, usePortfolio, type DisplayAsset } from "./use-portfolio.ts";
 import { HOOK_TINT, type HookName } from "./hook-tint.ts";
@@ -333,6 +334,12 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
 
       <TabsContent value="positions">
         <div className="max-h-[360px] overflow-auto">
+          {/* Winning/voided market positions with USDC waiting (C-011 GAP-3). */}
+          {portfolio.walletAddress && (
+            <div className="px-3.5 pt-3">
+              <ClaimWinnings address={portfolio.walletAddress} />
+            </div>
+          )}
           {!portfolio.walletAddress && (
             <EmptyState>Connect a wallet to see your liquidity positions.</EmptyState>
           )}

@@ -4,6 +4,7 @@ import { ArrowLeft, Bot, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
+import { ClaimWinnings } from "./ClaimWinnings.tsx";
 import type { SlateEvent } from "./use-slate.ts";
 
 const EXPLORER = "https://basescan.org/tx/";
@@ -102,6 +103,7 @@ interface Props {
  * tabs. Renders in place of the games list; the trade sidebar stays put.
  */
 export function MarketDetail({ event, onBack, onAgent }: Props) {
+  const { user } = usePrivy();
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
   const [tab, setTab] = useState<Tab>("comments");
@@ -150,6 +152,10 @@ export function MarketDetail({ event, onBack, onAgent }: Props) {
           </p>
         </div>
       </div>
+
+      {/* When this game's market has settled and the connected wallet holds
+          a winning (or voided) position, offer the claim right here. */}
+      <ClaimWinnings address={user?.wallet?.address} providerEventId={event.providerEventId} />
 
       <PriceChart event={event} detail={detail} failed={failed} />
 
