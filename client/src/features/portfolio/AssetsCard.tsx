@@ -17,6 +17,7 @@ import { getUserLocalPositions, type LocalPosition } from "@/features/liquidity/
 import { localPoolKey } from "@/features/liquidity/local-pools.ts";
 import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
 import { ClaimWinnings } from "@/features/markets/ClaimWinnings.tsx";
+import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { AssetIcon, type AssetSymbol } from "./asset-icons.tsx";
 import { toDisplayAssets, usePortfolio, type DisplayAsset } from "./use-portfolio.ts";
 import { HOOK_TINT, type HookName } from "./hook-tint.ts";
@@ -338,6 +339,14 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
           {portfolio.walletAddress && (
             <div className="px-3.5 pt-3">
               <ClaimWinnings address={portfolio.walletAddress} />
+            </div>
+          )}
+          {/* Live market (outcome-token) positions with one-click Close
+              (B7-003) — same section the profile shows; Close deep-links
+              the trade sidebar onto a pre-filled full-balance sell. */}
+          {portfolio.walletAddress && (
+            <div className="px-3.5 pb-3">
+              <MarketPositionsSection />
             </div>
           )}
           {!portfolio.walletAddress && (

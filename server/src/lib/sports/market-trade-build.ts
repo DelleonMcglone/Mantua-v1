@@ -12,7 +12,12 @@ const MARKET_STARTS_AT_ABI = parseAbi(["function startsAt() view returns (uint64
 import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { computeMarketId } from "../market-id.ts";
-import { buildPoolSwapTestCalldata } from "../v4-onchain-swap.ts";
+import {
+  MAX_SQRT_PRICE_LIMIT,
+  MIN_SQRT_PRICE_LIMIT,
+  buildPoolSwapTestCalldata,
+} from "../v4-onchain-swap.ts";
+import { readSlot0 } from "../v4-state-view.ts";
 import { DYNAMIC_MARKET_BY_CHAIN } from "../v4-contracts.ts";
 import {
   MARKETS_BY_CHAIN,
@@ -22,6 +27,10 @@ import {
 } from "../markets-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
 import { getToken } from "../tokens.ts";
+import { DEFAULT_SLIPPAGE_BPS } from "../constants.ts";
+import { assertSlippageBounds } from "../slippage.ts";
+import { sqrtBigInt } from "../sqrt-price.ts";
+import { assertSwapRoute } from "../swap-route.ts";
 
 /**
  * C-004 — the platform currency is the chain's canonical USDC (on Base
@@ -58,6 +67,23 @@ export class NoMarketError extends Error {
   }
 }
 
+/**
+ * The sports-market stack (factory / periphery / Dynamic Market hook) has
+ * no deployment on the target chain — the gated state, not a bug. Routes
+ * map this to a clean "markets aren't live here yet" response instead of
+ * an opaque 502 (B7 edge case: MARKETS_BY_CHAIN empty ⇒ gated errors,
+ * never opaque throws).
+ */
+export class MarketsNotDeployedError extends Error {
+  constructor(chainId: SupportedChainId) {
+    super(
+      `Sports markets are not deployed on chain ${String(chainId)} yet — ` +
+        `outcome-token trading opens when the market contracts land.`,
+    );
+    this.name = "MarketsNotDeployedError";
+  }
+}
+
 /** Betting window is over: the game has kicked off (or finished). The
  *  hook enforces this on-chain with its timestamp freeze — this check
  *  turns that guaranteed revert into a clean, quotable-in-advance error. */
@@ -83,6 +109,81 @@ export function marketTradeSpendUsd(direction: "buy" | "sell", amountRaw: bigint
   return direction === "buy" ? Number(amountRaw) / 1e6 : null;
 }
 
+/** Quote-derived minimum acceptable output: `amountOut × (1 − slippage)`.
+ *  Surfaced to the client alongside the quote; the on-chain enforcement of
+ *  the same tolerance travels as the sqrtPriceLimitX96 in the calldata. */
+export function marketMinOut(amountOut: bigint, slippageBps: number): bigint {
+  assertSlippageBounds(slippageBps);
+  return (amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+}
+
+/**
+ * B7-003 — the in-calldata slippage bound for a market swap.
+ *
+ * The market periphery's swap router is v4-core's stock PoolSwapTest,
+ * which carries no `amountOutMinimum` field — the one protection lever
+ * that rides in the signed transaction is `SwapParams.sqrtPriceLimitX96`:
+ * the PoolManager will not execute past that price, and with exact-input
+ * semantics any input it can't fill within the bound stays with the
+ * sender. So the min-out contract becomes: *execution price is bounded;
+ * if the pool moved beyond tolerance you get a bounded partial fill (or
+ * nothing) and keep the rest of your input* — protection in the calldata,
+ * not display-only (031 principle).
+ *
+ * The bound is anchored on the trade's own projected landing price, not
+ * the spot price, so a healthy fill's own price impact doesn't trip it:
+ *
+ *   p_spot = (sqrtPriceX96 / 2^96)²         (token1 per token0)
+ *   p_eff  = quoted average execution price (out/in, direction-adjusted)
+ *   p_land ≈ 2·p_eff − p_spot               (final marginal price for
+ *                                            ~uniform liquidity: the
+ *                                            average sits midway between
+ *                                            start and end price)
+ *   limit  = p_land shifted by ±slippageBps, converted back to sqrt form.
+ *
+ * All integer math (Q192 fixed point + integer sqrt); clamped inside v4's
+ * legal sqrt bounds and kept strictly on the correct side of spot so the
+ * PoolManager never rejects the direction.
+ */
+export function marketSwapSqrtPriceLimit(args: {
+  spotSqrtPriceX96: bigint;
+  zeroForOne: boolean;
+  amountIn: bigint;
+  amountOut: bigint;
+  slippageBps: number;
+}): bigint {
+  const { spotSqrtPriceX96, zeroForOne, amountIn, amountOut, slippageBps } = args;
+  assertSlippageBounds(slippageBps);
+  if (spotSqrtPriceX96 <= 0n) throw new Error("spotSqrtPriceX96 must be positive");
+  if (amountIn <= 0n || amountOut <= 0n) throw new Error("quote amounts must be positive");
+
+  const pSpot = spotSqrtPriceX96 * spotSqrtPriceX96; // price in X192
+  // Effective price is token1-per-token0 whichever way the swap runs.
+  const pEff = zeroForOne ? (amountOut << 192n) / amountIn : (amountIn << 192n) / amountOut;
+  // Projected post-fill marginal price; a degenerate (>50% impact) quote
+  // projects ≤ 0 — fall back to the direction's extreme (the trade is
+  // already consuming most of the pool; the slippage band is meaningless).
+  const pLand = 2n * pEff - pSpot;
+  if (pLand <= 0n) return zeroForOne ? MIN_SQRT_PRICE_LIMIT : MAX_SQRT_PRICE_LIMIT;
+
+  const pLimit = zeroForOne
+    ? (pLand * BigInt(10_000 - slippageBps)) / 10_000n
+    : (pLand * BigInt(10_000 + slippageBps)) / 10_000n;
+  let limit = sqrtBigInt(pLimit);
+
+  // Keep the limit strictly on the correct side of spot (v4 rejects a
+  // zeroForOne swap whose limit is ≥ current price, and vice versa), and
+  // inside the legal sqrt-price range.
+  if (zeroForOne) {
+    if (limit >= spotSqrtPriceX96) limit = spotSqrtPriceX96 - 1n;
+    if (limit < MIN_SQRT_PRICE_LIMIT) limit = MIN_SQRT_PRICE_LIMIT;
+  } else {
+    if (limit <= spotSqrtPriceX96) limit = spotSqrtPriceX96 + 1n;
+    if (limit > MAX_SQRT_PRICE_LIMIT) limit = MAX_SQRT_PRICE_LIMIT;
+  }
+  return limit;
+}
+
 export interface BuiltMarketTrade {
   to: `0x${string}`;
   data: `0x${string}`;
@@ -92,12 +193,25 @@ export interface BuiltMarketTrade {
   marketId: `0x${string}`;
   marketAddress: `0x${string}`;
   yesToken: `0x${string}`;
-  quote: { amountIn: string; amountOut: string; effectivePriceBps: number | null };
+  /** The price bound encoded in `data` — on-chain slippage protection. */
+  sqrtPriceLimitX96: string;
+  quote: {
+    amountIn: string;
+    amountOut: string;
+    /** Quote − slippage tolerance; the calldata's price bound enforces
+     *  the same tolerance on-chain. */
+    amountOutMinimum: string;
+    effectivePriceBps: number | null;
+  };
 }
 
 /**
  * Quote + encode one trade. `direction` "buy" spends USDC for YES;
  * "sell" spends YES for USDC. `amountRaw` is the exact input (6dp).
+ * `slippageBps` (default `DEFAULT_SLIPPAGE_BPS`, hard-capped at
+ * `MAX_SLIPPAGE_BPS` via `assertSlippageBounds`) becomes the on-chain
+ * `sqrtPriceLimitX96` bound in the returned calldata — both directions,
+ * same protection.
  */
 export async function buildMarketTrade(args: {
   providerEventId: string;
@@ -105,13 +219,16 @@ export async function buildMarketTrade(args: {
   direction: "buy" | "sell";
   amountRaw: bigint;
   chainId?: SupportedChainId;
+  slippageBps?: number;
 }): Promise<BuiltMarketTrade> {
   const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const slippageBps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
+  assertSlippageBounds(slippageBps);
   const markets = MARKETS_BY_CHAIN[chainId];
   const periphery = MARKETS_PERIPHERY_BY_CHAIN[chainId];
   const dm = DYNAMIC_MARKET_BY_CHAIN[chainId];
   if (!markets || !periphery || !dm) {
-    throw new Error(`Sports markets are not deployed on chain ${String(chainId)}`);
+    throw new MarketsNotDeployedError(chainId);
   }
   assertUsdcCollateral(chainId, markets.collateral);
   const client = getRpcClient(chainId);
@@ -147,6 +264,12 @@ export async function buildMarketTrade(args: {
 
   const inputIsYes = args.direction === "sell";
   const zeroForOne = inputIsYes ? plan.yesIsToken0 : !plan.yesIsToken0;
+  const inputToken = inputIsYes ? yesToken : markets.collateral;
+  const outputToken = inputIsYes ? markets.collateral : yesToken;
+
+  // B7-005 / DM-112 — this pair (YES token on one side) must classify
+  // "market-pool"; a cross-over would mean the routing split broke.
+  assertSwapRoute("market-pool", inputToken, outputToken, chainId);
 
   const { result } = await client.simulateContract({
     address: periphery.quoter,
@@ -156,11 +279,30 @@ export async function buildMarketTrade(args: {
   });
   const [amountOut] = result;
 
+  // B7-003 — slippage protection IN the calldata for both directions:
+  // derive the sqrt-price bound from the live pool price + this quote,
+  // encode it in the swap. A quote without a readable pool price would
+  // mean an unbounded swap — fail closed instead.
+  const slot0 = await readSlot0(plan.key, chainId);
+  if (!slot0) {
+    throw new Error(
+      `Market pool for game ${args.providerEventId} has no readable price — cannot bound slippage`,
+    );
+  }
+  const sqrtPriceLimitX96 = marketSwapSqrtPriceLimit({
+    spotSqrtPriceX96: slot0.sqrtPriceX96,
+    zeroForOne,
+    amountIn: args.amountRaw,
+    amountOut,
+    slippageBps,
+  });
+
   const calldata = buildPoolSwapTestCalldata({
     poolKey: plan.key,
     zeroForOne,
     amountInRaw: args.amountRaw,
     chainId,
+    sqrtPriceLimitX96,
   });
 
   const usdc = args.direction === "buy" ? args.amountRaw : amountOut;
@@ -169,13 +311,15 @@ export async function buildMarketTrade(args: {
 
   return {
     ...calldata,
-    inputToken: inputIsYes ? yesToken : markets.collateral,
+    inputToken,
     marketId,
     marketAddress,
     yesToken,
+    sqrtPriceLimitX96: sqrtPriceLimitX96.toString(),
     quote: {
       amountIn: args.amountRaw.toString(),
       amountOut: amountOut.toString(),
+      amountOutMinimum: marketMinOut(amountOut, slippageBps).toString(),
       effectivePriceBps,
     },
   };

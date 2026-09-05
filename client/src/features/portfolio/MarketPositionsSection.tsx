@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { LineChart } from "lucide-react";
 import { api } from "@/lib/api.ts";
+import { closePositionDetail } from "@/features/markets/market-trade-core.ts";
 
 interface PositionRow {
   marketId: string;
@@ -110,24 +111,26 @@ export function MarketPositionsSection() {
                       </span>
                     )}
                   </span>
-                  {row.side === "yes" &&
-                    row.league &&
-                    row.providerEventId &&
-                    row.state === "OPEN" && (
+                  {(() => {
+                    // One-click Close (B7-003): deep-links the league page
+                    // sidebar onto a Sell pre-filled with the full balance.
+                    const close = closePositionDetail(row);
+                    if (!close) return null;
+                    return (
                       <button
                         type="button"
+                        aria-label={`Close position — sell ${tokens.toFixed(2)} ${row.label} tokens`}
                         onClick={() => {
                           window.dispatchEvent(
-                            new CustomEvent("mantua:close-position", {
-                              detail: { league: row.league, eventId: row.providerEventId },
-                            }),
+                            new CustomEvent("mantua:close-position", { detail: close }),
                           );
                         }}
                         className="rounded-sm border border-border-soft px-2 py-0.5 text-[10px] text-text-dim hover:text-text cursor-pointer"
                       >
                         Close
                       </button>
-                    )}
+                    );
+                  })()}
                 </div>
               </li>
             );
