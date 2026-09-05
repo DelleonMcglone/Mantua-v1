@@ -4,7 +4,9 @@ import { isAddress, formatUnits, parseAbi, parseUnits } from "viem";
 import { env } from "../env.ts";
 import { db } from "../db/client.ts";
 import { chatMessages, chatSessions } from "../db/schema/chat.ts";
+import type { AuditAction } from "../db/schema/safety.ts";
 import { users } from "../db/schema/users.ts";
+import { logAudit } from "./audit.ts";
 import { logger } from "./logger.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { BASE_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
@@ -664,6 +666,109 @@ function deferBackground(work: Promise<unknown>): void {
   } catch {
     void safe;
   }
+}
+
+/**
+ * 030 — audit rows for chat-driven MUTATING tool calls.
+ *
+ * The same actions via their HTTP routes (or the loops) write
+ * `mantua_audit_log` rows; the chat tool executor previously wrote none, so
+ * an incident reconstruction would miss every chat-driven action. Action
+ * names reuse the route/loop equivalents so one query covers both surfaces.
+ * Tools whose LIBRARY layer already audits every call (bridge → agent_bridge
+ * in `agent-bridge.ts`, commerce → agent_commerce in `agent-commerce.ts`,
+ * x402 → agent_x402 in `x402-buyer.ts`) still get a chat-level row: the
+ * chat row records the tool boundary (args + outcome as the model saw them),
+ * which the lib row does not.
+ */
+const MUTATING_TOOL_ACTIONS: Record<string, AuditAction> = {
+  swap: "agent_swap",
+  send: "agent_send",
+  trade_market: "agent_market_trade",
+  bridge: "agent_bridge",
+  add_liquidity: "agent_add_liquidity",
+  remove_liquidity: "agent_remove_liquidity",
+  create_pool: "create_pool",
+  create_job: "agent_commerce",
+  fund_job: "agent_commerce",
+  settle_job: "agent_commerce",
+};
+
+/**
+ * Map a chat tool call to its audit action, or null when the call is
+ * read-only (no row). `gateway` and `manage_wallet` are mixed read/write
+ * tools — only their mutating sub-actions audit.
+ */
+export function auditActionForToolCall(
+  name: string,
+  args: Record<string, unknown>,
+): AuditAction | null {
+  if (name === "manage_wallet") {
+    return args["action"] === "set_cap" ? "agent_wallet_cap_update" : null;
+  }
+  if (name === "gateway") {
+    const a = args["action"];
+    return a === "deposit" || a === "deposit_base" || a === "spend" ? "agent_gateway" : null;
+  }
+  return MUTATING_TOOL_ACTIONS[name] ?? null;
+}
+
+/**
+ * Cap on the serialized size of the `params` jsonb payload. Tool args carry
+ * no secrets (amounts, symbols, addresses), but a model could emit an
+ * arbitrarily large input object — cap it rather than store unbounded json.
+ */
+const MAX_AUDIT_PARAMS_CHARS = 2_000;
+
+function capAuditParams(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  let serialized: string;
+  try {
+    serialized = JSON.stringify(args);
+  } catch {
+    return { tool, argsTruncated: "[unserializable args]" };
+  }
+  if (serialized.length <= MAX_AUDIT_PARAMS_CHARS) return { tool, args };
+  return { tool, argsTruncated: serialized.slice(0, MAX_AUDIT_PARAMS_CHARS) };
+}
+
+/**
+ * Write one audit row for a chat tool execution (no-op for read-only tools).
+ * Never throws: `logAudit` swallows db failures, and the caller defers this
+ * fire-and-forget — same pattern as every other logAudit call site.
+ */
+export async function auditChatToolCall(entry: {
+  walletAddress: string | undefined;
+  chainId: SupportedChainId;
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  data?: unknown;
+  error?: string | undefined;
+}): Promise<void> {
+  const action = auditActionForToolCall(entry.tool, entry.args);
+  if (!action) return;
+  const data =
+    entry.data && typeof entry.data === "object" ? (entry.data as Record<string, unknown>) : null;
+  const txHash =
+    entry.ok && data && typeof data["txHash"] === "string" ? data["txHash"] : undefined;
+  // A cap raise the user's message didn't attest returns a structured refusal
+  // (no throw) — that must not read as a successful cap write in the ledger.
+  const capRaiseRejected =
+    entry.ok && action === "agent_wallet_cap_update" && data?.["status"] === "cap_raise_rejected";
+  const reason = !entry.ok
+    ? entry.error
+    : capRaiseRejected
+      ? "cap_raise_rejected: raise not attested by the user's current message"
+      : undefined;
+  await logAudit({
+    walletAddress: entry.walletAddress,
+    action,
+    outcome: entry.ok ? (capRaiseRejected ? "rejected_other" : "success") : "failure",
+    params: capAuditParams(entry.tool, entry.args),
+    chainId: entry.chainId,
+    txHash,
+    reason,
+  });
 }
 
 /**
@@ -1381,8 +1486,9 @@ export async function* runAgentChat(params: {
   const client = getAnthropic();
 
   // Ensure the agent wallet exists ON THE ACTIVE CHAIN so swap/send have
-  // something to act on (the wallet is provisioned on first use).
-  await getOrCreateAgentWallet(privyUserId, walletAddress, chainId);
+  // something to act on (the wallet is provisioned on first use). Kept for
+  // the audit rows below — chat-driven actions are logged against it.
+  const agentWallet = await getOrCreateAgentWallet(privyUserId, walletAddress, chainId);
 
   const userDbId = await resolveUserId(privyUserId);
   if (!userDbId) {
@@ -1452,6 +1558,16 @@ export async function* runAgentChat(params: {
       yield { type: "tool_start", id: tu.id, tool: tu.name, args };
       try {
         const data = await executeTool(privyUserId, walletAddress, tu.name, args, message, chainId);
+        deferBackground(
+          auditChatToolCall({
+            walletAddress: agentWallet.address,
+            chainId,
+            tool: tu.name,
+            args,
+            ok: true,
+            data,
+          }),
+        );
         steps.push({ tool: tu.name, args, ok: true, data });
         yield { type: "tool_result", id: tu.id, tool: tu.name, ok: true, data };
         toolResults.push({
@@ -1461,6 +1577,16 @@ export async function* runAgentChat(params: {
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
+        deferBackground(
+          auditChatToolCall({
+            walletAddress: agentWallet.address,
+            chainId,
+            tool: tu.name,
+            args,
+            ok: false,
+            error: errMsg,
+          }),
+        );
         steps.push({ tool: tu.name, args, ok: false, error: errMsg });
         yield { type: "tool_result", id: tu.id, tool: tu.name, ok: false, error: errMsg };
         toolResults.push({

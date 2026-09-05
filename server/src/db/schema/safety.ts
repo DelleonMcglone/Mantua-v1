@@ -102,6 +102,8 @@ export type AuditAction =
   | "agent_remove_liquidity"
   | "agent_instruction_parse"
   | "agent_bridge"
+  | "agent_market_trade"
+  | "agent_gateway"
   | "agent_x402"
   | "command_parse"
   | "fiat_bank_link"

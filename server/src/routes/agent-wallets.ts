@@ -110,8 +110,11 @@ agentWalletsRouter.get(
   },
 );
 
+// 030 — `.positive()` matches the library clamp (`assertValidDailyCap`
+// rejects 0), so a `dailyCapUsd: 0` PATCH fails cleanly at the boundary with
+// the standard 400 envelope instead of surfacing the raw clamp error.
 const updateCapSchema = z.object({
-  dailyCapUsd: z.number().nonnegative().max(HARD_DAILY_CAP_USD),
+  dailyCapUsd: z.number().positive().max(HARD_DAILY_CAP_USD),
 });
 
 /**
@@ -120,7 +123,7 @@ const updateCapSchema = z.object({
  * independently of the user's primary wallet cap (D-008 / P1-001).
  * The cap is enforced in `server/src/lib/spending-cap.ts:checkSpendingCap`
  * which already routes agent-wallet addresses through `agent_wallets`.
- * Range: 0 ≤ dailyCapUsd ≤ HARD_DAILY_CAP_USD ($50k absolute ceiling
+ * Range: 0 < dailyCapUsd ≤ HARD_DAILY_CAP_USD ($50k absolute ceiling
  * shared with the user wallet — set in code, not at runtime).
  */
 agentWalletsRouter.patch(
