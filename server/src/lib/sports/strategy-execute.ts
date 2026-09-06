@@ -60,7 +60,19 @@ export type ExecuteOutcome =
        * the durable finalizer already closed + audited — do neither again. */
       finalizedBy: "poll" | "webhook";
     }
-  | { kind: "held"; reason: string }
+  | {
+      kind: "held";
+      reason: string;
+      /**
+       * True when a later tick can plausibly succeed with no human in the
+       * loop (daily cap resets at UTC midnight) — the engine releases the
+       * claim so the strategy re-arms. False for waits that need a person
+       * or a feature (user-wallet position, unprovisioned wallet,
+       * rebalance) — the strategy stays `triggered`, recorded for the
+       * dashboard, and the close is the user's to click (B9-005 edge case).
+       */
+      retryable: boolean;
+    }
   | { kind: "failed"; error: string };
 
 export async function executeTriggeredClose(
@@ -70,7 +82,7 @@ export async function executeTriggeredClose(
   deps: ExecuteCloseDeps = {},
 ): Promise<ExecuteOutcome> {
   if (decision.action !== "close-position") {
-    return { kind: "held", reason: "rebalance execution not yet supported" };
+    return { kind: "held", reason: "rebalance execution not yet supported", retryable: false };
   }
 
   const marketRows = await db
@@ -83,7 +95,9 @@ export async function executeTriggeredClose(
     .innerJoin(events, eq(markets.eventId, events.id))
     .where(eq(markets.marketId, decision.marketId));
   const market = marketRows.at(0);
-  if (!market?.yesToken) return { kind: "held", reason: "market row or yesToken missing" };
+  if (!market?.yesToken) {
+    return { kind: "held", reason: "market row or yesToken missing", retryable: false };
+  }
 
   const walletRows = await db
     .select({ circleWalletId: agentWallets.circleWalletId, address: agentWallets.address })
@@ -91,7 +105,7 @@ export async function executeTriggeredClose(
     .where(eq(agentWallets.userId, row.userId))
     .limit(1);
   const wallet = walletRows.at(0);
-  if (!wallet) return { kind: "held", reason: "no agent wallet provisioned" };
+  if (!wallet) return { kind: "held", reason: "no agent wallet provisioned", retryable: false };
 
   const readBalance =
     deps.balanceOf ??
@@ -104,7 +118,7 @@ export async function executeTriggeredClose(
       }));
   const balance = await readBalance(market.yesToken, wallet.address);
   if (balance === 0n) {
-    return { kind: "held", reason: "agent wallet holds no position in this market" };
+    return { kind: "held", reason: "agent wallet holds no position in this market", retryable: false };
   }
 
   // YES ≤ 1 USDC each, so the strategy's USD cap bounds tokens directly.
@@ -125,7 +139,11 @@ export async function executeTriggeredClose(
         { strategyId: row.id, wallet: wallet.address, err },
         "strategy: close held by the daily spending cap",
       );
-      return { kind: "held", reason: "daily spending cap reached — close retried on a later tick" };
+      return {
+        kind: "held",
+        reason: "daily spending cap reached — close retried on a later tick",
+        retryable: true,
+      };
     }
     throw err; // ledger outage is not a strategy decision — let the cron's error handling see it
   }

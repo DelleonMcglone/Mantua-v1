@@ -109,7 +109,7 @@ describe("executeTriggeredClose (C-019 cron daily cap)", () => {
     assert.equal(seen.usd, 2);
   });
 
-  it("holds the close when the wallet is capped out — no trade fires", async () => {
+  it("holds the close when the wallet is capped out — no trade fires, and it is retryable", async () => {
     const { calls, deps } = makeDeps({
       checkSpendingCap: () =>
         Promise.reject(
@@ -123,7 +123,66 @@ describe("executeTriggeredClose (C-019 cron daily cap)", () => {
     const outcome = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, deps);
     assert.equal(outcome.kind, "held");
     assert.match(outcome.reason, /daily spending cap/);
+    // The daily cap resets at UTC midnight, so the engine may release the
+    // claim and retry on a later tick — unlike the waits below.
+    assert.equal(outcome.retryable, true);
     assert.deepEqual(calls, [], "a cap block never reaches the trade executor");
+  });
+
+  it("both caps bind — the strategy cap clamps the leg BEFORE the daily cap sees it", async () => {
+    // Balance is 2 YES (≤ $2), but the strategy's own cap is $0.75: the
+    // tighter bound wins, so the trade and the daily-cap check both see
+    // 0.75 — never the full balance.
+    let capSawUsd: number | undefined;
+    let tradedRaw: bigint | undefined;
+    const { deps } = makeDeps({
+      checkSpendingCap: (_wallet, usd) => {
+        capSawUsd = usd;
+        return Promise.resolve();
+      },
+      agentMarketTrade: (args) => {
+        tradedRaw = args.amountRaw;
+        return Promise.resolve({
+          txHash: "0xtrade",
+          circleTxId: "c1",
+          finalizedBy: "poll",
+          marketId: "0xmkt1",
+          quote: { amountIn: "750000", amountOut: "740000", effectivePriceBps: null },
+        });
+      },
+    });
+    const capped = { ...STRATEGY, capUsd: "0.75" };
+    const outcome = await executeTriggeredClose(fakeDb(MARKET, WALLET), capped, DECISION, deps);
+    assert.equal(outcome.kind, "executed");
+    assert.equal(capSawUsd, 0.75);
+    assert.equal(tradedRaw, 750_000n);
+  });
+
+  it("a user-wallet position (agent holds nothing) waits — held, NOT retryable", async () => {
+    const { deps } = makeDeps({});
+    deps.balanceOf = () => Promise.resolve(0n);
+    const outcome = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, deps);
+    assert.equal(outcome.kind, "held");
+    assert.equal(outcome.retryable, false);
+    assert.match(outcome.reason, /no position/);
+  });
+
+  it("a delta-hedge rebalance trigger is held, NOT retryable — recorded for the dashboard", async () => {
+    const { calls, deps } = makeDeps({});
+    const rebalance = { ...DECISION, action: "rebalance" } as typeof DECISION;
+    const outcome = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, rebalance, deps);
+    assert.equal(outcome.kind, "held");
+    assert.equal(outcome.retryable, false);
+    assert.deepEqual(calls, []);
+  });
+
+  it("a trade failure reports failed with the error — the engine bounds the retries", async () => {
+    const { deps } = makeDeps({
+      agentMarketTrade: () => Promise.reject(new Error("swap reverted: FROZEN")),
+    });
+    const outcome = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, deps);
+    assert.equal(outcome.kind, "failed");
+    assert.match(outcome.error, /FROZEN/);
   });
 
   it("does not swallow a cap-ledger outage — that is not a strategy decision", async () => {

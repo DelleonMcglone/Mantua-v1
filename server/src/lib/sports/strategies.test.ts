@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import {
   evaluateStrategy,
   strategyConfigSchema,
+  ticksFromSlates,
   type ArmedStrategy,
   type MarketTick,
   type StrategyConfig,
 } from "./strategies.ts";
+import { marketIdsFor } from "./resolution.ts";
+import type { ProviderEvent, ProviderSlate, ProviderTeam } from "./provider.ts";
 
 const MARKET = "0x" + "11".repeat(32);
 const MARKET_B = "0x" + "22".repeat(32);
@@ -68,6 +71,35 @@ void describe("take-profit / stop evaluation (B9-002)", () => {
     const d = evaluateStrategy(armed(tpStop), [tick({ impliedProbBps: 8000 })], NOW);
     assert.equal(d.kind, "trigger");
     assert.match((d as { reason: string }).reason, /take-profit/);
+  });
+
+  void it("truth table: threshold equality fires, one bp inside holds, per type", () => {
+    const tpOnly: StrategyConfig = {
+      kind: "take-profit-stop",
+      marketId: MARKET,
+      side: "yes",
+      takeProfitBps: 8000,
+    };
+    const stopOnly: StrategyConfig = {
+      kind: "take-profit-stop",
+      marketId: MARKET,
+      side: "yes",
+      stopBps: 3000,
+    };
+    const at = (config: StrategyConfig, p: number) =>
+      evaluateStrategy(armed(config), [tick({ impliedProbBps: p })], NOW).kind;
+    // take_profit: p >= threshold fires.
+    assert.equal(at(tpOnly, 7999), "hold");
+    assert.equal(at(tpOnly, 8000), "trigger");
+    assert.equal(at(tpOnly, 9999), "trigger");
+    // a take-profit-only strategy never fires downward.
+    assert.equal(at(tpOnly, 1), "hold");
+    // stop: p <= threshold fires.
+    assert.equal(at(stopOnly, 3001), "hold");
+    assert.equal(at(stopOnly, 3000), "trigger");
+    assert.equal(at(stopOnly, 1), "trigger");
+    // a stop-only strategy never fires upward.
+    assert.equal(at(stopOnly, 9999), "hold");
   });
 
   void it("triggers stop at/below the threshold", () => {
@@ -172,6 +204,79 @@ void describe("delta hedge evaluation (B9-003)", () => {
       NOW,
     );
     assert.deepEqual(d, { kind: "disarm", reason: "market-frozen" });
+  });
+});
+
+void describe("ticksFromSlates — game-state ticks (B9-005)", () => {
+  const EVENT_ID = "401slate";
+  const [HOME_MARKET, AWAY_MARKET] = marketIdsFor(EVENT_ID);
+
+  function team(key: string): ProviderTeam {
+    return { providerId: key, key: `nfl:${key}`, name: key, abbreviation: key };
+  }
+  function event(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
+    return {
+      providerEventId: EVENT_ID,
+      league: "nfl",
+      startsAt: NOW + 3600,
+      status: "scheduled",
+      home: team("HOME"),
+      away: team("AWAY"),
+      homeWinProbabilityBps: 6500,
+      ...overrides,
+    };
+  }
+  function slate(events: ProviderEvent[], delayed = false): ProviderSlate {
+    return { provider: "espn", league: "nfl", events, delayed, fetchedAt: NOW };
+  }
+
+  void it("a scheduled future game is live, with complementary home/away prices", () => {
+    const ticks = ticksFromSlates([slate([event()])], NOW);
+    const home = ticks.find((t) => t.marketId === HOME_MARKET);
+    const away = ticks.find((t) => t.marketId === AWAY_MARKET);
+    assert.deepEqual(home, {
+      marketId: HOME_MARKET,
+      impliedProbBps: 6500,
+      frozen: false,
+      resolved: false,
+    });
+    assert.equal(away?.impliedProbBps, 3500);
+    // (the assert above narrows `away` — an undefined tick cannot equal 3500)
+    assert.equal(away.frozen, false);
+  });
+
+  void it("game-state transitions: kickoff time, in_progress, and final all freeze", () => {
+    for (const e of [
+      event({ startsAt: NOW }), // kickoff moment — same clock as the contract freeze
+      event({ startsAt: NOW - 60 }),
+      event({ status: "in_progress" }),
+      event({ status: "final" }),
+    ]) {
+      const ticks = ticksFromSlates([slate([e])], NOW);
+      assert.equal(ticks[0].frozen, true);
+      assert.equal(ticks[1].frozen, true);
+    }
+  });
+
+  void it("final and void statuses mark resolved; in_progress does not", () => {
+    assert.equal(ticksFromSlates([slate([event({ status: "final" })])], NOW)[0].resolved, true);
+    assert.equal(ticksFromSlates([slate([event({ status: "cancelled" })])], NOW)[0].resolved, true);
+    assert.equal(
+      ticksFromSlates([slate([event({ status: "in_progress" })])], NOW)[0].resolved,
+      false,
+    );
+  });
+
+  void it("a delayed slate yields NO ticks — strategies never act on stale data", () => {
+    assert.deepEqual(ticksFromSlates([slate([event()], true)], NOW), []);
+  });
+
+  void it("a missing provider price yields null — evaluation holds, never guesses", () => {
+    const e = event();
+    delete e.homeWinProbabilityBps;
+    const ticks = ticksFromSlates([slate([e])], NOW);
+    assert.equal(ticks[0].impliedProbBps, null);
+    assert.equal(ticks[1].impliedProbBps, null);
   });
 });
 

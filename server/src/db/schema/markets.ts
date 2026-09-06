@@ -520,6 +520,13 @@ export const hedgeStrategies = pgTable(
     executedAt: timestamp("executed_at", { withTimezone: true }),
     /** Why it stopped — freeze auto-disarm, kill switch, expiry, user action. */
     disarmedReason: varchar("disarmed_reason", { length: 32 }),
+    /**
+     * Counted execution failures (B9-005). A failed close releases the
+     * claim back to `armed` and increments this; at MAX_EXECUTE_ATTEMPTS
+     * the engine auto-disarms (`execute-failed`) instead of retrying
+     * forever. Cap-holds do not count — the daily cap resets on its own.
+     */
+    executeAttempts: integer("execute_attempts").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
