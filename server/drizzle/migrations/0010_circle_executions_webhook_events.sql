@@ -6,7 +6,7 @@
 -- still leaves the webhook finalizer something to resolve. `webhook_events`
 -- records raw notification deliveries keyed by Circle's notification id —
 -- redelivery is a no-op at the storage layer (unique).
-CREATE TABLE "circle_executions" (
+CREATE TABLE IF NOT EXISTS "circle_executions" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"circle_tx_id" varchar(64) NOT NULL,
 	"kind" varchar(32) NOT NULL,
@@ -26,13 +26,17 @@ CREATE TABLE "circle_executions" (
 	CONSTRAINT "circle_executions_circle_tx_id_unique" UNIQUE("circle_tx_id")
 );
 --> statement-breakpoint
-ALTER TABLE "circle_executions" ADD CONSTRAINT "circle_executions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+DO $$ BEGIN
+	IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'circle_executions_user_id_users_id_fk') THEN
+		ALTER TABLE "circle_executions" ADD CONSTRAINT "circle_executions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+	END IF;
+END $$;
 --> statement-breakpoint
-CREATE INDEX "circle_executions_status_idx" ON "circle_executions" USING btree ("status","created_at");
+CREATE INDEX IF NOT EXISTS "circle_executions_status_idx" ON "circle_executions" USING btree ("status","created_at");
 --> statement-breakpoint
-CREATE INDEX "circle_executions_wallet_idx" ON "circle_executions" USING btree ("wallet_address","created_at");
+CREATE INDEX IF NOT EXISTS "circle_executions_wallet_idx" ON "circle_executions" USING btree ("wallet_address","created_at");
 --> statement-breakpoint
-CREATE TABLE "webhook_events" (
+CREATE TABLE IF NOT EXISTS "webhook_events" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"notification_id" varchar(64) NOT NULL,
 	"event_type" varchar(64),

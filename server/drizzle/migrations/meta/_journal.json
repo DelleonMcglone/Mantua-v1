@@ -75,8 +75,22 @@
     {
       "idx": 10,
       "version": "7",
-      "when": 1788998400000,
-      "tag": "0011_fiat_transfers",
+      "when": 1788393717614,
+      "tag": "0010_circle_executions_webhook_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788393777614,
+      "tag": "0011_hedge_strategy_execute_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788393837614,
+      "tag": "0012_fiat_transfers",
       "breakpoints": true
     }
   ]
