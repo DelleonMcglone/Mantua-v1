@@ -434,7 +434,10 @@ export function liveResolutionSubmitter(
         return null;
       }
     },
-    resolve: (marketId, outcome) => write("resolve", [marketId, outcome]),
+    // S-025: the only argument `resolve` accepts is a ResolutionAuthorization
+    // minted by `assertResolutionCriteria` — this call site cannot be reached
+    // without the criteria gate having passed.
+    resolve: (auth) => write("resolve", [auth.marketId, auth.outcome]),
     void: (marketId) => write("voidMarket", [marketId]),
   };
 }
@@ -851,5 +854,6 @@ export async function filterPlanToExistingMarkets(
     freezes: plan.freezes.filter((id) => exists.get(id)),
     submissions: plan.submissions.filter((s) => exists.get(s.marketId)),
     held: plan.held,
+    assessments: plan.assessments,
   };
 }

@@ -162,6 +162,15 @@ export function parseGenericSlate(payload: unknown, league: LeagueSlug): Provide
   return out;
 }
 
+/**
+ * The corroboration regime a settlement pass runs under (S-023/S-025).
+ * `dual-source` means a secondary provider is configured and agreement is
+ * required; `single-source` is DM-107's staged policy while the second
+ * vendor is unchosen — the primary's word plus the criteria gate governs,
+ * and every evidence bundle records that the exemption applied.
+ */
+export type CorroborationPolicy = "dual-source" | "single-source";
+
 /** The outcome of comparing two providers on one event. */
 export type Corroboration =
   | { kind: "agreed"; winningOutcomeIndex: number }
