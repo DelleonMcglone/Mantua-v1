@@ -6,3 +6,4 @@ export * from "./safety.ts";
 export * from "./markets.ts";
 export * from "./circle.ts";
 export * from "./activity.ts";
+export * from "./fiat.ts";

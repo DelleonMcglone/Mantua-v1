@@ -20,6 +20,20 @@ const schema = z.object({
   ZERO_HASH_PASSPHRASE: z.string().min(1).optional(),
   ZERO_HASH_SECRET: z.string().min(1).optional(),
   ZERO_HASH_PLATFORM_CODE: z.string().min(1).optional(),
+  /** Zero Hash environment: `sandbox` targets the cert host
+   *  (api.cert.zerohash.com), `production` the live API. Independent of
+   *  FIAT_RAILS_MODE so `sandbox` mode can exercise real cert credentials. */
+  ZERO_HASH_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
+  /** HMAC secret for Zero Hash webhook deliveries (x-zh-hook-signature).
+   *  Absent → POST /api/fiat/webhook fails closed (503) — an unverified
+   *  provider event is never processed. */
+  ZERO_HASH_WEBHOOK_SECRET: z.string().min(1).optional(),
+  /** D-112 — the USDC destination network for fiat deposits is CONFIG, not
+   *  code. Zero Hash asset codes are `USDC.<NETWORK>`; this names the
+   *  network half. Whether Zero Hash can deliver USDC on Arc is an OPEN
+   *  question tracked in D-112 — if the launch chain moves, this variable
+   *  (plus Zero Hash-side asset support) is the entire switch. */
+  FIAT_USDC_NETWORK: z.string().min(1).default("BASE"),
   PLAID_CLIENT_ID: z.string().min(1).optional(),
   PLAID_SECRET: z.string().min(1).optional(),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),

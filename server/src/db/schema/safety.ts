@@ -110,4 +110,5 @@ export type AuditAction =
   | "fiat_bank_link"
   | "fiat_deposit"
   | "fiat_withdraw"
+  | "fiat_transfer"
   | "fee_admin_update";

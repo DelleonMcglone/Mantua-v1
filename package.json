@@ -46,5 +46,10 @@
   },
   "engines": {
     "node": ">=20.18.0"
+  },
+  "overrides": {
+    "plaid": {
+      "axios": "1.20.0"
+    }
   }
 }

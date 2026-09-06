@@ -71,6 +71,13 @@
       "when": 1788393657614,
       "tag": "0009_prediction_markets_extension",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788998400000,
+      "tag": "0011_fiat_transfers",
+      "breakpoints": true
     }
   ]
 }
