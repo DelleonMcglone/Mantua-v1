@@ -490,6 +490,11 @@ export const resolutions = pgTable(
     /** S-024 confidence state at the moment of the write (VERIFIED /
      *  RESOLVED for automated resolves; null for pre-040 rows and voids). */
     confidenceState: varchar("confidence_state", { length: 24 }),
+    /** D-104 dispute window this resolve waited out, stamped from the
+     *  review row at write time. Null for voids, manual overrides, and
+     *  pre-044 rows. */
+    disputeWindowOpensAt: timestamp("dispute_window_opens_at", { withTimezone: true }),
+    disputeWindowClosesAt: timestamp("dispute_window_closes_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("resolutions_market_idx").on(t.marketId)],
@@ -530,6 +535,16 @@ export const resolutionReviews = pgTable(
     disputedAt: timestamp("disputed_at", { withTimezone: true }),
     escalatedAt: timestamp("escalated_at", { withTimezone: true }),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    /** D-104 dispute window: opened on the first pass the outcome clears the
+     *  S-025 criteria gate; the on-chain submit waits until `closesAt` has
+     *  passed. Cancelled (nulled) when the review escalates to DISPUTED, so
+     *  a later re-verification opens a fresh window. */
+    disputeWindowOpensAt: timestamp("dispute_window_opens_at", { withTimezone: true }),
+    disputeWindowClosesAt: timestamp("dispute_window_closes_at", { withTimezone: true }),
+    /** D-104 operator hold: while set, the elapsed window does NOT submit.
+     *  Written only by the authenticated ops route, always with a note. */
+    operatorHoldAt: timestamp("operator_hold_at", { withTimezone: true }),
+    operatorHoldNote: text("operator_hold_note"),
     /** Append-only [{state, at, reason}] transition trail. */
     history: jsonb("history")
       .notNull()

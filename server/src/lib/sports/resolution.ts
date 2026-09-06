@@ -27,6 +27,7 @@ import {
 } from "./resolution-confidence.ts";
 import {
   type CriteriaResult,
+  type ManualOverrideEvidence,
   type ResolutionAuthorization,
   type ResolutionEvidence,
   type SlateMeta,
@@ -306,16 +307,23 @@ export interface ResolutionSubmitter {
 export interface ResolutionRecord {
   marketId: `0x${string}`;
   providerEventId: string;
-  method: "auto";
+  /** `auto` for the pipeline; `manual` only via the D-104 override route. */
+  method: "auto" | "manual";
   kind: "resolve" | "void";
   outcome: number | null;
   source: string;
   signer: string;
   txHash: string;
   /** The full S-026 evidence bundle. Always present for resolves (the gate
-   *  built it); a lighter source snapshot for voids. */
-  evidence?: ResolutionEvidence | Record<string, unknown>;
+   *  built it); the manual-override bundle for D-104 overrides; a lighter
+   *  source snapshot for voids. */
+  evidence?: ResolutionEvidence | ManualOverrideEvidence | Record<string, unknown>;
   confidenceState?: ConfidenceState | null;
+  /** Mandatory for manual overrides (D-104); absent for automated rows. */
+  note?: string;
+  /** The D-104 dispute window this resolve waited out, stamped onto the
+   *  resolutions row. Absent for voids (window-exempt) and manual rows. */
+  disputeWindow?: { opensAt: Date; closesAt: Date };
 }
 
 export interface ResolutionLogWriter {
@@ -337,6 +345,48 @@ export interface ExecutionSummary {
   /** Gate refusals — NOT failures: the plan asked, the criteria said no. */
   rejected: RejectedSubmission[];
   failures: { marketId: string; error: string }[];
+  /** D-104 — dispute windows opened this pass (one per game outcome). */
+  windowsOpened: number;
+  /** Resolves parked because their window has not yet elapsed. */
+  awaitingWindow: number;
+  /** Resolves parked by an operator hold (ops route). */
+  heldByOperator: number;
+}
+
+// ─── D-104 dispute window ──────────────────────────────────────────────────
+
+/** One game outcome's persisted window state, as the gate port reports it. */
+export interface DisputeWindowState {
+  opensAt: Date;
+  closesAt: Date;
+  /** Operator park (ops route). While set, an elapsed window never submits. */
+  heldAt: Date | null;
+  holdNote: string | null;
+}
+
+/**
+ * Port over the persisted dispute window (D-104). Keyed by provider event
+ * id — both markets of a game's pair share one outcome, so they share one
+ * window. `open` must be idempotent (the pair's second market may ask on
+ * the same pass) and must make the new state visible to `stateFor`
+ * immediately.
+ */
+export interface DisputeWindowGate {
+  /** The configured RESOLUTION_DISPUTE_WINDOW_SECONDS. */
+  windowSeconds: number;
+  stateFor(providerEventId: string): DisputeWindowState | null;
+  open(providerEventId: string, opensAt: Date, closesAt: Date): Promise<void>;
+}
+
+/** Window lifecycle moments the caller audits (window open / hold /
+ *  elapsed-submit). `awaiting` is informational — no ink required. */
+export interface DisputeWindowEvent {
+  kind: "opened" | "awaiting" | "held" | "elapsed";
+  providerEventId: string;
+  marketId: `0x${string}`;
+  opensAt: Date;
+  closesAt: Date;
+  holdNote?: string | null;
 }
 
 export interface ExecutionOptions {
@@ -349,6 +399,12 @@ export interface ExecutionOptions {
   storedEventOf?: (providerEventId: string) => StoredEventSnapshot | null;
   /** Called for every gate refusal — the cron writes audit rows here. */
   onRejected?: (rejection: RejectedSubmission) => void | Promise<void>;
+  /** D-104 dispute window. Absent → legacy immediate-submit behaviour (the
+   *  pure-test contract); the cron always supplies the DB-backed gate. */
+  disputeWindow?: DisputeWindowGate;
+  /** Window lifecycle callback — the cron writes audit rows for `opened`,
+   *  `held` and `elapsed` here. */
+  onWindowEvent?: (event: DisputeWindowEvent) => void | Promise<void>;
 }
 
 /**
@@ -375,6 +431,9 @@ export async function executeResolution(
     voided: 0,
     rejected: [],
     failures: [],
+    windowsOpened: 0,
+    awaitingWindow: 0,
+    heldByOperator: 0,
   };
   const nowSeconds = opts.nowSeconds ?? Math.floor(Date.now() / 1000);
 
@@ -418,6 +477,7 @@ export async function executeResolution(
       let txHash: string;
       let evidence: ResolutionRecord["evidence"];
       let confidenceState: ConfidenceState | null = null;
+      let window: DisputeWindowState | null = null;
 
       if (s.kind === "resolve") {
         const ctx = s.context;
@@ -458,6 +518,60 @@ export async function executeResolution(
           await reject(s, verdict.failed, verdict.criteria);
           continue;
         }
+
+        // D-104 — the mandatory dispute window sits between the criteria
+        // gate passing and the on-chain submit. First pass that clears the
+        // gate opens the window (no submit, no log ink); later passes submit
+        // only once it has elapsed, the confidence state is still good (the
+        // gate above re-checked it this pass), and no operator hold exists.
+        // Voids never reach this branch — they are window-exempt (B4-005).
+        if (opts.disputeWindow) {
+          const gate = opts.disputeWindow;
+          const existing = gate.stateFor(s.providerEventId);
+          if (!existing) {
+            const opensAt = new Date(nowSeconds * 1000);
+            const closesAt = new Date((nowSeconds + gate.windowSeconds) * 1000);
+            await gate.open(s.providerEventId, opensAt, closesAt);
+            summary.windowsOpened += 1;
+            await opts.onWindowEvent?.({
+              kind: "opened",
+              providerEventId: s.providerEventId,
+              marketId: s.marketId,
+              opensAt,
+              closesAt,
+            });
+            if (gate.windowSeconds > 0) continue;
+            // Zero window (tests/dev, warned at boot): opened for the
+            // record, elapsed immediately — fall through to submit.
+            window = { opensAt, closesAt, heldAt: null, holdNote: null };
+          } else {
+            window = existing;
+            const base = {
+              providerEventId: s.providerEventId,
+              marketId: s.marketId,
+              opensAt: existing.opensAt,
+              closesAt: existing.closesAt,
+            };
+            if (existing.heldAt !== null) {
+              summary.heldByOperator += 1;
+              await opts.onWindowEvent?.({ kind: "held", ...base, holdNote: existing.holdNote });
+              continue;
+            }
+            if (nowSeconds * 1000 < existing.closesAt.getTime()) {
+              summary.awaitingWindow += 1;
+              await opts.onWindowEvent?.({ kind: "awaiting", ...base });
+              continue;
+            }
+          }
+          await opts.onWindowEvent?.({
+            kind: "elapsed",
+            providerEventId: s.providerEventId,
+            marketId: s.marketId,
+            opensAt: window.opensAt,
+            closesAt: window.closesAt,
+          });
+        }
+
         txHash = await submitter.resolve(verdict.auth);
         evidence = verdict.auth.evidence;
       } else {
@@ -486,6 +600,9 @@ export async function executeResolution(
         txHash,
         ...(evidence !== undefined ? { evidence } : {}),
         confidenceState,
+        ...(window !== null
+          ? { disputeWindow: { opensAt: window.opensAt, closesAt: window.closesAt } }
+          : {}),
       });
 
       if (s.kind === "resolve") summary.resolved += 1;

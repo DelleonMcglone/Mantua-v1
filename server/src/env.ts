@@ -244,6 +244,16 @@ const schema = z.object({
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
 
+  /** D-104 — mandatory dispute window: the delay, in seconds, between the
+   *  moment an outcome passes the S-025 criteria gate and the on-chain
+   *  resolve submission. During the window an operator can hold or dispute;
+   *  only an unheld, still-VERIFIED outcome submits once it elapses. 0 is
+   *  allowed for tests/dev (the first pass then opens-and-submits in one
+   *  sweep) but is flagged as a deploy hazard in production by
+   *  `resolutionDisputeWindowIssues` below. Voids are exempt (B4-005:
+   *  returning collateral cannot pick a wrong winner). */
+  RESOLUTION_DISPUTE_WINDOW_SECONDS: z.coerce.number().int().min(0).default(900),
+
   /** Settlement signer — the Resolver contract's authorised `signer` key
    *  (B4). Signs market creation (`createMarketIfAbsent`), freeze sweeps,
    *  and resolve/void submissions. Absent → market creation is skipped and
@@ -327,6 +337,19 @@ export function rateLimitStoreIssues(e: Env): string[] {
   ];
 }
 
+/**
+ * D-104 startup check: a zero dispute window disables a mandatory
+ * settlement protection. Fine for tests and local dev (warned), a deploy
+ * hazard in production (fails the boot via the shared issues machinery,
+ * same posture as circleCredentialIssues).
+ */
+export function resolutionDisputeWindowIssues(e: Env): string[] {
+  if (e.RESOLUTION_DISPUTE_WINDOW_SECONDS > 0) return [];
+  return [
+    "RESOLUTION_DISPUTE_WINDOW_SECONDS is 0 — the D-104 dispute window is disabled and verified outcomes submit on-chain on the first sweep. Only acceptable for tests/dev; set a positive window (default 900) in production.",
+  ];
+}
+
 export function loadEnv(): Env {
   const parsed = schema.safeParse(blankEnvToUndefined(process.env));
   if (!parsed.success) {
@@ -334,7 +357,11 @@ export function loadEnv(): Env {
     console.error(z.treeifyError(parsed.error));
     process.exit(1);
   }
-  const issues = [...circleCredentialIssues(parsed.data), ...rateLimitStoreIssues(parsed.data)];
+  const issues = [
+    ...circleCredentialIssues(parsed.data),
+    ...rateLimitStoreIssues(parsed.data),
+    ...resolutionDisputeWindowIssues(parsed.data),
+  ];
   if (issues.length > 0) {
     const fatal = parsed.data.NODE_ENV === "production";
     console[fatal ? "error" : "warn"](`Configuration ${fatal ? "errors" : "warnings"}:`);
