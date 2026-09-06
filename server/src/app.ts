@@ -37,6 +37,7 @@ import { analyzeChatRouter } from "./routes/analyze-chat.ts";
 import { healthRouter } from "./routes/health.ts";
 import { liquidityAddRouter } from "./routes/liquidity-add.ts";
 import { liquidityRemoveRouter } from "./routes/liquidity-remove.ts";
+import { marketMetricsRouter } from "./routes/market-metrics.ts";
 import { marketPoolsRouter } from "./routes/market-pools.ts";
 import { poolCreateRouter } from "./routes/pool-create.ts";
 import { poolStateRouter } from "./routes/pool-state.ts";
@@ -80,6 +81,8 @@ app.use(liquidityAddRouter);
 app.use(liquidityRemoveRouter);
 // B7-006 — pool↔market linkage for the pool list's market-status column.
 app.use(marketPoolsRouter);
+// 038 / S-010 — Mantua's own per-market metrics snapshot (authless read).
+app.use(marketMetricsRouter);
 app.use(positionsRouter);
 app.use(earningsRouter);
 app.use(portfolioRouter);

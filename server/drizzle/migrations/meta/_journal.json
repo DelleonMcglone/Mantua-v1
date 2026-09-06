@@ -92,6 +92,13 @@
       "when": 1788393837614,
       "tag": "0012_fiat_transfers",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788393897614,
+      "tag": "0013_canonical_sports_stats",
+      "breakpoints": true
     }
   ]
 }
