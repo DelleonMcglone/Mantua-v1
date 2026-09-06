@@ -135,6 +135,65 @@ export interface ProviderInjuryReport {
   providerUpdatedAt?: number;
 }
 
+/**
+ * One play from a play-by-play feed (S-005 / task 041). Maps onto the
+ * `game_plays` table: the provider's `sequence` is the append cursor —
+ * Sportradar documents it as an epoch-milliseconds-scale number
+ * (football/reference/nfl-play-by-play), which is why the column is bigint.
+ */
+export interface ProviderPlay {
+  /** Provider's monotonically increasing play ordering within the game. */
+  sequence: number;
+  /** Quarter/period number, when the feed nests plays under periods. */
+  period?: number;
+  /** Game clock at the play, provider format (e.g. "12:34"). */
+  clock?: string;
+  /** Provider play-type slug, e.g. "rush", "pass", "kickoff". */
+  playType?: string;
+  description?: string;
+  /** Provider-agnostic key of the team in possession at the play's start. */
+  teamKey?: string;
+  scoringPlay: boolean;
+  /** Running score AFTER the play, when the feed reports it. */
+  homeScore?: number;
+  awayScore?: number;
+  /** Provider extras that don't earn columns (wall clock, end-of-play
+   *  possession, …) — persisted into `game_plays.detail`. */
+  detail?: Record<string, unknown>;
+}
+
+/**
+ * One team's standings line (S-006 / task 041). Maps onto `team_records`.
+ * Field semantics follow Sportradar's postgame-standings reference
+ * (football/reference/nfl-postgame-standings); other providers must
+ * normalise onto the same meanings, never invent.
+ */
+export interface ProviderTeamStanding {
+  providerTeamId: string;
+  /** Provider-agnostic team key (see `teamKey`). */
+  teamKey: string;
+  /** Season label, e.g. "2026". */
+  season: string;
+  /** Collapsed onto the `team_records.season_type` convention. */
+  seasonType: "regular" | "preseason" | "postseason";
+  wins: number;
+  losses: number;
+  ties: number;
+  divisionRank?: number;
+  conferenceRank?: number;
+  pointsFor?: number;
+  pointsAgainst?: number;
+  /** Streak notation, e.g. "W3", "L1". */
+  streak?: string;
+  /** Home/away win–loss strings, e.g. "5-2". */
+  homeRecord?: string;
+  awayRecord?: string;
+  /** Flat numeric season aggregates the feed publishes (win_pct, split
+   *  records, …) — persisted into `team_records.stats` for the
+   *  `teamSeasonStats` reader. */
+  stats: Record<string, number>;
+}
+
 /** Shared envelope for reference-data feeds — same trust flags as a slate. */
 export interface ProviderFeed<T> {
   provider: string;
@@ -175,6 +234,19 @@ export interface SportsDataProvider {
 
   /** Current injury reports across the league. */
   getInjuries?(league: LeagueSlug): Promise<ProviderFeed<ProviderInjuryReport>>;
+
+  /**
+   * Play-by-play for one game, by the provider's event id (task 041).
+   * Quota rule: the ingest worker calls this only for LIVE and just-finished
+   * games on a bounded per-tick rotation — never per user request.
+   */
+  getPlayByPlay?(
+    league: LeagueSlug,
+    providerEventId: string,
+  ): Promise<ProviderFeed<ProviderPlay>>;
+
+  /** Season standings/records across the league (task 041). */
+  getStandings?(league: LeagueSlug): Promise<ProviderFeed<ProviderTeamStanding>>;
 }
 
 /** Thrown when a provider is reachable but its response is unusable. */

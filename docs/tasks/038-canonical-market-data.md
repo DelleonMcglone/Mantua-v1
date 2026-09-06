@@ -1,6 +1,6 @@
 # 038 — Canonical sports data + Mantua market-data layer (S-005/S-006/S-007/S-008/S-010)
 
-**Status:** 🟢 schema + read layer complete — awaiting ingestion wiring (sibling task)
+**Status:** 🟢 schema + read layer complete — ingestion wiring landed in task 041 (`041-ingestion-tools-wiring.md`)
 **Branch:** `038-canonical-market-data`
 
 Phase 3 rows S-005..S-008 and S-010: complete the canonical sports-data
@@ -111,14 +111,24 @@ market Mantua doesn't know. Mounted in `app.ts` next to the pools router.
   0013 re-applied idempotently; smoke script seeded the scratch DB and
   exercised every read path end-to-end (real SQL, not mocks).
 
-## Awaiting ingestion wiring (sibling task)
+## Ingestion wiring — closed by task 041
 
-- Writers for `game_plays`, `team_records` (+ `stats`), and
-  `players.season_stats` from the provider adapters.
-- Until then: standings/trend/stat readers return `insufficient_data` /
-  `null` honestly; game-history and market-metrics paths are live today
-  off the existing `events` / `market_prices` / `market_fills` /
-  `market_positions` rows.
+- ✅ **`game_plays`** — written by `refreshPlayByPlay` (store.ts) from
+  Sportradar's pinned pbp feed, live/just-finished games only, on a
+  quota-bounded rotation. One 038 correction rode along: the pinned doc
+  shows `sequence` is an epoch-ms-scale number, so migration **0015**
+  widened the column int4 → bigint (the (event, provider, sequence)
+  idempotency design is unchanged).
+- ✅ **`team_records` (+ `stats` jsonb)** — written by the standings pass in
+  `refreshReferenceData` from the 041-pinned
+  `/seasons/{year}/{type}/standings/season.json` feed; `stats` carries
+  `win_pct` plus every categorised split (home/road/division/…).
+- ❌ **`players.season_stats`** — still unwritten, deliberately: the only
+  pinned source (nfl-seasonal-statistics) costs one call per team per
+  refresh, which a trial key's ~33 calls/day cannot carry on top of the
+  existing rotation. The typed reader and the `get_player_stats` serving
+  path are wired and activate the moment rows appear (production key or a
+  cheaper feed). Honest `unavailable` until then.
 - On-chain metric inputs (YES supply, pool liquidity, holders) activate
   on their own once the Base markets deployment lands and
   `MARKETS_BY_CHAIN` / `MARKETS_PERIPHERY_BY_CHAIN` are populated.

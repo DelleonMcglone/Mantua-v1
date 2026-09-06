@@ -257,3 +257,163 @@ void describe("feed freshness registry (S-003)", () => {
     assert.equal(snap.delayed, true);
   });
 });
+
+// ─── Task 041: pbp target selection + planners ──────────────────────────────
+
+import {
+  PBP_FINAL_GRACE_SECONDS,
+  planGamePlayRows,
+  planTeamRecordRows,
+  selectPbpTargets,
+  type PbpCandidateRow,
+} from "./ingest.ts";
+import type { ProviderPlay, ProviderTeamStanding } from "./provider.ts";
+
+function candidate(overrides: Partial<PbpCandidateRow> = {}): PbpCandidateRow {
+  return { providerEventId: "e-1", status: "in_progress", startsAt: NOW - 3_600, ...overrides };
+}
+
+void describe("selectPbpTargets (041 quota rule)", () => {
+  void it("includes live games and just-finished finals, never scheduled games", () => {
+    const targets = selectPbpTargets(
+      [
+        candidate({ providerEventId: "live" }),
+        candidate({ providerEventId: "sched", status: "scheduled", startsAt: NOW + 3_600 }),
+        candidate({ providerEventId: "fresh-final", status: "final", startsAt: NOW - 4 * 3_600 }),
+        candidate({ providerEventId: "postponed", status: "postponed" }),
+      ],
+      NOW,
+      10,
+    );
+    assert.deepEqual(
+      targets.map((t) => t.providerEventId),
+      ["live", "fresh-final"],
+    );
+  });
+
+  void it("excludes finals older than the just-finished grace window", () => {
+    const targets = selectPbpTargets(
+      [
+        candidate({
+          providerEventId: "old-final",
+          status: "final",
+          startsAt: NOW - PBP_FINAL_GRACE_SECONDS - 1,
+        }),
+        candidate({ providerEventId: "fresh-final", status: "final", startsAt: NOW - 3_600 }),
+      ],
+      NOW,
+      10,
+    );
+    assert.deepEqual(
+      targets.map((t) => t.providerEventId),
+      ["fresh-final"],
+    );
+  });
+
+  void it("caps the per-tick spend, live games first", () => {
+    const targets = selectPbpTargets(
+      [
+        candidate({ providerEventId: "final-a", status: "final", startsAt: NOW - 2 * 3_600 }),
+        candidate({ providerEventId: "live-late", startsAt: NOW - 1_800 }),
+        candidate({ providerEventId: "live-early", startsAt: NOW - 7_200 }),
+        candidate({ providerEventId: "final-b", status: "final", startsAt: NOW - 3 * 3_600 }),
+      ],
+      NOW,
+      2,
+    );
+    // Both slots go to live games (oldest kickoff first — closest to done).
+    assert.deepEqual(
+      targets.map((t) => t.providerEventId),
+      ["live-early", "live-late"],
+    );
+    assert.deepEqual(selectPbpTargets([candidate()], NOW, 0), []);
+  });
+});
+
+void describe("planGamePlayRows (041)", () => {
+  const play = (overrides: Partial<ProviderPlay> = {}): ProviderPlay => ({
+    sequence: 1_698_611_000_000,
+    period: 1,
+    clock: "15:00",
+    playType: "kickoff",
+    description: "kickoff",
+    teamKey: "nfl:LV",
+    scoringPlay: false,
+    homeScore: 0,
+    awayScore: 0,
+    ...overrides,
+  });
+
+  void it("maps plays onto stable (event, provider, sequence) rows — re-ingest is a no-op", () => {
+    const plays = [play(), play({ sequence: 1_698_611_137_531, scoringPlay: true })];
+    const first = planGamePlayRows("ev-uuid", "sportradar", plays);
+    const second = planGamePlayRows("ev-uuid", "sportradar", plays);
+    assert.deepEqual(first, second); // identical rows → onConflictDoNothing no-op
+    assert.equal(first.length, 2);
+    assert.deepEqual(
+      first.map((r) => [r.eventId, r.provider, r.sequence]),
+      [
+        ["ev-uuid", "sportradar", 1_698_611_000_000],
+        ["ev-uuid", "sportradar", 1_698_611_137_531],
+      ],
+    );
+  });
+
+  void it("collapses duplicate sequences (last wins) so a batch cannot self-conflict", () => {
+    const rows = planGamePlayRows("ev", "sportradar", [
+      play({ description: "first version" }),
+      play({ description: "corrected version" }),
+    ]);
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].description, "corrected version");
+  });
+});
+
+void describe("planTeamRecordRows (041)", () => {
+  const standing = (overrides: Partial<ProviderTeamStanding> = {}): ProviderTeamStanding => ({
+    providerTeamId: "sr-kc",
+    teamKey: "nfl:KC",
+    season: "2026",
+    seasonType: "regular",
+    wins: 11,
+    losses: 6,
+    ties: 0,
+    divisionRank: 1,
+    streak: "W3",
+    homeRecord: "6-2",
+    awayRecord: "5-4",
+    stats: { win_pct: 0.647 },
+    ...overrides,
+  });
+
+  void it("maps standings onto team_records upserts, skipping teams not yet canonical", () => {
+    const plan = planTeamRecordRows(
+      [standing(), standing({ teamKey: "nfl:LV", providerTeamId: "sr-lv" })],
+      new Map([["nfl:KC", "team-uuid-kc"]]),
+      false,
+    );
+    assert.equal(plan.rows.length, 1);
+    assert.equal(plan.skippedUnknownTeams, 1); // heals on the next hierarchy pass
+    assert.deepEqual(plan.rows[0], {
+      teamId: "team-uuid-kc",
+      season: "2026",
+      seasonType: "regular",
+      wins: 11,
+      losses: 6,
+      ties: 0,
+      divisionRank: 1,
+      conferenceRank: null,
+      pointsFor: null,
+      pointsAgainst: null,
+      streak: "W3",
+      homeRecord: "6-2",
+      awayRecord: "5-4",
+      stats: { win_pct: 0.647 },
+    });
+  });
+
+  void it("plans NOTHING from a delayed feed — stale standings must not overwrite fresh ones", () => {
+    const plan = planTeamRecordRows([standing()], new Map([["nfl:KC", "t"]]), true);
+    assert.deepEqual(plan, { rows: [], skippedUnknownTeams: 0 });
+  });
+});

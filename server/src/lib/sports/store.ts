@@ -19,11 +19,13 @@ import { eq, and, isNull, or, asc, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import {
   events,
+  gamePlays,
   injuries,
   leagues,
   markets,
   players,
   sports,
+  teamRecords,
   teams,
 } from "../../db/schema/index.ts";
 import type { OnChainMarketDetail } from "./markets-onchain.ts";
@@ -35,7 +37,17 @@ import type {
   ProviderTeam,
   SportsDataProvider,
 } from "./provider.ts";
-import { planInjuryTransitions, recordFeedPoll, type InjuryTransitionPlan } from "./ingest.ts";
+import {
+  planGamePlayRows,
+  planInjuryTransitions,
+  planTeamRecordRows,
+  recordFeedPoll,
+  selectPbpTargets,
+  PBP_FINAL_GRACE_SECONDS,
+  type InjuryTransitionPlan,
+  type TeamRecordPlan,
+} from "./ingest.ts";
+import { canonicalToPublicSlate, type PublicSlate } from "./public-slate.ts";
 
 /** The catalog the covered leagues hang off. Mirrors DM-105. */
 const CATALOG: Record<
@@ -423,6 +435,159 @@ export async function applyInjuryPlan(
   return result;
 }
 
+// ─── Standings → team_records writer (task 041) ─────────────────────────────
+
+/**
+ * Apply a planned standings snapshot (see `planTeamRecordRows` in ingest.ts —
+ * the pure half). Upsert keyed on the schema's (team, season, seasonType)
+ * unique, overwriting in place per the table's snapshot convention;
+ * `updatedAt` is the staleness signal `getStandings` readers surface.
+ */
+export async function upsertTeamRecords(
+  db: DB,
+  provider: string,
+  plan: TeamRecordPlan,
+): Promise<number> {
+  let written = 0;
+  for (const r of plan.rows) {
+    await db
+      .insert(teamRecords)
+      .values({ ...r, provider })
+      .onConflictDoUpdate({
+        target: [teamRecords.teamId, teamRecords.season, teamRecords.seasonType],
+        set: {
+          wins: r.wins,
+          losses: r.losses,
+          ties: r.ties,
+          divisionRank: r.divisionRank,
+          conferenceRank: r.conferenceRank,
+          pointsFor: r.pointsFor,
+          pointsAgainst: r.pointsAgainst,
+          streak: r.streak,
+          homeRecord: r.homeRecord,
+          awayRecord: r.awayRecord,
+          stats: r.stats,
+          provider,
+          updatedAt: sql`now()`,
+        },
+      });
+    written += 1;
+  }
+  return written;
+}
+
+// ─── Play-by-play ingestion (task 041) ──────────────────────────────────────
+
+export interface PlayByPlayRefreshResult {
+  league: LeagueSlug;
+  provider: string;
+  /** Live/just-finished games that qualified this tick (pre-cap). */
+  gamesConsidered: number;
+  /** Games actually fetched (post-cap, post-failure). */
+  gamesPolled: number;
+  playsInserted: number;
+  delayed: boolean;
+}
+
+/**
+ * The pbp ingestion pass (S-005 wiring): fetch play-by-play for LIVE and
+ * just-finished games only, on a bounded per-tick rotation, and append into
+ * `game_plays`.
+ *
+ * Quota posture: `selectPbpTargets` (pure, tested) is the only source of
+ * fetch targets — scheduled games and long-finished games can never spend a
+ * call, and at most `maxGames` games are fetched per tick regardless of how
+ * busy the slate is. The (event, provider, sequence) unique makes re-ingest
+ * an append-only no-op, so a game polled while live and again after closing
+ * only ever adds the missing tail.
+ *
+ * A `delayed` pbp feed is still written: stale plays are plays that DID
+ * happen (append-only, never overwritten), unlike a stale injury list which
+ * would wrongly "heal" players. The flag is recorded per-feed for health
+ * reporting.
+ *
+ * Returns null when the provider offers no pbp capability (ESPN).
+ */
+export async function refreshPlayByPlay(
+  db: DB,
+  provider: SportsDataProvider,
+  league: LeagueSlug,
+  maxGames = 2,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): Promise<PlayByPlayRefreshResult | null> {
+  const getPlayByPlay = provider.getPlayByPlay?.bind(provider);
+  if (typeof getPlayByPlay !== "function") return null;
+
+  const leagueId = await ensureLeague(db, league);
+  const graceStart = new Date((nowSeconds - PBP_FINAL_GRACE_SECONDS) * 1000);
+  const rows = await db
+    .select({
+      id: events.id,
+      providerEventId: events.providerEventId,
+      status: events.status,
+      startsAt: events.startsAt,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.leagueId, leagueId),
+        eq(events.provider, provider.name),
+        or(
+          eq(events.status, "in_progress"),
+          and(eq(events.status, "final"), sql`${events.startsAt} >= ${graceStart}`),
+        ),
+      ),
+    );
+
+  const targets = selectPbpTargets(
+    rows.map((r) => ({
+      providerEventId: r.providerEventId,
+      status: r.status,
+      startsAt: Math.floor(r.startsAt.getTime() / 1000),
+    })),
+    nowSeconds,
+    maxGames,
+  );
+  const idByProviderEventId = new Map(rows.map((r) => [r.providerEventId, r.id]));
+
+  const result: PlayByPlayRefreshResult = {
+    league,
+    provider: provider.name,
+    gamesConsidered: rows.length,
+    gamesPolled: 0,
+    playsInserted: 0,
+    delayed: false,
+  };
+
+  for (const target of targets) {
+    const eventId = idByProviderEventId.get(target.providerEventId);
+    if (eventId === undefined) continue;
+    try {
+      const feed = await getPlayByPlay(league, target.providerEventId);
+      result.delayed ||= feed.delayed;
+      const planned = planGamePlayRows(eventId, feed.provider, feed.items);
+      if (planned.length > 0) {
+        const inserted = await db
+          .insert(gamePlays)
+          .values(planned)
+          .onConflictDoNothing()
+          .returning({ id: gamePlays.id });
+        result.playsInserted += inserted.length;
+      }
+      result.gamesPolled += 1;
+    } catch (err) {
+      // One game's pbp failing must not stop the rotation or the tick.
+      logger.warn(
+        { league, providerEventId: target.providerEventId, err: String(err) },
+        "sports: play-by-play fetch failed",
+      );
+    }
+  }
+
+  recordFeedPoll("pbp", league, provider.name, result.delayed);
+  return result;
+}
+
 // ─── Reference-data refresh (S-003 orchestration) ───────────────────────────
 
 export interface ReferenceRefreshResult {
@@ -432,6 +597,12 @@ export interface ReferenceRefreshResult {
   teams: { upserted: number; eventsLinked: number; delayed: boolean } | null;
   rosters: { teamsRefreshed: number; playersUpserted: number } | null;
   injuries: (InjuryApplyResult & { reports: number; delayed: boolean }) | null;
+  standings: {
+    reports: number;
+    upserted: number;
+    skippedUnknownTeams: number;
+    delayed: boolean;
+  } | null;
 }
 
 /**
@@ -458,6 +629,7 @@ export async function refreshReferenceData(
     teams: null,
     rosters: null,
     injuries: null,
+    standings: null,
   };
 
   let teamIdsByKey: ReadonlyMap<string, string> = new Map();
@@ -501,6 +673,32 @@ export async function refreshReferenceData(
     result.injuries = { ...applied, reports: feed.items.length, delayed: feed.delayed };
   }
 
+  // Task 041 — standings snapshot into `team_records`. The pure planner
+  // refuses delayed feeds (a stale table must not overwrite a fresher one);
+  // teams missing from the canonical table are skipped and heal on the next
+  // hierarchy pass.
+  if (typeof provider.getStandings === "function") {
+    const feed = await provider.getStandings(league);
+    let ids: ReadonlyMap<string, string> = teamIdsByKey;
+    if (ids.size === 0) {
+      const leagueId = await ensureLeague(db, league);
+      const teamRows = await db
+        .select({ id: teams.id, key: teams.key })
+        .from(teams)
+        .where(eq(teams.leagueId, leagueId));
+      ids = new Map(teamRows.map((t) => [t.key, t.id]));
+    }
+    const plan = planTeamRecordRows(feed.items, ids, feed.delayed);
+    const upserted = await upsertTeamRecords(db, feed.provider, plan);
+    recordFeedPoll("standings", league, feed.provider, feed.delayed);
+    result.standings = {
+      reports: feed.items.length,
+      upserted,
+      skippedUnknownTeams: plan.skippedUnknownTeams,
+      delayed: feed.delayed,
+    };
+  }
+
   return result;
 }
 
@@ -517,6 +715,11 @@ export interface CanonicalEventRow {
   homeScore: number | null;
   awayScore: number | null;
   lastPolledAt: Date | null;
+  /** Mantua's own opening line for the HOME moneyline market (0–1 decimal
+   *  string), when one was minted — the pre-pool probability the board
+   *  shows until `withLiveOdds` overlays the live pool price. Null when no
+   *  market exists for the game. */
+  homeOpeningProbability: string | null;
 }
 
 export interface CanonicalSlate {
@@ -533,9 +736,8 @@ export interface CanonicalSlate {
 }
 
 /**
- * Last-good events for a league from the canonical table — the serve-through
- * copy for provider outages. Window defaults to yesterday→+7d, mirroring the
- * board's horizon.
+ * Last-good events for a league from the canonical table. Window defaults to
+ * yesterday→+7d, mirroring the board's horizon.
  */
 export async function readCanonicalSlate(
   db: DB,
@@ -544,9 +746,38 @@ export async function readCanonicalSlate(
   windowBackDays = 1,
   windowForwardDays = 7,
 ): Promise<CanonicalSlate> {
+  return readCanonicalSlateRange(
+    db,
+    league,
+    (nowSeconds - windowBackDays * 86_400) * 1000,
+    (nowSeconds + windowForwardDays * 86_400) * 1000,
+  );
+}
+
+/**
+ * Canonical events for a league in an explicit [fromMs, toMs] window — the
+ * board's `?dates=` browsing read (task 041: the interactive slate read is
+ * canonical-first; ESPN lives only inside ingestion now).
+ *
+ * Mantua's opening line for each game's home moneyline market rides along
+ * (left join — games without a minted market carry null), so the board can
+ * show a probability before the pool trades; `withLiveOdds` overlays the
+ * live pool price on top exactly as it did over provider slates.
+ *
+ * When the window holds no events, `dataAsOf` still reports the league's
+ * most recent ingest time (if any), so "empty because it's an off-day" and
+ * "empty because nothing was ever ingested" stay distinguishable.
+ */
+export async function readCanonicalSlateRange(
+  db: DB,
+  league: LeagueSlug,
+  fromMs: number,
+  toMs: number,
+  chainId = 8453,
+): Promise<CanonicalSlate> {
   const leagueId = await ensureLeague(db, league);
-  const from = new Date((nowSeconds - windowBackDays * 86_400) * 1000);
-  const to = new Date((nowSeconds + windowForwardDays * 86_400) * 1000);
+  const from = new Date(fromMs);
+  const to = new Date(toMs);
   const rows = await db
     .select({
       providerEventId: events.providerEventId,
@@ -559,8 +790,18 @@ export async function readCanonicalSlate(
       homeScore: events.homeScore,
       awayScore: events.awayScore,
       lastPolledAt: events.lastPolledAt,
+      homeOpeningProbability: markets.openingProbability,
     })
     .from(events)
+    .leftJoin(
+      markets,
+      and(
+        eq(markets.eventId, events.id),
+        eq(markets.marketType, "moneyline"),
+        eq(markets.outcomeIndex, 0),
+        eq(markets.chainId, chainId),
+      ),
+    )
     .where(
       and(
         eq(events.leagueId, leagueId),
@@ -574,7 +815,36 @@ export async function readCanonicalSlate(
     const t = r.lastPolledAt?.getTime();
     if (t !== undefined && (dataAsOf === null || t > dataAsOf)) dataAsOf = t;
   }
+  if (rows.length === 0) {
+    // Off-day vs never-ingested: report the league's overall ingest time.
+    const agg = await db
+      .select({ max: sql<Date | string | null>`max(${events.lastPolledAt})` })
+      .from(events)
+      .where(eq(events.leagueId, leagueId));
+    const raw = agg.at(0)?.max ?? null;
+    if (raw !== null) {
+      const t = raw instanceof Date ? raw.getTime() : Date.parse(raw);
+      if (Number.isFinite(t)) dataAsOf = t;
+    }
+  }
   return { events: rows, dataAsOf };
+}
+
+/**
+ * The canonical slate as a ready-to-serve `PublicSlate` (task 041) — the
+ * shared read for the board route and the chat agents' `get_sports_slate`.
+ * `delayed` is computed from the ingest freshness (`dataAsOf`), so callers
+ * surface staleness instead of assuming liveness.
+ */
+export async function readCanonicalPublicSlate(
+  db: DB,
+  league: LeagueSlug,
+  range?: { fromMs: number; toMs: number },
+): Promise<PublicSlate> {
+  const canonical = range
+    ? await readCanonicalSlateRange(db, league, range.fromMs, range.toMs)
+    : await readCanonicalSlate(db, league);
+  return canonicalToPublicSlate(league, canonical, { now: Date.now() });
 }
 
 // ─── Market rows (B4-006 prerequisite) ──────────────────────────────────────

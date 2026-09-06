@@ -10,8 +10,10 @@ import {
   parseSportradarGame,
   parseSportradarHierarchy,
   parseSportradarInjuries,
+  parseSportradarPlays,
   parseSportradarRoster,
   parseSportradarSchedule,
+  parseSportradarStandings,
   politeFetch,
 } from "./sportradar.ts";
 
@@ -125,6 +127,131 @@ const INJURIES = {
           id: "33cad59b-2dae-4d1d-a9b4-4f4f9d0f4a6f",
           name: "Unknown Status",
           injuries: [{ id: "i-x", status: "Mysterious", primary: "Unknown" }],
+        },
+      ],
+    },
+  ],
+};
+
+// Task 041 — pbp shape per nfl-play-by-play: periods[] → pbp[] (drives with
+// events[]) → play objects; sequence is an epoch-ms-scale ordering number.
+const PBP = {
+  id: GAME.id,
+  status: "inprogress",
+  quarter: 2,
+  clock: "12:34",
+  periods: [
+    {
+      period_type: "quarter",
+      number: 1,
+      sequence: 1,
+      pbp: [
+        {
+          type: "drive",
+          id: "drive-1",
+          events: [
+            {
+              type: "play",
+              id: "play-1",
+              sequence: 1698611000000,
+              clock: "15:00",
+              play_type: "kickoff",
+              description: "L.Kicker kicks 65 yards from LV 35 to the end zone, touchback.",
+              home_points: 0,
+              away_points: 0,
+              wall_clock: "2026-09-13T17:01:33+00:00",
+              start_situation: {
+                possession: { id: "t-lv", name: "Raiders", market: "Las Vegas", alias: "LV" },
+              },
+              end_situation: {
+                possession: { id: "t-kc", name: "Chiefs", market: "Kansas City", alias: "KC" },
+              },
+            },
+            {
+              type: "event", // a non-play pbp event (e.g. a comment) — skipped
+              id: "ev-1",
+              sequence: 1698611010000,
+              description: "Officials review the spot.",
+            },
+            {
+              type: "play",
+              id: "play-2",
+              sequence: 1698611137531,
+              clock: "12:34",
+              play_type: "pass",
+              scoring_play: true,
+              description: "P.Sample passes deep left, TOUCHDOWN.",
+              home_points: 7,
+              away_points: 0,
+              start_situation: {
+                possession: { id: "t-kc", name: "Chiefs", market: "Kansas City", alias: "KC" },
+              },
+              end_situation: {
+                possession: { id: "t-lv", name: "Raiders", market: "Las Vegas", alias: "LV" },
+              },
+            },
+            { type: "play", id: "play-broken" }, // no sequence — skipped, never guessed
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+// Task 041 — standings shape per nfl-postgame-standings: season{year,type} +
+// conferences[].divisions[].teams[] with rank/streak objects and a records[]
+// array of categorised splits (home / road / …).
+const STANDINGS = {
+  season: { id: "s-2026", year: 2026, type: "REG", name: "REG" },
+  conferences: [
+    {
+      id: "afc",
+      name: "AFC",
+      divisions: [
+        {
+          id: "afc-west",
+          name: "AFC West",
+          teams: [
+            {
+              id: "82d2d380-3834-4938-835f-aec541e5ece7",
+              name: "Chiefs",
+              market: "Kansas City",
+              alias: "KC",
+              sr_id: "sr:competitor:4422",
+              wins: 11,
+              losses: 6,
+              ties: 0,
+              win_pct: 0.647,
+              points_for: 410,
+              points_against: 333,
+              rank: { division: 1, conference: 3, clinched: "division" },
+              streak: { type: "win", length: 3, desc: "W3" },
+              records: [
+                { category: "home", wins: 6, losses: 2, ties: 0, win_pct: 0.75 },
+                { category: "road", wins: 5, losses: 4, ties: 0, win_pct: 0.556 },
+                { category: "division", wins: 4, losses: 2, ties: 0, win_pct: 0.667 },
+              ],
+            },
+            {
+              id: "7d4fcc64-9cb5-4d1b-8e75-8a906d1e1576",
+              name: "Raiders",
+              market: "Las Vegas",
+              alias: "LV",
+              wins: 7,
+              losses: 9,
+              ties: 1,
+              win_pct: 0.441,
+              points_for: 301,
+              points_against: 355,
+              rank: { division: 3, conference: 12 },
+              streak: { type: "loss", length: 2, desc: "L2" },
+              records: [
+                { category: "home", wins: 4, losses: 4, ties: 1 },
+                { category: "road", wins: 3, losses: 5, ties: 0 },
+              ],
+            },
+            { name: "No Id Or Record" }, // malformed — skipped, never guessed
+          ],
         },
       ],
     },
@@ -256,6 +383,81 @@ void describe("parseSportradarInjuries", () => {
   void it("drops reports whose designation it does not recognise", () => {
     const reports = parseSportradarInjuries(INJURIES, "nfl");
     assert.ok(!reports.some((r) => r.playerName === "Unknown Status"));
+  });
+});
+
+// ─── Task 041 parsers: play-by-play + standings ─────────────────────────────
+
+void describe("parseSportradarPlays (041 / S-005)", () => {
+  void it("walks periods → pbp drives → events and keeps only typed plays with a sequence", () => {
+    const plays = parseSportradarPlays(PBP, "nfl");
+    assert.equal(plays.length, 2); // the non-play event and the broken play drop
+    assert.deepEqual(plays[0], {
+      sequence: 1698611000000,
+      period: 1,
+      clock: "15:00",
+      playType: "kickoff",
+      description: "L.Kicker kicks 65 yards from LV 35 to the end zone, touchback.",
+      teamKey: "nfl:LV",
+      scoringPlay: false,
+      homeScore: 0,
+      awayScore: 0,
+      detail: { possessionAfter: "nfl:KC", wallClock: "2026-09-13T17:01:33+00:00" },
+    });
+  });
+
+  void it("keeps the epoch-ms-scale sequence verbatim — it is the append cursor", () => {
+    const plays = parseSportradarPlays(PBP, "nfl");
+    assert.equal(plays[1].sequence, 1698611137531);
+    assert.ok(plays[1].sequence > 2 ** 31, "sequence exceeds int4 — the 0015 bigint migration exists for this");
+  });
+
+  void it("marks scoring plays and derives possession keys from the documented aliases", () => {
+    const [, td] = parseSportradarPlays(PBP, "nfl");
+    assert.equal(td.scoringPlay, true);
+    assert.equal(td.teamKey, "nfl:KC"); // possession at the play's start
+    assert.equal(td.detail?.["possessionAfter"], "nfl:LV"); // ball after the play
+    assert.deepEqual([td.homeScore, td.awayScore], [7, 0]);
+  });
+
+  void it("refuses a payload without a periods array", () => {
+    assert.throws(() => parseSportradarPlays({ nope: true }, "nfl"), /periods/);
+  });
+});
+
+void describe("parseSportradarStandings (041 / S-006)", () => {
+  void it("flattens conferences → divisions → teams with ranks, streaks, and splits", () => {
+    const lines = parseSportradarStandings(STANDINGS, "nfl");
+    assert.equal(lines.length, 2); // the malformed team drops
+    const kc = lines[0];
+    assert.equal(kc.teamKey, "nfl:KC");
+    assert.equal(kc.season, "2026");
+    assert.equal(kc.seasonType, "regular");
+    assert.deepEqual([kc.wins, kc.losses, kc.ties], [11, 6, 0]);
+    assert.equal(kc.divisionRank, 1);
+    assert.equal(kc.conferenceRank, 3);
+    assert.deepEqual([kc.pointsFor, kc.pointsAgainst], [410, 333]);
+    assert.equal(kc.streak, "W3");
+    assert.equal(kc.homeRecord, "6-2");
+    assert.equal(kc.awayRecord, "5-4"); // Sportradar's away category is "road"
+  });
+
+  void it("lands win_pct and every categorised split in the stats aggregate map", () => {
+    const [kc] = parseSportradarStandings(STANDINGS, "nfl");
+    assert.equal(kc.stats["win_pct"], 0.647);
+    assert.equal(kc.stats["home_wins"], 6);
+    assert.equal(kc.stats["road_win_pct"], 0.556);
+    assert.equal(kc.stats["division_wins"], 4);
+  });
+
+  void it("composes a tie-carrying record string and a streak from type+length when desc is odd", () => {
+    const [, lv] = parseSportradarStandings(STANDINGS, "nfl");
+    assert.equal(lv.homeRecord, "4-4-1");
+    assert.equal(lv.streak, "L2");
+  });
+
+  void it("refuses a payload without season/conferences", () => {
+    assert.throws(() => parseSportradarStandings({ conferences: [] }, "nfl"), /season/);
   });
 });
 
@@ -414,5 +616,24 @@ void describe("SportradarProvider", () => {
   void it("refuses leagues outside the licensed package instead of guessing", async () => {
     const { p } = provider({});
     await assert.rejects(() => p.getSlate("wnba"));
+  });
+
+  void it("serves play-by-play from /games/{id}/pbp.json (041)", async () => {
+    const { p, calls } = provider({ [`/games/${GAME.id}/pbp.json`]: PBP });
+    const feed = await p.getPlayByPlay("nfl", GAME.id);
+    assert.equal(feed.provider, "sportradar");
+    assert.equal(feed.items.length, 2);
+    assert.ok(calls[0].includes(`/games/${GAME.id}/pbp.json`));
+  });
+
+  void it("resolves the season pointer before fetching standings (041)", async () => {
+    const { p, calls } = provider({
+      "/games/current_week/schedule.json": SCHEDULE,
+      "/seasons/2026/REG/standings/season.json": STANDINGS,
+    });
+    const feed = await p.getStandings("nfl");
+    assert.equal(feed.items.length, 2);
+    assert.equal(feed.items[0].teamKey, "nfl:KC");
+    assert.ok(calls.some((u) => u.includes("/seasons/2026/REG/standings/season.json")));
   });
 });

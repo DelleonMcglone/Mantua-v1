@@ -5,6 +5,7 @@ import {
   varchar,
   timestamp,
   index,
+  bigint,
   integer,
   smallint,
   boolean,
@@ -47,8 +48,11 @@ export const gamePlays = pgTable(
       .notNull()
       .references(() => events.id, { onDelete: "cascade" }),
     provider: varchar("provider", { length: 32 }).notNull(),
-    /** Provider's play ordering within the game — the append cursor. */
-    sequence: integer("sequence").notNull(),
+    /** Provider's play ordering within the game — the append cursor.
+     *  Bigint (migration 0015): Sportradar documents pbp `sequence` as an
+     *  epoch-milliseconds-scale number, which overflows int4. Values stay
+     *  far below 2^53, so number mode is safe. */
+    sequence: bigint("sequence", { mode: "number" }).notNull(),
     /** Period/quarter/half/inning number, provider-normalised. */
     period: smallint("period"),
     /** Game clock at the play, provider format (e.g. "12:34"). */

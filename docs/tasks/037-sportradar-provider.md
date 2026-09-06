@@ -33,8 +33,11 @@ canonical DB → UI + agents; agents never hit the provider per-request.**
   - rosters → `/teams/{team_id}/full_roster.json`
   - injuries → `/seasons/{year}/{type}/{week}/injuries.json` (week resolved
     from the current-week schedule payload)
-  - play-by-play (`/games/{game_id}/pbp.json`) is pinned in the header for
-    future prop markets, not consumed yet.
+  - play-by-play (`/games/{game_id}/pbp.json`) — pinned here for future
+    markets; **consumed since task 041** (`game_plays` ingestion for live
+    and just-finished games, on a quota-bounded rotation), alongside the
+    041-pinned standings feed
+    (`/seasons/{year}/{type}/standings/season.json` → `team_records`).
 - **No guessed fields.** Parsers read `unknown` and validate (espn.ts
   posture); mappings that could not be verified from docs are marked
   TODO-verify (roster status codes without prose definitions; whether the
@@ -100,10 +103,14 @@ WNBA on ESPN, no code change either way.
   provider AND its stale cache are both gone — the board renders old data
   labeled as old instead of blanking. Resolution still refuses anything
   delayed (unchanged).
-- The interactive slate route stays on ESPN for `?dates=` browsing (a
-  trial Sportradar quota belongs to ingestion, not page loads); flipping
-  the board's primary read fully onto canonical-DB reads is the natural
-  follow-through once Sportradar is under contract.
+- ~~The interactive slate route stays on ESPN for `?dates=` browsing~~ —
+  **closed by task 041** (`041-ingestion-tools-wiring.md`): the board's
+  `?dates=` read now serves the canonical tables via
+  `readCanonicalPublicSlate` (with `dataAsOf` + a freshness-computed
+  `delayed`), and the direct `EspnProvider` instances in `agent-chat.ts` /
+  `research-chat.ts` were replaced with the same canonical read. Providers
+  are now reached ONLY from ingestion (cron-sports-sync, cron-resolution,
+  strategies' live checks).
 
 ### Tests (44 new assertions across the sports suite)
 
