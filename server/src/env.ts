@@ -180,6 +180,25 @@ const schema = z.object({
   /** Daily x402 spend ceiling in USDC (summed from the audit log). */
   X402_DAILY_CAP_USD: z.coerce.number().positive().default(1),
 
+  // ── Sports data provider (S-001/S-003, D-102) ────────────────────────
+  /** Sportradar API key (Console master key, `x-api-key` header auth).
+   *  Optional: absent → the licensed adapter is unavailable and the sports
+   *  layer falls back to the ESPN prototyping adapter (espn.ts). The key
+   *  itself comes from the operator's Sportradar account; contract signature
+   *  is operator-side work tracked in D-102. */
+  SPORTRADAR_API_KEY: z
+    .string()
+    .min(1)
+    // Like CIRCLE_API_KEY: no shape guess beyond "no whitespace" — Sportradar
+    // has changed key lengths before (24 → 40 chars) and is the only
+    // authority on the format.
+    .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
+    .optional(),
+  /** Sportradar access level — the URL path segment AND the politeness
+   *  profile. `trial` keys are hard-limited to 1 QPS / 1,000 calls per
+   *  rolling 30 days, so the adapter stretches its TTLs accordingly. */
+  SPORTRADAR_ENV: z.enum(["trial", "production"]).default("trial"),
+
   /** Pyth Hermes base URL — primary off-chain price source (DefiLlama is the
    *  fallback). Override to point at a self-hosted Hermes; feature is always-on
    *  with graceful fallback, so no separate enable flag. */

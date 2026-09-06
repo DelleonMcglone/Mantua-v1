@@ -1,11 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
-import { EspnProvider } from "../lib/sports/espn.ts";
-import { refreshSlate } from "../lib/sports/ingest.ts";
+import { activeBreakerState, providerFor } from "../lib/sports/active-provider.ts";
+import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
+  refreshReferenceData,
   upsertEvents,
   upsertMarketRows,
 } from "../lib/sports/store.ts";
@@ -19,9 +20,6 @@ import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 
 export const cronSportsSyncRouter = Router();
-
-/** One provider instance so the breaker and cache state survive across runs. */
-const espn = new EspnProvider();
 
 /** The covered leagues, per DM-105. Promotion is a data change elsewhere. */
 const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
@@ -86,12 +84,21 @@ cronSportsSyncRouter.get(
     }
     for (const league of LEAGUES) {
       try {
+        // D-102/S-003: Sportradar (licensed) where configured and covering
+        // the league; ESPN (prototyping fallback) otherwise. Selection is
+        // per league — NFL can be on Sportradar while WNBA stays on ESPN.
+        const provider = providerFor(league);
         const perChain: Record<string, unknown> = {};
         let eventsPersisted: unknown = null;
         for (const chainId of chains) {
           // Market ids are chain-distinct (market-id.ts), so each chain
           // gets its own plan against the same slate fetch (provider-cached).
-          const refresh = await refreshSlate(espn, league, Math.floor(Date.now() / 1000), chainId);
+          const refresh = await refreshSlate(
+            provider,
+            league,
+            Math.floor(Date.now() / 1000),
+            chainId,
+          );
           if (eventsPersisted === null) {
             eventsPersisted = await upsertEvents(db, refresh.provider, league, refresh.events);
           }
@@ -108,7 +115,19 @@ cronSportsSyncRouter.get(
             marketsOnChain: creation ?? "disabled (no signer for this chain)",
           };
         }
-        results[league] = { events: eventsPersisted, chains: perChain };
+        // S-003: teams/players/injuries into the canonical tables, when the
+        // provider offers the capabilities (Sportradar does; ESPN yields
+        // all-null and the pass is a no-op). Failure here must not undo the
+        // slate work above — reference data heals on the next tick.
+        let reference: unknown = null;
+        try {
+          reference = await refreshReferenceData(db, provider, league);
+        } catch (err) {
+          logger.warn({ league, err }, "sports-sync: reference-data pass failed");
+          reference = { error: err instanceof Error ? err.message : String(err) };
+        }
+
+        results[league] = { events: eventsPersisted, reference, chains: perChain };
       } catch (err) {
         failures += 1;
         logger.error({ league, err }, "sports-sync: league failed");
@@ -118,7 +137,8 @@ cronSportsSyncRouter.get(
 
     res.status(failures === LEAGUES.length ? 502 : 200).json({
       ok: failures < LEAGUES.length,
-      breakers: espn.breakerState(),
+      breakers: activeBreakerState(),
+      feeds: feedFreshnessSnapshot(),
       reclaimed,
       rebanded,
       leagues: results,

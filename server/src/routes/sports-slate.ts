@@ -1,13 +1,25 @@
 import { Router, type Request, type Response } from "express";
+import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
-import { EspnProvider } from "../lib/sports/espn.ts";
-import { toPublicSlate, type PublicSlate } from "../lib/sports/public-slate.ts";
+import { espnFallback } from "../lib/sports/active-provider.ts";
+import {
+  canonicalToPublicSlate,
+  toPublicSlate,
+  type PublicSlate,
+} from "../lib/sports/public-slate.ts";
+import { readCanonicalSlate } from "../lib/sports/store.ts";
 import { withLiveOdds } from "../lib/sports/live-odds.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 
 export const sportsSlateRouter = Router();
 
-const espn = new EspnProvider();
+// The interactive board read stays on the ESPN adapter: its `?dates=` range
+// browsing is an ESPN-specific extension, and a Sportradar TRIAL key's
+// 1,000-calls/30-days quota belongs to ingestion, not to page loads. The
+// canonical tables (fed by Sportradar when licensed — S-003) are the outage
+// fallback below, and the intended end-state primary read per the phase's
+// provider → ingest → canonical DB → UI rule.
+const espn = espnFallback();
 const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
 
 function isLeague(value: unknown): value is LeagueSlug {
@@ -73,6 +85,19 @@ sportsSlateRouter.get("/api/sports/slate", async (req: Request, res: Response) =
         );
       } catch (err) {
         logger.warn({ league, err }, "sports-slate: fetch failed");
+        // S-003 outage path: the provider is down AND its stale-grace cache
+        // is exhausted — serve last-good canonical rows with an explicit
+        // `dataAsOf` instead of blanking the league. An empty canonical
+        // table (nothing ever ingested) still reports the error.
+        try {
+          const canonical = await readCanonicalSlate(db, league);
+          if (canonical.events.length > 0) {
+            slates[league] = canonicalToPublicSlate(league, canonical);
+            return;
+          }
+        } catch (fallbackErr) {
+          logger.warn({ league, err: fallbackErr }, "sports-slate: canonical fallback failed");
+        }
         slates[league] = { error: "Slate temporarily unavailable" };
       }
     }),

@@ -25,6 +25,7 @@ import { probabilityToPrice } from "../probability.ts";
 import {
   type LeagueSlug,
   type ProviderEvent,
+  type ProviderInjuryReport,
   type SportsDataProvider,
   isSettleable,
   isVoidStatus,
@@ -180,6 +181,8 @@ export async function refreshSlate(
     logger.warn({ league, provider: slate.provider }, "sports: slate is delayed");
   }
 
+  recordFeedPoll("slate", league, slate.provider, slate.delayed);
+
   return {
     league,
     provider: slate.provider,
@@ -188,3 +191,132 @@ export async function refreshSlate(
     marketsPlanned,
   };
 }
+
+// ─── Per-feed freshness (S-003) ─────────────────────────────────────────────
+//
+// The `events` table already carries `last_polled_at` per row; teams and
+// players carry `updated_at`. What the schema deliberately does NOT carry is
+// per-FEED bookkeeping — that is process state, tracked here in the same
+// spirit as the resilience layer's breaker snapshots ("extend the pattern,
+// not the schema"). `lastGoodAt` only advances on a non-delayed fetch, so
+// `lastPolledAt − lastGoodAt` is exactly how long a feed has been limping.
+
+export type FeedName = "slate" | "teams" | "rosters" | "injuries";
+
+export interface FeedFreshness {
+  provider: string;
+  /** Last attempt that returned at all (fresh OR stale-grace). */
+  lastPolledAt: number;
+  /** Last genuinely fresh (non-delayed) result. */
+  lastGoodAt: number | null;
+  delayed: boolean;
+}
+
+const feedFreshness = new Map<string, FeedFreshness>();
+
+export function recordFeedPoll(
+  feed: FeedName,
+  league: LeagueSlug,
+  provider: string,
+  delayed: boolean,
+  now: number = Date.now(),
+): void {
+  const key = `${league}:${feed}`;
+  const prev = feedFreshness.get(key);
+  feedFreshness.set(key, {
+    provider,
+    lastPolledAt: now,
+    lastGoodAt: delayed ? (prev?.lastGoodAt ?? null) : now,
+    delayed,
+  });
+}
+
+/** Snapshot for health endpoints and the sync tick's report. */
+export function feedFreshnessSnapshot(): Record<string, FeedFreshness> {
+  return Object.fromEntries(feedFreshness.entries());
+}
+
+// ─── Injury open/resolve planning (S-003) ───────────────────────────────────
+
+/** An open injury row as the planner sees it (store supplies the real rows). */
+export interface OpenInjuryRow {
+  id: string;
+  providerPlayerId: string;
+  status: string;
+  description: string | null;
+}
+
+/** What the store should do to the `injuries` table for one feed read. */
+export interface InjuryTransitionPlan {
+  /** Row ids whose report is over — player recovered or status changed. */
+  resolve: string[];
+  /** New reports to insert as open rows. */
+  open: ProviderInjuryReport[];
+  /** Row ids unchanged by this read (freshness bump only). */
+  touch: string[];
+}
+
+/**
+ * Decide open/resolve transitions from the current feed against the open
+ * rows. Pure, so the rules are testable without a database:
+ *
+ *  - report with no open row            → open a new row
+ *  - report matching an open row        → touch (same status + description)
+ *  - report differing from the open row → resolve old, open new (history is
+ *    append-only; a status change is a new report, per the schema's comment
+ *    that a player's current status is the LATEST open row)
+ *  - open row with no report            → resolve (the player dropped off
+ *    the injury report, i.e. returned)
+ *
+ * `delayed` feeds plan nothing: a stale injury list must not "recover" every
+ * player just because the fetch limped (same asymmetry as settlement — a
+ * wrong resolve is worse than a late one).
+ */
+export function planInjuryTransitions(
+  openRows: readonly OpenInjuryRow[],
+  reports: readonly ProviderInjuryReport[],
+  delayed: boolean,
+): InjuryTransitionPlan {
+  if (delayed) return { resolve: [], open: [], touch: [] };
+
+  const plan: InjuryTransitionPlan = { resolve: [], open: [], touch: [] };
+  const openByPlayer = new Map<string, OpenInjuryRow[]>();
+  for (const row of openRows) {
+    const list = openByPlayer.get(row.providerPlayerId) ?? [];
+    list.push(row);
+    openByPlayer.set(row.providerPlayerId, list);
+  }
+
+  const reported = new Set<string>();
+  for (const report of reports) {
+    // One report per player per read: the adapter already picked the latest.
+    if (reported.has(report.providerPlayerId)) continue;
+    reported.add(report.providerPlayerId);
+
+    const open = openByPlayer.get(report.providerPlayerId) ?? [];
+    const match = open.find(
+      (row) =>
+        row.status === report.status && (row.description ?? null) === (report.description ?? null),
+    );
+    if (match) {
+      plan.touch.push(match.id);
+      // Duplicated/superseded open rows for the same player resolve — the
+      // "current status is the latest open row" convention wants one.
+      for (const row of open) if (row.id !== match.id) plan.resolve.push(row.id);
+    } else {
+      for (const row of open) plan.resolve.push(row.id);
+      plan.open.push(report);
+    }
+  }
+
+  for (const [playerId, rows] of openByPlayer) {
+    if (reported.has(playerId)) continue;
+    for (const row of rows) plan.resolve.push(row.id);
+  }
+
+  return plan;
+}
+
+// The effectful half of the reference-data pass — `refreshReferenceData` —
+// lives in store.ts with the other DB writers, so this module stays free of
+// runtime DB imports and its planners stay unit-testable under the stub env.
