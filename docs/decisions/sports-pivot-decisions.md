@@ -7,19 +7,19 @@ reasoning, and what was rejected. `✅ CLOSED` is binding on downstream phases;
 
 **Status as of 2026-08-16: 8 closed, 3 open.**
 
-| ID     | Decision                   | Status    | Outcome                                                                        |
-| ------ | -------------------------- | --------- | ------------------------------------------------------------------------------ |
-| DM-101 | Market mechanism           | ✅ CLOSED | Outcome-token AMM — YES/NO ERC-20 against USDC in v4 pools                     |
-| DM-102 | Conditional token standard | ✅ CLOSED | Purpose-built binary ERC-20 pair per market                                    |
-| DM-103 | Resolution authority       | ⏸ OPEN    | Needs owner sign-off — trust model with user-visible consequences              |
-| DM-104 | Chain                      | ✅ CLOSED | Arc Testnet (5042002)                                                          |
-| DM-105 | League coverage            | ✅ CLOSED | NFL and WNBA; other leagues show "Coming soon"                                 |
-| DM-106 | Market types               | ✅ CLOSED | Moneyline at launch; totals deferred to W4 as P2                               |
-| DM-107 | Settlement data source     | ✅ CLOSED | ESPN primary, second provider in W3 for disagreement detection                 |
-| DM-108 | Jurisdictional posture     | ✅ CLOSED | Testnet, implied not marketed — no testnet notice in the UI                    |
-| DM-110 | Dynamic Market Hook spec   | ⏸ BLOCKED | Spec not supplied; B2 (6 × P0) cannot start                                    |
-| DM-111 | Agent wallet path          | ✅ CLOSED | Keep the existing Circle DCW path — Arc fully supported, no migration needed   |
-| DM-112 | Routing split              | ✅ CLOSED | Market pools direct to PoolManager/PositionManager; Trading API for base pairs |
+| ID     | Decision                   | Status    | Outcome                                                                         |
+| ------ | -------------------------- | --------- | ------------------------------------------------------------------------------- |
+| DM-101 | Market mechanism           | ✅ CLOSED | Outcome-token AMM — YES/NO ERC-20 against USDC in v4 pools                      |
+| DM-102 | Conditional token standard | ✅ CLOSED | Purpose-built binary ERC-20 pair per market                                     |
+| DM-103 | Resolution authority       | ✅ CLOSED | 2026-09-06 via D-104 (`v2-open-decisions.md`) — service signer + owner operator |
+| DM-104 | Chain                      | ✅ CLOSED | Arc Testnet (5042002)                                                           |
+| DM-105 | League coverage            | ✅ CLOSED | NFL and WNBA; other leagues show "Coming soon"                                  |
+| DM-106 | Market types               | ✅ CLOSED | Moneyline at launch; totals deferred to W4 as P2                                |
+| DM-107 | Settlement data source     | ✅ CLOSED | ESPN primary, second provider in W3 for disagreement detection                  |
+| DM-108 | Jurisdictional posture     | ✅ CLOSED | Testnet, implied not marketed — no testnet notice in the UI                     |
+| DM-110 | Dynamic Market Hook spec   | ⏸ BLOCKED | Spec not supplied; B2 (6 × P0) cannot start                                     |
+| DM-111 | Agent wallet path          | ✅ CLOSED | Keep the existing Circle DCW path — Arc fully supported, no migration needed    |
+| DM-112 | Routing split              | ✅ CLOSED | Market pools direct to PoolManager/PositionManager; Trading API for base pairs  |
 
 ---
 
@@ -63,7 +63,13 @@ covered.
 
 ---
 
-## DM-103 — Resolution authority ⏸ OPEN
+## DM-103 — Resolution authority ✅ CLOSED 2026-09-06 via D-104
+
+> Closed by **D-104** in `docs/decisions/v2-open-decisions.md`: the proposed
+> default below was adopted — Mantua-held resolver (`signer` = automated
+> service key, `operator` = owner-held override, both rotatable on the
+> `Resolver` contract) plus a mandatory dispute window and an audited
+> manual-override path. The original framing is kept for history.
 
 **Proposed default.** A Mantua-held resolver key with manual override,
 disclosed in the UI.
