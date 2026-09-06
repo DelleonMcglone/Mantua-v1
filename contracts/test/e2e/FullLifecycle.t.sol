@@ -94,9 +94,10 @@ contract FullLifecycleTest is Test {
     }
 
     /// Alice and Bob mint full sets; the pool opens at 50%; Alice LPs; Bob
-    /// buys YES (price moves); kickoff freezes trading but NOT LP exit;
-    /// the resolver settles YES; both redeem; the market ends solvent-empty.
-    function test_fullLifecycle_createSeedTradeFreezeResolveRedeem() public {
+    /// buys YES (price moves); the game kicks off and trading CONTINUES
+    /// in-play (D-103); on final the resolver freezes — swaps halt but NOT
+    /// LP exit; the resolver settles YES; both redeem; solvent-empty.
+    function test_fullLifecycle_createSeedTradeInPlayFreezeResolveRedeem() public {
         // 1. Positions on both sides via split (B1's mint path).
         vm.startPrank(alice);
         usdc.approve(address(market), type(uint256).max);
@@ -148,9 +149,46 @@ contract FullLifecycleTest is Test {
         uint256 bobYesBought = yes.balanceOf(bob) - bobYesBefore;
         assertGt(bobYesBought, 0, "swap must deliver YES");
 
-        // 5. Kickoff. The hook rejects trading with no keeper write ever made
-        //    (timestamp layer), and the market's own freeze is permissionless.
-        vm.warp(kickoff + 1);
+        // 5. Kickoff — and trading CONTINUES (D-103 in-play). The keeper
+        //    marks the game LIVE; Bob trades mid-game, the leg the old
+        //    design forbade. split/merge stay open too.
+        vm.warp(kickoff + 1 hours);
+        vm.prank(signerKey); // registry keeper (spec §0.1: keeper = resolver key)
+        registry.updateMarket(key.toId(), 6000, 8000, I.EventState.LIVE);
+
+        assertTrue(market.isTradeable(), "in-play market reports tradeable");
+        uint256 bobYesMidGame = yes.balanceOf(bob);
+        vm.prank(bob);
+        swapRouter.swap(
+            key,
+            SwapParams({
+                zeroForOne: zeroForOne,
+                amountSpecified: -int256(50e6),
+                sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+            }),
+            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
+            ""
+        );
+        assertGt(yes.balanceOf(bob), bobYesMidGame, "in-play swap must deliver YES");
+        vm.startPrank(bob);
+        usdc.approve(address(market), type(uint256).max);
+        market.split(25e6); // set-minting stays open while trading is open
+        vm.stopPrank();
+
+        // 6. Final whistle. The keeper writes FINAL (halts the pool) and the
+        //    resolver freezes the market (halts split/merge) — the
+        //    data-driven freeze. A stranger still can't freeze: the
+        //    permissionless path waits for kickoff + MAX_EVENT_DURATION.
+        vm.warp(kickoff + 4 hours);
+        vm.expectRevert(Market.TooEarlyToFreeze.selector);
+        market.freeze(); // this test contract is a stranger to the market
+
+        vm.prank(signerKey);
+        registry.updateMarket(key.toId(), 6000, 8000, I.EventState.FINAL);
+        vm.prank(signerKey);
+        resolver.freeze(MARKET_ID);
+        assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
+
         vm.startPrank(bob);
         vm.expectRevert(); // wrapped by v4 as Hooks.Wrap__FailedHookCall
         swapRouter.swap(
@@ -163,10 +201,11 @@ contract FullLifecycleTest is Test {
             PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
             ""
         );
+        vm.expectRevert(Market.NotOpen.selector);
+        market.split(10e6); // split/merge close at freeze, as before
         vm.stopPrank();
-        market.freeze();
 
-        // 6. LP exit stays open during the halt — a frozen market must never
+        // 7. LP exit stays open during the halt — a frozen market must never
         //    trap liquidity (spec §26; hook has no remove-liquidity gate).
         vm.prank(alice);
         lpRouter.modifyLiquidity(
@@ -175,11 +214,11 @@ contract FullLifecycleTest is Test {
             ""
         );
 
-        // 7. The Resolver's signer settles YES (home won).
+        // 8. The Resolver's signer settles YES (home won).
         vm.prank(signerKey);
         resolver.resolve(MARKET_ID, 0);
 
-        // 8. Everyone redeems. YES pays 1 USDC; NO pays nothing.
+        // 9. Everyone redeems. YES pays 1 USDC; NO pays nothing.
         uint256 aliceUsdcBefore = usdc.balanceOf(alice);
         uint256 aliceYes = yes.balanceOf(alice);
         vm.prank(alice);
@@ -192,8 +231,8 @@ contract FullLifecycleTest is Test {
         market.redeem();
         assertEq(usdc.balanceOf(bob), bobUsdcBefore + bobYes, "buyer's YES redeems 1:1 too");
 
-        // 9. Solvency at the end: the market holds exactly the collateral
-        //    backing YES tokens still outstanding (none held by our actors).
+        // 10. Solvency at the end: the market holds exactly the collateral
+        //     backing YES tokens still outstanding (none held by our actors).
         assertEq(yes.balanceOf(alice) + yes.balanceOf(bob), 0, "all YES redeemed");
         assertGe(usdc.balanceOf(address(market)), yes.totalSupply(), "collateral covers remaining YES");
     }

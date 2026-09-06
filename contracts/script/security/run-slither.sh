@@ -55,7 +55,37 @@ except Exception as e:
   popd > /dev/null
 done
 
+# ─── Task 045 (P-013): first-party markets + dynamic-market contracts ───
+#
+# Unlike the vendored hooks above, these live in the main contracts/
+# Foundry project, so Slither runs against the project root using the
+# forge build artifacts. filter-paths keeps the findings to first-party
+# sources (lib deps, tests, scripts, and the vendored hook submodules
+# are out of scope for this pass — the submodules have their own runs).
+echo ""
+echo "═══ slither: markets + dynamic-market (first-party) ═══"
+pushd contracts > /dev/null
+slither . \
+  --foundry-out-directory out \
+  --filter-paths "lib/|test/|script/|hooks/stable-protection|hooks/dynamic-fee" \
+  --no-fail-pedantic \
+  --json "../$OUT_DIR/markets-dynamic-market.json" \
+  > "../$OUT_DIR/markets-dynamic-market.txt" 2>&1 || true
+
+python3 -c "
+import json
+try:
+    d = json.load(open('../$OUT_DIR/markets-dynamic-market.json'))
+    det = d.get('results', {}).get('detectors', [])
+    by = {}
+    for f in det: by[f.get('impact','?')] = by.get(f.get('impact','?'),0)+1
+    print(f'  total findings: {len(det)}  high: {by.get(\"High\",0)}  medium: {by.get(\"Medium\",0)}  low: {by.get(\"Low\",0)}  info: {by.get(\"Informational\",0)}')
+except Exception as e:
+    print(f'  (JSON parse failed: {e})')
+" || echo "  (python summary failed)"
+popd > /dev/null
+
 echo ""
 echo "═══ done ═══"
-echo "Per-hook outputs:"
+echo "Per-target outputs:"
 ls -1 "$OUT_DIR"

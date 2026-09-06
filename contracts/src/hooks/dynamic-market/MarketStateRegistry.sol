@@ -16,9 +16,9 @@ import {MarketErrors} from "./MarketErrors.sol";
 ///      move a kickoff timestamp, or take the operator role (spec §25).
 ///
 ///      Registration is once-only. There is no kickoff setter at all, because
-///      a mutable kickoff would defeat the §6 freeze: the freeze reads that
-///      timestamp, so anyone able to push it forward could keep a started game
-///      tradeable.
+///      a mutable kickoff would defeat the §6 time backstop: the backstop
+///      reads that timestamp, so anyone able to push it forward could keep an
+///      abandoned market tradeable past `kickoff + MAX_EVENT_DURATION`.
 contract MarketStateRegistry is IMarketStateRegistry {
     /// @inheritdoc IMarketStateRegistry
     address public override operator;

@@ -1,12 +1,18 @@
 # Spec — Market Lifecycle
 
-**Task:** B0-002 in `docs/tasks/sports-pivot.md`.
+**Task:** B0-002 in `docs/tasks/sports-pivot.md`; in-play revision per D-103
+(task 045).
 **Depends on:** DM-101 (outcome-token AMM), DM-102 (binary ERC-20 pair),
 DM-104 (Base Mainnet), DM-106 (moneyline only). Reasoning for each in
 `docs/decisions/sports-pivot-decisions.md`.
-**Open:** DM-103 (resolution authority) — the resolver's identity and signer
-arrangement are unresolved. This spec describes what the resolver _does_; who
-holds the key is still the owner's call.
+**Resolution authority:** decided — D-104 in
+`docs/decisions/v2-open-decisions.md`. The `Resolver` contract holds two
+rotatable keys: `signer` (the automated service) and `operator` (the owner's
+manual override).
+**Trading window:** decided — D-103 (2026-09-06): **in-play trading**. Buy/sell
+runs before and during the event; the resolver freezes on final; a
+permissionless time backstop at `startsAt + MAX_EVENT_DURATION` (12 h) closes
+any market the service failed to freeze.
 
 ---
 
@@ -37,13 +43,18 @@ is allowed to live.
 
 ## 2. States
 
-| State      | Trading | Split / merge | Redeem   | Entered when                            |
-| ---------- | ------- | ------------- | -------- | --------------------------------------- |
-| `OPEN`     | yes     | yes           | no       | market created                          |
-| `FROZEN`   | no      | no            | no       | scheduled start time reached (B4-002)   |
-| `RESOLVED` | no      | no            | yes      | resolver submits an outcome (B4-001)    |
-| `SETTLED`  | no      | no            | yes      | all outstanding sets redeemed           |
-| `INVALID`  | no      | no            | yes, 1:1 | game postponed, cancelled, or abandoned |
+| State      | Trading  | Split / merge | Redeem   | Entered when                                                                                                        |
+| ---------- | -------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
+| `OPEN`     | yes \*   | yes \*        | no       | market created; **runs through the game** (in-play trading, D-103)                                                   |
+| `FROZEN`   | no       | no            | no       | resolver freezes on final (data-driven, B4-002); or **anyone**, once `startsAt + MAX_EVENT_DURATION` (12 h) passes |
+| `RESOLVED` | no       | no            | yes      | resolver submits an outcome (B4-001)                                                                                 |
+| `SETTLED`  | no       | no            | yes      | all outstanding sets redeemed                                                                                        |
+| `INVALID`  | no       | no            | yes, 1:1 | game postponed, cancelled, or abandoned                                                                              |
+
+\* The time backstop caps the window even inside `OPEN`: past
+`startsAt + MAX_EVENT_DURATION` the hook halts swaps, `isTradeable()` reports
+false, and the market merely awaits its (now permissionless) freeze.
+`split`/`merge` gate on the state machine and close at the freeze itself.
 
 Transitions are one-way. `RESOLVED → OPEN` does not exist; a mis-resolution is
 handled by the incident runbook (B10-009), not by a state change.
@@ -101,22 +112,46 @@ Both are exact and fee-free. Fees are the hook's job, on the swap path only.
 
 ### 3.4 Freeze
 
-At the scheduled start time the market moves to `FROZEN` (B4-002). Two
-mechanisms enforce it, and both are required:
+Trading runs **through the game** (in-play trading, D-103) and closes when the
+event is over, not at kickoff. Two paths move the market to `FROZEN`, and both
+are required:
 
-1. The **hook** rejects swaps once the market is frozen (B2-003). This is the
+1. **Data-driven (the normal path).** The `Resolver` contract — its signer or
+   operator — calls `freeze()` when the event is final (or at any point once
+   it is underway). Only the resolver may freeze inside the event window: a
+   permissionless freeze there would let anyone close a live market early.
+   There is no freeze before kickoff on either path — a called-off game is
+   §3.7 void's job.
+2. **Time backstop (the failure path).** Once
+   `startsAt + MAX_EVENT_DURATION` (12 hours, a shared constant in
+   `Market.sol` and `RiskPolicy.sol`) has passed, `freeze()` is permissionless.
+   No event runs 12 hours, so no market outlives its event even if the
+   service is down.
+
+Two mechanisms enforce the halt on swaps, and both are required:
+
+1. The **hook** rejects swaps once the keeper marks the event `FINAL` — and,
+   independently of any keeper write, once the same
+   `kickoff + MAX_EVENT_DURATION` backstop passes (B2-003). This is the
    binding one — it holds even if the interface is bypassed.
 2. The **interface** stops offering the market for trading.
 
 Freezing also disarms any hedging strategy attached to the market (B9-007) —
 a strategy that cannot execute must not sit armed waiting to fire.
 
-`split` and `merge` close at freeze. Allowing them while the outcome is being
-determined would let someone mint sets against a known result.
+`split` and `merge` stay open while trading is open — full collateralisation
+makes set-minting harmless even against a known score, since a set is always
+worth exactly 1 USDC (D-103) — and close at freeze with everything else.
 
-> **Note.** Freezing at scheduled start means no in-play trading at launch.
-> Live in-game markets are deferred past Sept 16, and moving to in-play
-> trading changes this step rather than adding to it.
+During play, toxic-flow protection is the hook's degradation ladder: dynamic
+fees, per-trade caps, and the stale-keeper clamp (fee → `MAX_FEE`, cap →
+`MIN_TRADE_CAP`). A data-feed outage additionally halts server-side quoting
+(P-012) while on-chain trading stays open-but-clamped; feed failure never
+mis-freezes and never mis-resolves.
+
+> Superseded note: the launch design froze at scheduled start (no in-play
+> trading). D-103 (2026-09-06, `docs/decisions/v2-open-decisions.md`) replaced
+> that with the semantics above.
 
 ### 3.5 Resolve
 
@@ -171,18 +206,19 @@ the other side.
 
 ## 4. Failure modes
 
-| Failure                            | Behaviour                                                          |
-| ---------------------------------- | ------------------------------------------------------------------ |
-| Provider down at scheduled start   | Freeze still fires — it is time-based, not data-based              |
-| Provider down after final          | Market stays `FROZEN`; resolution waits; manual override available |
-| Providers disagree on the final    | Flagged for review (B3-008); no automatic resolution               |
-| Game postponed                     | `INVALID` per §3.7                                                 |
-| Pool has no liquidity              | Market is not listed; `split`/`merge` still work                   |
-| Resolver submits the wrong outcome | Not recoverable on-chain. Incident runbook (B10-009)               |
+| Failure                            | Behaviour                                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Provider down during the game      | Trading stays open but clamped (stale-keeper: fee → `MAX_FEE`, cap → `MIN_TRADE_CAP`); server-side quoting halts (P-012)                   |
+| Provider down at the final         | Market stays `OPEN` until the backstop: at `startsAt + MAX_EVENT_DURATION` the hook halts swaps and `freeze()` becomes permissionless      |
+| Provider down after freeze         | Market stays `FROZEN`; resolution waits; manual override available                                                                         |
+| Providers disagree on the final    | Flagged for review (B3-008); no automatic resolution                                                                                       |
+| Game postponed                     | `INVALID` per §3.7                                                                                                                         |
+| Pool has no liquidity              | Market is not listed; `split`/`merge` still work                                                                                           |
+| Resolver submits the wrong outcome | Not recoverable on-chain. Incident runbook (B10-009)                                                                                       |
 
-The last row is the residual risk behind DM-103 and the plan's Risk 2. No
-dispute window exists at v1, which is why the resolver's identity is worth
-deciding deliberately.
+The last row is the residual risk behind D-104 and the plan's Risk 2. D-104
+adds a mandatory dispute window (`RESOLUTION_DISPUTE_WINDOW_SECONDS`) between
+the criteria gate and the on-chain submit, which is the mitigation.
 
 ---
 

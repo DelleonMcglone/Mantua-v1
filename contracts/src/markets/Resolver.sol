@@ -7,7 +7,7 @@ import {MarketFactory} from "./MarketFactory.sol";
 /// @title Resolver
 /// @notice PURPOSE: the settlement authority for every market, addressed by
 ///         market id. B4-001 (resolve by id, signer authority, event),
-///         B4-002 (freeze forwarding), B4-004 (operator override),
+///         B4-002 (data-driven freeze, D-103), B4-004 (operator override),
 ///         B4-005 (void path).
 ///
 /// @dev **Why this exists as a contract rather than an EOA.** Each `Market`
@@ -107,12 +107,17 @@ contract Resolver {
         emit MarketVoided(marketId, address(market), msg.sender);
     }
 
-    // ─── Freeze forwarding (B4-002) ──────────────────────────────────────
+    // ─── Freeze (B4-002, D-103) ──────────────────────────────────────────
 
-    /// @notice Freeze a market by id. Permissionless, exactly as the market's
-    ///         own `freeze()` is — this is address-book convenience for the
-    ///         cron sweep, not a new authority.
-    function freeze(bytes32 marketId) external {
+    /// @notice Freeze a market by id — the data-driven freeze on "final"
+    ///         (or once the event is underway). Signer or operator only:
+    ///         calls from this contract reach `Market.freeze()` as the
+    ///         resolver, which unlocks the from-kickoff path, so an open
+    ///         forward here would hand early freezing to anyone. The
+    ///         permissionless backstop still exists — on the market itself,
+    ///         where `freeze()` accepts any caller after
+    ///         `startsAt + MAX_EVENT_DURATION`.
+    function freeze(bytes32 marketId) external onlyAuthorized {
         _market(marketId).freeze();
     }
 

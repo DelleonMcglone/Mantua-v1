@@ -47,13 +47,16 @@ library MarketErrors {
     ///         override the fee at all. Spec §8; §44 failure condition.
     error StaticFeePoolRejected();
 
-    /// @notice Kickoff is at or before the current block. Such a market would
-    ///         be born frozen and never tradeable.
+    /// @notice Kickoff is at or before the current block. A market registered
+    ///         mid-event would open with part of its backstop window already
+    ///         spent; registration is pre-game only.
     error KickoffInPast();
 
     // ─── Halts (spec §23, §24) ───────────────────────────────────────────
 
-    /// @notice The kickoff freeze has fired. Spec §6.
+    /// @notice The market is frozen: the event went `FINAL`, or the
+    ///         `kickoff + MAX_EVENT_DURATION` time backstop fired. Spec §6
+    ///         (D-103 in-play semantics).
     error MarketFrozen();
 
     /// @notice The market has resolved; trading is permanently halted. Spec §5.

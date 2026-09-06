@@ -40,12 +40,14 @@ library RiskPolicy {
     /// @notice Keeper state older than this is stale. Spec §22.
     uint64 internal constant STALE_AFTER = 900;
 
-    /// @notice How far before kickoff trading halts. Spec §6.
-    /// @dev Zero deliberately. `Market.freeze()` becomes callable exactly at
-    ///      `startsAt`; a non-zero lead would have the hook stop trading
-    ///      before the market contract considers itself frozen, leaving the two
-    ///      disagreeing about when the market closed.
-    uint64 internal constant FREEZE_LEAD = 0;
+    /// @notice How long after kickoff the time backstop allows trading —
+    ///         in-play trading runs through the game (D-103), and this is the
+    ///         longest any event can possibly run. Spec §6.
+    /// @dev Must equal `Market.MAX_EVENT_DURATION`: the market's
+    ///      permissionless `freeze()` unlocks at the same instant this
+    ///      backstop halts swaps, so the two layers agree about when an
+    ///      abandoned market closed.
+    uint64 internal constant MAX_EVENT_DURATION = 12 hours;
 
     // ─── Pure checks ─────────────────────────────────────────────────────
 
@@ -80,12 +82,16 @@ library RiskPolicy {
         return nowTs - lastUpdate > STALE_AFTER;
     }
 
-    /// @notice Whether the kickoff freeze has fired. Spec §6.
+    /// @notice Whether the time backstop has fired: the event cannot still be
+    ///         running, so trading halts even if the keeper never wrote
+    ///         `FINAL`. Spec §6 (D-103 semantics).
     /// @dev Depends only on the registration timestamp and the block clock —
-    ///      never on keeper liveness, which is spec §44's "kickoff freeze
-    ///      depends on a keeper update" failure condition.
-    function isFrozen(uint64 kickoffTimestamp, uint64 nowTs) internal pure returns (bool) {
-        uint64 freezeAt = kickoffTimestamp > FREEZE_LEAD ? kickoffTimestamp - FREEZE_LEAD : 0;
-        return nowTs >= freezeAt;
+    ///      never on keeper liveness, which is spec §44's "freeze depends on
+    ///      a keeper update" failure condition. Subtraction rather than
+    ///      addition so a kickoff near `type(uint64).max` cannot overflow
+    ///      into a market that never closes.
+    function isPastBackstop(uint64 kickoffTimestamp, uint64 nowTs) internal pure returns (bool) {
+        if (nowTs < kickoffTimestamp) return false;
+        return nowTs - kickoffTimestamp >= MAX_EVENT_DURATION;
     }
 }

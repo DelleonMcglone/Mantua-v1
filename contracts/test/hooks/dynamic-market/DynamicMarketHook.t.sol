@@ -179,10 +179,51 @@ contract DynamicMarketHookTest is Test {
 
     // ─── Halts (§23, §24; edge case 16) ──────────────────────────────────
 
-    function test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate() public {
-        // Edge case 15 — the freeze must not depend on keeper liveness.
+    function test_swapAllowedAtAndAfterKickoff() public {
+        // D-103 in-play trading: kickoff halts nothing. Trading runs through
+        // the game until the keeper writes FINAL or the backstop fires.
         _register();
-        vm.warp(kickoff);
+        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        vm.warp(kickoff + 1 hours);
+        vm.prank(keeper);
+        registry.updateMarket(id, 5000, 8000, I.EventState.LIVE); // fresh, in-play
+
+        vm.prank(address(manager));
+        hook.beforeSwap(trader, key, _swap(-1e6), "");
+    }
+
+    function test_swapAllowedInPlayEvenWithKeeperOffline() public {
+        // A dead keeper degrades (stale → MAX_FEE, MIN_TRADE_CAP) but must
+        // not halt an in-play market — the halt is FINAL or the backstop.
+        _register();
+        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        vm.warp(kickoff + 1 hours); // no keeper write, ever
+
+        vm.prank(address(manager));
+        (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
+        assertEq(feeWithFlag & ~LPFeeLibrary.OVERRIDE_FEE_FLAG, RiskPolicy.MAX_FEE, "stale in-play clamps the fee");
+    }
+
+    function test_swapRevertsAtBackstopWithoutAnyKeeperUpdate() public {
+        // Edge case 15 — the freeze must not depend on keeper liveness. The
+        // timestamp layer now fires at kickoff + MAX_EVENT_DURATION: no event
+        // can still be running, so trading halts even if the keeper never
+        // wrote FINAL.
+        _register();
+        vm.warp(kickoff + RiskPolicy.MAX_EVENT_DURATION);
+        vm.prank(address(manager));
+        vm.expectRevert(MarketErrors.MarketFrozen.selector);
+        hook.beforeSwap(trader, key, _swap(-1e6), "");
+    }
+
+    function test_swapRevertsOnceEventIsFinal() public {
+        // The data-driven freeze: keeper marks FINAL, swaps halt — mirroring
+        // the resolver's freeze of the Market contract.
+        _register();
+        vm.warp(kickoff + 3 hours);
+        vm.prank(keeper);
+        registry.updateMarket(id, 5000, 8000, I.EventState.FINAL);
+
         vm.prank(address(manager));
         vm.expectRevert(MarketErrors.MarketFrozen.selector);
         hook.beforeSwap(trader, key, _swap(-1e6), "");

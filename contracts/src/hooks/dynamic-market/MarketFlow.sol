@@ -42,13 +42,18 @@ library MarketFlow {
     /// @dev One place, so the swap and add-liquidity gates cannot drift apart.
     ///      Each reason reverts distinctly because a frozen trader waits, a
     ///      resolved one redeems, and a paused one needs an operator.
+    ///      In-play (D-103): PRE_GAME, LIVE, and CRITICAL all trade — the
+    ///      halt is state-driven (`FINAL`, mirroring the resolver's freeze of
+    ///      the Market contract) with a timestamp backstop that fires even if
+    ///      the keeper never writes again (spec §6, §44).
     function requireTradeable(I registry, I.MarketState memory s) internal view {
         if (registry.globalPaused() || s.paused) revert MarketErrors.MarketPaused();
         if (s.eventState == I.EventState.RESOLVED) revert MarketErrors.MarketResolved();
         if (s.eventState == I.EventState.VOID) revert MarketErrors.MarketVoided();
-        // Timestamp-driven, so it fires with the keeper offline (spec §6, §44).
-        if (RiskPolicy.isFrozen(s.kickoffTimestamp, uint64(block.timestamp))) revert MarketErrors.MarketFrozen();
         if (s.eventState == I.EventState.FINAL) revert MarketErrors.MarketFrozen();
+        if (RiskPolicy.isPastBackstop(s.kickoffTimestamp, uint64(block.timestamp))) {
+            revert MarketErrors.MarketFrozen();
+        }
     }
 
     /// @notice Decayed buy/sell flow as of `nowTs`, without writing.

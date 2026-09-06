@@ -81,17 +81,53 @@ contract ResolverTest is Test {
         fresh.resolve(MARKET_ID, 0);
     }
 
-    // ─── Freeze forwarding (B4-002) ──────────────────────────────────────
+    // ─── Freeze (B4-002, D-103 data-driven) ──────────────────────────────
 
-    function test_freezeByIdIsPermissionlessAfterKickoff() public {
+    function test_signerFreezesByIdFromKickoff() public {
+        // The data-driven freeze: the resolution service closes trading when
+        // its feed says the event is underway/final.
         vm.warp(startsAt);
-        vm.prank(alice); // deliberately not signer or operator
+        vm.prank(signer);
         resolver.freeze(MARKET_ID);
+        assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
+    }
+
+    function test_operatorFreezesByIdFromKickoff() public {
+        vm.warp(startsAt);
+        vm.prank(operator);
+        resolver.freeze(MARKET_ID);
+        assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
+    }
+
+    function test_strangerCannotFreezeThroughTheResolver() public {
+        // Calls from this contract reach Market.freeze() as the resolver,
+        // which unlocks the from-kickoff path — so the forward must not be
+        // open, or anyone could close a live market early (D-103).
+        vm.warp(startsAt);
+        vm.prank(alice);
+        vm.expectRevert(Resolver.NotAuthorized.selector);
+        resolver.freeze(MARKET_ID);
+    }
+
+    function test_freezeBeforeKickoffStillRejectedByTheMarket() public {
+        // The Resolver adds authority only; the market's own window governs.
+        vm.prank(signer);
+        vm.expectRevert(Market.TooEarlyToFreeze.selector);
+        resolver.freeze(MARKET_ID);
+    }
+
+    function test_backstopFreezeIsPermissionlessOnTheMarketItself() public {
+        // The permissionless backstop does not live here: anyone freezes the
+        // market directly once startsAt + MAX_EVENT_DURATION passes.
+        vm.warp(uint256(startsAt) + market.MAX_EVENT_DURATION());
+        vm.prank(alice);
+        market.freeze();
         assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
     }
 
     function test_freezeByIdRejectsUnknownMarket() public {
         vm.warp(startsAt);
+        vm.prank(signer);
         vm.expectRevert(Resolver.UnknownMarket.selector);
         resolver.freeze(keccak256("never-created"));
     }
@@ -101,6 +137,7 @@ contract ResolverTest is Test {
     function test_signerResolvesByMarketId() public {
         _openPosition();
         vm.warp(startsAt);
+        vm.prank(signer);
         resolver.freeze(MARKET_ID);
 
         vm.expectEmit(true, true, false, true);
@@ -117,6 +154,7 @@ contract ResolverTest is Test {
         // not leave a finished game unresolvable.
         _openPosition();
         vm.warp(startsAt);
+        vm.prank(signer);
         resolver.freeze(MARKET_ID);
 
         vm.prank(operator);
@@ -126,6 +164,7 @@ contract ResolverTest is Test {
 
     function test_strangerCannotResolve() public {
         vm.warp(startsAt);
+        vm.prank(signer);
         resolver.freeze(MARKET_ID);
 
         vm.prank(alice);
@@ -166,6 +205,7 @@ contract ResolverTest is Test {
     function test_operatorCanVoidAFrozenMarket() public {
         // A game abandoned mid-play: frozen at kickoff, then called off.
         vm.warp(startsAt);
+        vm.prank(signer);
         resolver.freeze(MARKET_ID);
         vm.prank(operator);
         resolver.voidMarket(MARKET_ID);
@@ -186,6 +226,7 @@ contract ResolverTest is Test {
         resolver.setSigner(next);
 
         vm.warp(startsAt);
+        vm.prank(operator);
         resolver.freeze(MARKET_ID);
 
         vm.prank(signer);
@@ -219,6 +260,7 @@ contract ResolverTest is Test {
         // The new operator inherits the override (B4-007 will swap this for a
         // multisig once DM-103 closes; the seat itself already rotates).
         vm.warp(startsAt);
+        vm.prank(next);
         resolver.freeze(MARKET_ID);
         vm.prank(next);
         resolver.resolve(MARKET_ID, 0);

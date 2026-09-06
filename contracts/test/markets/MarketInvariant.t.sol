@@ -95,9 +95,17 @@ contract MarketHandler is Test {
         no.transfer(to, amount);
     }
 
-    function freeze() external {
-        vm.warp(market.startsAt());
-        try market.freeze() {} catch {}
+    function freeze(bool viaBackstop) external {
+        // Either freeze path is reachable for the fuzzer: the resolver's
+        // data-driven freeze from kickoff, or anyone once the backstop opens.
+        if (viaBackstop) {
+            vm.warp(uint256(market.startsAt()) + market.MAX_EVENT_DURATION());
+            try market.freeze() {} catch {}
+        } else {
+            vm.warp(market.startsAt());
+            vm.prank(market.resolver());
+            try market.freeze() {} catch {}
+        }
     }
 
     function resolve(uint256 outcomeSeed) external {
