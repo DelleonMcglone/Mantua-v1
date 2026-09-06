@@ -128,6 +128,16 @@ export const players = pgTable(
     jerseyNumber: smallint("jersey_number"),
     /** active | inactive | retired */
     status: varchar("status", { length: 16 }).notNull().default("active"),
+    /**
+     * Player season stat aggregates keyed by season label, e.g.
+     * `{"2026": {"passingYards": 3120, ...}}` (task 038, S-007). Jsonb by
+     * design — stat categories differ per sport and provider, and the
+     * (player, season) dimension fits one keyed object without a new
+     * table. Typed reader: `playerSeasonStats` in lib/sports/history.ts.
+     */
+    seasonStats: jsonb("season_stats")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
     provider: varchar("provider", { length: 32 }).notNull(),
     providerPlayerId: varchar("provider_player_id", { length: 128 }).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
