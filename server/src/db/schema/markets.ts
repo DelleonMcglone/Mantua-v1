@@ -487,6 +487,9 @@ export const resolutions = pgTable(
     txHash: varchar("tx_hash", { length: 66 }),
     /** Free-text justification. Required for manual overrides. */
     note: text("note"),
+    /** S-024 confidence state at the moment of the write (VERIFIED /
+     *  RESOLVED for automated resolves; null for pre-040 rows and voids). */
+    confidenceState: varchar("confidence_state", { length: 24 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("resolutions_market_idx").on(t.marketId)],
@@ -494,6 +497,55 @@ export const resolutions = pgTable(
 
 export type Resolution = typeof resolutions.$inferSelect;
 export type NewResolution = typeof resolutions.$inferInsert;
+
+/**
+ * S-024 — one row per game outcome the pipeline is tracking toward
+ * settlement, carrying the explicit confidence state machine defined in
+ * `server/src/lib/sports/resolution-confidence.ts` (the ONLY place
+ * transitions live). Keyed by (provider event, chain) rather than market:
+ * confidence is about the game's outcome, and both of a game's markets
+ * settle from the same review.
+ *
+ * `history` is an append-only jsonb array of `{state, at, reason}` steps —
+ * the audit trail S-026 wants for "how did we come to believe this".
+ */
+export const resolutionReviews = pgTable(
+  "resolution_reviews",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    providerEventId: varchar("provider_event_id", { length: 128 }).notNull(),
+    chainId: integer("chain_id").notNull().default(8453),
+    /** PENDING_RECONCILIATION | VERIFIED | DISPUTED | MANUAL_REVIEW | RESOLVED */
+    state: varchar("state", { length: 24 }).notNull(),
+    /** dual-source | single-source — the corroboration regime in force. */
+    policy: varchar("policy", { length: 16 }).notNull(),
+    /** Latest transition's reason, denormalised from history for querying. */
+    reason: text("reason"),
+    /** Game-vocabulary winner (0 home, 1 away) the review verified, if any. */
+    winningOutcomeIndex: smallint("winning_outcome_index"),
+    /** When a final was first observed — the reconciliation timeout clock. */
+    firstFinalSeenAt: timestamp("first_final_seen_at", { withTimezone: true }),
+    disputedAt: timestamp("disputed_at", { withTimezone: true }),
+    escalatedAt: timestamp("escalated_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    /** Append-only [{state, at, reason}] transition trail. */
+    history: jsonb("history")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    unique("resolution_reviews_event_chain_uq").on(t.providerEventId, t.chainId),
+    // Operators sweep DISPUTED / MANUAL_REVIEW; the cron sweeps PENDING.
+    index("resolution_reviews_state_idx").on(t.state),
+  ],
+);
+
+export type ResolutionReview = typeof resolutionReviews.$inferSelect;
+export type NewResolutionReview = typeof resolutionReviews.$inferInsert;
 
 // ─── Hedging ─────────────────────────────────────────────────────────────────
 

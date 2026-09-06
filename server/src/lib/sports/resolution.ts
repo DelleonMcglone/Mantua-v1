@@ -16,15 +16,42 @@
  * backwards, so the mapping lives in one function with its own tests.
  */
 
+import { logger } from "../logger.ts";
 import { computeMarketId } from "../market-id.ts";
-import { corroborate } from "./consensus.ts";
-import { decideSettlement } from "./ingest.ts";
+import { type Corroboration, type CorroborationPolicy, corroborate } from "./consensus.ts";
+import { type SettlementAction, decideSettlement } from "./ingest.ts";
 import type { ProviderEvent, ProviderSlate } from "./provider.ts";
+import {
+  type ConfidenceState,
+  inlineConfidence,
+} from "./resolution-confidence.ts";
+import {
+  type CriteriaResult,
+  type ResolutionAuthorization,
+  type ResolutionEvidence,
+  type SlateMeta,
+  assertResolutionCriteria,
+} from "./resolution-criteria.ts";
+import type { StoredEventSnapshot } from "./resolution-freshness.ts";
 
 /** YES won this market's pair. Mirrors `Market.resolve` semantics. */
 export const OUTCOME_YES = 0;
 /** NO won this market's pair. */
 export const OUTCOME_NO = 1;
+
+/**
+ * Everything the S-025 criteria gate needs to independently re-check one
+ * settlement decision — the snapshots and verdicts the plan was built from,
+ * carried with the submission so the executor never has to trust the plan.
+ */
+export interface SettlementContext {
+  event: ProviderEvent;
+  secondaryEvent: ProviderEvent | null;
+  corroboration: Corroboration | null;
+  policy: CorroborationPolicy;
+  slate: SlateMeta;
+  secondarySlate: SlateMeta | null;
+}
 
 export interface MarketSubmission {
   marketId: `0x${string}`;
@@ -32,11 +59,25 @@ export interface MarketSubmission {
   kind: "resolve" | "void";
   /** Present iff kind is "resolve": 0 = this market's YES won, 1 = its NO won. */
   outcome?: number;
+  /** Which game side this market's YES names (0 home, 1 away) — the gate
+   *  re-derives the two-vocabulary mapping from it. Present for resolves. */
+  marketOutcomeIndex?: number;
+  /** The evidence this submission was planned from. */
+  context?: SettlementContext;
 }
 
 export interface HeldEvent {
   providerEventId: string;
   reason: string;
+}
+
+/** One final's verdict this pass — what the S-024 review rows advance on. */
+export interface EventAssessment {
+  providerEventId: string;
+  event: ProviderEvent;
+  settlement: SettlementAction;
+  corroboration: Corroboration | null;
+  policy: CorroborationPolicy;
 }
 
 export interface ResolutionPlan {
@@ -45,6 +86,9 @@ export interface ResolutionPlan {
   submissions: MarketSubmission[];
   /** Events deliberately not settled this pass, with the reason logged. */
   held: HeldEvent[];
+  /** Per-final verdicts for confidence tracking (S-024). Empty on a delayed
+   *  slate — stale data must not advance confidence in either direction. */
+  assessments: EventAssessment[];
 }
 
 /** Both market ids for one game, in outcome-index order (home, away). */
@@ -89,12 +133,14 @@ export function marketActionsFor(
       providerEventId,
       kind: "resolve",
       outcome: homeWon ? OUTCOME_YES : OUTCOME_NO,
+      marketOutcomeIndex: 0,
     },
     {
       marketId: awayMarket,
       providerEventId,
       kind: "resolve",
       outcome: homeWon ? OUTCOME_NO : OUTCOME_YES,
+      marketOutcomeIndex: 1,
     },
   ];
 }
@@ -138,7 +184,16 @@ export function planResolution(
   nowSeconds: number = Math.floor(Date.now() / 1000),
   chainId?: number,
 ): ResolutionPlan {
-  const plan: ResolutionPlan = { freezes: [], submissions: [], held: [] };
+  const plan: ResolutionPlan = { freezes: [], submissions: [], held: [], assessments: [] };
+  const policy: CorroborationPolicy = secondary ? "dual-source" : "single-source";
+  const slateMeta: SlateMeta = {
+    provider: primary.provider,
+    fetchedAt: primary.fetchedAt,
+    delayed: primary.delayed,
+  };
+  const secondaryMeta: SlateMeta | null = secondary
+    ? { provider: secondary.provider, fetchedAt: secondary.fetchedAt, delayed: secondary.delayed }
+    : null;
 
   for (const event of primary.events) {
     // B4-002: kickoff passed and the game is (or should be) underway — the
@@ -152,6 +207,21 @@ export function planResolution(
     }
 
     const settlement = decideSettlement(event, primary.delayed);
+    const secondaryEvent = secondary ? matchSecondary(event, secondary) : null;
+    const check = secondary ? corroborate(event, secondaryEvent) : null;
+
+    // S-024: every final on a FRESH slate gets an assessment, held or not —
+    // the review rows are the memory of what each pass observed. A delayed
+    // slate assesses nothing: stale data must not advance confidence.
+    if (event.status === "final" && !primary.delayed) {
+      plan.assessments.push({
+        providerEventId: event.providerEventId,
+        event,
+        settlement,
+        corroboration: check,
+        policy,
+      });
+    }
 
     if (settlement.kind === "wait") {
       if (event.status === "final" || event.status === "unknown") {
@@ -161,12 +231,23 @@ export function planResolution(
     }
 
     if (settlement.kind === "void") {
-      plan.submissions.push(...voidActionsFor(event.providerEventId, chainId));
+      plan.submissions.push(
+        ...voidActionsFor(event.providerEventId, chainId).map((s) => ({
+          ...s,
+          context: {
+            event,
+            secondaryEvent,
+            corroboration: check,
+            policy,
+            slate: slateMeta,
+            secondarySlate: secondaryMeta,
+          },
+        })),
+      );
       continue;
     }
 
-    if (secondary) {
-      const check = corroborate(event, matchSecondary(event, secondary));
+    if (check) {
       if (check.kind !== "agreed") {
         plan.held.push({
           providerEventId: event.providerEventId,
@@ -186,7 +267,19 @@ export function planResolution(
     }
 
     plan.submissions.push(
-      ...marketActionsFor(event.providerEventId, settlement.winningOutcomeIndex, chainId),
+      ...marketActionsFor(event.providerEventId, settlement.winningOutcomeIndex, chainId).map(
+        (s) => ({
+          ...s,
+          context: {
+            event,
+            secondaryEvent,
+            corroboration: check,
+            policy,
+            slate: slateMeta,
+            secondarySlate: secondaryMeta,
+          },
+        }),
+      ),
     );
   }
 
@@ -195,16 +288,21 @@ export function planResolution(
 
 // ─── Execution over ports ──────────────────────────────────────────────────
 
-/** On-chain gateway. The only thing in this file that can spend gas. */
+/** On-chain gateway. The only thing in this file that can spend gas.
+ *
+ *  `resolve` takes a `ResolutionAuthorization` — mintable only by
+ *  `assertResolutionCriteria` — not loose (marketId, outcome) arguments.
+ *  That makes "resolve without passing the criteria gate" a type error at
+ *  every call site, which is the S-025 structural guarantee. */
 export interface ResolutionSubmitter {
   signerAddress(): string;
   /** Resolves null when the market was already frozen — that is success. */
   freeze(marketId: `0x${string}`): Promise<string | null>;
-  resolve(marketId: `0x${string}`, outcome: number): Promise<string>;
+  resolve(auth: ResolutionAuthorization): Promise<string>;
   void(marketId: `0x${string}`): Promise<string>;
 }
 
-/** B4-006 — the public log row for one settlement action. */
+/** B4-006 / S-026 — the public log row for one settlement action. */
 export interface ResolutionRecord {
   marketId: `0x${string}`;
   providerEventId: string;
@@ -214,31 +312,90 @@ export interface ResolutionRecord {
   source: string;
   signer: string;
   txHash: string;
+  /** The full S-026 evidence bundle. Always present for resolves (the gate
+   *  built it); a lighter source snapshot for voids. */
+  evidence?: ResolutionEvidence | Record<string, unknown>;
+  confidenceState?: ConfidenceState | null;
 }
 
 export interface ResolutionLogWriter {
   record(entry: ResolutionRecord): Promise<void>;
 }
 
+/** A submission the criteria gate refused, with every failed criterion. */
+export interface RejectedSubmission {
+  marketId: string;
+  providerEventId: string;
+  failed: CriteriaResult[];
+  criteria: CriteriaResult[];
+}
+
 export interface ExecutionSummary {
   frozen: number;
   resolved: number;
   voided: number;
+  /** Gate refusals — NOT failures: the plan asked, the criteria said no. */
+  rejected: RejectedSubmission[];
   failures: { marketId: string; error: string }[];
+}
+
+export interface ExecutionOptions {
+  /** Clock for the criteria gate; defaults to wall time. */
+  nowSeconds?: number;
+  /** DB-backed S-024 confidence state per event; the gate falls back to the
+   *  pure inline derivation when absent or null. */
+  confidenceOf?: (providerEventId: string) => ConfidenceState | null;
+  /** Ingest-store snapshot per event for the reconciliation precheck. */
+  storedEventOf?: (providerEventId: string) => StoredEventSnapshot | null;
+  /** Called for every gate refusal — the cron writes audit rows here. */
+  onRejected?: (rejection: RejectedSubmission) => void | Promise<void>;
 }
 
 /**
  * Execute a plan. Failures are isolated per market: one revert must not stop
  * the rest of the slate settling, and a failed submission stays unsettled for
  * the next sweep rather than being retried in a tight loop here.
+ *
+ * Every resolve passes through `assertResolutionCriteria` (S-025). A refusal
+ * is recorded loudly and the market stays unsettled; there is no code path
+ * from here to `submitter.resolve` that skips the gate, because the gate is
+ * the only mint of the authorization the submitter accepts. Voids are exempt
+ * (B4-005): returning collateral cannot pick a wrong winner.
  */
 export async function executeResolution(
   plan: ResolutionPlan,
   submitter: ResolutionSubmitter,
   log: ResolutionLogWriter,
   source: string,
+  opts: ExecutionOptions = {},
 ): Promise<ExecutionSummary> {
-  const summary: ExecutionSummary = { frozen: 0, resolved: 0, voided: 0, failures: [] };
+  const summary: ExecutionSummary = {
+    frozen: 0,
+    resolved: 0,
+    voided: 0,
+    rejected: [],
+    failures: [],
+  };
+  const nowSeconds = opts.nowSeconds ?? Math.floor(Date.now() / 1000);
+
+  const reject = async (s: MarketSubmission, failed: CriteriaResult[], all: CriteriaResult[]) => {
+    const rejection: RejectedSubmission = {
+      marketId: s.marketId,
+      providerEventId: s.providerEventId,
+      failed,
+      criteria: all,
+    };
+    summary.rejected.push(rejection);
+    logger.error(
+      {
+        marketId: s.marketId,
+        providerEventId: s.providerEventId,
+        failed: failed.map((c) => `${c.name}: ${c.detail}`),
+      },
+      "resolution: criteria gate refused a resolve — market stays unsettled",
+    );
+    await opts.onRejected?.(rejection);
+  };
 
   for (const marketId of plan.freezes) {
     try {
@@ -257,10 +414,66 @@ export async function executeResolution(
       // forever. Freeze is idempotent — already-frozen reverts are treated
       // as done by the submitter — so sweep it in-line before settling.
       await submitter.freeze(s.marketId).catch(() => null);
-      const txHash =
-        s.kind === "resolve"
-          ? await submitter.resolve(s.marketId, s.outcome ?? OUTCOME_YES)
-          : await submitter.void(s.marketId);
+
+      let txHash: string;
+      let evidence: ResolutionRecord["evidence"];
+      let confidenceState: ConfidenceState | null = null;
+
+      if (s.kind === "resolve") {
+        const ctx = s.context;
+        if (!ctx || s.outcome === undefined || s.marketOutcomeIndex === undefined) {
+          // A submission with no evidence attached cannot be argued for.
+          await reject(
+            s,
+            [
+              {
+                name: "final_status",
+                pass: false,
+                detail: "submission carries no settlement context",
+              },
+            ],
+            [],
+          );
+          continue;
+        }
+        confidenceState =
+          opts.confidenceOf?.(s.providerEventId) ??
+          inlineConfidence(ctx.corroboration, ctx.policy);
+        const verdict = assertResolutionCriteria({
+          marketId: s.marketId,
+          marketOutcomeIndex: s.marketOutcomeIndex,
+          outcome: s.outcome,
+          event: ctx.event,
+          secondaryEvent: ctx.secondaryEvent,
+          corroboration: ctx.corroboration,
+          policy: ctx.policy,
+          confidenceState,
+          slate: ctx.slate,
+          secondarySlate: ctx.secondarySlate,
+          storedEvent: opts.storedEventOf?.(s.providerEventId) ?? null,
+          freezeCompleted: true,
+          nowSeconds,
+        });
+        if (!verdict.ok) {
+          await reject(s, verdict.failed, verdict.criteria);
+          continue;
+        }
+        txHash = await submitter.resolve(verdict.auth);
+        evidence = verdict.auth.evidence;
+      } else {
+        txHash = await submitter.void(s.marketId);
+        evidence = s.context
+          ? {
+              schema: "resolution-evidence@1",
+              kind: "void",
+              providerEventId: s.providerEventId,
+              status: s.context.event.status,
+              provider: s.context.slate.provider,
+              retrievedAt: new Date(s.context.slate.fetchedAt).toISOString(),
+              delayed: s.context.slate.delayed,
+            }
+          : undefined;
+      }
 
       await log.record({
         marketId: s.marketId,
@@ -271,6 +484,8 @@ export async function executeResolution(
         source,
         signer: submitter.signerAddress(),
         txHash,
+        ...(evidence !== undefined ? { evidence } : {}),
+        confidenceState,
       });
 
       if (s.kind === "resolve") summary.resolved += 1;

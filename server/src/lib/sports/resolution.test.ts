@@ -42,9 +42,11 @@ function fakeSubmitter(failOn: Set<string> = new Set()) {
       calls.push(`freeze:${id.slice(0, 10)}`);
       return Promise.resolve(null);
     },
-    resolve: (id, outcome) => {
-      if (failOn.has(id)) return Promise.reject(new Error("revert"));
-      calls.push(`resolve:${id.slice(0, 10)}:${String(outcome)}`);
+    // S-025: resolve only accepts an authorization minted by the criteria
+    // gate — there is no way to hand this fake a bare (marketId, outcome).
+    resolve: (auth) => {
+      if (failOn.has(auth.marketId)) return Promise.reject(new Error("revert"));
+      calls.push(`resolve:${auth.marketId.slice(0, 10)}:${String(auth.outcome)}`);
       return Promise.resolve(`0xtx-${String(calls.length)}`);
     },
     void: (id) => {
@@ -198,7 +200,7 @@ void describe("executeResolution", () => {
     const { log, records } = fakeLog();
 
     const plan = planResolution(slate([event()]), null, NOW);
-    const summary = await executeResolution(plan, submitter, log, "espn");
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
 
     assert.equal(summary.resolved, 2);
     assert.equal(summary.failures.length, 0);
@@ -215,7 +217,7 @@ void describe("executeResolution", () => {
     const { log, records } = fakeLog();
 
     const plan = planResolution(slate([event()]), null, NOW);
-    const summary = await executeResolution(plan, submitter, log, "espn");
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
 
     assert.equal(summary.resolved, 1, "the away market still settled");
     assert.equal(summary.failures.length, 1);
@@ -228,7 +230,7 @@ void describe("executeResolution", () => {
     const { log, records } = fakeLog();
 
     const plan = planResolution(slate([event()]), null, NOW);
-    const summary = await executeResolution(plan, submitter, log, "espn");
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
 
     assert.equal(summary.resolved, 0);
     assert.equal(records.length, 0);
@@ -242,7 +244,7 @@ void describe("executeResolution", () => {
       null,
       NOW,
     );
-    const summary = await executeResolution(plan, submitter, log, "espn");
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
     assert.equal(summary.frozen, 2);
   });
 });
@@ -278,5 +280,266 @@ void describe("B10-004 — provider outage mid-game", () => {
     const plan = planResolution(recovered, null, NOW);
     assert.equal(plan.submissions.length, 2, "fresh data resolves both markets");
     assert.equal(plan.held.length, 0);
+  });
+});
+
+// ─── Task 040 — criteria gate at the executor (S-025) ──────────────────────
+
+void describe("S-025 — executeResolution routes every resolve through the criteria gate", () => {
+  void it("a DISPUTED review blocks resolution even when today's slate agrees", async () => {
+    // An earlier pass recorded a provider disagreement; the review row is
+    // DISPUTED. Today both sources happen to agree — the market must STILL
+    // not resolve: disputes exit through a human, never through luck.
+    const { submitter, calls } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW,
+      confidenceOf: () => "DISPUTED",
+    });
+
+    assert.equal(summary.resolved, 0);
+    assert.equal(summary.rejected.length, 2);
+    assert.equal(records.length, 0, "no log rows for refused resolves");
+    assert.ok(calls.every((c) => !c.startsWith("resolve:")), "submitter.resolve never called");
+    assert.ok(
+      summary.rejected[0].failed.some((c) => c.name === "confidence_verified"),
+      "the confidence criterion is the one that failed",
+    );
+  });
+
+  void it("the stale-feed breaker trips at execution time (S-022)", async () => {
+    // The plan was built from a slate fetched long before the executor runs
+    // (e.g. a wedged sweep resumed late). The gate re-checks freshness at
+    // submission time and refuses.
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW + 10 * 60, // slate.fetchedAt is 10 minutes stale by now
+    });
+
+    assert.equal(summary.resolved, 0);
+    assert.equal(summary.rejected.length, 2);
+    assert.equal(records.length, 0);
+    assert.ok(summary.rejected[0].failed.some((c) => c.name === "feed_fresh"));
+  });
+
+  void it("a final reported implausibly soon after kickoff is refused", async () => {
+    const fresh = slate([event({ startsAt: NOW - 600 })]); // "final" 10min in
+    const { submitter } = fakeSubmitter();
+    const { log } = fakeLog();
+    const plan = planResolution(fresh, null, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
+
+    assert.equal(summary.resolved, 0);
+    assert.ok(summary.rejected[0].failed.some((c) => c.name === "kickoff_elapsed"));
+  });
+
+  void it("a tampered outcome is caught by the independent mapping re-derivation", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+    // Corrupt the plan the way a planner bug would: flip one outcome.
+    plan.submissions[0].outcome = OUTCOME_NO; // scores say home won → YES
+
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
+
+    assert.equal(summary.resolved, 1, "the untampered market still settles");
+    assert.equal(summary.rejected.length, 1);
+    assert.ok(summary.rejected[0].failed.some((c) => c.name === "outcome_mapping"));
+    assert.equal(records.length, 1);
+  });
+
+  void it("a resolve submission without settlement context is refused", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+    delete plan.submissions[0].context;
+
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
+
+    assert.equal(summary.resolved, 1);
+    assert.equal(summary.rejected.length, 1);
+    assert.equal(records.length, 1);
+  });
+
+  void it("a stored-event contradiction fails the reconciliation precheck", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW,
+      // Ingest recorded the same game final with the OPPOSITE winner.
+      storedEventOf: () => ({
+        status: "final",
+        homeScore: 20,
+        awayScore: 27,
+        lastPolledAt: new Date(NOW * 1000 - 60_000),
+      }),
+    });
+
+    assert.equal(summary.resolved, 0);
+    assert.equal(summary.rejected.length, 2);
+    assert.ok(summary.rejected[0].failed.some((c) => c.name === "store_reconciled"));
+  });
+
+  void it("rejections invoke onRejected with the failed criteria (audit hook)", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+    const seen: string[][] = [];
+
+    await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW,
+      confidenceOf: () => "MANUAL_REVIEW",
+      onRejected: (r) => {
+        seen.push(r.failed.map((c) => c.name));
+      },
+    });
+
+    assert.equal(seen.length, 2);
+    assert.deepEqual(seen[0], ["confidence_verified"]);
+  });
+
+  void it("voids bypass the gate — returning collateral cannot pick a wrong winner", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    // Delayed slate: resolves are impossible, voids still go (B4-005).
+    const plan = planResolution(slate([event({ status: "cancelled" })], true), null, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW + 20 * 60, // stale by every measure
+    });
+
+    assert.equal(summary.voided, 2);
+    assert.equal(summary.rejected.length, 0);
+    assert.equal(records.length, 2);
+  });
+});
+
+// ─── Task 040 — evidence completeness (S-026) ──────────────────────────────
+
+void describe("S-026 — a resolved row's evidence answers the post-mortem questions", () => {
+  void it("happy path: which sources, what they said, when, and which criteria passed", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const secondary: ProviderSlate = {
+      provider: "secondprovider",
+      league: "nfl",
+      events: [event({ providerEventId: "sec-1" })],
+      delayed: false,
+      fetchedAt: NOW * 1000 - 5_000,
+    };
+    const plan = planResolution(slate([event()]), secondary, NOW);
+
+    const summary = await executeResolution(plan, submitter, log, "espn", {
+      nowSeconds: NOW,
+      storedEventOf: () => ({
+        status: "final",
+        homeScore: 27,
+        awayScore: 20,
+        lastPolledAt: new Date(NOW * 1000 - 30_000),
+      }),
+    });
+    assert.equal(summary.resolved, 2);
+
+    const evidence = records[0].evidence as {
+      schema: string;
+      providerEventId: string;
+      gameWinningOutcomeIndex: number;
+      policy: string;
+      sources: { role: string; provider: string; retrievedAt: string | null; status: string; homeScore: number | null; awayScore: number | null }[];
+      consensus: { kind: string };
+      confidenceState: string | null;
+      criteria: { name: string; pass: boolean }[];
+      decidedAt: string;
+    };
+
+    assert.equal(evidence.schema, "resolution-evidence@1");
+    // WHICH sources: primary, secondary, and the ingest store.
+    assert.deepEqual(
+      evidence.sources.map((s) => s.role),
+      ["primary", "secondary", "store"],
+    );
+    // WHAT each said: every source carries its own scoreline and status.
+    assert.ok(evidence.sources.every((s) => s.status === "final"));
+    assert.ok(evidence.sources.every((s) => s.homeScore === 27 && s.awayScore === 20));
+    // WHEN: every source carries its own retrieval timestamp.
+    assert.ok(evidence.sources.every((s) => s.retrievedAt !== null));
+    assert.equal(evidence.sources[0].retrievedAt, new Date(NOW * 1000).toISOString());
+    assert.equal(evidence.sources[1].retrievedAt, new Date(NOW * 1000 - 5_000).toISOString());
+    // The consensus verdict and the derived winner.
+    assert.equal(evidence.consensus.kind, "agreed");
+    assert.equal(evidence.gameWinningOutcomeIndex, 0);
+    assert.equal(evidence.policy, "dual-source");
+    // WHICH criteria passed: the full list, all green.
+    assert.equal(evidence.criteria.length, 9);
+    assert.ok(evidence.criteria.every((c) => c.pass));
+    // The confidence state that authorised the write.
+    assert.equal(records[0].confidenceState, "VERIFIED");
+    // And both markets carry evidence, each naming its own side.
+    assert.ok(records.every((r) => r.evidence !== undefined));
+  });
+
+  void it("single-source policy is recorded as an explicit exemption, never as agreement", async () => {
+    const { submitter } = fakeSubmitter();
+    const { log, records } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+
+    await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
+
+    const evidence = records[0].evidence as {
+      policy: string;
+      consensus: { kind: string };
+      criteria: { name: string; detail: string }[];
+    };
+    assert.equal(evidence.policy, "single-source");
+    assert.equal(evidence.consensus.kind, "policy-exempt-single-source");
+    const corroborated = evidence.criteria.find((c) => c.name === "corroborated");
+    assert.match(corroborated?.detail ?? "", /policy-exempt/);
+  });
+});
+
+// ─── Task 040 — assessments feed the confidence machine (S-024) ────────────
+
+void describe("planResolution assessments", () => {
+  void it("every final on a fresh slate is assessed, held or not", () => {
+    const plan = planResolution(
+      slate([
+        event(),
+        event({
+          providerEventId: "no-scores",
+          homeScore: undefined as never,
+          awayScore: undefined as never,
+        }),
+        event({ providerEventId: "live", status: "in_progress", startsAt: NOW - 600 }),
+      ]),
+      null,
+      NOW,
+    );
+    assert.deepEqual(
+      plan.assessments.map((a) => a.providerEventId).sort(),
+      ["401671789", "no-scores"],
+    );
+    assert.ok(plan.assessments.every((a) => a.policy === "single-source"));
+  });
+
+  void it("a delayed slate assesses nothing — stale data must not move confidence", () => {
+    const plan = planResolution(slate([event()], true), null, NOW);
+    assert.equal(plan.assessments.length, 0);
+  });
+
+  void it("a disagreement is assessed even though the event is held", () => {
+    const secondary = slate([event({ providerEventId: "other-id", homeScore: 20, awayScore: 27 })]);
+    const plan = planResolution(slate([event()]), secondary, NOW);
+    assert.equal(plan.submissions.length, 0);
+    assert.equal(plan.assessments.length, 1);
+    assert.equal(plan.assessments[0].corroboration?.kind, "disagreed");
+    assert.equal(plan.assessments[0].policy, "dual-source");
   });
 });
