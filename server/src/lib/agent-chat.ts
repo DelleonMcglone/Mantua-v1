@@ -23,6 +23,22 @@ import { agentMarketTrade } from "./sports/market-agent-trade.ts";
 import { EspnProvider } from "./sports/espn.ts";
 import { toPublicSlate } from "./sports/public-slate.ts";
 import { withLiveOdds } from "./sports/live-odds.ts";
+import {
+  makeSportsToolsDb,
+  getGame,
+  getLiveGameState,
+  getTeamStats,
+  getPlayerStats,
+  getPlayerInjuryStatus,
+  getRecentGames,
+  getHeadToHead,
+  getStandings,
+  getPlayByPlay,
+  getMarketPrice,
+  getMarketHistory,
+  getMarketVolume,
+  getMarketLiquidity,
+} from "./sports/agent-sports-tools.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import {
@@ -182,6 +198,7 @@ Sports betting — you evaluate sports markets, analyze matchups, and place bets
 - Evaluate before betting: compare the implied probability against what you can learn — market_research context, x402 sports stats / prediction-market odds services (state the cost), and the game's status. State your reasoning with the numbers ("pool implies 62% home win; the away side has covered 7 of 9 — buying away YES") the same way you cite signals before a swap.
 - Place or exit bets with trade_market: providerEventId from the slate, outcomeIndex 0 = home team's YES market, 1 = away team's; direction buy spends USDC, sell exits YES tokens back to USDC. Only bet games whose slate status is scheduled AND whose start time is still in the future — betting freezes on-chain at kickoff, so skip in-progress and finished games when spreading a budget across a slate. Buys count against the daily spending cap exactly like swaps. A winning YES redeems for 1 USDC after resolution; a tied, postponed, or cancelled game voids the market and settles at 0.50 per token.
 - Frame prices as the market's implied view, not a guarantee, and never present a bet as risk-free.
+- Sports data tools (canonical database): your sports knowledge comes from Mantua's own database via these read-only tools — NOT from web search or memory. get_game (a team's game + its marketIds), get_live_game_state, get_team_stats, get_player_stats, get_player_injury_status, get_recent_games, get_head_to_head, get_standings, get_play_by_play, and the market tools get_market_price / get_market_history / get_market_volume / get_market_liquidity. Identify teams and players by name — the tools fuzzy-match and return didYouMean candidates on ambiguity: relay the question, never pick one silently. A status of unavailable or a "not yet ingested" reason means the data isn't in the database yet — say so plainly and never invent scores, stats, injuries, or plays a tool didn't return. Chain them for a bet evaluation: get_game gives the event, opponent, and marketIds; feed those marketIds into the market tools for price, history, volume, and liquidity.
 
 Funding: when the user wants to fund the agent wallet, give them the agent wallet's address (get_portfolio shows it) and tell them to send USDC on Base to it — from their own wallet or an exchange withdrawal (network: Base). Balances refresh automatically once it lands.
 
@@ -197,6 +214,10 @@ Conventions:
 // Shared provider instance so the slate tool reuses its TTL cache across
 // turns, same as the public /api/sports/slate route.
 const espn = new EspnProvider();
+
+// 039 — the sports-data tool suite reads the CANONICAL Mantua database
+// through this seam, never the provider per-request.
+const sportsToolsDb = makeSportsToolsDb(db);
 
 const TOOLS: Anthropic.Tool[] = [
   {
@@ -637,6 +658,181 @@ const TOOLS: Anthropic.Tool[] = [
     description:
       "Read the Stable Protection hook's live guard state THROUGH Circle Contracts (SCP): the EUR/USD peg reference, current deviation in bps, peg zone (HEALTHY→CRITICAL), whether the circuit breaker is blocking swaps, and the hook owner. Use when asked about the hook's health, peg guard, or circuit breaker. Read-only.",
     input_schema: { type: "object", properties: {} },
+  },
+  // ── 039 sports-data suite (S-011..S-020) — canonical-DB reads, no audit ──
+  {
+    name: "get_game",
+    description:
+      "Find one game in Mantua's canonical database by team name (fuzzy-matched; ambiguity returns didYouMean — relay it, never guess). Returns the event (status, start time, scores), which side the team is, the opponent, and the game's markets with their marketIds — the ids every market tool takes. No date → the live game if one is on, else the next scheduled, else the most recent. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        team: { type: "string", description: "Team name, key, or abbreviation (e.g. 'Falcons')." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+        date: { type: "string", description: "Optional YYYY-MM-DD to search around." },
+        windowDays: {
+          type: "number",
+          description: "Half-width of the date window in days (1-14, default 3).",
+        },
+      },
+      required: ["team"],
+    },
+  },
+  {
+    name: "get_live_game_state",
+    description:
+      "Live state of an in-progress game from the canonical database: score and status. Fields the database does not store yet (period, clock, possession) are returned null with a fieldsNotStored reason — never invented. Identify the game by team name or providerEventId. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        team: { type: "string", description: "Team name (fuzzy-matched)." },
+        providerEventId: { type: "string", description: "Exact provider event id, if known." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+    },
+  },
+  {
+    name: "get_team_stats",
+    description:
+      "Team profile from the canonical database: identity plus a win/loss record and points for/against DERIVED from finished games. Detailed per-team stats are not ingested yet and return a structured unavailable — say so rather than guessing. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        team: { type: "string", description: "Team name, key, or abbreviation." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+      required: ["team"],
+    },
+  },
+  {
+    name: "get_player_stats",
+    description:
+      "Player profile from the canonical database: name, position, jersey number, roster status, team. Per-player stat lines are not ingested yet and return a structured unavailable — never invent numbers. Fuzzy name match with didYouMean on ambiguity. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        player: { type: "string", description: "Player name (fuzzy-matched)." },
+        team: { type: "string", description: "Optional team name to disambiguate." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+      required: ["player"],
+    },
+  },
+  {
+    name: "get_player_injury_status",
+    description:
+      "Open injury reports from the canonical database, for one player or a whole team ('who's out tonight'). An empty list distinguishes 'no open report' from 'injury feed not ingested yet' — relay that distinction; absence of rows is not proof of health. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        player: { type: "string", description: "Player name (fuzzy-matched)." },
+        team: { type: "string", description: "Team name — returns all open reports for it." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+    },
+  },
+  {
+    name: "get_recent_games",
+    description:
+      "A team's recent form: its last N finished games from the canonical database with opponent, home/away, score, and W/L/T result. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        team: { type: "string", description: "Team name, key, or abbreviation." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+        limit: { type: "number", description: "Games to return (1-20, default 5)." },
+      },
+      required: ["team"],
+    },
+  },
+  {
+    name: "get_head_to_head",
+    description:
+      "Finished meetings between two teams from the canonical database: per-team win counts and the game list. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        teamA: { type: "string", description: "First team name." },
+        teamB: { type: "string", description: "Second team name." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+        limit: { type: "number", description: "Max meetings to return (1-20, default 10)." },
+      },
+      required: ["teamA", "teamB"],
+    },
+  },
+  {
+    name: "get_standings",
+    description:
+      "League standings DERIVED from finished games in the canonical database (wins/losses/ties, points, win pct) — an official standings feed is not ingested, and the result says so. Omit league for all covered leagues. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+    },
+  },
+  {
+    name: "get_play_by_play",
+    description:
+      "Play-by-play for a game. The canonical database has no play-by-play storage yet, so this always returns a structured unavailable (it still confirms whether the game itself exists) — relay that instead of inventing plays. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        team: { type: "string", description: "Team name (fuzzy-matched)." },
+        providerEventId: { type: "string", description: "Exact provider event id, if known." },
+        league: { type: "string", description: "Optional league slug (nfl, wnba)." },
+      },
+    },
+  },
+  {
+    name: "get_market_price",
+    description:
+      "Latest captured price of one sports market from the canonical database: implied probability (and bps), capture source and age. marketId comes from get_game. No capture yet → structured unavailable. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marketId: { type: "string", description: "0x market id from get_game (66 chars)." },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "get_market_history",
+    description:
+      "Time series of a sports market's captured implied probability (oldest→newest) plus the net change over the window. marketId comes from get_game. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marketId: { type: "string", description: "0x market id from get_game (66 chars)." },
+        limit: { type: "number", description: "Max points (1-500, default 50)." },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "get_market_volume",
+    description:
+      "Trading volume for a sports market from indexed fills in the canonical database: trade counts and USDC volume by direction over a window (default 24h). Zero fills is stated as such — it may mean no trading OR indexing pending. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marketId: { type: "string", description: "0x market id from get_game (66 chars)." },
+        windowHours: { type: "number", description: "Lookback window in hours (1-720, default 24)." },
+      },
+      required: ["marketId"],
+    },
+  },
+  {
+    name: "get_market_liquidity",
+    description:
+      "Pool depth for a sports market from the latest canonical capture (USDC). Returns poolDeployed=false with null liquidity before the pool is seeded on-chain — a graceful pre-deployment answer, not an error. Read-only.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marketId: { type: "string", description: "0x market id from get_game (66 chars)." },
+      },
+      required: ["marketId"],
+    },
   },
 ];
 
@@ -1442,6 +1638,35 @@ async function executeTool(
     case "inspect_hook_contract": {
       return await readHookViaScp();
     }
+    // ── 039 sports-data suite — read-only canonical-DB queries. Input
+    // validation (zod) lives inside each function; throws surface as tool
+    // errors like every other case.
+    case "get_game":
+      return await getGame(sportsToolsDb, input);
+    case "get_live_game_state":
+      return await getLiveGameState(sportsToolsDb, input);
+    case "get_team_stats":
+      return await getTeamStats(sportsToolsDb, input);
+    case "get_player_stats":
+      return await getPlayerStats(sportsToolsDb, input);
+    case "get_player_injury_status":
+      return await getPlayerInjuryStatus(sportsToolsDb, input);
+    case "get_recent_games":
+      return await getRecentGames(sportsToolsDb, input);
+    case "get_head_to_head":
+      return await getHeadToHead(sportsToolsDb, input);
+    case "get_standings":
+      return await getStandings(sportsToolsDb, input);
+    case "get_play_by_play":
+      return await getPlayByPlay(sportsToolsDb, input);
+    case "get_market_price":
+      return await getMarketPrice(sportsToolsDb, input);
+    case "get_market_history":
+      return await getMarketHistory(sportsToolsDb, input);
+    case "get_market_volume":
+      return await getMarketVolume(sportsToolsDb, input);
+    case "get_market_liquidity":
+      return await getMarketLiquidity(sportsToolsDb, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
