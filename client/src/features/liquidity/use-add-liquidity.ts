@@ -75,6 +75,41 @@ interface PoolCreateCalldataRes {
   poolKey: { currency0: string; currency1: string; sqrtPriceX96: string };
 }
 
+/**
+ * B7-004 — add liquidity to one market's YES/USDC pool on the Dynamic
+ * Market stack. Keyed by game + outcome (the market-trade convention);
+ * the server resolves the DM stack per DM-112 and returns the gated
+ * state (409, gated: true) while market pools aren't deployed.
+ */
+export interface MarketAddLiquidityArgs {
+  market: { providerEventId: string; outcomeIndex: 0 | 1 };
+  /** YES-token side, raw 6dp units. */
+  amountYesRaw: string;
+  /** USDC side, raw 6dp units. */
+  amountUsdcRaw: string;
+  slippageBps: number;
+}
+
+interface MarketCalldataRes extends CalldataRes {
+  /** Sorted pool currencies (YES token + USDC) — the exact addresses to
+   *  approve to Permit2; the server always returns them. */
+  currency0: `0x${string}`;
+  currency1: `0x${string}`;
+  market: {
+    marketId: `0x${string}`;
+    yesToken: `0x${string}`;
+    collateral: `0x${string}`;
+    yesIsToken0: boolean;
+  };
+}
+
+/** Server codes that mean "market pools are gated", not "you failed". */
+export const MARKET_GATED_CODES = new Set(["MARKET_POOLS_NOT_DEPLOYED", "MARKET_POOL_NOT_LIVE"]);
+
+export function isMarketGatedError(err: unknown): boolean {
+  return err instanceof ApiError && MARKET_GATED_CODES.has(err.code);
+}
+
 export function useAddLiquidity() {
   const { wallets } = useWallets();
   const chainId = BASE_CHAIN_ID;
@@ -296,9 +331,134 @@ export function useAddLiquidity() {
     }
   }
 
+  /**
+   * Market-pool add (B7-004). Separate from `execute` on purpose: no
+   * pool-create step (market pools are seeded by the market planner, never
+   * user-created), approvals run on the server-returned currency addresses
+   * (YES tokens aren't registry symbols), and the record write is keyed by
+   * marketId. A gated server response (409 MARKET_POOLS_NOT_DEPLOYED /
+   * MARKET_POOL_NOT_LIVE) lands in `state.error` — callers detect it with
+   * `isMarketGatedError` and render the gate, not a failure.
+   */
+  async function executeMarket(args: MarketAddLiquidityArgs): Promise<`0x${string}` | null> {
+    try {
+      const wallet = wallets.find((w) => w.walletClientType === "privy") ?? wallets[0];
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- runtime defensive
+      if (!wallet) throw new Error("No wallet connected");
+      if (wallet.chainId !== `eip155:${String(chainId)}`) {
+        await wallet.switchChain(chainId);
+      }
+      const chain = CHAIN_INFO[chainId].viemChain;
+      const publicClient = createPublicClient({ chain, transport: getRpcTransport(chainId) });
+      const owner = wallet.address as `0x${string}`;
+      const provider = await wallet.getEthereumProvider();
+      const walletClient = createWalletClient({
+        account: owner,
+        chain,
+        transport: custom(hardenProvider(provider, chainId)),
+      });
+
+      setState({ status: "preparing" });
+      const calldata = await api.post<MarketCalldataRes>("/api/liquidity/add/calldata", {
+        chainId,
+        market: args.market,
+        amountYesRaw: args.amountYesRaw,
+        amountUsdcRaw: args.amountUsdcRaw,
+        slippageBps: args.slippageBps,
+        deadlineSeconds: Math.floor(Date.now() / 1000) + 1200,
+      });
+
+      // Both sides are plain ERC-20s (YES token + USDC) — approve Permit2
+      // on the exact addresses the server resolved for this pool.
+      setState({ status: "approving", message: "Checking token approvals…" });
+      const approval0 = await ensurePermit2Approval(
+        walletClient,
+        publicClient,
+        calldata.currency0,
+        owner,
+      );
+      const approval1 = await ensurePermit2Approval(
+        walletClient,
+        publicClient,
+        calldata.currency1,
+        owner,
+      );
+
+      let to = calldata.to;
+      let data = calldata.data;
+      if (calldata.permit2) {
+        setState({
+          status: "signing",
+          message: "Sign Permit2 batch in your wallet…",
+          ...(approval0 ? { approvalTx: approval0 } : approval1 ? { approvalTx: approval1 } : {}),
+        });
+        const signTypedDataArgs = buildSignTypedDataArgs(calldata.permit2.typedData);
+        const signature = await walletClient.signTypedData({
+          account: owner,
+          ...signTypedDataArgs,
+        });
+        // calldata.to is the DM stack's PositionManager (server-resolved
+        // per DM-112) — the multicall must target it, not the hero PM.
+        const wrapped = wrapInMulticall(
+          owner,
+          calldata.permit2.permitBatch,
+          signature,
+          calldata.data,
+          calldata.to,
+        );
+        to = wrapped.to;
+        data = wrapped.data;
+      }
+
+      setState({
+        status: "signing",
+        ...(approval0 ? { approvalTx: approval0 } : approval1 ? { approvalTx: approval1 } : {}),
+      });
+      const txHash = await walletClient.sendTransaction({
+        account: owner,
+        chain,
+        to,
+        data,
+        value: BigInt(calldata.value),
+      });
+      setState({ status: "pending", txHash });
+
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      const outcome = receipt.status === "success" ? "success" : "failure";
+      const tokenId =
+        outcome === "success" ? extractMintedTokenId(receipt, owner, calldata.to) : null;
+
+      void api.post("/api/liquidity/add/record", {
+        chainId,
+        txHash,
+        marketId: calldata.market.marketId,
+        amountYesRaw: args.amountYesRaw,
+        amountUsdcRaw: args.amountUsdcRaw,
+        liquidity: calldata.liquidity,
+        tickLower: calldata.tickLower,
+        tickUpper: calldata.tickUpper,
+        poolKeyHash: calldata.poolKeyHash,
+        ...(tokenId ? { tokenId } : {}),
+        outcome,
+      });
+
+      setState({
+        status: outcome === "success" ? "success" : "error",
+        txHash,
+        ...(outcome === "failure" ? { error: new Error("Transaction reverted") } : {}),
+      });
+      return txHash;
+    } catch (err) {
+      const e = err instanceof Error ? err : new Error("add liquidity failed");
+      setState({ status: "error", error: e });
+      return null;
+    }
+  }
+
   return {
     state,
     execute,
+    executeMarket,
     reset: () => {
       setState({ status: "idle" });
     },

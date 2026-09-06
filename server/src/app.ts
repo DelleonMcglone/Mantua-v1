@@ -36,6 +36,7 @@ import { analyzeChatRouter } from "./routes/analyze-chat.ts";
 import { healthRouter } from "./routes/health.ts";
 import { liquidityAddRouter } from "./routes/liquidity-add.ts";
 import { liquidityRemoveRouter } from "./routes/liquidity-remove.ts";
+import { marketPoolsRouter } from "./routes/market-pools.ts";
 import { poolCreateRouter } from "./routes/pool-create.ts";
 import { poolStateRouter } from "./routes/pool-state.ts";
 import { poolsRouter } from "./routes/pools.ts";
@@ -74,6 +75,8 @@ app.use(poolCreateRouter);
 app.use(poolStateRouter);
 app.use(liquidityAddRouter);
 app.use(liquidityRemoveRouter);
+// B7-006 — pool↔market linkage for the pool list's market-status column.
+app.use(marketPoolsRouter);
 app.use(positionsRouter);
 app.use(earningsRouter);
 app.use(portfolioRouter);

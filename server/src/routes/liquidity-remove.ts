@@ -11,6 +11,10 @@ import { getRequestContext } from "../lib/request-context.ts";
 import { getRpcClient } from "../lib/rpc-client.ts";
 import { DEFAULT_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import { buildRemoveLiquidityCalldata } from "../lib/v4-remove-liquidity.ts";
+import {
+  MarketLiquidityGatedError,
+  assertMarketPoolsDeployed,
+} from "../lib/market-pool-liquidity.ts";
 import { decodePositionInfo } from "../lib/v4-position-info.ts";
 import { POSITION_MANAGER_VIEW_ABI, getV4StackForHook } from "../lib/v4-contracts.ts";
 import { readSlot0 } from "../lib/v4-state-view.ts";
@@ -120,11 +124,21 @@ liquidityRemoveRouter.post(
     try {
       let pos: ResolvedPosition;
       const chainId = parsed.data.chainId ?? DEFAULT_CHAIN_ID;
+      // B7-004 — market-pool positions live on the Dynamic Market stack.
+      // Gate FIRST (a remove against an undeployed market pool must
+      // surface the gated state, not a "position not found" probe on the
+      // wrong PositionManager), then resolve by the DM hook so the
+      // per-hook PM lookup below lands on the DM stack per DM-112.
+      let hookAddressForResolve = parsed.data.hookAddress;
+      if (parsed.data.market) {
+        const { dm } = assertMarketPoolsDeployed(chainId);
+        hookAddressForResolve = dm.hook;
+      }
       if (parsed.data.tokenId) {
         const result = await resolveByTokenId(
           parsed.data.tokenId,
           ctx.walletAddress,
-          parsed.data.hookAddress,
+          hookAddressForResolve,
           chainId,
         );
         if ("error" in result) {
@@ -234,6 +248,10 @@ liquidityRemoveRouter.post(
         positionLiquidity: totalLiquidity.toString(),
       });
     } catch (err) {
+      if (err instanceof MarketLiquidityGatedError) {
+        res.status(409).json({ error: err.message, code: err.code, gated: true });
+        return;
+      }
       const message = err instanceof Error ? err.message : "calldata failed";
       logger.warn({ err }, "POST /api/liquidity/remove/calldata failed");
       res.status(400).json({ error: message, code: "REMOVE_LIQUIDITY_INVALID" });
