@@ -13,9 +13,9 @@ import {
 import { getSport, SPORTS, type SportId } from "./sports.ts";
 import { useSlate, type SlateEvent } from "./use-slate.ts";
 import { useMarketTrade } from "./use-market-trade.ts";
+import { rawToHuman6 } from "./market-trade-core.ts";
 import { MarketDetail } from "./MarketDetail.tsx";
-
-const EXPLORER = "https://basescan.org/tx/";
+import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 
 interface Props {
   sport: SportId;
@@ -28,6 +28,9 @@ interface Props {
   initialEventId?: string | undefined;
   /** Deep-link: open the sidebar on this direction. */
   initialDirection?: "buy" | "sell" | undefined;
+  /** Deep-link: pre-fill the sidebar amount (one-click Close sends the
+   *  full held balance, already in human units). */
+  initialAmount?: string | undefined;
 }
 
 interface Selection {
@@ -128,6 +131,7 @@ export function LeaguePage({
   onAgent,
   initialEventId,
   initialDirection,
+  initialAmount,
 }: Props) {
   const active = getSport(sport);
   const weekOptions = useMemo(() => buildWeekOptions(), []);
@@ -282,6 +286,9 @@ export function LeaguePage({
               key={`${effective.event.providerEventId}-${String(effective.outcomeIndex)}`}
               selection={effective}
               initialDirection={initialDirection}
+              initialAmount={
+                effective.event.providerEventId === initialEventId ? initialAmount : undefined
+              }
               onPick={(outcomeIndex) => {
                 setSelection({ event: effective.event, outcomeIndex });
               }}
@@ -411,15 +418,17 @@ function TradeSidebar({
   selection,
   onPick,
   initialDirection,
+  initialAmount,
 }: {
   selection: Selection;
   onPick: (outcome: 0 | 1) => void;
   initialDirection?: "buy" | "sell" | undefined;
+  initialAmount?: string | undefined;
 }) {
   const { authenticated, user } = usePrivy();
   const { event, outcomeIndex } = selection;
   const [direction, setDirection] = useState<"buy" | "sell">(initialDirection ?? "buy");
-  const [amount, setAmount] = useState("0");
+  const [amount, setAmount] = useState(initialAmount ?? "0");
   const [yesBalance, setYesBalance] = useState<bigint | null>(null);
 
   const { phase, execute } = useMarketTrade({
@@ -454,6 +463,12 @@ function TradeSidebar({
 
   const quote = calldata?.quote ?? null;
   const out = quote ? Number(quote.amountOut) / 1e6 : null;
+  // Server-quoted floor (quote − slippage tolerance); the matching price
+  // bound is already inside the calldata the wallet will sign.
+  const minOut =
+    quote && typeof quote.amountOutMinimum === "string"
+      ? Number(quote.amountOutMinimum) / 1e6
+      : null;
   const busy =
     phase.kind === "approving" || phase.kind === "signing" || phase.kind === "confirming";
 
@@ -531,8 +546,11 @@ function TradeSidebar({
           <span className="font-mono text-text">{(Number(yesBalance) / 1e6).toFixed(2)}</span> YES
           <button
             type="button"
+            aria-label="Sell your full balance"
             onClick={() => {
-              setAmount((Number(yesBalance) / 1e6).toFixed(2));
+              // Exact digits from the raw balance — float division could
+              // round the last decimal up past what the wallet holds.
+              setAmount(rawToHuman6(yesBalance));
             }}
             className="rounded-sm border border-border-soft px-1.5 py-0.5 text-[10px] text-text-dim hover:text-text cursor-pointer"
           >
@@ -556,33 +574,39 @@ function TradeSidebar({
       </div>
 
       <div className="mt-3 min-h-[38px] text-[12px] leading-relaxed text-text-dim">
-        {phase.kind === "quoting" && "Quoting…"}
+        {phase.kind === "quoting" && <span role="status">Quoting…</span>}
         {quote && out !== null && direction === "buy" && (
           <>
             You receive <span className="font-mono text-text">{out.toFixed(2)}</span>{" "}
             {chosen.abbreviation} YES
             {quote.effectivePriceBps !== null &&
               ` · pays ${out.toFixed(2)} USDC if ${chosen.name} win`}
+            {minOut !== null && ` · min ${minOut.toFixed(2)} after slippage`}
           </>
         )}
         {quote && out !== null && direction === "sell" && (
           <>
             You receive <span className="font-mono text-text">{out.toFixed(2)}</span> USDC
+            {minOut !== null && ` · min ${minOut.toFixed(2)} after slippage`}
           </>
         )}
-        {phase.kind === "error" && <span className="text-yellow">{phase.message}</span>}
+        {phase.kind === "error" && (
+          <span role="alert" className="text-yellow">
+            {phase.message}
+          </span>
+        )}
         {busy && (
-          <span className="text-accent">
+          <span role="status" className="text-accent">
             {phase.kind === "approving" && "Approve in your wallet…"}
             {phase.kind === "signing" && "Sign the trade in your wallet…"}
             {phase.kind === "confirming" && "Confirming on-chain…"}
           </span>
         )}
         {phase.kind === "done" && (
-          <span className="text-green">
+          <span role="status" className="text-green">
             Done.{" "}
             <a
-              href={`${EXPLORER}${phase.txHash}`}
+              href={getExplorerTxUrl(BASE_CHAIN_ID, phase.txHash)}
               target="_blank"
               rel="noopener noreferrer"
               className="underline"
@@ -598,12 +622,14 @@ function TradeSidebar({
           variant="primary"
           size="lg"
           className="mt-2 w-full"
+          aria-live="polite"
+          aria-atomic="true"
           disabled={phase.kind !== "quoted"}
           onClick={() => {
             void execute();
           }}
         >
-          {busy ? "Working…" : "Trade"}
+          {busy ? "Working…" : direction === "sell" ? "Sell" : "Trade"}
         </Button>
       ) : (
         <Button

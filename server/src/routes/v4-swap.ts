@@ -10,6 +10,7 @@ import {
   quoteExactInputV4,
 } from "../lib/v4-onchain-swap.ts";
 import { buildUniversalRouterSwap, minOutFromQuote } from "../lib/v4-universal-router.ts";
+import { isMarketPoolHook } from "../lib/swap-route.ts";
 import { MAX_SLIPPAGE_BPS } from "../lib/constants.ts";
 import { HOOK_NAMES, isFeeTier } from "../lib/v4-contracts.ts";
 import { HookPairNotAllowedError } from "../lib/hook-pair-gating.ts";
@@ -256,6 +257,16 @@ v4SwapRouter.post(
             amountInRaw: BigInt(amountInRaw),
             chainId,
           });
+          // B7-005 / DM-112 backstop — a pool keyed to the Dynamic Market
+          // hook belongs to the market-trade path (its own PoolManager +
+          // periphery); encoding it for the canonical UniversalRouter would
+          // target the wrong v4 stack. Registry-symbol validation makes
+          // this unreachable today; the assert keeps it that way.
+          if (isMarketPoolHook(quote.poolKey.hooks, chainId)) {
+            throw new Error(
+              "Market outcome pools trade through /api/markets/trade/calldata, not the token-swap path (DM-112)",
+            );
+          }
           // amountOutMinimum: amountOut * (1 - slippage), enforced ON-CHAIN
           // by the UniversalRouter calldata below.
           const minOut = minOutFromQuote(BigInt(quote.amountOut), slippageBps);

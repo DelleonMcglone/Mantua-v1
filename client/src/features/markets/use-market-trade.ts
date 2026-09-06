@@ -8,7 +8,6 @@ const ERC20 = parseAbi([
   "function allowance(address owner, address spender) view returns (uint256)",
   "function approve(address spender, uint256 amount) returns (bool)",
 ]);
-const MAX_UINT = 2n ** 256n - 1n;
 
 export interface TradeCalldata {
   to: `0x${string}`;
@@ -19,7 +18,17 @@ export interface TradeCalldata {
   marketAddress: `0x${string}`;
   marketId: `0x${string}`;
   yesToken: `0x${string}`;
-  quote: { amountIn: string; amountOut: string; effectivePriceBps: number | null };
+  /** On-chain price bound encoded in `data` — the server-built calldata
+   *  carries the slippage protection; the client just signs it. */
+  sqrtPriceLimitX96: string;
+  quote: {
+    amountIn: string;
+    amountOut: string;
+    /** Quote − slippage tolerance (display; the calldata's price bound
+     *  enforces the same tolerance on-chain). */
+    amountOutMinimum: string;
+    effectivePriceBps: number | null;
+  };
 }
 
 export type TradePhase =
@@ -96,11 +105,14 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
         });
         if (allowance < BigInt(calldata.quote.amountIn)) {
           setPhase({ kind: "approving", calldata });
+          // Bounded to the trade amount — never MaxUint (the 031/C-022
+          // principle): no standing allowance to the market router
+          // survives the trade.
           const approveTx = await wallet.writeContract({
             address: calldata.inputToken,
             abi: ERC20,
             functionName: "approve",
-            args: [calldata.approvalTarget, MAX_UINT],
+            args: [calldata.approvalTarget, BigInt(calldata.quote.amountIn)],
           });
           await publicClientFor(chainId).waitForTransactionReceipt({ hash: approveTx });
         }

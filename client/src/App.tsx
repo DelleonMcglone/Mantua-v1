@@ -12,6 +12,7 @@ import type { LegalDoc } from "./components/legal/LegalPage.tsx";
 import { DocsPage } from "./components/docs/DocsPage.tsx";
 import { LeaguePage } from "./features/markets/LeaguePage.tsx";
 import { isSportId, type SportId } from "./features/markets/sports.ts";
+import { rawToHuman6 } from "./features/markets/market-trade-core.ts";
 import { AppShell } from "./components/shell/AppShell.tsx";
 import { Card } from "./components/shell/Card.tsx";
 import { HomePromptRow, type HomePromptId } from "./components/shell/HomeMenu.tsx";
@@ -61,7 +62,15 @@ type Route =
        *  identical — otherwise a repeated "swap USDC for EURC" does nothing. */
       nonce?: number;
     }
-  | { kind: "market"; sport: SportId; selectEventId?: string; direction?: "buy" | "sell" }
+  | {
+      kind: "market";
+      sport: SportId;
+      selectEventId?: string;
+      direction?: "buy" | "sell";
+      /** Pre-filled sidebar amount (human units) — one-click Close sends
+       *  the full held balance. */
+      amount?: string;
+    }
   | { kind: "profile" }
   | { kind: "trading" }
   | { kind: "pools" }
@@ -158,17 +167,27 @@ export default function App() {
     };
   }, []);
 
-  // Close-position deep-link from the profile's positions list: open the
-  // league page with that game selected and the sidebar on Sell.
+  // Close-position deep-link from any positions list (profile, portfolio
+  // card, market detail): open the league page with that game selected and
+  // the sidebar on Sell, pre-filled with the full held balance (B7-003
+  // one-click Close). `balance` is the raw 6dp holding.
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ league?: string; eventId?: string }>).detail;
+      const detail = (e as CustomEvent<{ league?: string; eventId?: string; balance?: string }>)
+        .detail;
       if (detail.league && isSportId(detail.league) && detail.eventId) {
+        let amount: string | undefined;
+        try {
+          amount = detail.balance ? rawToHuman6(detail.balance) : undefined;
+        } catch {
+          amount = undefined; // unparseable balance — open on Sell without a pre-fill
+        }
         setRoute({
           kind: "market",
           sport: detail.league,
           selectEventId: detail.eventId,
           direction: "sell",
+          ...(amount ? { amount } : {}),
         });
       }
     };
@@ -489,6 +508,7 @@ function fullPage(route: Route, setRoute: (r: Route) => void): React.ReactNode |
           sport={route.sport}
           initialEventId={route.selectEventId}
           initialDirection={route.direction}
+          initialAmount={route.amount}
           onSelectSport={(sport) => {
             setRoute({ kind: "market", sport });
           }}

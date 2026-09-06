@@ -208,11 +208,13 @@ export function decodeSwapRevertReason(err: unknown): string | null {
  * v4 sqrt price limits. Anything inside `MIN_SQRT_PRICE_LIMIT <
  * sqrtPriceX96 < MAX_SQRT_PRICE_LIMIT` is accepted; using these
  * extremes effectively disables price-impact protection at the
- * PoolManager level. Slippage is enforced upstream via the quote +
- * client-supplied tolerance.
+ * PoolManager level. Callers that want in-calldata protection pass a
+ * real `sqrtPriceLimitX96` (see `buildPoolSwapTestCalldata`) — the
+ * market-trade builder derives one from the live pool price + slippage
+ * tolerance (B7-003).
  */
-const MIN_SQRT_PRICE_LIMIT = 4295128740n; // TickMath.MIN_SQRT_PRICE + 1
-const MAX_SQRT_PRICE_LIMIT = 1461446703485210103287273052203988822378723970341n; // TickMath.MAX_SQRT_PRICE - 1
+export const MIN_SQRT_PRICE_LIMIT = 4295128740n; // TickMath.MIN_SQRT_PRICE + 1
+export const MAX_SQRT_PRICE_LIMIT = 1461446703485210103287273052203988822378723970341n; // TickMath.MAX_SQRT_PRICE - 1
 
 export interface OnchainQuoteArgs {
   tokenIn: TokenSymbol;
@@ -618,6 +620,15 @@ export interface SwapCalldataArgs {
   amountInRaw: bigint;
   /** Target chain — picks the right PoolSwapTest deployment. */
   chainId?: SupportedChainId;
+  /**
+   * On-chain price bound for the swap (v4 `SwapParams.sqrtPriceLimitX96`).
+   * When set, the PoolManager stops the swap at this price — execution
+   * beyond it is impossible however the pool moved between quote and
+   * inclusion; any unconsumed input stays with the sender. Omitted →
+   * the extreme bound for the direction (no in-calldata protection;
+   * caller enforces slippage some other way).
+   */
+  sqrtPriceLimitX96?: bigint;
 }
 
 export interface SwapCalldataResult {
@@ -643,18 +654,20 @@ export interface SwapCalldataResult {
  * first or — for native ETH input — pass the right `value` and skip
  * the approval.
  *
- * `sqrtPriceLimitX96` is set to the absolute extremes so the
- * PoolManager doesn't reject on price-bound — the user's effective
- * slippage protection is the `amountOutMinimum` we'll surface in the
- * UI from the quote (this signature returns the raw swap; min-out
- * checking is on the caller).
+ * PoolSwapTest has no `amountOutMinimum` field, so the in-calldata
+ * protection lever is `sqrtPriceLimitX96` (B7-003 / 031 principle:
+ * protection travels in the signed transaction, not the UI). Pass a
+ * real bound via `args.sqrtPriceLimitX96`; when omitted the limit
+ * falls to the absolute extreme for the direction and the caller owns
+ * slippage enforcement.
  */
 export function buildPoolSwapTestCalldata(args: SwapCalldataArgs): SwapCalldataResult {
   const poolSwapTest = getV4StackForHook(args.poolKey.hooks, args.chainId).poolSwapTest;
   if (!poolSwapTest) {
     throw new Error("PoolSwapTest is not deployed for this pool's hook stack");
   }
-  const sqrtPriceLimit = args.zeroForOne ? MIN_SQRT_PRICE_LIMIT : MAX_SQRT_PRICE_LIMIT;
+  const sqrtPriceLimit =
+    args.sqrtPriceLimitX96 ?? (args.zeroForOne ? MIN_SQRT_PRICE_LIMIT : MAX_SQRT_PRICE_LIMIT);
   // amountSpecified: negative = exact-input (the convention v4-core uses).
   const amountSpecified = -args.amountInRaw;
   const data = encodeFunctionData({

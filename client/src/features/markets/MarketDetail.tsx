@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
 import { ClaimWinnings } from "./ClaimWinnings.tsx";
+import { closePositionDetail } from "./market-trade-core.ts";
 import type { SlateEvent } from "./use-slate.ts";
 
 const EXPLORER = "https://basescan.org/tx/";
@@ -58,10 +59,12 @@ interface Comment {
 interface PositionRow {
   marketId: string;
   label: string;
+  state: string;
   side: "yes" | "no";
   balance: string;
   impliedProbBps: number | null;
   valueRaw: string;
+  league: string | null;
   providerEventId: string | null;
   entryPriceBps: number | null;
   pnlRaw: string | null;
@@ -521,28 +524,50 @@ function PositionsTab({ event }: { event: SlateEvent }) {
   return (
     <ul className="flex flex-col gap-2">
       {rows.map((p) => {
+        const tokens = Number(p.balance) / 1e6;
         const value = Number(p.valueRaw) / 1e6;
         const pnl = p.pnlRaw === null ? null : Number(p.pnlRaw) / 1e6;
+        // One-click Close (B7-003): pre-fills the trade sidebar with a
+        // sell of the full held balance via the close-position deep-link.
+        const close = closePositionDetail(p);
         return (
           <li
             key={p.marketId}
-            className="flex items-center justify-between rounded-md border border-border-soft px-3.5 py-2.5 text-[13px]"
+            className="flex items-center justify-between gap-3 rounded-md border border-border-soft px-3.5 py-2.5 text-[13px]"
           >
             <div>
               <div className="font-medium">{p.label}</div>
               <div className="text-[11px] text-text-dim">
-                {Number(p.balance).toFixed(2)} YES
+                {tokens.toFixed(2)} YES
                 {p.entryPriceBps !== null &&
                   ` · avg entry ${String(Math.round(p.entryPriceBps / 100))}¢`}
               </div>
             </div>
-            <div className="text-right">
-              <div className="font-mono">${value.toFixed(2)}</div>
-              {pnl !== null && (
-                <div className={`font-mono text-[11px] ${pnl >= 0 ? "text-green" : "text-yellow"}`}>
-                  {pnl >= 0 ? "+" : ""}
-                  {pnl.toFixed(2)}
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <div className="font-mono">${value.toFixed(2)}</div>
+                {pnl !== null && (
+                  <div
+                    className={`font-mono text-[11px] ${pnl >= 0 ? "text-green" : "text-yellow"}`}
+                  >
+                    {pnl >= 0 ? "+" : ""}
+                    {pnl.toFixed(2)}
+                  </div>
+                )}
+              </div>
+              {close && (
+                <button
+                  type="button"
+                  aria-label={`Close position — sell ${tokens.toFixed(2)} ${p.label} tokens`}
+                  onClick={() => {
+                    window.dispatchEvent(
+                      new CustomEvent("mantua:close-position", { detail: close }),
+                    );
+                  }}
+                  className="rounded-sm border border-border-soft px-2 py-1 text-[11px] text-text-dim hover:text-text cursor-pointer"
+                >
+                  Close
+                </button>
               )}
             </div>
           </li>

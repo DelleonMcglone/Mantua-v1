@@ -5,10 +5,12 @@ import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import {
   MarketClosedError,
+  MarketsNotDeployedError,
   NoMarketError,
   buildMarketTrade,
   marketTradeSpendUsd,
 } from "../lib/sports/market-trade-build.ts";
+import { MAX_SLIPPAGE_BPS } from "../lib/constants.ts";
 import { isSupportedChainId } from "../lib/chains.ts";
 import { SafetyError } from "../lib/errors.ts";
 import { getRequestContext } from "../lib/request-context.ts";
@@ -31,6 +33,10 @@ const bodySchema = z.object({
     }),
   /** Execution chain — omitted means Base (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
+  /** Slippage tolerance in bps — becomes the on-chain price bound in the
+   *  calldata (B7-003). Hard-capped at MAX_SLIPPAGE_BPS; omitted means the
+   *  platform default. */
+  slippageBps: z.number().int().min(0).max(MAX_SLIPPAGE_BPS).optional(),
 });
 
 /**
@@ -70,6 +76,7 @@ marketTradeRouter.post(
         direction: parsed.data.direction,
         amountRaw,
         ...(parsed.data.chainId !== undefined ? { chainId: parsed.data.chainId } : {}),
+        ...(parsed.data.slippageBps !== undefined ? { slippageBps: parsed.data.slippageBps } : {}),
       };
       // C-019 — buys check the daily cap and record the spend intent on the
       // ledger before calldata leaves the server (guardSpend): a failed check
@@ -89,6 +96,13 @@ marketTradeRouter.post(
       if (err instanceof SafetyError) {
         logger.warn({ err, wallet }, "market-trade: blocked by the spending cap");
         res.status(400).json({ error: err.message, code: err.code, details: err.details });
+        return;
+      }
+      if (err instanceof MarketsNotDeployedError) {
+        // Gated state, not a failure: the market stack isn't live on this
+        // chain (MARKETS_BY_CHAIN empty). Surface it as such — never an
+        // opaque 502 (B7 edge case).
+        res.status(503).json({ error: err.message, code: "MARKETS_NOT_DEPLOYED" });
         return;
       }
       if (err instanceof NoMarketError) {
