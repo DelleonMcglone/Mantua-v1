@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
+import { env } from "../env.ts";
 import { logAudit } from "../lib/audit.ts";
 import { logger } from "../lib/logger.ts";
-import { EspnProvider } from "../lib/sports/espn.ts";
+import { providerFor } from "../lib/sports/active-provider.ts";
 import { executeResolution, planResolution } from "../lib/sports/resolution.ts";
 import { checkFeedFreshness } from "../lib/sports/resolution-freshness.ts";
 import {
@@ -12,18 +13,52 @@ import {
 } from "../lib/sports/markets-onchain.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import {
+  drizzleDisputeWindow,
   drizzleResolutionLog,
+  loadDisputeWindows,
   loadStoredEvents,
   syncConfidenceReviews,
 } from "../lib/sports/resolution-store.ts";
-import type { LeagueSlug } from "../lib/sports/provider.ts";
+import type { LeagueSlug, ProviderSlate, SportsDataProvider } from "../lib/sports/provider.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { parseDates } from "./sports-slate.ts";
 
 export const cronResolutionRouter = Router();
 
-const espn = new EspnProvider();
 const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+
+/**
+ * D-104 — settlement reads the SAME canonical provider routing as every
+ * other consumer: `providerFor(league)` (Sportradar where configured and
+ * covering the league, ESPN only as the configured fallback). The previous
+ * direct `new EspnProvider()` meant finals settled off the prototyping
+ * fallback even where the licensed provider was configured — and off a
+ * different provider than the ingest store the S-022 reconciliation
+ * precheck compares against. Exported so tests can pin the routing.
+ */
+export function resolutionProviderFor(league: LeagueSlug): SportsDataProvider {
+  return providerFor(league);
+}
+
+/**
+ * Fetch the settlement slate. The optional `?dates=` backfill window is an
+ * ESPN-adapter capability (`EspnProvider.getSlate(league, dates?)`) that the
+ * `SportsDataProvider` interface does not carry; passing it through the
+ * structural call below is a no-op for adapters that ignore it, and we warn
+ * loudly rather than pretend a Sportradar-served league was backfilled.
+ */
+async function resolutionSlateFor(league: LeagueSlug, dates: string | null): Promise<ProviderSlate> {
+  const provider = resolutionProviderFor(league);
+  if (dates !== null && provider.name !== "espn") {
+    logger.warn(
+      { league, provider: provider.name, dates },
+      "resolution: ?dates= backfill is only honoured by the espn adapter — sweeping the current slate",
+    );
+  }
+  const getSlate: (league: LeagueSlug, dates?: string) => Promise<ProviderSlate> =
+    provider.getSlate.bind(provider);
+  return getSlate(league, dates ?? undefined);
+}
 
 /**
  * GET /api/cron/resolution — B4-003's settlement sweep, hardened by task 040.
@@ -43,6 +78,13 @@ const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
  *  3. S-025: every resolve passes `assertResolutionCriteria` inside
  *     `executeResolution` — refusals surface as `rejected` with the failed
  *     criteria, audited as `rejected_other`.
+ *  4. D-104 (task 044): a mandatory dispute window
+ *     (`RESOLUTION_DISPUTE_WINDOW_SECONDS`) separates the gate passing from
+ *     the on-chain submit. The first pass that clears the gate opens the
+ *     window (audited, no submit); later passes submit only once it has
+ *     elapsed, the outcome is still VERIFIED, and no operator hold (ops
+ *     route) is set. A DISPUTED escalation cancels the window. Voids are
+ *     window-exempt (B4-005).
  *
  * **Live when `MARKET_SIGNER_PRIVATE_KEY` is configured** (the Resolver
  * deployed 2026-08-17). Without the signer this stays a 503
@@ -73,7 +115,7 @@ cronResolutionRouter.get(
 
     for (const league of LEAGUES) {
       try {
-        const slate = await espn.getSlate(league, dates ?? undefined);
+        const slate = await resolutionSlateFor(league, dates);
         const nowMs = Date.now();
         const nowSeconds = Math.floor(nowMs / 1000);
 
@@ -127,15 +169,43 @@ cronResolutionRouter.get(
             const live = await filterPlanToExistingMarkets(plan, chainId);
             // S-022 — reconciliation precheck inputs: the ingest store's own
             // view of every event this pass wants to settle.
-            const stored = await loadStoredEvents(
+            const liveEventIds = [...new Set(live.submissions.map((s) => s.providerEventId))];
+            const stored = await loadStoredEvents(db, slate.provider, liveEventIds);
+            // D-104 — the mandatory dispute window between the criteria
+            // gate and the on-chain submit. Preloaded from the review rows;
+            // the executor opens/checks it per game outcome.
+            const windowGate = drizzleDisputeWindow(
               db,
-              slate.provider,
-              [...new Set(live.submissions.map((s) => s.providerEventId))],
+              chainId,
+              env.RESOLUTION_DISPUTE_WINDOW_SECONDS,
+              await loadDisputeWindows(db, chainId, liveEventIds),
             );
             const summary = await executeResolution(live, submitter, log, slate.provider, {
               nowSeconds,
               confidenceOf: (id) => reviews.states.get(id) ?? null,
               storedEventOf: (id) => stored.get(id) ?? null,
+              disputeWindow: windowGate,
+              onWindowEvent: async (evt) => {
+                if (evt.kind === "awaiting") return; // informational — no ink
+                const reasons = {
+                  opened: `dispute window opened — closes ${evt.closesAt.toISOString()}`,
+                  held: `operator hold active — not submitting: ${evt.holdNote ?? "(no note)"}`,
+                  elapsed: "dispute window elapsed and outcome still VERIFIED — submitting",
+                } as const;
+                await logAudit({
+                  action: "market_resolution",
+                  outcome: evt.kind === "held" ? "rejected_other" : "pending",
+                  reason: reasons[evt.kind],
+                  params: {
+                    providerEventId: evt.providerEventId,
+                    marketId: evt.marketId,
+                    disputeWindowOpensAt: evt.opensAt.toISOString(),
+                    disputeWindowClosesAt: evt.closesAt.toISOString(),
+                    windowSeconds: env.RESOLUTION_DISPUTE_WINDOW_SECONDS,
+                  },
+                  chainId,
+                });
+              },
               onRejected: async (rejection) => {
                 await logAudit({
                   action: "market_resolution",

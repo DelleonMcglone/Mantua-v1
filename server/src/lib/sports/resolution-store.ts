@@ -10,9 +10,16 @@
  * the chain has not done.
  */
 
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
-import { events, markets, resolutionReviews, resolutions } from "../../db/schema/index.ts";
+import {
+  events,
+  markets,
+  resolutionReviews,
+  resolutions,
+  type Resolution,
+  type ResolutionReview,
+} from "../../db/schema/index.ts";
 import { logger } from "../logger.ts";
 import {
   type ConfidenceState,
@@ -21,15 +28,24 @@ import {
   observationFor,
 } from "./resolution-confidence.ts";
 import type { StoredEventSnapshot } from "./resolution-freshness.ts";
-import type { EventAssessment, ResolutionLogWriter, ResolutionRecord } from "./resolution.ts";
+import type {
+  DisputeWindowGate,
+  DisputeWindowState,
+  EventAssessment,
+  ResolutionLogWriter,
+  ResolutionRecord,
+} from "./resolution.ts";
 
 /**
  * Map the service's vocabulary onto the schema's `method` column, which
- * predates it: `auto` for an automated resolve, `void` for a void (the schema
- * treats void as its own method with a null outcome), `manual` reserved for
- * operator overrides recorded by hand.
+ * predates it: `auto` for an automated resolve, `void` for an automated void
+ * (the schema treats void as its own method with a null outcome), `manual`
+ * for D-104 operator overrides — resolve OR void — recorded through the ops
+ * route: the operator's deliberate act is the fact worth indexing, not the
+ * shape of the transaction it produced.
  */
-function methodFor(record: ResolutionRecord): "auto" | "void" {
+function methodFor(record: ResolutionRecord): "auto" | "manual" | "void" {
+  if (record.method === "manual") return "manual";
   return record.kind === "void" ? "void" : "auto";
 }
 
@@ -55,6 +71,10 @@ export function drizzleResolutionLog(db: DB, chainId = 8453): ResolutionLogWrite
         signer: entry.signer,
         txHash: entry.txHash,
         confidenceState: entry.confidenceState ?? null,
+        note: entry.note ?? null,
+        // D-104: stamp the window this resolve waited out onto the row.
+        disputeWindowOpensAt: entry.disputeWindow?.opensAt ?? null,
+        disputeWindowClosesAt: entry.disputeWindow?.closesAt ?? null,
       });
 
       // Reconcile the market row. `onConflictDoNothing`-style tolerance: the
@@ -211,7 +231,13 @@ export async function syncConfidenceReviews(
           reason: step.reason,
           updatedAt: now,
           ...(winner >= 0 ? { winningOutcomeIndex: winner } : {}),
-          ...(step.state === "DISPUTED" ? { disputedAt: now } : {}),
+          // D-104: a dispute CANCELS any open dispute window — the null
+          // fields mean a later re-verification (a human act; DISPUTED
+          // never auto-relaxes) opens a fresh window rather than inheriting
+          // one that ran down while the outcome was contested.
+          ...(step.state === "DISPUTED"
+            ? { disputedAt: now, disputeWindowOpensAt: null, disputeWindowClosesAt: null }
+            : {}),
           ...(step.state === "MANUAL_REVIEW" ? { escalatedAt: now } : {}),
           history: appendHistory(step.state, now, step.reason),
         })
@@ -262,4 +288,224 @@ export async function loadStoredEvents(
     });
   }
   return out;
+}
+
+// ─── D-104 — dispute-window persistence ────────────────────────────────────
+
+/**
+ * The persisted dispute windows (and operator holds) for the given events,
+ * from their `resolution_reviews` rows. Only rows whose window has been
+ * opened are returned — a hold set before any window exists still parks the
+ * outcome, because the pass that opens the window leaves the hold columns
+ * untouched and the NEXT pass sees both.
+ */
+export async function loadDisputeWindows(
+  db: DB,
+  chainId: number,
+  providerEventIds: readonly string[],
+): Promise<Map<string, DisputeWindowState>> {
+  const out = new Map<string, DisputeWindowState>();
+  if (providerEventIds.length === 0) return out;
+  const rows = await db
+    .select({
+      providerEventId: resolutionReviews.providerEventId,
+      opensAt: resolutionReviews.disputeWindowOpensAt,
+      closesAt: resolutionReviews.disputeWindowClosesAt,
+      heldAt: resolutionReviews.operatorHoldAt,
+      holdNote: resolutionReviews.operatorHoldNote,
+    })
+    .from(resolutionReviews)
+    .where(
+      and(
+        eq(resolutionReviews.chainId, chainId),
+        inArray(resolutionReviews.providerEventId, [...providerEventIds]),
+      ),
+    );
+  for (const r of rows) {
+    if (r.opensAt === null || r.closesAt === null) continue;
+    out.set(r.providerEventId, {
+      opensAt: r.opensAt,
+      closesAt: r.closesAt,
+      heldAt: r.heldAt,
+      holdNote: r.holdNote,
+    });
+  }
+  return out;
+}
+
+/**
+ * The DB-backed `DisputeWindowGate` for one cron pass. Preloaded so
+ * `stateFor` is synchronous inside the executor loop; `open` writes through
+ * to the review row (guarded `WHERE dispute_window_opens_at IS NULL`, so a
+ * concurrent pass cannot shorten an already-open window) and updates the
+ * in-memory view so the pair's second market sees the window immediately.
+ * A review row that unexpectedly does not exist leaves the window
+ * memory-only for this pass — the outcome simply waits for the next sweep,
+ * which errs toward delay, never toward early settlement.
+ */
+export function drizzleDisputeWindow(
+  db: DB,
+  chainId: number,
+  windowSeconds: number,
+  preloaded: Map<string, DisputeWindowState>,
+): DisputeWindowGate {
+  const states = new Map(preloaded);
+  return {
+    windowSeconds,
+    stateFor: (providerEventId) => states.get(providerEventId) ?? null,
+    async open(providerEventId, opensAt, closesAt) {
+      states.set(providerEventId, { opensAt, closesAt, heldAt: null, holdNote: null });
+      await db
+        .update(resolutionReviews)
+        .set({
+          disputeWindowOpensAt: opensAt,
+          disputeWindowClosesAt: closesAt,
+          updatedAt: opensAt,
+        })
+        .where(
+          and(
+            eq(resolutionReviews.providerEventId, providerEventId),
+            eq(resolutionReviews.chainId, chainId),
+            isNull(resolutionReviews.disputeWindowOpensAt),
+          ),
+        );
+    },
+  };
+}
+
+// ─── D-104 — operator hold / manual override / ops surface store ───────────
+
+/** One pending (non-RESOLVED) review with its window + hold, for the ops
+ *  GET surface. */
+export type PendingReviewRow = ResolutionReview;
+
+/** One settlement-log row, for the ops GET surface. */
+export type ResolutionOpsRow = Resolution;
+
+/**
+ * Everything the ops route (routes/resolution-ops.ts) needs from the DB —
+ * one seam, so route tests fake this instead of drizzle chains.
+ */
+export interface ResolutionOpsStore {
+  reviewFor(providerEventId: string, chainId: number): Promise<ResolutionReview | null>;
+  /** Park a pending outcome. `not_found` when no review row exists. */
+  setHold(
+    providerEventId: string,
+    chainId: number,
+    note: string,
+    at: Date,
+  ): Promise<"ok" | "not_found">;
+  /** Release a hold. Distinguishes "no row" from "row without a hold". */
+  clearHold(
+    providerEventId: string,
+    chainId: number,
+    at: Date,
+  ): Promise<"ok" | "not_found" | "no_hold">;
+  /** Market state + game linkage for the override guard. */
+  marketContext(
+    marketId: string,
+  ): Promise<{ state: string; providerEventId: string | null } | null>;
+  /** Advance the review to RESOLVED after a landed manual override. */
+  markManuallyResolved(
+    providerEventId: string,
+    chainId: number,
+    txHash: string,
+    note: string,
+    at: Date,
+  ): Promise<void>;
+  listResolutions(limit: number): Promise<ResolutionOpsRow[]>;
+  listPending(chainId: number, limit: number): Promise<PendingReviewRow[]>;
+}
+
+export function drizzleResolutionOpsStore(db: DB): ResolutionOpsStore {
+  return {
+    async reviewFor(providerEventId, chainId) {
+      const row = await db.query.resolutionReviews.findFirst({
+        where: and(
+          eq(resolutionReviews.providerEventId, providerEventId),
+          eq(resolutionReviews.chainId, chainId),
+        ),
+      });
+      return row ?? null;
+    },
+
+    async setHold(providerEventId, chainId, note, at) {
+      const updated = await db
+        .update(resolutionReviews)
+        .set({ operatorHoldAt: at, operatorHoldNote: note, updatedAt: at })
+        .where(
+          and(
+            eq(resolutionReviews.providerEventId, providerEventId),
+            eq(resolutionReviews.chainId, chainId),
+          ),
+        )
+        .returning({ id: resolutionReviews.id });
+      return updated.length > 0 ? "ok" : "not_found";
+    },
+
+    async clearHold(providerEventId, chainId, at) {
+      const existing = await db.query.resolutionReviews.findFirst({
+        where: and(
+          eq(resolutionReviews.providerEventId, providerEventId),
+          eq(resolutionReviews.chainId, chainId),
+        ),
+      });
+      if (!existing) return "not_found";
+      if (existing.operatorHoldAt === null) return "no_hold";
+      await db
+        .update(resolutionReviews)
+        .set({ operatorHoldAt: null, operatorHoldNote: null, updatedAt: at })
+        .where(eq(resolutionReviews.id, existing.id));
+      return "ok";
+    },
+
+    async marketContext(marketId) {
+      const rows = await db
+        .select({ state: markets.state, providerEventId: events.providerEventId })
+        .from(markets)
+        .leftJoin(events, eq(markets.eventId, events.id))
+        .where(eq(markets.marketId, marketId))
+        .limit(1);
+      if (rows.length === 0) return null;
+      return { state: rows[0].state, providerEventId: rows[0].providerEventId };
+    },
+
+    async markManuallyResolved(providerEventId, chainId, txHash, note, at) {
+      // The automated machine treats MANUAL_REVIEW/DISPUTED as absorbing —
+      // this write IS the human act those states wait for, so it moves any
+      // non-RESOLVED state and says so in the history trail.
+      const reason = `manual_override: tx ${txHash} — ${note}`;
+      await db
+        .update(resolutionReviews)
+        .set({
+          state: "RESOLVED",
+          reason,
+          resolvedAt: at,
+          updatedAt: at,
+          history: appendHistory("RESOLVED", at, reason),
+        })
+        .where(
+          and(
+            eq(resolutionReviews.providerEventId, providerEventId),
+            eq(resolutionReviews.chainId, chainId),
+            ne(resolutionReviews.state, "RESOLVED"),
+          ),
+        );
+    },
+
+    listResolutions(limit) {
+      return db.select().from(resolutions).orderBy(desc(resolutions.createdAt)).limit(limit);
+    },
+
+    listPending(chainId, limit) {
+      return db
+        .select()
+        .from(resolutionReviews)
+        .where(
+          and(eq(resolutionReviews.chainId, chainId), ne(resolutionReviews.state, "RESOLVED")),
+        )
+        .orderBy(desc(resolutionReviews.updatedAt))
+        .limit(limit);
+    },
+  };
 }

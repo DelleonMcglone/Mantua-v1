@@ -134,6 +134,24 @@ export interface ResolutionEvidence {
   decidedAt: string;
 }
 
+/**
+ * D-104 — the evidence bundle a MANUAL override writes instead of the
+ * automated `ResolutionEvidence`. Deliberately honest about what it is not:
+ * no criteria were checked, no sources corroborated — the record is the
+ * operator's identity trail (mandatory note, decidedAt) and the outcome.
+ */
+export interface ManualOverrideEvidence {
+  schema: "resolution-evidence@1";
+  kind: "manual-override";
+  providerEventId: string | null;
+  marketId: string;
+  /** 0 = this market's YES won, 1 = NO; null for a manual void. */
+  outcome: number | null;
+  /** The operator's mandatory justification (also on `resolutions.note`). */
+  note: string;
+  decidedAt: string;
+}
+
 function sourceFrom(
   role: EvidenceSource["role"],
   provider: string,
@@ -214,30 +232,37 @@ export function buildEvidence(
 /** Mint function wired up by the class's static block — the only way to
  *  construct an authorization is `assertResolutionCriteria` passing. */
 let mintAuthorization:
-  | ((
+  | (<E extends ResolutionEvidence | ManualOverrideEvidence>(
       marketId: `0x${string}`,
       outcome: number,
       criteria: CriteriaResult[],
-      evidence: ResolutionEvidence,
-    ) => ResolutionAuthorization)
+      evidence: E,
+    ) => ResolutionAuthorization<E>)
   | null = null;
 
 /**
- * Proof that one specific (market, outcome) passed the full criteria gate.
+ * Proof that one specific (market, outcome) passed the full criteria gate —
+ * or, exactly once per D-104, that an operator explicitly overrode it.
  * `ResolutionSubmitter.resolve` takes this instead of loose arguments, so
- * the type system routes every on-chain resolve through the gate.
+ * the type system routes every on-chain resolve through one of exactly two
+ * mints in this module: `assertResolutionCriteria` (automated, evidence is
+ * the full `ResolutionEvidence` bundle) and `authorizeManualOverride` (the
+ * audited D-104 operator path, mandatory note). Generic over the evidence
+ * type so each mint's callers see the exact bundle shape they were given.
  */
-export class ResolutionAuthorization {
+export class ResolutionAuthorization<
+  E extends ResolutionEvidence | ManualOverrideEvidence = ResolutionEvidence | ManualOverrideEvidence,
+> {
   readonly marketId: `0x${string}`;
   readonly outcome: number;
   readonly criteria: readonly CriteriaResult[];
-  readonly evidence: ResolutionEvidence;
+  readonly evidence: E;
 
   private constructor(
     marketId: `0x${string}`,
     outcome: number,
     criteria: CriteriaResult[],
-    evidence: ResolutionEvidence,
+    evidence: E,
   ) {
     this.marketId = marketId;
     this.outcome = outcome;
@@ -251,8 +276,40 @@ export class ResolutionAuthorization {
   }
 }
 
+/**
+ * D-104 — the audited manual-override mint: the ONLY way to construct a
+ * `ResolutionAuthorization` outside the criteria gate. Refuses without a
+ * substantive note; the resulting evidence bundle says plainly that nothing
+ * was checked. Reached exclusively from the authenticated ops route
+ * (`POST /api/ops/resolution/override`) — using it anywhere in the
+ * automated pipeline is a review-blocking bug, not a shortcut.
+ */
+export function authorizeManualOverride(input: {
+  marketId: `0x${string}`;
+  outcome: number;
+  providerEventId: string | null;
+  note: string;
+  nowSeconds?: number;
+}): ResolutionAuthorization<ManualOverrideEvidence> {
+  const note = input.note.trim();
+  if (note.length === 0) {
+    throw new Error("manual override requires a non-empty note (D-104)");
+  }
+  const evidence: ManualOverrideEvidence = {
+    schema: "resolution-evidence@1",
+    kind: "manual-override",
+    providerEventId: input.providerEventId,
+    marketId: input.marketId,
+    outcome: input.outcome,
+    note,
+    decidedAt: new Date((input.nowSeconds ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
+  };
+  if (!mintAuthorization) throw new Error("authorization mint not initialised");
+  return mintAuthorization(input.marketId, input.outcome, [], evidence);
+}
+
 export type CriteriaVerdict =
-  | { ok: true; auth: ResolutionAuthorization; criteria: CriteriaResult[] }
+  | { ok: true; auth: ResolutionAuthorization<ResolutionEvidence>; criteria: CriteriaResult[] }
   | { ok: false; failed: CriteriaResult[]; criteria: CriteriaResult[] };
 
 /**
