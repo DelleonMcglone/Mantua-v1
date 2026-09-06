@@ -8,25 +8,26 @@
 
 ## Summary table
 
-| ID    | Decision                                  | Recommendation                                                                                                                                              | Confidence                                | Needs external input?                                     |
-| ----- | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
-| D-002 | Promote DynamicFee / RWAGate / ALO hooks  | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                                               | High                                      | Audit firm (D-003) for DynamicFee                         |
-| D-003 | External security audit                   | YES — mandatory                                                                                                                                             | Very high                                 | Audit firm engagement                                     |
-| D-004 | Hosting target                            | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                                               | High                                      | None                                                      |
-| D-005 | Privy login methods                       | email + Google + Apple + passkey + external wallet (skip SMS)                                                                                               | High                                      | None                                                      |
-| D-006 | Embedded wallet auto-create               | `users-without-wallets`                                                                                                                                     | High                                      | None                                                      |
-| D-007 | WalletConnect                             | YES — enable                                                                                                                                                | High                                      | None                                                      |
-| D-008 | Privy wallet vs separate CDP agent wallet | Separate CDP wallet                                                                                                                                         | High                                      | None                                                      |
-| D-009 | Per-wallet daily spending cap             | YES — keep, $500 default, tiered raise                                                                                                                      | High                                      | None                                                      |
-| D-010 | Mantua fee rate                           | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                                             | Medium                                    | None (legal weighs on D-012)                              |
-| D-011 | Fee recipient                             | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                                             | Very high                                 | Choose signers                                            |
-| D-012 | Legal review before fee collection        | YES — non-negotiable                                                                                                                                        | Very high                                 | Crypto-native counsel                                     |
-| D-013 | LLM provider (intent parser)              | Anthropic primary, OpenAI fallback                                                                                                                          | Medium                                    | None                                                      |
-| D-014 | Intent parser confidence threshold        | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                             | Medium                                    | Tune in beta                                              |
-| D-106 | x402 payments — scope, non-goals, gate    | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                           | High (facts); open questions undecided    | Counsel (open question: D-012 posture for seller revenue) |
-| D-112 | Launch chain: Base vs Arc mainnet          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then           | High (process) | Owner decision after 2026-09-17    |
-| D-110 | Wallet-stack reconciliation               | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                | High                                      | None                                                      |
-| D-111 | Gasless user transactions (C-005/C-006)   | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning | High (architecture); live path unverified | None (operator provisions the paymaster policy)           |
+| ID    | Decision                                    | Recommendation                                                                                                                                                 | Confidence                                | Needs external input?                                     |
+| ----- | ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------- |
+| D-002 | Promote DynamicFee / RWAGate / ALO hooks    | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                                                  | High                                      | Audit firm (D-003) for DynamicFee                         |
+| D-003 | External security audit                     | YES — mandatory                                                                                                                                                | Very high                                 | Audit firm engagement                                     |
+| D-004 | Hosting target                              | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                                                  | High                                      | None                                                      |
+| D-005 | Privy login methods                         | email + Google + Apple + passkey + external wallet (skip SMS)                                                                                                  | High                                      | None                                                      |
+| D-006 | Embedded wallet auto-create                 | `users-without-wallets`                                                                                                                                        | High                                      | None                                                      |
+| D-007 | WalletConnect                               | YES — enable                                                                                                                                                   | High                                      | None                                                      |
+| D-008 | Privy wallet vs separate CDP agent wallet   | Separate CDP wallet                                                                                                                                            | High                                      | None                                                      |
+| D-009 | Per-wallet daily spending cap               | YES — keep, $500 default, tiered raise                                                                                                                         | High                                      | None                                                      |
+| D-010 | Mantua fee rate                             | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                                                | Medium                                    | None (legal weighs on D-012)                              |
+| D-011 | Fee recipient                               | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                                                | Very high                                 | Choose signers                                            |
+| D-012 | Legal review before fee collection          | YES — non-negotiable                                                                                                                                           | Very high                                 | Crypto-native counsel                                     |
+| D-013 | LLM provider (intent parser)                | Anthropic primary, OpenAI fallback                                                                                                                             | Medium                                    | None                                                      |
+| D-014 | Intent parser confidence threshold          | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                                | Medium                                    | Tune in beta                                              |
+| D-102 | Licensed sports data provider (S-001/S-002) | Sportradar NFL API v7 primary behind the existing provider abstraction; SportsDataIO held as the negotiation alternative; ESPN stays prototyping-only fallback | High (architecture); contract unsigned    | Operator signs the Sportradar commercial agreement        |
+| D-106 | x402 payments — scope, non-goals, gate      | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                              | High (facts); open questions undecided    | Counsel (open question: D-012 posture for seller revenue) |
+| D-112 | Launch chain: Base vs Arc mainnet           | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                  | High (process)                            | Owner decision after 2026-09-17                           |
+| D-110 | Wallet-stack reconciliation                 | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                   | High                                      | None                                                      |
+| D-111 | Gasless user transactions (C-005/C-006)     | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning    | High (architecture); live path unverified | None (operator provisions the paymaster policy)           |
 
 ---
 
@@ -293,6 +294,84 @@
 
 ---
 
+## D-102 — Licensed sports data provider: Sportradar primary, SportsDataIO alternative
+
+**Decision:** ✅ ACCEPTED (technical selection) — 2026-09-06. Sportradar's NFL
+API v7 is the licensed PRIMARY sports data provider, integrated behind the
+existing `SportsDataProvider` abstraction (S-003, branch
+`037-sportradar-provider`). **Status: 🟡 contract unsigned** — the adapter is
+code-complete and env-gated (`SPORTRADAR_API_KEY` + `SPORTRADAR_ENV`); the
+commercial agreement itself is operator-side work this record cannot close.
+SportsDataIO is retained as the priced negotiation alternative. ESPN's
+undocumented backend remains the prototyping-only fallback (and the WNBA
+source until a WNBA package is licensed) — it carries no contract, no SLA,
+and no licence, which is why B3's Risk 1 exists.
+
+**What the Sportradar "NFL" licence actually covers — read this before
+negotiating.** Genius Sports — not Sportradar — is the NFL's **exclusive
+distributor of real-time official play-by-play, Next Gen Stats, and the
+league's official sports-betting data feed**, under a partnership extended
+through the **2029 season** ([NFL.com](https://www.nfl.com/news/nfl-extends-strategic-partnership-with-genius-sports),
+[SportsPro](https://www.sportspro.com/news/nfl-genius-sports-betting-data-streaming-partnership-extension-june-2025/)).
+Sportradar held that role 2015–2021 and walked away when "the economics
+became irrational" ([Sports Handle](https://sportshandle.com/sportradar-genius-nfl-data/)).
+Sportradar's NFL API v7 — whose URL path (`/nfl/official/…`) is historical
+product naming, not a rights claim — is Sportradar's own licensed commercial
+NFL product: schedules, boxscores, play-by-play, hierarchy, rosters, weekly
+injuries, with documented cache freshness (boxscore: 3s in-progress) and an
+SLA-backed contract. That is exactly what Mantua's ingestion needs; Mantua is
+not a sportsbook buying the official betting feed. If a regulator or partner
+ever requires _the_ official NFL feed, that conversation is with Genius
+Sports and is out of this record's scope.
+
+**Access model (verified on developer.sportradar.com, 2026-09-06):**
+
+- **Auth:** single Console master key, `x-api-key` header
+  ([authentication](https://developer.sportradar.com/getting-started/docs/authentication)).
+- **Trial:** self-service via the Sportradar Console/Marketplace; **1 QPS
+  and 1,000 requests per rolling 30 days**
+  ([your account](https://developer.sportradar.com/getting-started/docs/your-account)).
+  The adapter's pacing + long TTLs are sized to this.
+- **Production:** the same endpoints with `production` in the path; keys are
+  provisioned under a commercial contract. **Pricing is B2B and not
+  published** — Sportradar sells by sport package, feed tier, and usage;
+  budget expectation from third-party comparisons is materially above
+  SportsDataIO for the same league.
+- **MCP:** an official remote MCP server exists
+  (`https://developer.sportradar.com/mcp`, `sportradar-football` profile) —
+  see S-004 in `docs/tasks/037-sportradar-provider.md`; it is a docs/dev
+  tool, not a data plane.
+
+**Comparison (sources fetched 2026-09-06):**
+
+| Dimension                | Sportradar (NFL API v7)                                                                                                                                                                                              | SportsDataIO (NFL)                                                                                                                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Coverage                 | Schedules, boxscore, play-by-play, hierarchy, rosters, weekly injuries, standings; odds/probabilities are a separate Odds package ([NFL overview](https://developer.sportradar.com/football/reference/nfl-overview)) | Scores, schedules, stats, projections, odds aggregated from major sportsbooks, news, injuries ([NFL portal](https://sportsdata.io/developers/api-documentation/nfl))                                            |
+| Freshness/latency claims | Published per-feed cache TTLs: boxscore 3s in-progress / 60s scheduled; hierarchy 4h; player profile 15m ([boxscore ref](https://developer.sportradar.com/football/reference/nfl-game-boxscore))                     | No equivalent published per-feed TTL table on the comparison page; markets itself on "24/7/365 monitoring" ([comparison](https://sportsdata.io/sportradar-alternative))                                         |
+| Pricing model            | B2B contract, unpublished; enterprise-tier per third-party surveys ([SportsAPI.com](https://sportsapi.com/api-directory/sportradar/))                                                                                | Subscription products, also quote-based at production tier but positioned "more affordable price" than Sportradar, with a "full access free trial" ([comparison](https://sportsdata.io/sportradar-alternative)) |
+| Licensing posture        | Licensed data company; sells its own collected NFL feed; official-league partnerships in other sports                                                                                                                | Explicitly "No license restrictions or rights fees required" — aggregation posture, no official-league claim ([comparison](https://sportsdata.io/sportradar-alternative))                                       |
+| Trial                    | 1 QPS / 1,000 calls per 30 days, self-service                                                                                                                                                                        | Free trial, full access per marketing; API Replay for off-season testing                                                                                                                                        |
+| Tooling                  | Official MCP server (docs/dev-assist), Postman collections, OpenAPI specs                                                                                                                                            | Developer portal, replay tooling, free reference-ID mapping service                                                                                                                                             |
+
+**Why Sportradar primary:** (1) the deepest documented NFL feed set matching
+the canonical schema (hierarchy → `teams`, full rosters → `players`, weekly
+injuries → `injuries`) with per-feed freshness contracts; (2) provenance —
+a first-party collector, not an aggregator, which matters for DM-107's
+corroboration logic (an aggregator that itself consumes Sportradar would not
+be independent); (3) the trial tier allowed the integration to be built and
+verified before any spend. **Why keep SportsDataIO warm:** it is the
+credible price lever in the Sportradar negotiation, and its aggregation
+posture (odds included) covers the odds gap Sportradar prices separately.
+
+**Non-goals:** buying the Genius Sports official betting feed; licensing
+Sportradar's separate Odds Comparison or Images (team-mark) packages —
+each is its own decision when the need is real; moving WNBA off ESPN before
+a WNBA package is priced.
+
+**Blocks:** S-001 (contract — operator), production `SPORTRADAR_API_KEY`.
+
+---
+
 ## D-106 — x402 payments: scope, non-goals, and the build gate
 
 **Decision:** ✅ ACCEPTED — 2026-09-04 (owner lock): **no x402 build starts before
@@ -507,6 +586,7 @@ any chain- or gas-naming UI copy.
 working assumption; Arc mainnet is a live alternative.
 
 **What is PAUSED until the decision** (owner call, 2026-09-05):
+
 - C-001 mainnet half (Circle LIVE entitlement chase, mainnet entity secret,
   Gas Station billing) — the testnet half stays done and valid either way.
 - C-006 (both the interactive zero-ETH test and the full walkthrough).
@@ -516,15 +596,15 @@ working assumption; Arc mainnet is a live alternative.
 **Pivot-cost inventory** (what an Arc launch would change — kept current so
 the decision is priced, not guessed):
 
-| Area | Base → Arc impact |
-| --- | --- |
-| Chain constants/registries (`chains.ts` ×2, tokens, RPC, explorer) | Config swap — the per-chain map shapes were kept schema-stable in the migration for exactly this |
-| Uniswap v4 | **No canonical deployment on Arc** — every pool stack becomes self-deployed (the DM stack already is; base-pair pools and the UniversalRouter/Permit2 swap path would need Arc equivalents or the PoolSwapTest-style periphery) |
-| DM-112 routing | Trading API (Uniswap-hosted) is Base-only — base-pair routing collapses onto self-deployed stacks on Arc |
-| Gas / gasless | Arc uses **USDC as native gas** — C-005's Privy+Pimlico work is Base-specific; on Arc the ETH problem doesn't exist (fees are USDC), so C-005/C-006 restate rather than port |
-| Circle agent stack | Ports cleanly — DCW supports Arc blockchains natively (the June wallets were ARC-TESTNET); Gas Station/e2e re-run with Arc ids |
-| CCTP bridge / unified balance | Arc-mainnet availability to be verified at decision time |
-| Chainless UI | Unaffected by design — no user-facing chain references exist |
+| Area                                                               | Base → Arc impact                                                                                                                                                                                                               |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain constants/registries (`chains.ts` ×2, tokens, RPC, explorer) | Config swap — the per-chain map shapes were kept schema-stable in the migration for exactly this                                                                                                                                |
+| Uniswap v4                                                         | **No canonical deployment on Arc** — every pool stack becomes self-deployed (the DM stack already is; base-pair pools and the UniversalRouter/Permit2 swap path would need Arc equivalents or the PoolSwapTest-style periphery) |
+| DM-112 routing                                                     | Trading API (Uniswap-hosted) is Base-only — base-pair routing collapses onto self-deployed stacks on Arc                                                                                                                        |
+| Gas / gasless                                                      | Arc uses **USDC as native gas** — C-005's Privy+Pimlico work is Base-specific; on Arc the ETH problem doesn't exist (fees are USDC), so C-005/C-006 restate rather than port                                                    |
+| Circle agent stack                                                 | Ports cleanly — DCW supports Arc blockchains natively (the June wallets were ARC-TESTNET); Gas Station/e2e re-run with Arc ids                                                                                                  |
+| CCTP bridge / unified balance                                      | Arc-mainnet availability to be verified at decision time                                                                                                                                                                        |
+| Chainless UI                                                       | Unaffected by design — no user-facing chain references exist                                                                                                                                                                    |
 
 **Meanwhile:** work proceeds only on chain-agnostic phases (B7 trading page,
 B9-005 execution engine, B10 E2Es, design-debt follow-ups). Nothing merged

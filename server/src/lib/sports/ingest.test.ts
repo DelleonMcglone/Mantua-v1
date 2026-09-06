@@ -171,3 +171,89 @@ void describe("refreshSlate (B3-005)", () => {
     assert.equal(result.marketsPlanned.length, 2);
   });
 });
+
+// ─── S-003: injury open/resolve planning ────────────────────────────────────
+
+import {
+  feedFreshnessSnapshot,
+  planInjuryTransitions,
+  recordFeedPoll,
+  type OpenInjuryRow,
+} from "./ingest.ts";
+import type { ProviderInjuryReport } from "./provider.ts";
+
+function report(overrides: Partial<ProviderInjuryReport> = {}): ProviderInjuryReport {
+  return {
+    providerPlayerId: "p1",
+    playerName: "Pat Sample",
+    teamKey: "nfl:KC",
+    status: "questionable",
+    description: "Hamstring",
+    ...overrides,
+  };
+}
+
+function openRow(overrides: Partial<OpenInjuryRow> = {}): OpenInjuryRow {
+  return {
+    id: "row-1",
+    providerPlayerId: "p1",
+    status: "questionable",
+    description: "Hamstring",
+    ...overrides,
+  };
+}
+
+void describe("planInjuryTransitions (S-003)", () => {
+  void it("opens a row for a first-seen report", () => {
+    const plan = planInjuryTransitions([], [report()], false);
+    assert.equal(plan.open.length, 1);
+    assert.deepEqual(plan.resolve, []);
+  });
+
+  void it("touches, not duplicates, an unchanged report", () => {
+    const plan = planInjuryTransitions([openRow()], [report()], false);
+    assert.deepEqual(plan.touch, ["row-1"]);
+    assert.equal(plan.open.length, 0);
+    assert.deepEqual(plan.resolve, []);
+  });
+
+  void it("resolves the old row and opens a new one when the status changes", () => {
+    // History is append-only: Questionable → Out is a resolve + open, so the
+    // schema's "latest open row is the current status" convention holds.
+    const plan = planInjuryTransitions([openRow()], [report({ status: "out" })], false);
+    assert.deepEqual(plan.resolve, ["row-1"]);
+    assert.equal(plan.open.length, 1);
+    assert.equal(plan.open[0].status, "out");
+  });
+
+  void it("resolves a row whose player dropped off the report — they returned", () => {
+    const plan = planInjuryTransitions([openRow()], [], false);
+    assert.deepEqual(plan.resolve, ["row-1"]);
+  });
+
+  void it("plans NOTHING from a delayed feed — a stale list must not 'heal' players", () => {
+    const plan = planInjuryTransitions([openRow()], [], true);
+    assert.deepEqual(plan, { resolve: [], open: [], touch: [] });
+  });
+
+  void it("collapses duplicate open rows for one player onto the matching one", () => {
+    const plan = planInjuryTransitions(
+      [openRow(), openRow({ id: "row-2", status: "out", description: null })],
+      [report()],
+      false,
+    );
+    assert.deepEqual(plan.touch, ["row-1"]);
+    assert.deepEqual(plan.resolve, ["row-2"]);
+  });
+});
+
+void describe("feed freshness registry (S-003)", () => {
+  void it("tracks lastPolledAt always, lastGoodAt only on fresh reads", () => {
+    recordFeedPoll("injuries", "nfl", "sportradar", false, 1_000);
+    recordFeedPoll("injuries", "nfl", "sportradar", true, 2_000);
+    const snap = feedFreshnessSnapshot()["nfl:injuries"];
+    assert.equal(snap.lastPolledAt, 2_000);
+    assert.equal(snap.lastGoodAt, 1_000); // the delayed poll did not advance it
+    assert.equal(snap.delayed, true);
+  });
+});

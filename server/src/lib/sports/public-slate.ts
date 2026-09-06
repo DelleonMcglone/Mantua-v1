@@ -15,6 +15,7 @@
  */
 
 import type { ProviderEvent, ProviderSlate, ProviderTeam } from "./provider.ts";
+import type { CanonicalSlate } from "./store.ts";
 
 export interface PublicTeam {
   key: string;
@@ -45,6 +46,13 @@ export interface PublicSlate {
   /** Served from a degraded path — show it as delayed, never as live. */
   delayed: boolean;
   fetchedAt: number;
+  /**
+   * S-003: when the slate came from the CANONICAL tables because the
+   * provider was down, this is the last-good ingest time (ms epoch) — the
+   * explicit "data as of" the UI must surface. Absent on live provider
+   * responses.
+   */
+  dataAsOf?: number;
   events: PublicEvent[];
 }
 
@@ -103,5 +111,46 @@ export function toPublicSlate(slate: ProviderSlate): PublicSlate {
     delayed: slate.delayed,
     fetchedAt: slate.fetchedAt,
     events: slate.events.map(publicEvent),
+  };
+}
+
+/**
+ * S-003 outage path: the canonical `events` rows as a public slate. Served
+ * only when the live provider is unreachable AND the cache has nothing —
+ * always `delayed: true`, always with `dataAsOf`, so no consumer can mistake
+ * last-good data for live data. Fields the canonical row does not keep
+ * (logos, records, odds) are simply absent; the board renders without them.
+ */
+export function canonicalToPublicSlate(league: string, canonical: CanonicalSlate): PublicSlate {
+  const now = Date.now();
+  return {
+    league,
+    provider: "canonical",
+    delayed: true,
+    fetchedAt: now,
+    ...(canonical.dataAsOf !== null ? { dataAsOf: canonical.dataAsOf } : {}),
+    events: canonical.events.map((row) => {
+      // The provider-agnostic key is "league:ABBR" (provider.ts teamKey);
+      // the suffix recovers the abbreviation for display.
+      const homeAbbr = row.homeTeamKey?.split(":").at(1) ?? "";
+      const awayAbbr = row.awayTeamKey?.split(":").at(1) ?? "";
+      return {
+        providerEventId: sanitizeProviderString(row.providerEventId),
+        startsAt: Math.floor(row.startsAt.getTime() / 1000),
+        status: sanitizeProviderString(row.status),
+        home: {
+          key: sanitizeProviderString(row.homeTeamKey ?? ""),
+          name: sanitizeProviderString(row.homeTeam),
+          abbreviation: sanitizeProviderString(homeAbbr),
+        },
+        away: {
+          key: sanitizeProviderString(row.awayTeamKey ?? ""),
+          name: sanitizeProviderString(row.awayTeam),
+          abbreviation: sanitizeProviderString(awayAbbr),
+        },
+        ...(row.homeScore !== null ? { homeScore: row.homeScore } : {}),
+        ...(row.awayScore !== null ? { awayScore: row.awayScore } : {}),
+      };
+    }),
   };
 }
