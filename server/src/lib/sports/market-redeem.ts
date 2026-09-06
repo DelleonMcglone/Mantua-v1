@@ -46,6 +46,30 @@ export function estimatePayoutRaw(fn: RedeemFunction, balanceRaw: bigint): bigin
   return fn === "redeemInvalid" ? balanceRaw / 2n : balanceRaw;
 }
 
+/**
+ * P-006 — the settlement value per token for one recorded position:
+ * $1 the winning side, $0 the losing side, $0.50 per share on INVALID
+ * (either side of a voided market). Returned as the 5dp decimal string the
+ * `market_positions.settlement_price` column stores; null when the market
+ * has not finished, or a RESOLVED market's winner is unknown to the
+ * resolutions log (never guess — the pass retries next tick).
+ *
+ * `winningOutcomeIndex` is market vocabulary: 0 = YES pays, 1 = NO pays
+ * (the same convention the redeemable listing reads).
+ */
+export function settlementPriceFor(
+  side: "yes" | "no",
+  state: string,
+  winningOutcomeIndex: number | null,
+): string | null {
+  const fn = redeemFunctionForDbState(state);
+  if (fn === null) return null;
+  if (fn === "redeemInvalid") return "0.50000";
+  if (winningOutcomeIndex !== 0 && winningOutcomeIndex !== 1) return null;
+  const winner = winningOutcomeIndex === 0 ? "yes" : "no";
+  return side === winner ? "1.00000" : "0.00000";
+}
+
 export interface RedeemableSidesInput {
   /** DB market state: OPEN | FROZEN | RESOLVED | SETTLED | INVALID. */
   state: string;

@@ -22,7 +22,7 @@
  */
 
 import { parseAbi } from "viem";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { db as defaultDb } from "../../db/client.ts";
 import {
@@ -35,7 +35,8 @@ import {
 import { getTokenHolders } from "../basescan.ts";
 import { isSupportedChainId } from "../chains.ts";
 import { logger } from "../logger.ts";
-import { MARKETS_PERIPHERY_BY_CHAIN, STATE_VIEW_ABI } from "../markets-contracts.ts";
+import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN, STATE_VIEW_ABI } from "../markets-contracts.ts";
+import { sqrtPriceX96ToRawProbability } from "../probability.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { TtlCache } from "../ttl-cache.ts";
 
@@ -272,6 +273,36 @@ export function secondsToKickoff(startsAtSeconds: number, nowSeconds: number): n
   return Math.max(0, startsAtSeconds - nowSeconds);
 }
 
+/**
+ * P-011 — the implied YES probability of one fill, as the `market_prices`
+ * decimal string (0–1, 5dp): the trade's effective price `usdc / tokens`,
+ * clamped into the contract's [0, 1] band (a thin book can execute a hair
+ * outside it). Null for malformed or zero-token fills — an unpriceable
+ * fill writes no tick rather than a fabricated one.
+ */
+export function fillImpliedProbability(usdcRaw: string, tokensRaw: string): string | null {
+  const usdc = Number(usdcRaw);
+  const tokens = Number(tokensRaw);
+  if (!Number.isFinite(usdc) || !Number.isFinite(tokens) || tokens <= 0 || usdc < 0) return null;
+  return Math.min(1, Math.max(0, usdc / tokens)).toFixed(5);
+}
+
+/**
+ * P-011 — snapshot cadence guard, pure: a pool capture is due only when
+ * the latest recorded `pool` tick for the market is at least
+ * `minIntervalSeconds` old (or absent). This is what makes re-running the
+ * sync cron idempotent-enough: back-to-back ticks cannot stack duplicate
+ * snapshots, while the normal cadence records every pass.
+ */
+export function poolSnapshotDue(
+  lastPoolCapturedAtMs: number | null,
+  nowMs: number,
+  minIntervalSeconds: number,
+): boolean {
+  if (lastPoolCapturedAtMs === null) return true;
+  return nowMs - lastPoolCapturedAtMs >= minIntervalSeconds * 1000;
+}
+
 // ─── Best-effort on-chain reads (null on any failure) ────────────────────────
 
 async function readYesSupply(yesToken: string | null, chainId: number): Promise<number | null> {
@@ -451,6 +482,137 @@ export const METRICS_BATCH_LIMIT = 50;
  * keyed by market id; unknown ids are omitted rather than fabricated.
  * A single failing market is skipped (logged), not fatal to the batch.
  */
+// ─── P-011: periodic pool-price snapshots (the sync cron's pass) ────────────
+
+/** Minimum spacing between recorded `pool` ticks per market. The sync cron
+ *  ticks every few minutes; 60s means a normal cadence always records and a
+ *  re-run (or overlapping invocation) cannot stack duplicates. */
+export const POOL_SNAPSHOT_MIN_INTERVAL_SECONDS = 60;
+
+/** How many OPEN pools one pass will read — fan-out bound, not a quota. */
+const SNAPSHOT_SCAN_LIMIT = 200;
+
+export interface PoolSnapshotSummary {
+  scanned: number;
+  written: number;
+  /** Skipped because a fresh-enough `pool` tick already exists (dedupe). */
+  skippedFresh: number;
+  /** Skipped because the pool has no readable price yet (uninitialized). */
+  skippedUnpriced: number;
+  failures: { marketId: string; error: string }[];
+}
+
+/**
+ * Record one `market_prices` row per OPEN market with a live pool — the
+ * periodic half of P-011's tick recording (the fill path writes the other
+ * half). Reads the pool price exactly the way the metrics/live-odds reads
+ * do (StateView `getSlot0` → implied probability, clamped to [0, 1]);
+ * liquidity rides along best-effort. Returns null when the market stack is
+ * not deployed on the chain — the cron degrades to planning, same as every
+ * other on-chain pass.
+ */
+export async function snapshotMarketPoolPrices(
+  db: DB = defaultDb,
+  chainId = 8453,
+  nowMs: number = Date.now(),
+): Promise<PoolSnapshotSummary | null> {
+  if (!isSupportedChainId(chainId)) return null;
+  const deployment = MARKETS_BY_CHAIN[chainId];
+  const periphery = MARKETS_PERIPHERY_BY_CHAIN[chainId];
+  if (!deployment || !periphery) return null; // pre-deployment — expected
+  const client = getRpcClient(chainId);
+
+  const rows = await db
+    .select({ marketId: markets.marketId, yesToken: markets.yesToken, poolId: markets.poolId })
+    .from(markets)
+    .where(
+      and(
+        eq(markets.chainId, chainId),
+        eq(markets.state, "OPEN"),
+        isNotNull(markets.poolId),
+        isNotNull(markets.yesToken),
+      ),
+    )
+    .limit(SNAPSHOT_SCAN_LIMIT);
+
+  const summary: PoolSnapshotSummary = {
+    scanned: rows.length,
+    written: 0,
+    skippedFresh: 0,
+    skippedUnpriced: 0,
+    failures: [],
+  };
+  if (rows.length === 0) return summary;
+
+  // Dedupe: the freshest recorded `pool` tick per market, one query.
+  const latest = await db
+    .select({
+      marketId: marketPrices.marketId,
+      capturedAt: sql<Date | string | null>`max(${marketPrices.capturedAt})`,
+    })
+    .from(marketPrices)
+    .where(
+      and(
+        inArray(
+          marketPrices.marketId,
+          rows.map((r) => r.marketId),
+        ),
+        eq(marketPrices.source, "pool"),
+      ),
+    )
+    .groupBy(marketPrices.marketId);
+  const latestByMarket = new Map<string, number>();
+  for (const l of latest) {
+    const t = l.capturedAt instanceof Date ? l.capturedAt.getTime() : Date.parse(String(l.capturedAt));
+    if (Number.isFinite(t)) latestByMarket.set(l.marketId, t);
+  }
+
+  for (const row of rows) {
+    if (!row.poolId || !row.yesToken) continue;
+    if (
+      !poolSnapshotDue(
+        latestByMarket.get(row.marketId) ?? null,
+        nowMs,
+        POOL_SNAPSHOT_MIN_INTERVAL_SECONDS,
+      )
+    ) {
+      summary.skippedFresh += 1;
+      continue;
+    }
+    try {
+      const [sqrtPriceX96] = await client.readContract({
+        address: periphery.stateView,
+        abi: STATE_VIEW_ABI,
+        functionName: "getSlot0",
+        args: [row.poolId as `0x${string}`],
+      });
+      if (sqrtPriceX96 === 0n) {
+        summary.skippedUnpriced += 1; // pool not initialized yet
+        continue;
+      }
+      // Token ordering in v4 is by address; the collateral side fixes it.
+      const yesIsToken0 = row.yesToken.toLowerCase() < deployment.collateral.toLowerCase();
+      const raw = sqrtPriceX96ToRawProbability(sqrtPriceX96, yesIsToken0);
+      const probability = Math.min(1, Math.max(0, raw)).toFixed(5);
+      const liquidity = await readPoolLiquidity(row.poolId, chainId); // best-effort null
+      await db.insert(marketPrices).values({
+        marketId: row.marketId,
+        impliedProbability: probability,
+        source: "pool",
+        liquidityRaw: liquidity,
+        capturedAt: new Date(nowMs),
+      });
+      summary.written += 1;
+    } catch (err) {
+      summary.failures.push({
+        marketId: row.marketId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return summary;
+}
+
 export async function getMarketMetricsBatch(
   marketIds: readonly string[],
   db: DB = defaultDb,

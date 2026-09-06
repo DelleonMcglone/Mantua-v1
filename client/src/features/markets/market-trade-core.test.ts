@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
-import { closePositionDetail, rawToHuman6 } from "./market-trade-core.ts";
+import { closePositionDetail, isTradableStatus, rawToHuman6 } from "./market-trade-core.ts";
 
 test("rawToHuman6 renders exact 6dp amounts from raw balances", () => {
   assert.equal(rawToHuman6(0n), "0");
@@ -44,4 +44,13 @@ test("closePositionDetail builds the deep-link for open YES rows only", () => {
   assert.equal(closePositionDetail({ ...open, state: "RESOLVED" }), null);
   assert.equal(closePositionDetail({ ...open, league: null }), null);
   assert.equal(closePositionDetail({ ...open, providerEventId: null }), null);
+});
+
+test("isTradableStatus (D-103 in-play): open before AND during the game, closed on final/void", () => {
+  assert.equal(isTradableStatus("scheduled"), true);
+  assert.equal(isTradableStatus("in_progress"), true, "kickoff no longer closes the trade UI");
+  assert.equal(isTradableStatus("final"), false);
+  assert.equal(isTradableStatus("postponed"), false);
+  assert.equal(isTradableStatus("cancelled"), false);
+  assert.equal(isTradableStatus("suspended"), false);
 });

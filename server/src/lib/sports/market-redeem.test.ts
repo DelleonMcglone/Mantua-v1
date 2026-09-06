@@ -8,6 +8,7 @@ import {
   redeemFunctionForDbState,
   redeemFunctionForOnchainState,
   redeemableSides,
+  settlementPriceFor,
 } from "./market-redeem.ts";
 
 describe("redeemFunctionForOnchainState (mirrors reclaimSettledMarkets)", () => {
@@ -143,5 +144,26 @@ describe("redeemableSides (the redeemable-listing shaper)", () => {
       });
       assert.deepEqual(sides, [], state);
     }
+  });
+});
+
+describe("settlementPriceFor (P-006 — the position mirror's settled value)", () => {
+  it("pays the winning side $1 and the losing side $0 (market vocabulary: 0 = YES pays)", () => {
+    assert.equal(settlementPriceFor("yes", "RESOLVED", 0), "1.00000");
+    assert.equal(settlementPriceFor("no", "RESOLVED", 0), "0.00000");
+    assert.equal(settlementPriceFor("yes", "SETTLED", 1), "0.00000");
+    assert.equal(settlementPriceFor("no", "SETTLED", 1), "1.00000");
+  });
+
+  it("pays either side $0.50 on INVALID, winner irrelevant", () => {
+    assert.equal(settlementPriceFor("yes", "INVALID", null), "0.50000");
+    assert.equal(settlementPriceFor("no", "INVALID", 0), "0.50000");
+  });
+
+  it("refuses to settle a live market or an unknown winner — hold, never guess", () => {
+    assert.equal(settlementPriceFor("yes", "OPEN", 0), null);
+    assert.equal(settlementPriceFor("yes", "FROZEN", 0), null);
+    assert.equal(settlementPriceFor("yes", "RESOLVED", null), null);
+    assert.equal(settlementPriceFor("yes", "RESOLVED", 7), null);
   });
 });

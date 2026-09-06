@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { ArrowLeft, Bot, ExternalLink } from "lucide-react";
+import { ArrowLeft, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
 import { ClaimWinnings } from "./ClaimWinnings.tsx";
 import { closePositionDetail } from "./market-trade-core.ts";
 import type { SlateEvent } from "./use-slate.ts";
-
-const EXPLORER = "https://basescan.org/tx/";
 
 // ─── Data shapes (mirror server/src/routes/market-detail.ts) ─────────────────
 
@@ -605,18 +603,9 @@ function ActivityTab({ event, detail }: { event: SlateEvent; detail: DetailRespo
               {a.tokens.toFixed(2)} {team.abbreviation} YES
               <span className="text-text-dim"> for ${a.usdc.toFixed(2)}</span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-text-mute">
-              {timeAgo(a.t)}
-              <a
-                href={`${EXPLORER}${a.txHash}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="View transaction"
-                className="text-text-dim hover:text-text"
-              >
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </div>
+            {/* P-010/D-104: chainless user UI — no public explorer links.
+                The internal ops surface carries the on-chain audit trail. */}
+            <div className="text-[11px] text-text-mute">{timeAgo(a.t)}</div>
           </li>
         );
       })}

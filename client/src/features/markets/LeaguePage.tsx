@@ -13,7 +13,7 @@ import {
 import { getSport, SPORTS, type SportId } from "./sports.ts";
 import { useSlate, type SlateEvent } from "./use-slate.ts";
 import { useMarketTrade } from "./use-market-trade.ts";
-import { rawToHuman6 } from "./market-trade-core.ts";
+import { isTradableStatus, rawToHuman6 } from "./market-trade-core.ts";
 import { MarketDetail } from "./MarketDetail.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 
@@ -156,8 +156,8 @@ export function LeaguePage({
       : undefined;
     const first =
       linked ??
-      events.find((e) => e.liveOdds && e.status === "scheduled") ??
-      events.find((e) => e.status === "scheduled") ??
+      events.find((e) => e.liveOdds && isTradableStatus(e.status)) ??
+      events.find((e) => isTradableStatus(e.status)) ??
       events.at(0);
     return first ? { event: first, outcomeIndex: 0 } : null;
   }, [selection, events, initialEventId]);
@@ -328,7 +328,9 @@ function GameRow({
 }) {
   const live = event.status === "in_progress";
   const final = event.status === "final";
-  const tradeable = Boolean(event.liveOdds) && event.status === "scheduled";
+  // D-103 in-play: prices stay clickable through the game; the window
+  // closes on final (or void), not at kickoff.
+  const tradeable = Boolean(event.liveOdds) && isTradableStatus(event.status);
   const time = new Date(event.startsAt * 1000).toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
@@ -645,8 +647,9 @@ function TradeSidebar({
       )}
 
       <p className="mt-3 text-[10.5px] leading-relaxed text-text-mute">
-        Trading halts at kickoff. Winning YES redeems for 1 USDC; postponed or tied games settle
-        both sides at 0.50. By trading you agree to the Terms of Use.
+        Trade before or during the game — trading closes when the game goes final. Winning YES
+        redeems for 1 USDC; postponed or tied games settle both sides at 0.50. By trading you agree
+        to the Terms of Use.
       </p>
     </div>
   );

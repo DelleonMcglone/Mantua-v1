@@ -22,6 +22,17 @@ export function rawToHuman6(raw: bigint | string): string {
   return frac.length > 0 ? `${whole}.${frac}` : whole;
 }
 
+/**
+ * D-103 in-play trading: the statuses during which the trade UI stays
+ * open. Buying and selling run before AND during the game; the window
+ * closes when the event goes final (or is called off) — NOT at kickoff.
+ * Every surface that offers a trade control gates on this one predicate
+ * so the client cannot disagree with itself about the betting window.
+ */
+export function isTradableStatus(status: string): boolean {
+  return status === "scheduled" || status === "in_progress";
+}
+
 /** The `mantua:close-position` event payload — profile rows, the market
  *  detail's positions tab, and the portfolio card all dispatch this to
  *  deep-link the league page's sidebar onto a pre-filled full-balance

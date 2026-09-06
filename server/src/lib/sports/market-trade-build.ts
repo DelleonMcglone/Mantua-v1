@@ -7,8 +7,11 @@
  */
 
 import { parseAbi } from "viem";
+import { and, eq } from "drizzle-orm";
 
 const MARKET_STARTS_AT_ABI = parseAbi(["function startsAt() view returns (uint64)"]);
+import { db as defaultDb, type DB } from "../../db/client.ts";
+import { events, markets as marketsTable } from "../../db/schema/index.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { computeMarketId } from "../market-id.ts";
@@ -26,6 +29,7 @@ import {
   MARKET_FACTORY_ABI,
 } from "../markets-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
+import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { getToken } from "../tokens.ts";
 import { DEFAULT_SLIPPAGE_BPS } from "../constants.ts";
 import { assertSlippageBounds } from "../slippage.ts";
@@ -84,17 +88,141 @@ export class MarketsNotDeployedError extends Error {
   }
 }
 
-/** Betting window is over: the game has kicked off (or finished). The
- *  hook enforces this on-chain with its timestamp freeze — this check
- *  turns that guaranteed revert into a clean, quotable-in-advance error. */
+/** Betting window is over: the event is FINAL (or void), the market is
+ *  frozen/resolved, or the D-103 time backstop has elapsed. In-play
+ *  (D-103) trading runs before AND during the game — kickoff alone closes
+ *  nothing. The hook enforces the same state-driven freeze on-chain; this
+ *  check turns that guaranteed revert into a clean, quotable-in-advance
+ *  error. */
 export class MarketClosedError extends Error {
-  constructor(providerEventId: string) {
+  constructor(providerEventId: string, detail?: string) {
     super(
-      `Betting is closed for game ${providerEventId} — it has already started. ` +
+      `Betting is closed for game ${providerEventId}${detail ? ` — ${detail}` : ""}. ` +
         `Positions can still be redeemed after the market resolves.`,
     );
     this.name = "MarketClosedError";
   }
+}
+
+/**
+ * P-012 — in-play quoting halt on a data-feed outage. During the game the
+ * server refuses to BUILD new buys while its own view of the event is dark:
+ * a quote priced off a game state that stopped updating is exactly the
+ * toxic-flow window the D-103 degradation ladder exists for. On-chain stays
+ * open-but-clamped (the hook's fee/cap ladder); exits (sells) still build,
+ * so existing positions are never trapped by the halt.
+ */
+export class MarketDataOutageError extends Error {
+  constructor(providerEventId: string, detail: string) {
+    super(
+      `Trading is paused for game ${providerEventId} — the live data feed is ` +
+        `stale (${detail}). New positions resume when the feed recovers; ` +
+        `selling an existing position is unaffected.`,
+    );
+    this.name = "MarketDataOutageError";
+  }
+}
+
+/**
+ * How stale the ingest pipeline's view of an in-play event may be before
+ * new buys halt. The sports-sync cron ticks every few minutes; ten minutes
+ * of silence during a LIVE game means at least two consecutive ticks were
+ * missed — an outage, not jitter. Deliberately looser than the resolution
+ * path's MAX_RESOLUTION_FEED_AGE_MS (settling needs fresher data than
+ * quoting) and tighter than STORE_POLL_MAX_AGE_MS (a pre-game lull is
+ * harmless; a live-game lull is not).
+ */
+export const IN_PLAY_FEED_MAX_AGE_MS = 10 * 60_000;
+
+/** What the tradability gate needs to know — the canonical DB's view. */
+export interface TradeGateRow {
+  /** events.status: scheduled | in_progress | final | postponed | cancelled */
+  status: string;
+  /** Kickoff, ms epoch. */
+  startsAtMs: number;
+  /** events.last_polled_at, ms epoch — null when never polled. */
+  lastPolledAtMs: number | null;
+  /** markets.state for this exact market, when a row exists. */
+  marketState: string | null;
+}
+
+export type Tradability =
+  | { kind: "open" }
+  | { kind: "closed"; reason: string }
+  | { kind: "halted"; reason: string };
+
+/**
+ * D-103 tradability, pure and tested:
+ *
+ *  - CLOSED on a final/void event, a FROZEN/RESOLVED/SETTLED/INVALID
+ *    market row, or past `startsAt + MAX_EVENT_DURATION_SECONDS` (the
+ *    permissionless backstop — no market outlives its event);
+ *  - HALTED (P-012, buys only) while the event is in play and the ingest
+ *    pipeline's `lastPolledAt` is older than IN_PLAY_FEED_MAX_AGE_MS —
+ *    absence of a poll timestamp counts as an outage, never as fresh;
+ *  - OPEN otherwise — including in play with a live feed, and for every
+ *    sell (exits ride through outages untouched).
+ */
+export function assessMarketTradability(
+  gate: TradeGateRow,
+  direction: "buy" | "sell",
+  nowMs: number,
+): Tradability {
+  if (gate.status === "final" || gate.status === "postponed" || gate.status === "cancelled") {
+    return { kind: "closed", reason: `the game is ${gate.status}` };
+  }
+  if (
+    gate.marketState !== null &&
+    ["FROZEN", "RESOLVED", "SETTLED", "INVALID"].includes(gate.marketState)
+  ) {
+    return { kind: "closed", reason: `the market is ${gate.marketState.toLowerCase()}` };
+  }
+  if (nowMs >= gate.startsAtMs + MAX_EVENT_DURATION_SECONDS * 1000) {
+    return { kind: "closed", reason: "the event's maximum duration has elapsed" };
+  }
+  const inPlay = gate.status === "in_progress" || nowMs >= gate.startsAtMs;
+  if (inPlay && direction === "buy") {
+    const age = gate.lastPolledAtMs === null ? null : nowMs - gate.lastPolledAtMs;
+    if (age === null || age > IN_PLAY_FEED_MAX_AGE_MS) {
+      return {
+        kind: "halted",
+        reason:
+          age === null ? "no ingest record for a live game" : `feed ${String(age)}ms behind`,
+      };
+    }
+  }
+  return { kind: "open" };
+}
+
+/** The default gate loader — the canonical events row (+ this market's
+ *  state) by provider event id. Null when the event was never ingested. */
+async function loadTradeGate(
+  db: DB,
+  providerEventId: string,
+  marketId: string,
+): Promise<TradeGateRow | null> {
+  const rows = await db
+    .select({
+      status: events.status,
+      startsAt: events.startsAt,
+      lastPolledAt: events.lastPolledAt,
+      marketState: marketsTable.state,
+    })
+    .from(events)
+    .leftJoin(
+      marketsTable,
+      and(eq(marketsTable.eventId, events.id), eq(marketsTable.marketId, marketId)),
+    )
+    .where(eq(events.providerEventId, providerEventId))
+    .limit(1);
+  const row = rows.at(0);
+  if (!row) return null;
+  return {
+    status: row.status,
+    startsAtMs: row.startsAt.getTime(),
+    lastPolledAtMs: row.lastPolledAt?.getTime() ?? null,
+    marketState: row.marketState ?? null,
+  };
 }
 
 /**
@@ -213,14 +341,17 @@ export interface BuiltMarketTrade {
  * `sqrtPriceLimitX96` bound in the returned calldata — both directions,
  * same protection.
  */
-export async function buildMarketTrade(args: {
-  providerEventId: string;
-  outcomeIndex: 0 | 1;
-  direction: "buy" | "sell";
-  amountRaw: bigint;
-  chainId?: SupportedChainId;
-  slippageBps?: number;
-}): Promise<BuiltMarketTrade> {
+export async function buildMarketTrade(
+  args: {
+    providerEventId: string;
+    outcomeIndex: 0 | 1;
+    direction: "buy" | "sell";
+    amountRaw: bigint;
+    chainId?: SupportedChainId;
+    slippageBps?: number;
+  },
+  deps: { db?: DB } = {},
+): Promise<BuiltMarketTrade> {
   const chainId = args.chainId ?? BASE_CHAIN_ID;
   const slippageBps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   assertSlippageBounds(slippageBps);
@@ -252,13 +383,31 @@ export async function buildMarketTrade(args: {
     abi: MARKET_ABI,
     functionName: "yesToken",
   });
-  const startsAt = await client.readContract({
-    address: marketAddress,
-    abi: MARKET_STARTS_AT_ABI,
-    functionName: "startsAt",
-  });
-  if (Number(startsAt) <= Math.floor(Date.now() / 1000)) {
-    throw new MarketClosedError(args.providerEventId);
+
+  // D-103 — the betting window is state-driven, not kickoff-driven: closed
+  // on final/frozen or past the time backstop, halted (buys only) on an
+  // in-play feed outage (P-012). The canonical DB is the gate's source; an
+  // event our own ingestion has never seen falls back to the on-chain
+  // kickoff timestamp, where only the backstop can be judged.
+  const nowMs = Date.now();
+  const gate = await loadTradeGate(deps.db ?? defaultDb, args.providerEventId, marketId);
+  if (gate) {
+    const verdict = assessMarketTradability(gate, args.direction, nowMs);
+    if (verdict.kind === "closed") {
+      throw new MarketClosedError(args.providerEventId, verdict.reason);
+    }
+    if (verdict.kind === "halted") {
+      throw new MarketDataOutageError(args.providerEventId, verdict.reason);
+    }
+  } else {
+    const startsAt = await client.readContract({
+      address: marketAddress,
+      abi: MARKET_STARTS_AT_ABI,
+      functionName: "startsAt",
+    });
+    if (Number(startsAt) + MAX_EVENT_DURATION_SECONDS <= Math.floor(nowMs / 1000)) {
+      throw new MarketClosedError(args.providerEventId, "the event's maximum duration has elapsed");
+    }
   }
   const plan = planMarketPool(yesToken, markets.collateral, dm.hook, 0.5);
 

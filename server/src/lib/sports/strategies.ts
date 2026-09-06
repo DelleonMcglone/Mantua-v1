@@ -87,7 +87,10 @@ export interface MarketTick {
   marketId: string;
   /** Implied probability of YES, in bps. Null when no price is available. */
   impliedProbBps: number | null;
-  /** Market frozen on-chain, or its kickoff has passed. */
+  /** Market frozen: the event is FINAL (or void), or the D-103 time
+   *  backstop (`startsAt + MAX_EVENT_DURATION_SECONDS`) has elapsed.
+   *  In-play (D-103) means kickoff alone freezes NOTHING — strategies
+   *  stay armed and can execute during the game. */
   frozen: boolean;
   resolved: boolean;
   /** Net USD exposure of the user's position in this market (delta hedge). */
@@ -116,8 +119,9 @@ function tickFor(ticks: readonly MarketTick[], marketId: string): MarketTick | u
  * Evaluate one armed strategy against current market ticks.
  *
  * Order is the safety property: kill switch, then expiry, then market
- * state, and only then triggers. A strategy whose game just kicked off
- * disarms — it never fires on the freeze tick.
+ * state, and only then triggers. A strategy whose game just went final
+ * disarms — it never fires on the freeze tick. (D-103 in-play: kickoff is
+ * NOT a freeze; the strategy keeps evaluating through the game.)
  */
 export function evaluateStrategy(
   strategy: ArmedStrategy,
@@ -195,14 +199,24 @@ export function evaluateStrategy(
 // ─── Ticks from slates ──────────────────────────────────────────────────────
 
 /**
+ * D-103's permissionless time backstop: no market outlives its event by
+ * more than this, even if the resolver never observes a final. Mirrors the
+ * contract-side `MAX_EVENT_DURATION` default (12 h after kickoff).
+ */
+export const MAX_EVENT_DURATION_SECONDS = 12 * 3600;
+
+/**
  * Build market ticks from provider slates (B9-005: "price and game-state
  * ticks"). Until the periphery deploy lets us read pool prices on-chain, the
  * provider's implied win probability is the price reference; the two markets
- * of one game get complementary probabilities. `frozen` is timestamp-driven
- * exactly like the contract's own freeze, so strategies disarm on the same
- * clock the market does. A delayed slate yields NO ticks — strategies must
- * not fire on stale data (same doctrine as settlement: delay is acceptable,
- * acting on delayed data is not).
+ * of one game get complementary probabilities. `frozen` follows D-103's
+ * in-play semantics — trading (and therefore hedging) runs before AND
+ * during the game, and closes when the event goes FINAL (or void), with
+ * the `startsAt + MAX_EVENT_DURATION_SECONDS` backstop guaranteeing a
+ * freeze even if the feed never reports the final — the same clock the
+ * contract freeze moved to. A delayed slate yields NO ticks — strategies
+ * must not fire on stale data (same doctrine as settlement: delay is
+ * acceptable, acting on delayed data is not).
  */
 export function ticksFromSlates(
   slates: readonly ProviderSlate[],
@@ -213,9 +227,8 @@ export function ticksFromSlates(
     if (slate.delayed) continue;
     for (const event of slate.events) {
       const [homeMarket, awayMarket] = marketIdsFor(event.providerEventId);
-      const frozen =
-        event.startsAt <= nowSeconds || event.status === "in_progress" || event.status === "final";
       const resolved = event.status === "final" || isVoidStatus(event.status);
+      const frozen = resolved || event.startsAt + MAX_EVENT_DURATION_SECONDS <= nowSeconds;
       const p = event.homeWinProbabilityBps;
       ticks.push(
         {

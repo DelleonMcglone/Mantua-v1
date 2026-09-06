@@ -37,16 +37,20 @@ import type {
   ProviderTeam,
   SportsDataProvider,
 } from "./provider.ts";
+import { computeMarketId } from "../market-id.ts";
 import {
+  planCanonicalMarkets,
   planGamePlayRows,
   planInjuryTransitions,
   planTeamRecordRows,
   recordFeedPoll,
   selectPbpTargets,
   PBP_FINAL_GRACE_SECONDS,
+  type CanonicalPlanResult,
   type InjuryTransitionPlan,
   type TeamRecordPlan,
 } from "./ingest.ts";
+import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { canonicalToPublicSlate, type PublicSlate } from "./public-slate.ts";
 
 /** The catalog the covered leagues hang off. Mirrors DM-105. */
@@ -850,10 +854,65 @@ export async function readCanonicalPublicSlate(
 // ─── Market rows (B4-006 prerequisite) ──────────────────────────────────────
 
 /**
+ * The plan-side half of P-002: markets are planned from the PERSISTED
+ * canonical `events` rows (the 041 rule — consumers read the DB, providers
+ * only feed ingestion), with the same tick's feed supplying only labels
+ * and opening odds. The pure decision lives in `planCanonicalMarkets`.
+ */
+export async function planMarketsFromCanonical(
+  db: DB,
+  provider: string,
+  league: LeagueSlug,
+  feedEvents: readonly ProviderEvent[],
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+  chainId?: number,
+): Promise<CanonicalPlanResult> {
+  const leagueId = await ensureLeague(db, league);
+  const now = new Date(nowSeconds * 1000);
+  const rows = await db
+    .select({
+      providerEventId: events.providerEventId,
+      status: events.status,
+      startsAt: events.startsAt,
+      homeTeamKey: events.homeTeamKey,
+      awayTeamKey: events.awayTeamKey,
+    })
+    .from(events)
+    .where(
+      and(
+        eq(events.leagueId, leagueId),
+        eq(events.provider, provider),
+        eq(events.status, "scheduled"),
+        sql`${events.startsAt} > ${now}`,
+      ),
+    );
+  return planCanonicalMarkets(
+    rows.map((r) => ({
+      providerEventId: r.providerEventId,
+      status: r.status,
+      startsAtSeconds: Math.floor(r.startsAt.getTime() / 1000),
+      homeTeamKey: r.homeTeamKey,
+      awayTeamKey: r.awayTeamKey,
+    })),
+    new Map(feedEvents.map((e) => [e.providerEventId, e])),
+    nowSeconds,
+    chainId,
+  );
+}
+
+/**
  * Persist the markets the on-chain sweep touched. The `resolutions` log
  * FK-references `markets.market_id`, so a row must exist BEFORE settlement
  * can be recorded — this runs on every sync tick and is idempotent
  * (insert-or-update keyed on the deterministic market id).
+ *
+ * P-002 — the keccak preimage binding persists here, WITH a recompute
+ * check: `computeMarketId(providerEventId, marketType, outcomeIndex,
+ * chainId)` must reproduce the sweep's market id, or the row is refused
+ * (a mismatch means the id and its claimed preimage disagree — corruption
+ * to escalate, not data to store). `provider`/`provider_event_id` are
+ * write-once via coalesce: a later sweep can backfill a pre-046 null but
+ * never overwrite a recorded binding.
  */
 export async function upsertMarketRows(
   db: DB,
@@ -863,6 +922,20 @@ export async function upsertMarketRows(
 ): Promise<number> {
   let written = 0;
   for (const d of details) {
+    const recomputed = computeMarketId({
+      providerEventId: d.providerEventId,
+      marketType: "moneyline",
+      outcomeIndex: d.outcomeIndex,
+      chainId,
+    });
+    if (recomputed.toLowerCase() !== d.marketId.toLowerCase()) {
+      logger.error(
+        { marketId: d.marketId, recomputed, providerEventId: d.providerEventId, chainId },
+        "sports: market id does not recompute from its preimage — refusing to persist",
+      );
+      continue;
+    }
+
     const eventRow = await db
       .select({ id: events.id })
       .from(events)
@@ -879,6 +952,8 @@ export async function upsertMarketRows(
         marketType: "moneyline",
         outcomeIndex: d.outcomeIndex,
         chainId,
+        provider,
+        providerEventId: d.providerEventId,
         yesToken: d.yesToken,
         noToken: d.noToken,
         poolId: d.poolId,
@@ -890,6 +965,9 @@ export async function upsertMarketRows(
           yesToken: d.yesToken,
           noToken: d.noToken,
           poolId: d.poolId,
+          // Write-once binding: backfill a null, never overwrite a value.
+          provider: sql`coalesce(${markets.provider}, ${provider})`,
+          providerEventId: sql`coalesce(${markets.providerEventId}, ${d.providerEventId})`,
           updatedAt: new Date(),
         },
       });
@@ -899,23 +977,24 @@ export async function upsertMarketRows(
 }
 
 /**
- * Markets worth a re-band scan on one chain: any market whose game has not
- * kicked off yet — the only window where the book is OPEN and tradeable, so
- * the only window where an out-of-band price can (and must) be arbed back.
- * As with reclaim below, the DB is just the candidate list; the sweeper
- * reads each market's on-chain state and skips anything not actually OPEN.
+ * Markets worth a re-band scan on one chain: any market whose event is
+ * still inside its trading window — pre-game OR in play (D-103: books stay
+ * OPEN through the game and freeze on final, with the 12h backstop), so an
+ * out-of-band price can appear (and must be arbed back) until then. As
+ * with reclaim below, the DB is just the candidate list; the sweeper reads
+ * each market's on-chain state and skips anything not actually OPEN.
  */
 export async function listRebandCandidates(
   db: DB,
   chainId: number,
   nowSeconds: number = Math.floor(Date.now() / 1000),
 ): Promise<{ marketId: string; yesToken: string | null; noToken: string | null }[]> {
-  const now = new Date(nowSeconds * 1000);
+  const windowStart = new Date((nowSeconds - MAX_EVENT_DURATION_SECONDS) * 1000);
   return db
     .select({ marketId: markets.marketId, yesToken: markets.yesToken, noToken: markets.noToken })
     .from(markets)
     .innerJoin(events, eq(markets.eventId, events.id))
-    .where(and(eq(markets.chainId, chainId), sql`${events.startsAt} >= ${now}`));
+    .where(and(eq(markets.chainId, chainId), sql`${events.startsAt} >= ${windowStart}`));
 }
 
 /**

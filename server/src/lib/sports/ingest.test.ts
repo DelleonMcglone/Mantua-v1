@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { decideSettlement, planMarkets, planSlate, refreshSlate } from "./ingest.ts";
+import {
+  decideSettlement,
+  planCanonicalMarkets,
+  planMarkets,
+  planSlate,
+  refreshSlate,
+  type CanonicalPlannableEvent,
+} from "./ingest.ts";
 import { computeMarketId } from "../market-id.ts";
 import type { LeagueSlug, ProviderEvent, ProviderSlate, SportsDataProvider } from "./provider.ts";
 
@@ -415,5 +422,84 @@ void describe("planTeamRecordRows (041)", () => {
   void it("plans NOTHING from a delayed feed — stale standings must not overwrite fresh ones", () => {
     const plan = planTeamRecordRows([standing()], new Map([["nfl:KC", "t"]]), true);
     assert.deepEqual(plan, { rows: [], skippedUnknownTeams: 0 });
+  });
+});
+
+void describe("planCanonicalMarkets (task 046 / P-002 — plan from the persisted rows)", () => {
+  function canonicalRow(
+    overrides: Partial<CanonicalPlannableEvent> = {},
+  ): CanonicalPlannableEvent {
+    return {
+      providerEventId: "401671789",
+      status: "scheduled",
+      startsAtSeconds: NOW + 3600,
+      homeTeamKey: "nfl:KC",
+      awayTeamKey: "nfl:LV",
+      ...overrides,
+    };
+  }
+  const feed = new Map([["401671789", event({ homeWinProbabilityBps: 6200 })]]);
+
+  void it("plans the same two markets planMarkets would, from the canonical row", () => {
+    const result = planCanonicalMarkets([canonicalRow()], feed, NOW);
+    assert.equal(result.planned.length, 2);
+    assert.deepEqual(
+      result.planned,
+      planMarkets(event({ homeWinProbabilityBps: 6200 }), NOW),
+      "identity, labels, ids and opening odds all match the direct plan",
+    );
+  });
+
+  void it("the persisted rows are the planning universe: an un-persisted feed game plans nothing", () => {
+    const result = planCanonicalMarkets([], feed, NOW);
+    assert.equal(result.planned.length, 0);
+  });
+
+  void it("a canonical game the feed dropped is skipped (counted), not planned blind", () => {
+    const result = planCanonicalMarkets([canonicalRow()], new Map(), NOW);
+    assert.equal(result.planned.length, 0);
+    assert.equal(result.skippedNoFeed, 1);
+  });
+
+  void it("only scheduled, pre-kickoff canonical rows plan — same window as planMarkets", () => {
+    for (const row of [
+      canonicalRow({ status: "in_progress" }),
+      canonicalRow({ status: "final" }),
+      canonicalRow({ startsAtSeconds: NOW }),
+      canonicalRow({ startsAtSeconds: NOW - 1 }),
+    ]) {
+      assert.equal(planCanonicalMarkets([row], feed, NOW).planned.length, 0);
+    }
+  });
+
+  void it("the canonical row's clock wins over the feed's", () => {
+    // Feed says kickoff moved an hour later; the persisted row is what the
+    // planner anchors the market's kickoff timestamp on.
+    const shifted = new Map([
+      ["401671789", event({ startsAt: NOW + 7200, homeWinProbabilityBps: 6200 })],
+    ]);
+    const result = planCanonicalMarkets([canonicalRow()], shifted, NOW);
+    assert.equal(result.planned[0].kickoffTimestamp, NOW + 3600);
+  });
+
+  void it("refuses a feed whose home/away contradicts the stored row — the outcome-index anchor", () => {
+    const flipped = new Map([
+      [
+        "401671789",
+        event({
+          home: { providerId: "2", key: "nfl:LV", name: "LV Team", abbreviation: "LV" },
+          away: { providerId: "1", key: "nfl:KC", name: "KC Team", abbreviation: "KC" },
+        }),
+      ],
+    ]);
+    const result = planCanonicalMarkets([canonicalRow()], flipped, NOW);
+    assert.equal(result.planned.length, 0);
+    assert.equal(result.skippedSideMismatch, 1);
+  });
+
+  void it("deterministic over the same rows + feed — re-running is a no-op through createMarketIfAbsent", () => {
+    const a = planCanonicalMarkets([canonicalRow()], feed, NOW);
+    const b = planCanonicalMarkets([canonicalRow()], feed, NOW);
+    assert.deepEqual(a, b);
   });
 });

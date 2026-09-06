@@ -2,13 +2,17 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  IN_PLAY_FEED_MAX_AGE_MS,
   MarketsNotDeployedError,
   assertUsdcCollateral,
+  assessMarketTradability,
   buildMarketTrade,
   marketMinOut,
   marketSwapSqrtPriceLimit,
   marketTradeSpendUsd,
+  type TradeGateRow,
 } from "./market-trade-build.ts";
+import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { MIN_SQRT_PRICE_LIMIT, MAX_SQRT_PRICE_LIMIT } from "../v4-onchain-swap.ts";
 import { DYNAMIC_MARKET_BY_CHAIN } from "../v4-contracts.ts";
 import { BASE_CHAIN_ID } from "../chains.ts";
@@ -189,5 +193,88 @@ describe("buildMarketTrade gating (MARKETS_BY_CHAIN empty)", () => {
         return true;
       },
     );
+  });
+});
+
+describe("assessMarketTradability (D-103 in-play window + P-012 outage halt)", () => {
+  const NOW_MS = 1_800_000_000_000;
+  function gate(overrides: Partial<TradeGateRow> = {}): TradeGateRow {
+    return {
+      status: "scheduled",
+      startsAtMs: NOW_MS + 3_600_000,
+      lastPolledAtMs: NOW_MS - 60_000,
+      marketState: "OPEN",
+      ...overrides,
+    };
+  }
+
+  it("pre-game: open for both directions", () => {
+    assert.deepEqual(assessMarketTradability(gate(), "buy", NOW_MS), { kind: "open" });
+    assert.deepEqual(assessMarketTradability(gate(), "sell", NOW_MS), { kind: "open" });
+  });
+
+  it("IN PLAY with a fresh feed: open — kickoff no longer closes the window", () => {
+    const live = gate({ status: "in_progress", startsAtMs: NOW_MS - 3_600_000 });
+    assert.deepEqual(assessMarketTradability(live, "buy", NOW_MS), { kind: "open" });
+    assert.deepEqual(assessMarketTradability(live, "sell", NOW_MS), { kind: "open" });
+  });
+
+  it("closed on a final, postponed, or cancelled event", () => {
+    for (const status of ["final", "postponed", "cancelled"]) {
+      const verdict = assessMarketTradability(gate({ status }), "buy", NOW_MS);
+      assert.equal(verdict.kind, "closed");
+    }
+  });
+
+  it("closed when the market row itself is frozen/resolved/settled/invalid", () => {
+    for (const marketState of ["FROZEN", "RESOLVED", "SETTLED", "INVALID"]) {
+      const verdict = assessMarketTradability(gate({ marketState }), "buy", NOW_MS);
+      assert.equal(verdict.kind, "closed");
+    }
+    // A null market row (not yet persisted) is not a close signal.
+    assert.equal(assessMarketTradability(gate({ marketState: null }), "buy", NOW_MS).kind, "open");
+  });
+
+  it("closed past the permissionless 12h backstop, whatever the feed claims", () => {
+    const stuck = gate({
+      status: "in_progress", // feed stuck mid-game
+      startsAtMs: NOW_MS - MAX_EVENT_DURATION_SECONDS * 1000,
+      lastPolledAtMs: NOW_MS, // even perfectly fresh
+    });
+    assert.equal(assessMarketTradability(stuck, "buy", NOW_MS).kind, "closed");
+    assert.equal(assessMarketTradability(stuck, "sell", NOW_MS).kind, "closed");
+  });
+
+  it("P-012: halts BUYS on an in-play feed outage; sells (exits) still build", () => {
+    const dark = gate({
+      status: "in_progress",
+      startsAtMs: NOW_MS - 3_600_000,
+      lastPolledAtMs: NOW_MS - IN_PLAY_FEED_MAX_AGE_MS - 1,
+    });
+    assert.equal(assessMarketTradability(dark, "buy", NOW_MS).kind, "halted");
+    assert.deepEqual(assessMarketTradability(dark, "sell", NOW_MS), { kind: "open" });
+  });
+
+  it("P-012: a live game with NO ingest record counts as an outage, never as fresh", () => {
+    const never = gate({
+      status: "in_progress",
+      startsAtMs: NOW_MS - 3_600_000,
+      lastPolledAtMs: null,
+    });
+    assert.equal(assessMarketTradability(never, "buy", NOW_MS).kind, "halted");
+  });
+
+  it("a stale feed BEFORE kickoff halts nothing — the halt is an in-play safeguard", () => {
+    const preGame = gate({ lastPolledAtMs: NOW_MS - IN_PLAY_FEED_MAX_AGE_MS * 10 });
+    assert.deepEqual(assessMarketTradability(preGame, "buy", NOW_MS), { kind: "open" });
+  });
+
+  it("in play by clock alone (status lagging at 'scheduled') still applies the halt", () => {
+    const kickedOff = gate({
+      status: "scheduled",
+      startsAtMs: NOW_MS - 60_000,
+      lastPolledAtMs: NOW_MS - IN_PLAY_FEED_MAX_AGE_MS - 1,
+    });
+    assert.equal(assessMarketTradability(kickedOff, "buy", NOW_MS).kind, "halted");
   });
 });

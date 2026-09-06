@@ -5,6 +5,7 @@ import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import {
   MarketClosedError,
+  MarketDataOutageError,
   MarketsNotDeployedError,
   NoMarketError,
   buildMarketTrade,
@@ -111,6 +112,13 @@ marketTradeRouter.post(
       }
       if (err instanceof MarketClosedError) {
         res.status(409).json({ error: err.message, code: "BETTING_CLOSED" });
+        return;
+      }
+      if (err instanceof MarketDataOutageError) {
+        // P-012 — in-play feed outage: new buys are refused with a typed,
+        // temporary error; sells (exits) never reach this branch. 503
+        // because the condition clears when the feed recovers.
+        res.status(503).json({ error: err.message, code: "TRADING_HALTED" });
         return;
       }
       logger.warn({ err }, "market-trade: quote failed");

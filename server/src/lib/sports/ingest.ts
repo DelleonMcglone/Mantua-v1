@@ -105,6 +105,76 @@ export function planSlate(
   return events.flatMap((e) => planMarkets(e, nowSeconds, chainId));
 }
 
+// ─── Plan from canonical events (task 046 / P-002) ──────────────────────────
+
+/** A persisted `events` row as the canonical planner consumes it. */
+export interface CanonicalPlannableEvent {
+  providerEventId: string;
+  /** scheduled | in_progress | final | postponed | cancelled */
+  status: string;
+  /** Kickoff, Unix seconds. */
+  startsAtSeconds: number;
+  homeTeamKey: string | null;
+  awayTeamKey: string | null;
+}
+
+export interface CanonicalPlanResult {
+  planned: PlannedMarket[];
+  /** Canonical rows the current feed no longer carries — a market needs the
+   *  feed's labels/odds to open, so these wait for the feed to return. */
+  skippedNoFeed: number;
+  /** Feed rows whose home/away contradicts the stored row — the same
+   *  corruption the store's upsert guard refuses; never plan from it. */
+  skippedSideMismatch: number;
+}
+
+/**
+ * The 041 architecture rule applied to market planning: **consumers read
+ * the DB, providers only feed ingestion.** The planning universe is the
+ * persisted canonical `events` rows — a game that ingestion has not
+ * persisted can never mint a market, and the stored row's home/away
+ * assignment (which fixes `outcomeIndex`, and which the store's
+ * side-conflict guard makes immutable) is the binding the market id hashes.
+ * The same tick's feed contributes only what the schema doesn't persist:
+ * team abbreviations for the on-chain label and the opening probability.
+ *
+ * Deterministic over the same rows + feed, so re-running stays a no-op
+ * through `createMarketIfAbsent` exactly as before.
+ */
+export function planCanonicalMarkets(
+  canonical: readonly CanonicalPlannableEvent[],
+  feedByEventId: ReadonlyMap<string, ProviderEvent>,
+  nowSeconds: number,
+  chainId?: number,
+): CanonicalPlanResult {
+  const result: CanonicalPlanResult = { planned: [], skippedNoFeed: 0, skippedSideMismatch: 0 };
+  for (const row of canonical) {
+    // Same window as planMarkets: only scheduled, pre-kickoff games open.
+    if (row.status !== "scheduled" || row.startsAtSeconds <= nowSeconds) continue;
+    const feed = feedByEventId.get(row.providerEventId);
+    if (!feed) {
+      result.skippedNoFeed += 1;
+      continue;
+    }
+    if (
+      (row.homeTeamKey !== null && feed.home.key !== row.homeTeamKey) ||
+      (row.awayTeamKey !== null && feed.away.key !== row.awayTeamKey)
+    ) {
+      result.skippedSideMismatch += 1;
+      continue;
+    }
+    // Identity and clock from the canonical row; labels/odds from the feed.
+    result.planned.push(
+      ...planMarkets(
+        { ...feed, status: "scheduled", startsAt: row.startsAtSeconds },
+        nowSeconds,
+        chainId,
+      ),
+    );
+  }
+  return result;
+}
+
 /** What the resolution service should do about one event. */
 export type SettlementAction =
   | { kind: "wait"; reason: string }
