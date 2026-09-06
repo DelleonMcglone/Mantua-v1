@@ -1,0 +1,14 @@
+-- 041 — `game_plays.sequence` widens int4 → bigint.
+--
+-- 038 modelled the play sequence as a small per-game index; the pinned
+-- Sportradar reference (football/reference/nfl-play-by-play, fetched
+-- 2026-09-06) documents `sequence` as an epoch-milliseconds-scale ordering
+-- number (13 digits, e.g. 1698611137531), which overflows int4. Widening
+-- keeps the 038 design intact: the (event, provider, sequence) unique stays
+-- the idempotent re-ingest key, now holding the provider's own cursor.
+--
+-- Idempotent per the 0009/0012 convention: ALTER ... TYPE bigint on a column
+-- that is already bigint is a clean no-op re-application, and the table is
+-- guaranteed to exist by 0013 earlier in the chain. No data rewrite risk —
+-- nothing has written this table before task 041.
+ALTER TABLE "game_plays" ALTER COLUMN "sequence" TYPE bigint;

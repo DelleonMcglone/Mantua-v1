@@ -17,6 +17,7 @@ import {
 } from "./agent-sports-tools.ts";
 import type {
   EventRow,
+  GamePlayRow,
   LeagueRow,
   MarketFillRow,
   MarketPriceRow,
@@ -24,6 +25,7 @@ import type {
   OpenInjuryRow,
   PlayerRow,
   SportsToolsDb,
+  TeamRecordRow,
   TeamRow,
 } from "./agent-sports-tools.ts";
 
@@ -69,6 +71,12 @@ interface Fixtures {
   markets: MarketRow[];
   prices: (MarketPriceRow & { marketId: string })[];
   fills: (MarketFillRow & { marketId: string })[];
+  /** Task 041 — ingested tables. Absent in the base fixtures on purpose:
+   *  the fallback paths are the base behavior, the preferred paths opt in. */
+  plays?: (GamePlayRow & { eventId: string })[];
+  teamRecords?: TeamRecordRow[];
+  /** playerId → the season_stats jsonb. */
+  seasonStats?: Record<string, unknown>;
 }
 
 const M0 = `0x${"a".repeat(64)}`;
@@ -303,6 +311,20 @@ function makeFakeDb(f: Fixtures): SportsToolsDb {
           .filter((x) => x.marketId === marketId && x.createdAt.getTime() >= since.getTime())
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
       ),
+    listPlaysForEvent: (eventId, limit) =>
+      Promise.resolve(
+        (f.plays ?? [])
+          .filter((p) => p.eventId === eventId)
+          .sort((a, b) => b.sequence - a.sequence)
+          .slice(0, limit),
+      ),
+    listTeamRecordsForTeam: (teamId) =>
+      Promise.resolve((f.teamRecords ?? []).filter((r) => r.teamId === teamId)),
+    listTeamRecordsForLeague: (leagueId) => {
+      const teamIds = new Set(f.teams.filter((t) => t.leagueId === leagueId).map((t) => t.id));
+      return Promise.resolve((f.teamRecords ?? []).filter((r) => teamIds.has(r.teamId)));
+    },
+    getPlayerSeasonStats: (playerId) => Promise.resolve((f.seasonStats ?? {})[playerId] ?? null),
   };
 }
 
@@ -413,11 +435,52 @@ void describe("get_live_game_state (S-012)", () => {
     assert.equal(res["period"], null);
     assert.equal(res["clock"], null);
     assert.equal(res["possession"], null);
-    assert.deepEqual(res["fieldsNotStored"], {
-      period: "not yet ingested",
-      clock: "not yet ingested",
-      possession: "not yet ingested",
+    const missing = asR(res["fieldsNotStored"]);
+    for (const field of ["period", "clock", "possession"]) {
+      assert.match(String(missing[field]), /not yet ingested — no plays ingested/);
+    }
+  });
+
+  void it("serves period/clock/possession from the latest ingested play (task 041)", async () => {
+    const withPlays = makeFakeDb({
+      ...fixtures(),
+      plays: [
+        {
+          eventId: "e-live",
+          sequence: 1_698_611_000_000,
+          period: 1,
+          clock: "10:12",
+          playType: "rush",
+          description: "K.Prime rushes for 4 yards",
+          teamKey: "nfl:ATL",
+          scoringPlay: false,
+          homeScore: 7,
+          awayScore: 3,
+          detail: {},
+        },
+        {
+          eventId: "e-live",
+          sequence: 1_698_611_137_531, // latest play wins
+          period: 2,
+          clock: "12:34",
+          playType: "pass",
+          description: "K.Prime passes deep to D.Catchman",
+          teamKey: "nfl:ATL",
+          scoringPlay: true,
+          homeScore: 14,
+          awayScore: 10,
+          detail: { possessionAfter: "nfl:NO" },
+        },
+      ],
     });
+    const res = asR(await getLiveGameState(withPlays, { team: "Falcons" }));
+    assert.equal(res["status"], "ok");
+    assert.equal(res["period"], 2);
+    assert.equal(res["clock"], "12:34");
+    // Possession is the ball AFTER the latest play (end_situation).
+    assert.equal(res["possession"], "nfl:NO");
+    assert.match(String(res["liveStateSource"]), /latest ingested play/);
+    assert.equal(res["fieldsNotStored"], undefined);
   });
 
   void it("is not_found (with the latest game) when the team has no live game", async () => {
@@ -439,7 +502,73 @@ void describe("get_live_game_state (S-012)", () => {
 
 // ─── S-013 / S-014 team + player stats ──────────────────────────────────────
 
+/** A Falcons team_records snapshot for the preferred-source tests. */
+function falconsRecord(overrides: Partial<TeamRecordRow> = {}): TeamRecordRow {
+  return {
+    teamId: "t-atl",
+    season: "2026",
+    seasonType: "regular",
+    wins: 11,
+    losses: 6,
+    ties: 0,
+    divisionRank: 1,
+    conferenceRank: 3,
+    pointsFor: 410,
+    pointsAgainst: 333,
+    streak: "W3",
+    homeRecord: "6-2",
+    awayRecord: "5-4",
+    stats: { win_pct: 0.647, home_wins: 6, home_losses: 2, road_wins: 5, road_losses: 4 },
+    updatedAt: hours(-4),
+    ...overrides,
+  };
+}
+
 void describe("get_team_stats / get_player_stats (S-013/S-014)", () => {
+  void it("prefers the ingested standings snapshot: official record + detailed stats (task 041)", async () => {
+    const withRecords = makeFakeDb({ ...fixtures(), teamRecords: [falconsRecord()] });
+    const res = asR(await getTeamStats(withRecords, { team: "Falcons" }));
+    assert.equal(res["status"], "ok");
+    assert.match(String(res["recordSource"]), /team_records/);
+    const record = asR(res["record"]);
+    assert.equal(record["wins"], 11);
+    assert.equal(record["losses"], 6);
+    assert.equal(record["divisionRank"], 1);
+    assert.equal(record["streak"], "W3");
+    assert.equal(record["homeRecord"], "6-2");
+    assert.equal(record["awayRecord"], "5-4");
+    const detailed = asR(res["detailedStats"]);
+    assert.equal(detailed["status"], "ok");
+    assert.deepEqual(asR(detailed["stats"])["win_pct"], 0.647);
+    // The derived record is gone — the official snapshot is the answer.
+    assert.equal(res["derivedRecord"], undefined);
+  });
+
+  void it("picks the latest season's regular snapshot when several exist", async () => {
+    const withRecords = makeFakeDb({
+      ...fixtures(),
+      teamRecords: [
+        falconsRecord({ season: "2025", wins: 8 }),
+        falconsRecord({ season: "2026", seasonType: "preseason", wins: 2 }),
+        falconsRecord({ season: "2026", seasonType: "regular", wins: 11 }),
+      ],
+    });
+    const res = asR(await getTeamStats(withRecords, { team: "Falcons" }));
+    const record = asR(res["record"]);
+    assert.equal(record["season"], "2026");
+    assert.equal(record["seasonType"], "regular");
+    assert.equal(record["wins"], 11);
+  });
+
+  void it("marks detailedStats unavailable when the snapshot carries no aggregates", async () => {
+    const withRecords = makeFakeDb({ ...fixtures(), teamRecords: [falconsRecord({ stats: {} })] });
+    const res = asR(await getTeamStats(withRecords, { team: "Falcons" }));
+    assert.equal(asR(res["record"])["wins"], 11);
+    const detailed = asR(res["detailedStats"]);
+    assert.equal(detailed["status"], "unavailable");
+    assert.match(String(detailed["reason"]), /no stat aggregates/);
+  });
+
   void it("derives the record from finished games and marks detailed stats unavailable", async () => {
     const res = asR(await getTeamStats(db, { team: "Falcons" }));
     assert.equal(res["status"], "ok");
@@ -463,6 +592,34 @@ void describe("get_team_stats / get_player_stats (S-013/S-014)", () => {
     assert.equal(p["position"], "QB");
     assert.equal(p["team"], "Atlanta Falcons");
     assert.equal(asR(res["stats"])["status"], "unavailable");
+  });
+
+  void it("serves players.season_stats when present, filtered by season (task 041)", async () => {
+    const withStats = makeFakeDb({
+      ...fixtures(),
+      seasonStats: {
+        "p-qb": {
+          "2025": { passing_yards: 3900, passing_touchdowns: 27 },
+          "2026": { passing_yards: 1200, passing_touchdowns: 9 },
+        },
+      },
+    });
+    const all = asR(await getPlayerStats(withStats, { player: "Kirk Prime" }));
+    const stats = asR(all["stats"]);
+    assert.equal(stats["status"], "ok");
+    assert.deepEqual(Object.keys(asR(stats["seasons"])).toSorted(), ["2025", "2026"]);
+
+    const one = asR(await getPlayerStats(withStats, { player: "Kirk Prime", season: "2026" }));
+    const oneStats = asR(one["stats"]);
+    assert.equal(oneStats["status"], "ok");
+    assert.deepEqual(asR(oneStats["seasons"]), {
+      "2026": { passing_yards: 1200, passing_touchdowns: 9 },
+    });
+
+    // A season with no entry is an honest unavailable, never zeros.
+    const missing = asR(await getPlayerStats(withStats, { player: "Kirk Prime", season: "2019" }));
+    assert.equal(asR(missing["stats"])["status"], "unavailable");
+    assert.match(String(asR(missing["stats"])["reason"]), /2019/);
   });
 
   void it("is unavailable when the players table has not been ingested", async () => {
@@ -534,12 +691,36 @@ void describe("get_recent_games / get_head_to_head (S-016/S-017)", () => {
 // ─── S-018 standings ────────────────────────────────────────────────────────
 
 void describe("get_standings (S-018)", () => {
+  void it("prefers the ingested official snapshot with ranks and staleness (task 041)", async () => {
+    const withRecords = makeFakeDb({
+      ...fixtures(),
+      teamRecords: [
+        falconsRecord(),
+        falconsRecord({ teamId: "t-no", wins: 9, losses: 8, divisionRank: 2, streak: "L1" }),
+      ],
+    });
+    const res = asR(await getStandings(withRecords, {}));
+    assert.equal(res["status"], "ok");
+    assert.match(String(res["note"]), /team_records/);
+    const league = asR(asArr(res["leagues"]).at(0));
+    assert.equal(league["source"], "team_records");
+    assert.equal(league["season"], "2026");
+    assert.equal(league["seasonType"], "regular");
+    assert.ok(league["asOf"]);
+    const rows = asArr(league["standings"]);
+    assert.equal(rows.at(0)?.["team"], "Atlanta Falcons"); // divisionRank 1
+    assert.equal(rows.at(0)?.["divisionRank"], 1);
+    assert.equal(rows.at(0)?.["streak"], "W3");
+    assert.equal(rows.at(1)?.["team"], "New Orleans Saints");
+  });
+
   void it("derives a sorted table from finished games and says it is derived", async () => {
     const res = asR(await getStandings(db, {}));
     assert.equal(res["status"], "ok");
-    assert.match(String(res["note"]), /derived from finished games/);
+    assert.match(String(res["note"]), /aggregated from finished games/);
     const league = asR(asArr(res["leagues"]).at(0));
     assert.equal(league["league"], "nfl");
+    assert.equal(league["source"], "derived");
     const rows = asArr(league["standings"]);
     assert.equal(rows.at(0)?.["team"], "Atlanta Falcons");
     assert.equal(rows.at(0)?.["wins"], 3);
@@ -561,12 +742,72 @@ void describe("get_standings (S-018)", () => {
 // ─── S-019 play-by-play ─────────────────────────────────────────────────────
 
 void describe("get_play_by_play (S-019)", () => {
-  void it("always returns a structured unavailable (no storage on this branch) with the game echoed", async () => {
+  void it("is a structured unavailable (with the game echoed) while no plays are ingested", async () => {
     const res = asR(await getPlayByPlay(db, { team: "Falcons" }));
     assert.equal(res["status"], "unavailable");
     assert.match(String(res["reason"]), /not yet ingested/);
     assert.equal(res["plays"], null);
     assert.ok(res["game"]);
+    // The team query resolves to the live game, where plays would be.
+    assert.equal(asR(res["game"])["status"], "in_progress");
+  });
+
+  void it("serves ingested plays newest-first with running scores (task 041)", async () => {
+    const withPlays = makeFakeDb({
+      ...fixtures(),
+      plays: [
+        {
+          eventId: "e-live",
+          sequence: 1_698_611_000_000,
+          period: 1,
+          clock: "10:12",
+          playType: "rush",
+          description: "K.Prime rushes for 4 yards",
+          teamKey: "nfl:ATL",
+          scoringPlay: false,
+          homeScore: 7,
+          awayScore: 3,
+          detail: {},
+        },
+        {
+          eventId: "e-live",
+          sequence: 1_698_611_137_531,
+          period: 2,
+          clock: "12:34",
+          playType: "pass",
+          description: "K.Prime passes deep to D.Catchman for a touchdown",
+          teamKey: "nfl:ATL",
+          scoringPlay: true,
+          homeScore: 14,
+          awayScore: 10,
+          detail: { possessionAfter: "nfl:NO" },
+        },
+      ],
+    });
+    const res = asR(await getPlayByPlay(withPlays, { team: "Falcons" }));
+    assert.equal(res["status"], "ok");
+    assert.equal(res["count"], 2);
+    const plays = asArr(res["plays"]);
+    // Newest first — the epoch-ms-scale provider sequence orders them.
+    assert.equal(plays.at(0)?.["sequence"], 1_698_611_137_531);
+    assert.equal(plays.at(0)?.["playType"], "pass");
+    assert.equal(plays.at(0)?.["scoringPlay"], true);
+    assert.deepEqual(
+      [plays.at(0)?.["homeScore"], plays.at(0)?.["awayScore"]],
+      [14, 10],
+    );
+    assert.equal(plays.at(1)?.["playType"], "rush");
+
+    // limit is honored.
+    const limited = asR(await getPlayByPlay(withPlays, { team: "Falcons", limit: 1 }));
+    assert.equal(limited["count"], 1);
+  });
+
+  void it("resolves by providerEventId and distinguishes unknown game from playless game", async () => {
+    const res = asR(await getPlayByPlay(db, { providerEventId: "pe-e-f1" }));
+    assert.equal(res["status"], "unavailable"); // known game, no plays stored
+    const miss = asR(await getPlayByPlay(db, { providerEventId: "pe-nope" }));
+    assert.equal(miss["status"], "not_found");
   });
 });
 

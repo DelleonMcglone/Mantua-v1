@@ -6,6 +6,7 @@ import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
+  refreshPlayByPlay,
   refreshReferenceData,
   upsertEvents,
   upsertMarketRows,
@@ -127,7 +128,19 @@ cronSportsSyncRouter.get(
           reference = { error: err instanceof Error ? err.message : String(err) };
         }
 
-        results[league] = { events: eventsPersisted, reference, chains: perChain };
+        // Task 041: play-by-play for LIVE and just-finished games only, on a
+        // bounded rotation (quota rule lives in selectPbpTargets). Null when
+        // the provider has no pbp capability (ESPN). Failure never undoes
+        // the slate work — the play log heals on the next tick.
+        let playByPlay: unknown = null;
+        try {
+          playByPlay = await refreshPlayByPlay(db, provider, league);
+        } catch (err) {
+          logger.warn({ league, err }, "sports-sync: play-by-play pass failed");
+          playByPlay = { error: err instanceof Error ? err.message : String(err) };
+        }
+
+        results[league] = { events: eventsPersisted, reference, playByPlay, chains: perChain };
       } catch (err) {
         failures += 1;
         logger.error({ league, err }, "sports-sync: league failed");

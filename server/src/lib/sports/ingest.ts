@@ -26,6 +26,8 @@ import {
   type LeagueSlug,
   type ProviderEvent,
   type ProviderInjuryReport,
+  type ProviderPlay,
+  type ProviderTeamStanding,
   type SportsDataProvider,
   isSettleable,
   isVoidStatus,
@@ -201,7 +203,7 @@ export async function refreshSlate(
 // not the schema"). `lastGoodAt` only advances on a non-delayed fetch, so
 // `lastPolledAt − lastGoodAt` is exactly how long a feed has been limping.
 
-export type FeedName = "slate" | "teams" | "rosters" | "injuries";
+export type FeedName = "slate" | "teams" | "rosters" | "injuries" | "standings" | "pbp";
 
 export interface FeedFreshness {
   provider: string;
@@ -314,6 +316,163 @@ export function planInjuryTransitions(
     for (const row of rows) plan.resolve.push(row.id);
   }
 
+  return plan;
+}
+
+// ─── Play-by-play target selection (task 041) ───────────────────────────────
+
+/** An event as the pbp planner sees it (store supplies the real rows). */
+export interface PbpCandidateRow {
+  providerEventId: string;
+  status: string;
+  /** Scheduled start, Unix seconds. */
+  startsAt: number;
+}
+
+/** How long after kickoff a `final` game still counts as "just finished" and
+ *  earns a closing pbp fetch. Sized to cover the gap between sync ticks so a
+ *  game that ended between ticks still gets its full log captured once. */
+export const PBP_FINAL_GRACE_SECONDS = 36 * 3_600;
+
+/**
+ * Which games this tick spends pbp quota on. Pure, so the quota rule is a
+ * tested invariant rather than a hope:
+ *
+ *  - LIVE (`in_progress`) games always qualify — their play log is growing.
+ *  - `final` games qualify only inside the just-finished grace window (one
+ *    closing capture; the append-only upsert makes the re-fetch a no-op).
+ *  - scheduled / postponed / cancelled games NEVER qualify — a game with no
+ *    plays yet (or ever) must not burn trial quota.
+ *  - the result is capped at `maxGames` per tick, live games first (oldest
+ *    kickoff first — the one closest to ending has the most complete log),
+ *    then just-finished games newest-kickoff-first.
+ */
+export function selectPbpTargets(
+  candidates: readonly PbpCandidateRow[],
+  nowSeconds: number,
+  maxGames = 2,
+  finalGraceSeconds: number = PBP_FINAL_GRACE_SECONDS,
+): PbpCandidateRow[] {
+  if (maxGames <= 0) return [];
+  const live = candidates
+    .filter((c) => c.status === "in_progress")
+    .sort((a, b) => a.startsAt - b.startsAt);
+  const justFinished = candidates
+    .filter((c) => c.status === "final" && c.startsAt >= nowSeconds - finalGraceSeconds)
+    .sort((a, b) => b.startsAt - a.startsAt);
+  return [...live, ...justFinished].slice(0, maxGames);
+}
+
+/** A `game_plays` row as planned — store.ts turns these into inserts. */
+export interface PlannedGamePlayRow {
+  eventId: string;
+  provider: string;
+  sequence: number;
+  period: number | null;
+  clock: string | null;
+  playType: string | null;
+  description: string | null;
+  teamKey: string | null;
+  scoringPlay: boolean;
+  homeScore: number | null;
+  awayScore: number | null;
+  detail: Record<string, unknown>;
+}
+
+/**
+ * Feed plays → insert rows for one game. Pure: collapses duplicate provider
+ * sequences (last occurrence wins — same rule as the injuries planner) so
+ * the batch itself can never violate the (event, provider, sequence) unique,
+ * and re-planning the same feed yields byte-identical rows — which is what
+ * makes the append-only `onConflictDoNothing` re-ingest a true no-op.
+ */
+export function planGamePlayRows(
+  eventId: string,
+  provider: string,
+  plays: readonly ProviderPlay[],
+): PlannedGamePlayRow[] {
+  const bySequence = new Map<number, PlannedGamePlayRow>();
+  for (const p of plays) {
+    bySequence.set(p.sequence, {
+      eventId,
+      provider,
+      sequence: p.sequence,
+      period: p.period ?? null,
+      clock: p.clock ?? null,
+      playType: p.playType ?? null,
+      description: p.description ?? null,
+      teamKey: p.teamKey ?? null,
+      scoringPlay: p.scoringPlay,
+      homeScore: p.homeScore ?? null,
+      awayScore: p.awayScore ?? null,
+      detail: p.detail ?? {},
+    });
+  }
+  return [...bySequence.values()].sort((a, b) => a.sequence - b.sequence);
+}
+
+// ─── Standings → team_records planning (task 041) ───────────────────────────
+
+/** A `team_records` upsert as planned — store.ts writes it. */
+export interface PlannedTeamRecordRow {
+  teamId: string;
+  season: string;
+  seasonType: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  divisionRank: number | null;
+  conferenceRank: number | null;
+  pointsFor: number | null;
+  pointsAgainst: number | null;
+  streak: string | null;
+  homeRecord: string | null;
+  awayRecord: string | null;
+  stats: Record<string, number>;
+}
+
+export interface TeamRecordPlan {
+  rows: PlannedTeamRecordRow[];
+  /** Standings lines for teams not in the canonical `teams` table yet —
+   *  healed by the next hierarchy pass, so skipping (not failing) is right. */
+  skippedUnknownTeams: number;
+}
+
+/**
+ * Standings feed → `team_records` upsert rows. Pure. A `delayed` feed plans
+ * NOTHING — a stale standings snapshot must not overwrite a fresher one
+ * (same asymmetry as the injuries planner).
+ */
+export function planTeamRecordRows(
+  standings: readonly ProviderTeamStanding[],
+  teamIdsByKey: ReadonlyMap<string, string>,
+  delayed: boolean,
+): TeamRecordPlan {
+  if (delayed) return { rows: [], skippedUnknownTeams: 0 };
+  const plan: TeamRecordPlan = { rows: [], skippedUnknownTeams: 0 };
+  for (const s of standings) {
+    const teamId = teamIdsByKey.get(s.teamKey);
+    if (teamId === undefined) {
+      plan.skippedUnknownTeams += 1;
+      continue;
+    }
+    plan.rows.push({
+      teamId,
+      season: s.season,
+      seasonType: s.seasonType,
+      wins: s.wins,
+      losses: s.losses,
+      ties: s.ties,
+      divisionRank: s.divisionRank ?? null,
+      conferenceRank: s.conferenceRank ?? null,
+      pointsFor: s.pointsFor ?? null,
+      pointsAgainst: s.pointsAgainst ?? null,
+      streak: s.streak ?? null,
+      homeRecord: s.homeRecord ?? null,
+      awayRecord: s.awayRecord ?? null,
+      stats: s.stats,
+    });
+  }
   return plan;
 }
 

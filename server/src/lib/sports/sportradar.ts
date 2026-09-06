@@ -21,7 +21,25 @@
  *  - Current week:    https://developer.sportradar.com/football/reference/nfl-current-week-schedule
  *  - Boxscore:        https://developer.sportradar.com/football/reference/nfl-game-boxscore
  *  - Play-by-play:    https://developer.sportradar.com/football/reference/nfl-play-by-play
- *                     (pinned for future prop/derivative markets; not consumed yet)
+ *                     (consumed since task 041: `game_plays` ingestion. Shape
+ *                     re-verified 2026-09-06: root `periods[]`, each period
+ *                     `{number, sequence, pbp[]}`; `pbp` holds drive objects
+ *                     whose `events[]` carry the plays; a play is
+ *                     `{type:"play", id, sequence, clock, play_type,
+ *                     description, home_points, away_points, scoring_play,
+ *                     wall_clock, start_situation{possession{alias,…}},
+ *                     end_situation{possession{alias,…}}}`. `sequence` is an
+ *                     epoch-milliseconds-scale ordering number — "use this
+ *                     value to help sequence play-by-play events".)
+ *  - Standings:       https://developer.sportradar.com/football/reference/nfl-postgame-standings
+ *                     (fetched 2026-09-06: path `/seasons/{year}/{type}/
+ *                     standings/season.json`; root `{season{year,type},
+ *                     conferences[]}`; conferences[].divisions[].teams[] each
+ *                     `{id, name, market, alias, wins, losses, ties, win_pct,
+ *                     points_for, points_against, rank{division, conference},
+ *                     streak{type, length, desc}, records[]{category, wins,
+ *                     losses, ties, win_pct, …}}` — categories include
+ *                     `home` and `road`.)
  *  - Hierarchy:       https://developer.sportradar.com/football/reference/nfl-league-hierarchy
  *  - Team roster:     https://developer.sportradar.com/football/reference/nfl-team-roster
  *  - Player profile:  https://developer.sportradar.com/football/reference/nfl-player-profile
@@ -42,7 +60,9 @@ import {
   type ProviderFeed,
   type ProviderInjuryReport,
   type ProviderInjuryStatus,
+  type ProviderPlay,
   type ProviderPlayer,
+  type ProviderTeamStanding,
   type ProviderSlate,
   type ProviderTeam,
   type SportsDataProvider,
@@ -71,7 +91,15 @@ const DEFAULT_429_COOLDOWN_MS = 5_000;
  */
 export const SPORTRADAR_TTLS: Record<
   "trial" | "production",
-  { schedule: number; event: number; hierarchy: number; roster: number; injuries: number }
+  {
+    schedule: number;
+    event: number;
+    hierarchy: number;
+    roster: number;
+    injuries: number;
+    pbp: number;
+    standings: number;
+  }
 > = {
   trial: {
     schedule: 30 * 60_000,
@@ -79,6 +107,10 @@ export const SPORTRADAR_TTLS: Record<
     hierarchy: 24 * 3_600_000,
     roster: 24 * 3_600_000,
     injuries: 6 * 3_600_000,
+    // Pbp is only fetched for live/just-finished games on a bounded per-tick
+    // rotation (task 041); the TTL stops one tick double-fetching a game.
+    pbp: 5 * 60_000,
+    standings: 6 * 3_600_000,
   },
   production: {
     schedule: 60_000,
@@ -86,6 +118,8 @@ export const SPORTRADAR_TTLS: Record<
     hierarchy: 4 * 3_600_000,
     roster: 3_600_000,
     injuries: 15 * 60_000,
+    pbp: 15_000,
+    standings: 3_600_000,
   },
 };
 
@@ -439,6 +473,222 @@ export function parseSportradarInjuries(
   return out;
 }
 
+/**
+ * Play-by-play payload → plays (task 041).
+ *
+ * Shape (nfl-play-by-play, header citation): root `periods[]`, each period
+ * `{number, sequence, pbp[]}`; `pbp` entries are drive objects carrying an
+ * `events[]` array, and (defensively) a `pbp` entry that is itself an event
+ * object of `type: "play"` is accepted too. Only entries whose `type` is
+ * `"play"` with a numeric `sequence` become rows — anything else (comments,
+ * timeouts typed differently, malformed entries) is skipped, never guessed.
+ *
+ * `sequence` is the provider's ordering number (epoch-ms scale — see the
+ * header); possession comes from `start_situation.possession.alias` (the
+ * offense running the play), and `end_situation.possession.alias` rides the
+ * detail jsonb as `possessionAfter` for live-state derivation.
+ */
+export function parseSportradarPlays(payload: unknown, league: LeagueSlug): ProviderPlay[] {
+  const root = asRecord(payload);
+  const periods = root?.["periods"];
+  if (!Array.isArray(periods)) throw new ProviderShapeError("payload has no periods array");
+
+  const out: ProviderPlay[] = [];
+  for (const periodRaw of periods) {
+    const periodRec = asRecord(periodRaw);
+    const periodNumber = asNumber(periodRec?.["number"]) ?? asNumber(periodRec?.["sequence"]);
+    const pbp = periodRec?.["pbp"];
+    if (!Array.isArray(pbp)) continue;
+
+    const eventObjects: Record<string, unknown>[] = [];
+    for (const entryRaw of pbp) {
+      const entry = asRecord(entryRaw);
+      if (!entry) continue;
+      const driveEvents = entry["events"];
+      if (Array.isArray(driveEvents)) {
+        for (const evRaw of driveEvents) {
+          const ev = asRecord(evRaw);
+          if (ev) eventObjects.push(ev);
+        }
+      } else if (entry["type"] === "play") {
+        eventObjects.push(entry);
+      }
+    }
+
+    for (const ev of eventObjects) {
+      if (ev["type"] !== "play") continue;
+      const sequence = asNumber(ev["sequence"]);
+      if (sequence === undefined) continue; // no cursor — skip, never guess
+      const clock = asString(ev["clock"]);
+      const playType = asString(ev["play_type"]);
+      const description = asString(ev["description"]);
+      const homeScore = asNumber(ev["home_points"]);
+      const awayScore = asNumber(ev["away_points"]);
+      const scoringPlay = ev["scoring_play"] === true;
+
+      const startPossession = asRecord(asRecord(ev["start_situation"])?.["possession"]);
+      const endPossession = asRecord(asRecord(ev["end_situation"])?.["possession"]);
+      const startAlias = asString(startPossession?.["alias"]);
+      const endAlias = asString(endPossession?.["alias"]);
+      const wallClock = asString(ev["wall_clock"]);
+
+      const detail: Record<string, unknown> = {
+        ...(endAlias ? { possessionAfter: teamKey(league, endAlias) } : {}),
+        ...(wallClock ? { wallClock } : {}),
+      };
+
+      out.push({
+        sequence,
+        ...(periodNumber !== undefined ? { period: periodNumber } : {}),
+        ...(clock ? { clock } : {}),
+        ...(playType ? { playType } : {}),
+        ...(description ? { description } : {}),
+        ...(startAlias ? { teamKey: teamKey(league, startAlias) } : {}),
+        scoringPlay,
+        ...(homeScore !== undefined ? { homeScore } : {}),
+        ...(awayScore !== undefined ? { awayScore } : {}),
+        ...(Object.keys(detail).length > 0 ? { detail } : {}),
+      });
+    }
+  }
+  return out;
+}
+
+/** Season type per the schedule/standings references: PRE | REG | PST. */
+function mapSeasonType(raw: unknown): "regular" | "preseason" | "postseason" | null {
+  if (typeof raw !== "string") return null;
+  switch (raw.toUpperCase()) {
+    case "REG":
+      return "regular";
+    case "PRE":
+      return "preseason";
+    case "PST":
+      return "postseason";
+    default:
+      return null; // unrecognised season type — skip the feed, never guess
+  }
+}
+
+/** "5-2" / "5-2-1" from documented numeric wins/losses/ties. */
+function recordString(wins: number, losses: number, ties: number): string {
+  return ties > 0 ? `${String(wins)}-${String(losses)}-${String(ties)}` : `${String(wins)}-${String(losses)}`;
+}
+
+/**
+ * Postgame-standings payload → standings lines (task 041).
+ *
+ * Shape (nfl-postgame-standings, header citation): root `{season{year,type},
+ * conferences[]}`; `conferences[].divisions[].teams[]` with `wins/losses/
+ * ties/win_pct/points_for/points_against`, `rank{division, conference}`,
+ * `streak{type, length, desc}`, and a `records[]` array of categorised
+ * splits (`home`, `road`, `division`, `conference`, …).
+ *
+ * The typed columns take the documented top-level fields; every categorised
+ * split plus `win_pct` lands as a flat numeric map in `stats` (the S-007
+ * aggregate jsonb, read by `teamSeasonStats`).
+ */
+export function parseSportradarStandings(
+  payload: unknown,
+  league: LeagueSlug,
+): ProviderTeamStanding[] {
+  const root = asRecord(payload);
+  const seasonRec = asRecord(root?.["season"]);
+  const year = asNumber(seasonRec?.["year"]);
+  const seasonType = mapSeasonType(seasonRec?.["type"]);
+  const conferences = root?.["conferences"];
+  if (year === undefined || seasonType === null || !Array.isArray(conferences)) {
+    throw new ProviderShapeError("standings payload has no season/conferences");
+  }
+
+  const out: ProviderTeamStanding[] = [];
+  for (const confRaw of conferences) {
+    const divisions = asRecord(confRaw)?.["divisions"];
+    if (!Array.isArray(divisions)) continue;
+    for (const divRaw of divisions) {
+      const teams = asRecord(divRaw)?.["teams"];
+      if (!Array.isArray(teams)) continue;
+      for (const teamRaw of teams) {
+        const rec = asRecord(teamRaw);
+        const providerTeamId = asString(rec?.["id"]);
+        const alias = asString(rec?.["alias"]);
+        const wins = asNumber(rec?.["wins"]);
+        const losses = asNumber(rec?.["losses"]);
+        if (!rec || !providerTeamId || !alias || wins === undefined || losses === undefined) {
+          continue; // skip the one bad team; keep the table
+        }
+        const ties = asNumber(rec["ties"]) ?? 0;
+        const winPct = asNumber(rec["win_pct"]);
+        const pointsFor = asNumber(rec["points_for"]);
+        const pointsAgainst = asNumber(rec["points_against"]);
+
+        const rank = asRecord(rec["rank"]);
+        const divisionRank = asNumber(rank?.["division"]);
+        const conferenceRank = asNumber(rank?.["conference"]);
+
+        // Streak: compose from the documented numeric fields; `desc` is used
+        // only when it already matches the "W3" notation the column models.
+        const streakRec = asRecord(rec["streak"]);
+        const streakDesc = asString(streakRec?.["desc"]);
+        const streakType = asString(streakRec?.["type"]);
+        const streakLength = asNumber(streakRec?.["length"]);
+        let streak: string | undefined;
+        if (streakDesc && /^[WLT]\d{1,3}$/.test(streakDesc)) streak = streakDesc;
+        else if (streakType && streakLength !== undefined) {
+          const letter = { win: "W", loss: "L", tie: "T" }[streakType.toLowerCase()];
+          if (letter) streak = `${letter}${String(streakLength)}`;
+        }
+
+        // Categorised splits → home/away record strings + flat stats map.
+        const stats: Record<string, number> = {
+          ...(winPct !== undefined ? { win_pct: winPct } : {}),
+        };
+        let homeRecord: string | undefined;
+        let awayRecord: string | undefined;
+        const records = rec["records"];
+        if (Array.isArray(records)) {
+          for (const splitRaw of records) {
+            const split = asRecord(splitRaw);
+            const category = asString(split?.["category"]);
+            if (!split || !category || !/^[a-z_]{1,24}$/.test(category)) continue;
+            const w = asNumber(split["wins"]);
+            const l = asNumber(split["losses"]);
+            const t = asNumber(split["ties"]) ?? 0;
+            if (w !== undefined) stats[`${category}_wins`] = w;
+            if (l !== undefined) stats[`${category}_losses`] = l;
+            if (t > 0 || asNumber(split["ties"]) !== undefined) stats[`${category}_ties`] = t;
+            const p = asNumber(split["win_pct"]);
+            if (p !== undefined) stats[`${category}_win_pct`] = p;
+            if (w !== undefined && l !== undefined) {
+              // Sportradar's away split is documented as category "road".
+              if (category === "home") homeRecord = recordString(w, l, t);
+              if (category === "road") awayRecord = recordString(w, l, t);
+            }
+          }
+        }
+
+        out.push({
+          providerTeamId,
+          teamKey: teamKey(league, alias),
+          season: String(year),
+          seasonType,
+          wins,
+          losses,
+          ties,
+          ...(divisionRank !== undefined ? { divisionRank } : {}),
+          ...(conferenceRank !== undefined ? { conferenceRank } : {}),
+          ...(pointsFor !== undefined ? { pointsFor } : {}),
+          ...(pointsAgainst !== undefined ? { pointsAgainst } : {}),
+          ...(streak ? { streak } : {}),
+          ...(homeRecord ? { homeRecord } : {}),
+          ...(awayRecord ? { awayRecord } : {}),
+          stats,
+        });
+      }
+    }
+  }
+  return out;
+}
+
 // ─── Polite transport ───────────────────────────────────────────────────────
 
 /**
@@ -621,6 +871,55 @@ export class SportradarProvider implements SportsDataProvider {
       provider: this.name,
       league,
       items: parseSportradarInjuries(res.value, league),
+      delayed: sched.delayed || res.delayed,
+      fetchedAt: res.fetchedAt,
+    };
+  }
+
+  /** Play-by-play for one game (task 041).
+   *  Path: /games/{game_id}/pbp.json (nfl-play-by-play). Quota rule: called
+   *  only by the ingest worker's bounded live/just-finished rotation. */
+  async getPlayByPlay(
+    league: LeagueSlug,
+    providerEventId: string,
+  ): Promise<ProviderFeed<ProviderPlay>> {
+    this.assertLeague(league);
+    const res = await this.http.get<unknown>(
+      `sportradar:pbp:${league}:${providerEventId}`,
+      `${this.prefix}/games/${encodeURIComponent(providerEventId)}/pbp.json`,
+      this.ttl.pbp,
+    );
+    return {
+      provider: this.name,
+      league,
+      items: parseSportradarPlays(res.value, league),
+      delayed: res.delayed,
+      fetchedAt: res.fetchedAt,
+    };
+  }
+
+  /** Season standings (task 041). Two-step like injuries: the current-week
+   *  schedule names {year}/{type} (provider-cached, so usually free), then
+   *  /seasons/{year}/{type}/standings/season.json (nfl-postgame-standings). */
+  async getStandings(league: LeagueSlug): Promise<ProviderFeed<ProviderTeamStanding>> {
+    this.assertLeague(league);
+    const sched = await this.http.get<unknown>(
+      `sportradar:slate:${league}`,
+      `${this.prefix}/games/current_week/schedule.json`,
+      this.ttl.schedule,
+    );
+    const pointer = parseSeasonPointer(sched.value);
+    if (!pointer) throw new ProviderShapeError("schedule payload names no season");
+
+    const res = await this.http.get<unknown>(
+      `sportradar:standings:${league}:${String(pointer.year)}:${pointer.type}`,
+      `${this.prefix}/seasons/${String(pointer.year)}/${pointer.type}/standings/season.json`,
+      this.ttl.standings,
+    );
+    return {
+      provider: this.name,
+      league,
+      items: parseSportradarStandings(res.value, league),
       delayed: sched.delayed || res.delayed,
       fetchedAt: res.fetchedAt,
     };

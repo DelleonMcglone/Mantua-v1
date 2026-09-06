@@ -34,14 +34,17 @@ import { and, desc, eq, gte, isNull, or } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import {
   events,
+  gamePlays,
   injuries,
   leagues,
   marketFills,
   marketPrices,
   markets,
   players,
+  teamRecords,
   teams,
 } from "../../db/schema/index.ts";
+import { playerSeasonStats, teamSeasonStats, type StatMap } from "./history.ts";
 import { sanitizeProviderString } from "./public-slate.ts";
 
 // ─── Row shapes (the columns this suite reads) ──────────────────────────────
@@ -123,6 +126,39 @@ export interface MarketFillRow {
   createdAt: Date;
 }
 
+/** One ingested play (task 041 — `game_plays`). */
+export interface GamePlayRow {
+  sequence: number;
+  period: number | null;
+  clock: string | null;
+  playType: string | null;
+  description: string | null;
+  teamKey: string | null;
+  scoringPlay: boolean;
+  homeScore: number | null;
+  awayScore: number | null;
+  detail: unknown;
+}
+
+/** One standings snapshot line (task 041 — `team_records`). */
+export interface TeamRecordRow {
+  teamId: string;
+  season: string;
+  seasonType: string;
+  wins: number;
+  losses: number;
+  ties: number;
+  divisionRank: number | null;
+  conferenceRank: number | null;
+  pointsFor: number | null;
+  pointsAgainst: number | null;
+  streak: string | null;
+  homeRecord: string | null;
+  awayRecord: string | null;
+  stats: unknown;
+  updatedAt: Date;
+}
+
 /**
  * The narrow read seam over the canonical DB. Each method is a thin, dumb
  * fetch — windowing, matching, aggregation, and the honesty envelope all
@@ -145,6 +181,13 @@ export interface SportsToolsDb {
   /** Price captures, newest first. */
   listMarketPrices(marketId: string, limit: number): Promise<MarketPriceRow[]>;
   listMarketFillsSince(marketId: string, since: Date): Promise<MarketFillRow[]>;
+  // ── task 041: the 038 tables, now ingested ──
+  /** Ingested plays for one game, newest first (desc sequence). */
+  listPlaysForEvent(eventId: string, limit: number): Promise<GamePlayRow[]>;
+  listTeamRecordsForTeam(teamId: string): Promise<TeamRecordRow[]>;
+  listTeamRecordsForLeague(leagueId: string): Promise<TeamRecordRow[]>;
+  /** The `players.season_stats` jsonb for one player (null when unset). */
+  getPlayerSeasonStats(playerId: string): Promise<unknown>;
 }
 
 /** Production implementation over the drizzle client. */
@@ -183,6 +226,23 @@ export function makeSportsToolsDb(db: DB): SportsToolsDb {
     state: markets.state,
     poolId: markets.poolId,
     openingProbability: markets.openingProbability,
+  };
+  const teamRecordCols = {
+    teamId: teamRecords.teamId,
+    season: teamRecords.season,
+    seasonType: teamRecords.seasonType,
+    wins: teamRecords.wins,
+    losses: teamRecords.losses,
+    ties: teamRecords.ties,
+    divisionRank: teamRecords.divisionRank,
+    conferenceRank: teamRecords.conferenceRank,
+    pointsFor: teamRecords.pointsFor,
+    pointsAgainst: teamRecords.pointsAgainst,
+    streak: teamRecords.streak,
+    homeRecord: teamRecords.homeRecord,
+    awayRecord: teamRecords.awayRecord,
+    stats: teamRecords.stats,
+    updatedAt: teamRecords.updatedAt,
   };
   return {
     async listLeagues() {
@@ -308,6 +368,48 @@ export function makeSportsToolsDb(db: DB): SportsToolsDb {
         .where(and(eq(marketFills.marketId, marketId), gte(marketFills.createdAt, since)))
         .orderBy(desc(marketFills.createdAt));
     },
+    async listPlaysForEvent(eventId, limit) {
+      return db
+        .select({
+          sequence: gamePlays.sequence,
+          period: gamePlays.period,
+          clock: gamePlays.clock,
+          playType: gamePlays.playType,
+          description: gamePlays.description,
+          teamKey: gamePlays.teamKey,
+          scoringPlay: gamePlays.scoringPlay,
+          homeScore: gamePlays.homeScore,
+          awayScore: gamePlays.awayScore,
+          detail: gamePlays.detail,
+        })
+        .from(gamePlays)
+        .where(eq(gamePlays.eventId, eventId))
+        .orderBy(desc(gamePlays.sequence))
+        .limit(limit);
+    },
+    async listTeamRecordsForTeam(teamId) {
+      return db
+        .select(teamRecordCols)
+        .from(teamRecords)
+        .where(eq(teamRecords.teamId, teamId))
+        .orderBy(desc(teamRecords.season));
+    },
+    async listTeamRecordsForLeague(leagueId) {
+      return db
+        .select(teamRecordCols)
+        .from(teamRecords)
+        .innerJoin(teams, eq(teamRecords.teamId, teams.id))
+        .where(eq(teams.leagueId, leagueId))
+        .orderBy(desc(teamRecords.season));
+    },
+    async getPlayerSeasonStats(playerId) {
+      const rows = await db
+        .select({ seasonStats: players.seasonStats })
+        .from(players)
+        .where(eq(players.id, playerId))
+        .limit(1);
+      return rows.at(0)?.seasonStats ?? null;
+    },
   };
 }
 
@@ -345,7 +447,12 @@ const gameRefInput = z
 const teamInput = z.object({ team: nameQuery, league: leagueQuery }).strict();
 
 const playerStatsInput = z
-  .object({ player: nameQuery, team: nameQuery.optional(), league: leagueQuery })
+  .object({
+    player: nameQuery,
+    team: nameQuery.optional(),
+    league: leagueQuery,
+    season: z.string().min(1).max(16).optional(),
+  })
   .strict();
 
 const injuryInput = z
@@ -632,6 +739,46 @@ function isFinal(e: EventRow): boolean {
   return e.status === "final" && e.homeScore !== null && e.awayScore !== null;
 }
 
+// ─── team_records helpers (task 041) ────────────────────────────────────────
+
+/** Typed stat aggregates off a record row's jsonb (history.ts reader). */
+function recordStats(row: TeamRecordRow): StatMap | null {
+  return teamSeasonStats(row.stats);
+}
+
+/**
+ * The snapshot a "current record/standings" question means: the latest
+ * season on file, preferring the regular-season snapshot when several
+ * season types exist for it.
+ */
+function pickLatestSeason(rows: readonly TeamRecordRow[]): { season: string; seasonType: string } | null {
+  if (rows.length === 0) return null;
+  const season = rows.reduce((max, r) => (r.season > max ? r.season : max), rows[0].season);
+  const ofSeason = rows.filter((r) => r.season === season);
+  const seasonType = ofSeason.some((r) => r.seasonType === "regular")
+    ? "regular"
+    : ofSeason[0].seasonType;
+  return { season, seasonType };
+}
+
+function publicTeamRecord(row: TeamRecordRow): Record<string, unknown> {
+  return {
+    season: clean(row.season),
+    seasonType: clean(row.seasonType),
+    wins: row.wins,
+    losses: row.losses,
+    ties: row.ties,
+    divisionRank: row.divisionRank,
+    conferenceRank: row.conferenceRank,
+    pointsFor: row.pointsFor,
+    pointsAgainst: row.pointsAgainst,
+    streak: row.streak === null ? null : clean(row.streak),
+    homeRecord: row.homeRecord === null ? null : clean(row.homeRecord),
+    awayRecord: row.awayRecord === null ? null : clean(row.awayRecord),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
 // ─── S-011 get_game ─────────────────────────────────────────────────────────
 
 export async function getGame(
@@ -768,21 +915,42 @@ export async function getLiveGameState(
       game: publicGame(catalog, event),
     };
   }
-  // Honesty rule: the canonical schema stores scores and status for a live
-  // game, but not period/clock/possession — report those absent with the
-  // reason, never invent them.
+  // Task 041: period/clock/possession derive from the latest ingested play
+  // (game_plays), when the pbp pass has reached this game. Fields the play
+  // log cannot support stay null with the reason — never invented.
+  const latestPlay = (await dbx.listPlaysForEvent(event.id, 1)).at(0);
+  const playDetail =
+    latestPlay && typeof latestPlay.detail === "object" && latestPlay.detail !== null
+      ? (latestPlay.detail as Record<string, unknown>)
+      : {};
+  // The ball after the latest play (`possessionAfter`, from the feed's
+  // end_situation) beats the possession at its start.
+  const possessionRaw =
+    typeof playDetail["possessionAfter"] === "string"
+      ? playDetail["possessionAfter"]
+      : (latestPlay?.teamKey ?? null);
+
+  const period = latestPlay?.period ?? null;
+  const clock = latestPlay?.clock ?? null;
+  const possession = possessionRaw === null ? null : clean(possessionRaw);
+
+  const fieldsNotStored: Record<string, string> = {};
+  const missingReason = latestPlay
+    ? "the latest ingested play does not carry this field"
+    : `${NOT_YET_INGESTED} — no plays ingested for this game yet`;
+  if (period === null) fieldsNotStored["period"] = missingReason;
+  if (clock === null) fieldsNotStored["clock"] = missingReason;
+  if (possession === null) fieldsNotStored["possession"] = missingReason;
+
   return {
     status: "ok",
     game: publicGame(catalog, event),
     score: { home: event.homeScore, away: event.awayScore },
-    period: null,
-    clock: null,
-    possession: null,
-    fieldsNotStored: {
-      period: NOT_YET_INGESTED,
-      clock: NOT_YET_INGESTED,
-      possession: NOT_YET_INGESTED,
-    },
+    period,
+    clock: clock === null ? null : clean(clock),
+    possession,
+    ...(latestPlay ? { liveStateSource: "derived from the latest ingested play (game_plays)" } : {}),
+    ...(Object.keys(fieldsNotStored).length > 0 ? { fieldsNotStored } : {}),
   };
 }
 
@@ -794,6 +962,34 @@ export async function getTeamStats(dbx: SportsToolsDb, raw: unknown): Promise<Re
   const resolved = resolveTeamOrFail(catalog, input.team, input.league);
   if (!resolved.ok) return resolved.error;
   const team = resolved.team;
+
+  // Task 041: prefer the ingested standings snapshot (team_records) — the
+  // official record with ranks, streak, splits, and the S-007 stat
+  // aggregates. The derived-from-events record below remains the fallback.
+  const recordRows = await dbx.listTeamRecordsForTeam(team.id);
+  const pick = pickLatestSeason(recordRows);
+  if (pick !== null) {
+    const best = recordRows.find(
+      (r) => r.season === pick.season && r.seasonType === pick.seasonType,
+    );
+    if (best !== undefined) {
+      const detailed = recordStats(best);
+      return {
+        status: "ok",
+        team: teamSummary(catalog, team),
+        record: publicTeamRecord(best),
+        recordSource: "official standings feed (team_records)",
+        detailedStats:
+          detailed !== null
+            ? { status: "ok", source: "team_records.stats", stats: detailed }
+            : {
+                status: "unavailable",
+                reason: `${NOT_YET_INGESTED} — the standings feed carried no stat aggregates for this team`,
+              },
+      };
+    }
+  }
+
   const finals = (await dbx.listEventsForTeam(team, 200)).filter(isFinal);
 
   let record: Record<string, unknown> | null = null;
@@ -826,7 +1022,7 @@ export async function getTeamStats(dbx: SportsToolsDb, raw: unknown): Promise<Re
       : { derivedRecordNote: "derived from finished games in the canonical database" }),
     detailedStats: {
       status: "unavailable",
-      reason: `${NOT_YET_INGESTED} — per-team stat storage lands with the provider wave`,
+      reason: `${NOT_YET_INGESTED} — no standings snapshot for this team in team_records yet`,
     },
   };
 }
@@ -918,13 +1114,35 @@ export async function getPlayerStats(dbx: SportsToolsDb, raw: unknown): Promise<
   const catalog = await loadCatalog(dbx);
   const resolved = await resolvePlayerOrFail(dbx, catalog, input.player, input.team, input.league);
   if (!resolved.ok) return resolved.error;
+
+  // Task 041: serve `players.season_stats` when present. No pinned feed
+  // writes it yet (the Sportradar seasonal-statistics endpoint costs one
+  // call per team and does not fit the trial quota — see the 041 task doc),
+  // so the honest empty answer remains the common case.
+  const seasonJson = await dbx.getPlayerSeasonStats(resolved.player.id);
+  const seasons: Record<string, StatMap> = {};
+  if (typeof seasonJson === "object" && seasonJson !== null && !Array.isArray(seasonJson)) {
+    for (const label of Object.keys(seasonJson)) {
+      if (input.season !== undefined && label !== input.season) continue;
+      const stats = playerSeasonStats(seasonJson, label);
+      if (stats !== null) seasons[clean(label)] = stats;
+    }
+  }
+
+  const seasonLabels = Object.keys(seasons);
   return {
     status: "ok",
     player: publicPlayer(resolved.ctx, resolved.player),
-    stats: {
-      status: "unavailable",
-      reason: `${NOT_YET_INGESTED} — per-player stat storage lands with the provider wave`,
-    },
+    stats:
+      seasonLabels.length > 0
+        ? { status: "ok", source: "players.season_stats", seasons }
+        : {
+            status: "unavailable",
+            reason:
+              input.season !== undefined
+                ? `${NOT_YET_INGESTED} — no season_stats entry for season "${clean(input.season)}" for this player`
+                : `${NOT_YET_INGESTED} — no season stat line stored for this player`,
+          },
   };
 }
 
@@ -1110,6 +1328,48 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
 
   const perLeague = await Promise.all(
     wanted.map(async (league) => {
+      // Task 041: prefer the ingested standings snapshot (team_records) —
+      // official wins/losses/ranks/streaks with `updatedAt` staleness. The
+      // derived-from-finished-events table below stays the fallback.
+      const recordRows = await dbx.listTeamRecordsForLeague(league.id);
+      const pick = pickLatestSeason(recordRows);
+      if (pick !== null) {
+        const snapshot = recordRows.filter(
+          (r) => r.season === pick.season && r.seasonType === pick.seasonType,
+        );
+        const teamsById = new Map(catalog.teams.map((t) => [t.id, t]));
+        const nameOf = (r: TeamRecordRow): string => {
+          const t = teamsById.get(r.teamId);
+          return t ? t.name : "";
+        };
+        const rows = [...snapshot]
+          .sort(
+            (x, y) =>
+              (x.divisionRank ?? Number.MAX_SAFE_INTEGER) -
+                (y.divisionRank ?? Number.MAX_SAFE_INTEGER) ||
+              y.wins - x.wins ||
+              nameOf(x).localeCompare(nameOf(y)),
+          )
+          .map((r) => {
+            const t = teamsById.get(r.teamId);
+            return {
+              team: t ? clean(t.name) : null,
+              key: t ? clean(t.key) : null,
+              ...publicTeamRecord(r),
+            };
+          });
+        let asOf = 0;
+        for (const r of snapshot) asOf = Math.max(asOf, r.updatedAt.getTime());
+        return {
+          league: clean(league.slug),
+          source: "team_records" as const,
+          season: clean(pick.season),
+          seasonType: clean(pick.seasonType),
+          asOf: new Date(asOf).toISOString(),
+          standings: rows,
+        };
+      }
+
       const finals = (await dbx.listEventsForLeague(league.id, 1000)).filter(isFinal);
       const table = new Map<
         string,
@@ -1148,7 +1408,7 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
           return { ...r, winPct: games === 0 ? 0 : Number(((r.wins + r.ties / 2) / games).toFixed(3)) };
         })
         .sort((x, y) => y.winPct - x.winPct || y.wins - x.wins || x.team.localeCompare(y.team));
-      return { league: clean(league.slug), standings: rows };
+      return { league: clean(league.slug), source: "derived" as const, standings: rows };
     }),
   );
 
@@ -1156,39 +1416,102 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
   if (nonEmpty.length === 0) {
     return {
       status: "unavailable",
-      reason: `${NOT_YET_INGESTED} — no finished games recorded, so standings cannot be derived yet`,
+      reason: `${NOT_YET_INGESTED} — no standings snapshot and no finished games to derive one from`,
     };
   }
+  const anyDerived = perLeague.some((l) => l.source === "derived" && l.standings.length > 0);
+  const anyOfficial = perLeague.some((l) => l.source === "team_records");
   return {
     status: "ok",
     leagues: perLeague,
-    note: "standings derived from finished games in the canonical database — an official standings feed is not ingested",
+    note: [
+      ...(anyOfficial
+        ? ['leagues marked source "team_records" serve the ingested official standings snapshot (asOf = its last refresh)']
+        : []),
+      ...(anyDerived
+        ? ['leagues marked source "derived" are aggregated from finished games — no official snapshot ingested for them yet']
+        : []),
+    ].join("; "),
   };
 }
 
 // ─── S-019 get_play_by_play ─────────────────────────────────────────────────
 
+const playByPlayInput = z
+  .object({
+    team: nameQuery.optional(),
+    league: leagueQuery,
+    providerEventId: providerEventIdSchema.optional(),
+    limit: z.number().int().min(1).max(100).optional(),
+  })
+  .strict();
+
 export async function getPlayByPlay(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
-  const input = parseInput(gameRefInput, raw, "get_play_by_play");
-  // Echo the game when it resolves so the agent learns whether the game
-  // itself exists — but the plays never exist on this branch's schema.
-  let game: Record<string, unknown> | null = null;
+  const input = parseInput(playByPlayInput, raw, "get_play_by_play");
+  if (input.team === undefined && input.providerEventId === undefined) {
+    throw new Error("get_play_by_play: provide `team` or `providerEventId`");
+  }
+  const catalog = await loadCatalog(dbx);
+
+  // Resolve the game: exact id wins; a team query prefers the live game,
+  // then the most recent game that has actually started (a scheduled game
+  // cannot have plays), then whatever is newest.
+  let event: EventRow | null;
   if (input.providerEventId !== undefined) {
-    const catalog = await loadCatalog(dbx);
-    const event = await dbx.getEventByProviderEventId(input.providerEventId);
-    if (event) game = publicGame(catalog, event);
-  } else if (input.team !== undefined) {
-    const catalog = await loadCatalog(dbx);
-    const resolved = resolveTeamOrFail(catalog, input.team, input.league);
+    event = await dbx.getEventByProviderEventId(input.providerEventId);
+    if (!event) {
+      if (!(await dbx.hasAnyEvents())) {
+        return { status: "unavailable", reason: `${NOT_YET_INGESTED} — no events in the canonical database yet` };
+      }
+      return { status: "not_found", note: `No event with providerEventId ${clean(input.providerEventId)}.` };
+    }
+  } else {
+    const resolved = resolveTeamOrFail(catalog, input.team ?? "", input.league);
     if (!resolved.ok) return resolved.error;
-    const latest = (await dbx.listEventsForTeam(resolved.team, 1)).at(0);
-    if (latest) game = publicGame(catalog, latest);
+    const teamEvents = await dbx.listEventsForTeam(resolved.team, 50);
+    event =
+      teamEvents.find((e) => e.status === "in_progress") ??
+      teamEvents.find((e) => e.status === "final") ??
+      teamEvents.at(0) ??
+      null;
+    if (!event) {
+      return {
+        status: "not_found",
+        note: `No games recorded for ${clean(resolved.team.name)}.`,
+        team: teamSummary(catalog, resolved.team),
+      };
+    }
+  }
+
+  // Task 041: the plays come from the ingested `game_plays` log. Empty is a
+  // structured unavailable — the pbp pass only covers live and just-finished
+  // games, so a scheduled or long-past game honestly has no stored plays.
+  const limit = input.limit ?? 40;
+  const plays = await dbx.listPlaysForEvent(event.id, limit);
+  if (plays.length === 0) {
+    return {
+      status: "unavailable",
+      reason: `${NOT_YET_INGESTED} — no plays stored for this game (play-by-play ingestion covers live and just-finished games)`,
+      plays: null,
+      game: publicGame(catalog, event),
+    };
   }
   return {
-    status: "unavailable",
-    reason: `${NOT_YET_INGESTED} — play-by-play has no storage in the canonical database on this branch`,
-    plays: null,
-    ...(game !== null ? { game } : {}),
+    status: "ok",
+    game: publicGame(catalog, event),
+    order: "newest first",
+    count: plays.length,
+    plays: plays.map((p) => ({
+      sequence: p.sequence,
+      period: p.period,
+      clock: p.clock === null ? null : clean(p.clock),
+      playType: p.playType === null ? null : clean(p.playType),
+      description: p.description === null ? null : clean(p.description),
+      team: p.teamKey === null ? null : clean(p.teamKey),
+      scoringPlay: p.scoringPlay,
+      homeScore: p.homeScore,
+      awayScore: p.awayScore,
+    })),
   };
 }
 

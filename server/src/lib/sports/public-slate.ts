@@ -115,21 +115,52 @@ export function toPublicSlate(slate: ProviderSlate): PublicSlate {
 }
 
 /**
- * S-003 outage path: the canonical `events` rows as a public slate. Served
- * only when the live provider is unreachable AND the cache has nothing —
- * always `delayed: true`, always with `dataAsOf`, so no consumer can mistake
- * last-good data for live data. Fields the canonical row does not keep
- * (logos, records, odds) are simply absent; the board renders without them.
+ * How fresh a canonical ingest must be to count as live rather than
+ * `delayed` (task 041). Live scores move minute-to-minute; anything the
+ * ingest workers last touched more than this long ago is honestly labeled
+ * delayed, with `dataAsOf` saying exactly how old it is.
  */
-export function canonicalToPublicSlate(league: string, canonical: CanonicalSlate): PublicSlate {
-  const now = Date.now();
+export const CANONICAL_FRESH_MS = 5 * 60_000;
+
+/**
+ * The canonical `events` rows as a public slate.
+ *
+ * Task 041 made this the board's PRIMARY read (provider → ingest →
+ * canonical DB → UI), not just the S-003 outage fallback. With `opts`,
+ * `delayed` is computed from ingest freshness: fresh canonical data is not
+ * delayed; stale (or never-ingested) data is, and `dataAsOf` is always
+ * surfaced so the UI can say how old. Without `opts` the original outage
+ * semantics hold — always `delayed: true`.
+ *
+ * Fields the canonical row does not keep (logos, provider record strings)
+ * are simply absent; the board renders without them. The home-market
+ * opening line (when a market was minted) fills `homeWinProbabilityBps`
+ * until `withLiveOdds` overlays the live pool price.
+ */
+export function canonicalToPublicSlate(
+  league: string,
+  canonical: CanonicalSlate,
+  opts?: { now?: number; freshMs?: number },
+): PublicSlate {
+  const now = opts?.now ?? Date.now();
+  const freshMs = opts?.freshMs ?? CANONICAL_FRESH_MS;
+  const delayed =
+    opts === undefined || canonical.dataAsOf === null || now - canonical.dataAsOf > freshMs;
   return {
     league,
     provider: "canonical",
-    delayed: true,
-    fetchedAt: now,
+    delayed,
+    // `fetchedAt` is when this data was last fetched from a provider — the
+    // ingest time, not the DB-read time. Stable across reads of the same
+    // ingest, which also lets `withLiveOdds` reuse its per-league cache.
+    fetchedAt: canonical.dataAsOf ?? now,
     ...(canonical.dataAsOf !== null ? { dataAsOf: canonical.dataAsOf } : {}),
     events: canonical.events.map((row) => {
+      const opening = row.homeOpeningProbability === null ? NaN : Number(row.homeOpeningProbability);
+      const openingBps =
+        Number.isFinite(opening) && opening > 0 && opening < 1
+          ? Math.round(opening * 10_000)
+          : undefined;
       // The provider-agnostic key is "league:ABBR" (provider.ts teamKey);
       // the suffix recovers the abbreviation for display.
       const homeAbbr = row.homeTeamKey?.split(":").at(1) ?? "";
@@ -150,6 +181,7 @@ export function canonicalToPublicSlate(league: string, canonical: CanonicalSlate
         },
         ...(row.homeScore !== null ? { homeScore: row.homeScore } : {}),
         ...(row.awayScore !== null ? { awayScore: row.awayScore } : {}),
+        ...(openingBps !== undefined ? { homeWinProbabilityBps: openingBps } : {}),
       };
     }),
   };

@@ -56,32 +56,37 @@ per 030's rule they are absent from `MUTATING_TOOL_ACTIONS`, so they write
 | S-015 | `getPlayerInjuryStatus` | `injuries` (open rows, `resolved_at` null) + `players` | `get_player_injury_status` |
 | S-016 | `getRecentGames` | finished `events` per team, limit N | `get_recent_games` |
 | S-017 | `getHeadToHead` | finished `events` between two teams | `get_head_to_head` |
-| S-018 | `getStandings` | aggregated from finished `events` (no record table exists) | `get_standings` |
-| S-019 | `getPlayByPlay` | none — no storage on this branch | `get_play_by_play` |
+| S-018 | `getStandings` | `team_records` snapshot (041), fallback: aggregated from finished `events` | `get_standings` |
+| S-019 | `getPlayByPlay` | `game_plays` (041 ingestion) | `get_play_by_play` |
 | S-020 | `getMarketPrice` | `markets` + latest `market_prices` row | `get_market_price` |
 | S-020 | `getMarketHistory` | `market_prices` series | `get_market_history` |
 | S-020 | `getMarketVolume` | `market_fills` aggregates over a window | `get_market_volume` |
 | S-020 | `getMarketLiquidity` | `markets.pool_id` + latest `market_prices.liquidity_raw` capture | `get_market_liquidity` |
 | S-021 | composition test | (all of the above) | — |
 
-## `unavailable` until the provider wave lands
+## `unavailable` until the provider wave lands — mostly closed by task 041
 
-The provider-ingestion wave runs in parallel; where a stat has no storage
-on this branch's base, the tool returns a structured `unavailable` with
-reason `"not yet ingested"` rather than failing:
+Task 041 (`041-ingestion-tools-wiring.md`) wired the ingestion these
+notes were waiting on. Current state:
 
-- **`get_play_by_play`** — always `unavailable` (no play-by-play storage
-  exists); it still echoes the game when it resolves.
-- **`get_live_game_state`** — score/status are served; `period`, `clock`,
-  `possession` are returned `null` with a `fieldsNotStored` reason (the
-  schema does not store them).
-- **`get_team_stats`** — identity + a W/L/points record *derived from
-  finished games* is served; `detailedStats` is `unavailable`.
-- **`get_player_stats`** — identity (position, jersey, roster status,
-  team) is served; the stat line itself is `unavailable`.
-- **`get_standings`** — derived from finished events (wins/losses are
-  computable); the result notes that no official standings feed is
-  ingested. `unavailable` only while zero finished games exist.
+- **`get_play_by_play`** — ✅ serves ingested `game_plays` rows (newest
+  first, with running scores); `unavailable` only when the game genuinely
+  has no stored plays (ingestion covers live + just-finished games).
+- **`get_live_game_state`** — ✅ `period`/`clock`/`possession` derive from
+  the latest ingested play (possession = the feed's end-of-play
+  possession); fields the play log can't support stay `null` with the
+  reason.
+- **`get_team_stats`** — ✅ prefers the official `team_records` snapshot
+  (record, ranks, streak, splits + `detailedStats` from the `stats`
+  jsonb); the derived-from-events record remains the fallback.
+- **`get_player_stats`** — identity served; the stat line reads
+  `players.season_stats` when present, but ❌ no feed writes that column
+  yet (trial-quota economics — see 041), so `unavailable` stays the
+  common honest answer.
+- **`get_standings`** — ✅ prefers the official `team_records` snapshot
+  (source: `team_records`, with an `asOf` staleness stamp); derived from
+  finished events (source: `derived`) as the fallback. `unavailable` only
+  when neither exists.
 - **`get_player_injury_status`** — when the whole `injuries` table is
   empty, an empty answer carries a note that the feed is not yet ingested
   and absence is **not** evidence of health (vs the found-player,
