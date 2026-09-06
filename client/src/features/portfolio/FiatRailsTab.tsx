@@ -1,11 +1,47 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePlaidLink } from "react-plaid-link";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { fiatStatusClass, fiatStatusLabel } from "./fiat-status.ts";
 import { useFiatRails } from "./use-fiat-rails.ts";
 
 function dollar(value: string): string {
   const n = Number(value);
   return Number.isFinite(n) ? `$${n.toFixed(2)}` : "$0.00";
+}
+
+/**
+ * F-002 — real Plaid Link launcher. Mounted only once a link token exists;
+ * opens Link as soon as the SDK is ready. Only the short-lived public token
+ * from `onSuccess` ever reaches our code — bank credentials stay inside
+ * Plaid's iframe, and the server-side exchange keeps the access token off
+ * the browser entirely (D-101).
+ */
+function PlaidLinkLauncher(props: {
+  token: string;
+  onSuccess: (publicToken: string) => void;
+  onExit: () => void;
+}) {
+  const { open, ready } = usePlaidLink({
+    token: props.token,
+    onSuccess: (publicToken) => {
+      // The SDK types the token as nullable for OAuth edge cases; without a
+      // token there is nothing to exchange — treat it as an exit.
+      if (publicToken) props.onSuccess(publicToken);
+      else props.onExit();
+    },
+    onExit: () => {
+      props.onExit();
+    },
+  });
+  useEffect(() => {
+    if (ready) open();
+  }, [ready, open]);
+  return (
+    <p role="status" className="text-[12px] text-text-dim">
+      Opening your secure bank connection…
+    </p>
+  );
 }
 
 /** Deposit → trade → withdraw. The detailed Plaid, Zero Hash, Circle and Base
@@ -40,21 +76,36 @@ export function FiatRailsTab() {
         </div>
       )}
 
-      {enabled && !rails.data?.bankLinked && (
+      {enabled && !rails.data?.bankLinked && !rails.linkToken && (
         <Button
           variant="primary"
           size="md"
           disabled={rails.working}
           onClick={() => {
-            void rails.linkBank();
+            // Real Plaid Link when the server offers it; deterministic
+            // sandbox link otherwise. Same button, same product words.
+            if (rails.data?.plaidReady) void rails.startPlaidLink();
+            else void rails.linkBank();
           }}
         >
           {rails.working ? "Connecting…" : "Connect bank account"}
         </Button>
       )}
+      {rails.linkToken && (
+        <PlaidLinkLauncher
+          token={rails.linkToken}
+          onSuccess={(publicToken) => {
+            void rails.completePlaidLink(publicToken);
+          }}
+          onExit={rails.cancelPlaidLink}
+        />
+      )}
 
       {enabled && rails.data?.bankLinked && (
         <>
+          {rails.data.bankLabel && (
+            <p className="text-[12px] text-text-dim">Connected to {rails.data.bankLabel}.</p>
+          )}
           <div className="flex gap-2">
             <Input
               aria-label="Dollar amount"
@@ -126,20 +177,8 @@ export function FiatRailsTab() {
                   </button>
                 )}
               </div>
-              <span
-                className={
-                  transfer.status === "complete"
-                    ? "text-green"
-                    : transfer.status === "failed"
-                      ? "text-red"
-                      : "text-amber"
-                }
-              >
-                {transfer.status === "complete"
-                  ? "Complete"
-                  : transfer.status === "failed"
-                    ? "Needs attention"
-                    : "Pending"}
+              <span className={fiatStatusClass(transfer.status)}>
+                {fiatStatusLabel(transfer.status)}
               </span>
             </div>
           ))}

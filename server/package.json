@@ -15,6 +15,7 @@
     "circle:preflight": "tsx --env-file-if-exists=.env src/scripts/circle-preflight.ts",
     "circle:id-smoke": "tsx --env-file-if-exists=.env src/scripts/circle-id-smoke.ts",
     "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
+    "fiat:e2e": "tsx --env-file-if-exists=.env src/scripts/fiat-e2e.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -40,6 +41,7 @@
     "pg": "8.20.0",
     "pino": "10.3.1",
     "pino-http": "11.0.0",
+    "plaid": "47.0.0",
     "serverless-http": "^4.0.0",
     "viem": "2.48.4",
     "zod": "4.3.6"

@@ -24,6 +24,7 @@ import { cronStrategiesRouter } from "./routes/cron-strategies.ts";
 import { cronResolutionRouter } from "./routes/cron-resolution.ts";
 import { cronIntentsRouter } from "./routes/cron-intents.ts";
 import { circleWebhookRouter } from "./routes/circle-webhook.ts";
+import { fiatWebhookRouter } from "./routes/fiat-webhook.ts";
 import { x402ServiceRouter } from "./routes/x402-service.ts";
 import { agentQueryRouter } from "./routes/agent-query.ts";
 import { agentSendRouter } from "./routes/agent-send.ts";
@@ -63,6 +64,8 @@ app.use(pinoHttp({ logger }));
 // C-015 — Circle webhook finalizer. Mounted BEFORE express.json() so the
 // ECDSA signature is verified over the raw body bytes Circle signed.
 app.use(circleWebhookRouter);
+// F-004 — Zero Hash fiat webhook. Also raw-body mounted (HMAC over bytes).
+app.use(fiatWebhookRouter);
 app.use(express.json());
 app.use(ipRateLimiter);
 app.use(killSwitch);
