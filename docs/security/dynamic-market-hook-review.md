@@ -9,6 +9,19 @@
 **Date:** 2026-08-17
 **Reviewer:** AI-assisted (Claude Opus 5). **Not a substitute for a human audit.**
 
+> **⚠️ Partially superseded — 2026-09-06 (task 045, decision D-103).** This
+> review was written against the **kickoff-freeze** hook. D-103 replaced it
+> with **in-play trading**: swaps run before and during the event, the halt is
+> the keeper's `eventState = FINAL` write, and `RiskPolicy.FREEZE_LEAD` was
+> removed in favour of `MAX_EVENT_DURATION = 12 hours` — a keeper-independent
+> backstop at `kickoff + 12 h`, asserted equal to `Market.MAX_EVENT_DURATION`.
+> The findings, the maturity ratings and the §44 pass/fail results below stand
+> as written for their date; only the freeze surface changed, and it was
+> re-reviewed under the new semantics in
+> [`markets-contracts-review.md`](./markets-contracts-review.md) (P-013) and
+> recorded in [`sign-off.md`](./sign-off.md) §A2. Citations touching the
+> freeze have been re-pointed at the shipped names; nothing else was rewritten.
+
 ---
 
 ## 1. Verdict
@@ -113,7 +126,7 @@ doing so would close this.
 | **Access controls**          | Satisfactory | Three roles, separated: PoolManager (callbacks), keeper (three fields), operator (registration/pause/roles). `onlyPoolManager` on all four callbacks; direct-call rejection tested for each. Two-step operator transfer. No `owner` god-role.                                                   |
 | **Complexity management**    | Satisfactory | Eight files, each ≤150 lines, each with a purpose statement. Pure maths isolated in `MarketMath`; policy constants isolated in `RiskPolicy`; no inheritance beyond one interface.                                                                                                               |
 | **Decentralisation**         | Weak         | A single keeper key drives model inputs and a single operator key controls registration and pause; both are EOAs today. This is inherent to the design at v1 and is acknowledged in spec §2.1 and Risk 2 of the pivot plan, not a defect in this code.                                          |
-| **Documentation**            | Satisfactory | Every module carries a purpose statement and spec cross-references; every non-obvious choice states its reason (rational decay, saturating add, absent stubs, `FREEZE_LEAD = 0`).                                                                                                               |
+| **Documentation**            | Satisfactory | Every module carries a purpose statement and spec cross-references; every non-obvious choice states its reason (rational decay, saturating add, absent stubs, and the freeze constant — `FREEZE_LEAD = 0` as reviewed, now `MAX_EVENT_DURATION = 12 hours` per D-103/045).                                                                                                               |
 | **Transaction ordering**     | Moderate     | Fee and cap depend on pool price, so a swap can be sandwiched to move the fee it pays. Bounded by `[BASE_FEE, MAX_FEE]`, and the directional adjustment charges the risk-increasing side, which penalises exactly that behaviour. Not eliminated.                                               |
 | **Low-level manipulation**   | Satisfactory | No `assembly`, no `delegatecall`, no `tx.origin`, no `selfdestruct`, no raw `call`. Verified by grep across the module.                                                                                                                                                                         |
 | **Testing and verification** | Satisfactory | 134 tests. All 16 §33 edge cases covered explicitly. 128k-call invariant campaign with **0 reverts**, plus a 100k deterministic sweep asserting the fee band.                                                                                                                                   |
@@ -129,7 +142,7 @@ doing so would close this.
 | Unregistered pool can initialize               | PASS   | `test_unregisteredPoolCannotInitialize`                                                      |
 | Static-fee pool can use the hook               | PASS   | `test_staticFeePoolIsRejected`                                                               |
 | User can invoke callbacks directly             | PASS   | Four direct-call rejection tests                                                             |
-| Kickoff freeze depends on a keeper update      | PASS   | `test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate` — no keeper write ever occurs           |
+| Freeze depends on a keeper update              | PASS   | Reviewed as `test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate`; renamed by 045 to `test_swapRevertsAtBackstopWithoutAnyKeeperUpdate` when the halt moved from kickoff to the 12 h backstop — no keeper write ever occurs, in either version |
 | Stale keeper state bricks the market           | PASS   | `test_staleKeeperStateChargesMaxFeeWithoutReverting`                                         |
 | LPs cannot remove liquidity during a halt      | PASS   | No `BEFORE_REMOVE_LIQUIDITY` bit; the function is not implemented                            |
 | `BEFORE_REMOVE_LIQUIDITY` enabled              | PASS   | `test_forbiddenPermissionsAreNotEncoded`                                                     |

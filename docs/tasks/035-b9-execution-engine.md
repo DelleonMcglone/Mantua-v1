@@ -75,9 +75,16 @@ honestly below.
 - **Delta-hedge rebalance execution** stays recorded-and-waiting
   (`held`, non-retryable) — evaluation and band sizing shipped with
   B9-003; the multi-market rebalance trade itself is future work.
-- **In-game (post-kickoff) strategies**: by design a strategy disarms at
-  the freeze tick, so score-change ticks can never reach a live strategy;
-  scores therefore do not feed evaluation.
+- **In-game (post-kickoff) strategies**: as of D-103 (2026-09-06) a
+  strategy stays armed *through* the game and disarms only on the close
+  (final/void, or the 12 h backstop) — task 046 moved `ticksFromSlates`.
+  The scope statement below is superseded in its premise but not its
+  conclusion: score-change ticks still do not feed evaluation, because the
+  engine evaluates price and game-state ticks only. Live scores as a
+  trigger input remain future work.
+  ~~By design a strategy disarms at the freeze tick, so score-change ticks
+  can never reach a live strategy; scores therefore do not feed
+  evaluation.~~
 - B9-008 market-maker mode stays deferred P3.
 
 ## Tests (all in the repo's injected-deps mock style)

@@ -109,7 +109,8 @@ export function previewLines(draft: StrategyDraft): string[] {
   }
   lines.push(`Spend cap: $${String(draft.capUsd ?? DEFAULT_CAP_USD)} USDC`);
   lines.push(
-    "Auto-disarms at kickoff freeze, resolution, or expiry. Nothing arms until you confirm.",
+    "Stays armed through the game. Auto-disarms when the market closes (final game, " +
+      "or 12h after kickoff), on resolution, or at expiry. Nothing arms until you confirm.",
   );
   return lines;
 }

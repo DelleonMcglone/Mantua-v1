@@ -41,7 +41,7 @@ void describe("parseStrategyDraft (B9-004)", () => {
     const d = parseStrategyDraft("take profit at 80%");
     assert.ok(d);
     const lines = previewLines(d).join("\n");
-    assert.match(lines, /Auto-disarms at kickoff/);
+    assert.match(lines, /Auto-disarms when the market closes/);
     assert.match(lines, /Nothing arms until you confirm/);
     assert.match(lines, /80%/);
   });

@@ -209,23 +209,31 @@ Checked explicitly after rebasing onto 044:
 
 ## Honest notes / follow-ups for other lanes
 
-- `client/src/features/portfolio/StrategiesSection.tsx` still says
+- ~~`client/src/features/portfolio/StrategiesSection.tsx` still says
   "Strategies auto-disarm at kickoff", and
   `client/src/components/docs/docs-content.tsx` says "trade under this hook
   until kickoff freezes them" — both out of this task's strict lane
   (markets features only); copy needs the D-103 update in their owning
-  lane.
+  lane.~~ **Resolved by task 047** (`docs/tasks/047-inplay-freeze-sweep.md`
+  §5) — both strings corrected; the wider copy sweep is task 048.
 - The trade sidebar surfaces the typed halt/closed messages via the
   existing ApiError plumbing (no special-casing added); a dedicated
   "trading paused" banner is UI polish for later.
 - `buildMarketTrade`'s gate reads the canonical DB; the strategy executor
   and agent trade share it, so an in-play outage also refuses agent BUYS
   while strategy closes (sells) keep working — the D-103 intent.
-- The on-chain hook still enforces kickoff-freeze until 045 lands; until
+- ~~The on-chain hook still enforces kickoff-freeze until 045 lands; until
   then an in-play buy the server now allows would revert on-chain. The
   server semantics are D-103-final and land first by design (the UI copy
-  and gating stay truthful the moment the hook flips).
-- **Cross-lane, needs the resolution lane (044/045 owners):**
+  and gating stay truthful the moment the hook flips).~~ **Resolved — 045
+  merged** (`docs/tasks/045-inplay-trading-security-e2e.md`): the hook gate
+  is `eventState == FINAL || isPastBackstop`, so server and chain now agree
+  and the in-play buy lands.
+- ~~**Cross-lane, needs the resolution lane (044/045 owners):**~~
+  **Resolved by task 047** (`docs/tasks/047-inplay-freeze-sweep.md`): the
+  sweep now freezes on `final` (with `startsAt <= now`) or once the 12 h
+  backstop has elapsed, and never on a merely-kicked-off game. Original
+  note kept for history:
   `planResolution` in `server/src/lib/sports/resolution.ts` still sweeps an
   on-chain `freeze` for every event where `startsAt <= now` and the status
   is scheduled/in_progress — the pre-D-103 kickoff freeze. Left untouched

@@ -141,7 +141,7 @@ liquidity incentives, or control LP withdrawal.
 - Model/market probability deviation premium
 - Directional fee adjustment
 - Per-swap USDC notional cap
-- Kickoff freeze
+- In-play trading with an event-`FINAL` halt and a `kickoff + MAX_EVENT_DURATION` (12 h) backstop (D-103; supersedes the kickoff freeze)
 - Resolution halt
 - Void halt
 - Administrative pause

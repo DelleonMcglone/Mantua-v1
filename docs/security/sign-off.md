@@ -107,9 +107,13 @@ As of this addendum the rail reads:
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Freeze integrity | Resolver freeze on final (contract) + hook halt on `eventState = FINAL` + **shared 12 h time backstop** on both layers (`Market.MAX_EVENT_DURATION` == `RiskPolicy.MAX_EVENT_DURATION`) | `Market.t.sol` freeze-window tests, `test_backstopMatchesTheHook`, `FullLifecycle.t.sol` in-game leg |
 
-The service-side strategy disarm (B9-007) still fires on the slate clock at
-kickoff; that is now *more* conservative than the contract, not aligned with
-it, and is not a safety gap.
+The service-side strategy disarm (B9-007) moved with the contract in task
+046: `ticksFromSlates` marks a market `frozen` when the event is `final` (or
+void) or once `startsAt + MAX_EVENT_DURATION` has passed, so a strategy now
+stays armed through the game and disarms on the same close the contract
+enforces. Safety precedence is unchanged — disarm conditions are still
+evaluated before trigger conditions, so a strategy can never fire on a frozen
+or resolved market.
 
 ## A3. Review status after the change
 

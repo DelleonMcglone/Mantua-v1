@@ -341,7 +341,7 @@ describe("processStrategy — trigger → claim → execute (B9-005)", () => {
 });
 
 describe("processStrategy — safety precedence (B9-007 still holds)", () => {
-  it("kickoff freeze disarms on the very tick that would have fired — no claim, no trade", async () => {
+  it("a market freeze disarms on the very tick that would have fired — no claim, no trade", async () => {
     const { named, deps } = makeDeps({});
     const result = await processStrategy(
       DB_STUB,

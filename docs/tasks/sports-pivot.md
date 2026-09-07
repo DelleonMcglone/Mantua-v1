@@ -286,7 +286,7 @@ dispute window. Disclosed in UI (B4-006).
 - [ ] Portfolio shows market positions, LP positions, balances, and history
 - [ ] Logged-in user opens a position on a real scheduled game
 - [ ] Logged-in user provides liquidity to a market pool
-- [ ] A market freezes at start, resolves from live data, and pays out correctly onchain
+- [ ] A market trades through the game, freezes on final (or at the 12 h backstop, D-103), resolves from live data, and pays out correctly onchain
 - [ ] A void game returns all collateral
 - [ ] Agent executes a market action from natural language with preview + confirmation
 - [ ] A user arms a hedging strategy in natural language and watches it execute under a cap
