@@ -23,10 +23,12 @@ contract RiskPolicyTest is Test {
 
     function test_timingsMatchSpec() public pure {
         assertEq(RiskPolicy.STALE_AFTER, 900, "STALE_AFTER must be 15 minutes");
-        // Zero deliberately: Market.freeze() fires exactly at startsAt, so a
-        // non-zero lead would have the hook and the market contract disagree
-        // about when the market closed.
-        assertEq(RiskPolicy.FREEZE_LEAD, 0, "FREEZE_LEAD must be 0 to match Market.startsAt");
+        // D-103 in-play trading: the backstop must equal the market
+        // contract's window, so the hook halts swaps at the same instant the
+        // market's permissionless freeze() unlocks. The cross-contract
+        // equality is asserted in Market.t.sol (test_backstopMatchesTheHook),
+        // where a Market instance exists to read the getter from.
+        assertEq(RiskPolicy.MAX_EVENT_DURATION, 12 hours, "backstop must be 12 hours");
     }
 
     // ─── Internal consistency ────────────────────────────────────────────
@@ -125,32 +127,37 @@ contract RiskPolicyTest is Test {
         assertFalse(RiskPolicy.isStale(2000, 1000));
     }
 
-    // ─── isFrozen (§6) ───────────────────────────────────────────────────
+    // ─── isPastBackstop (§6, D-103) ──────────────────────────────────────
 
-    function test_isFrozenFalseBeforeKickoff() public pure {
-        assertFalse(RiskPolicy.isFrozen(1000, 999));
+    function test_backstopSilentBeforeKickoff() public pure {
+        assertFalse(RiskPolicy.isPastBackstop(1000, 999));
     }
 
-    function test_isFrozenTrueAtKickoff() public pure {
-        // FREEZE_LEAD is 0, so the freeze fires exactly at kickoff — the same
-        // instant Market.freeze() becomes callable.
-        assertTrue(RiskPolicy.isFrozen(1000, 1000));
+    function test_backstopSilentDuringTheGame() public pure {
+        // In-play trading: kickoff itself halts nothing, and neither does any
+        // moment inside the event window.
+        assertFalse(RiskPolicy.isPastBackstop(1000, 1000));
+        assertFalse(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours - 1));
     }
 
-    function test_isFrozenTrueAfterKickoff() public pure {
-        assertTrue(RiskPolicy.isFrozen(1000, 1001));
+    function test_backstopFiresAtExactlyKickoffPlusMaxDuration() public pure {
+        // The same instant Market.freeze() becomes permissionless.
+        assertTrue(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours));
+        assertTrue(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours + 1));
     }
 
-    function test_isFrozenHandlesKickoffBelowFreezeLead() public pure {
-        // Guards the subtraction if FREEZE_LEAD is ever raised above a small
-        // kickoff timestamp in a test fixture.
-        assertFalse(RiskPolicy.isFrozen(0, 0) && RiskPolicy.FREEZE_LEAD > 0);
+    function test_backstopDoesNotOverflowNearMaxKickoff() public pure {
+        // Subtraction form: a kickoff near uint64 max must halt eventually
+        // rather than revert (which would read as "never frozen" via a
+        // try/catch or brick the swap path outright).
+        uint64 k = type(uint64).max - 1;
+        assertFalse(RiskPolicy.isPastBackstop(k, type(uint64).max));
     }
 
-    function testFuzz_isFrozenIsMonotonicInTime(uint64 kickoff, uint64 t) public pure {
+    function testFuzz_backstopIsMonotonicInTime(uint64 kickoff, uint64 t) public pure {
         vm.assume(t < type(uint64).max);
-        if (RiskPolicy.isFrozen(kickoff, t)) {
-            assertTrue(RiskPolicy.isFrozen(kickoff, t + 1), "freeze must never un-fire");
+        if (RiskPolicy.isPastBackstop(kickoff, t)) {
+            assertTrue(RiskPolicy.isPastBackstop(kickoff, t + 1), "backstop must never un-fire");
         }
     }
 }

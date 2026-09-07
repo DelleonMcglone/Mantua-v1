@@ -77,8 +77,13 @@ drizzle/migrations/meta/_journal.json.bak
 # Logs
 logs/
 *.log
+# Slither outputs default to untracked (ad-hoc runs land here), but any
+# output a security document CITES must be tracked — an audit found this
+# directory empty while findings.md pointed at it. Negate per cited artifact.
 docs/security/slither/*
 !docs/security/slither/.gitkeep
+!docs/security/slither/markets-dynamic-market.txt
+!docs/security/slither/markets-dynamic-market.json
 
 # Local Replit sync notes — never commit
 REPLIT_SYNC.*

@@ -19,8 +19,8 @@ import {Market} from "./Market.sol";
 contract MarketFactory {
     /// @notice USDC. Every market on this factory shares one collateral token.
     ERC20 public immutable collateral;
-    /// @notice Authorised to resolve and void markets this factory creates.
-    ///         Identity is DM-103, still open.
+    /// @notice Authorised to resolve, void, and freeze markets this factory
+    ///         creates. The Resolver contract (D-104).
     address public immutable resolver;
 
     /// @notice marketId → deployed market. Zero when not yet created.
@@ -42,12 +42,14 @@ contract MarketFactory {
 
     /// @notice Deploy the market for `marketId`. Reverts if it already exists.
     /// @param marketId Deterministic id per B0-004.
-    /// @param startsAt Scheduled kickoff; the market freezes at this time.
+    /// @param startsAt Scheduled kickoff; anchors the freeze backstop
+    ///                  (`startsAt + MAX_EVENT_DURATION`, D-103).
     /// @param label    Human label used to name the outcome tokens.
     function createMarket(bytes32 marketId, uint64 startsAt, string calldata label) external returns (Market market) {
         if (address(marketOf[marketId]) != address(0)) revert MarketExists();
-        // A market whose kickoff has already passed would be born frozen and
-        // could never be traded — reject rather than deploy dead weight.
+        // A market for a game that has already kicked off would open with the
+        // event underway and part of its backstop window spent — reject
+        // rather than deploy a market nobody priced pre-game.
         if (startsAt <= block.timestamp) revert StartInPast();
 
         market = new Market(marketId, collateral, startsAt, resolver, label);

@@ -6,6 +6,7 @@ import {MockERC20} from "solmate/test/utils/mocks/MockERC20.sol";
 import {Market} from "../../src/markets/Market.sol";
 import {MarketFactory} from "../../src/markets/MarketFactory.sol";
 import {OutcomeToken} from "../../src/markets/OutcomeToken.sol";
+import {RiskPolicy} from "../../src/hooks/dynamic-market/RiskPolicy.sol";
 
 /// @notice B1-007 — unit tests for the market primitives.
 ///         Split/merge round trip, collateral solvency, resolve-before-freeze
@@ -129,21 +130,80 @@ contract MarketTest is Test {
         market.split(0);
     }
 
-    // ─── Freeze ──────────────────────────────────────────────────────────
+    // ─── Freeze (in-play semantics, D-103) ───────────────────────────────
 
-    function test_freezeRejectedBeforeKickoff() public {
+    function test_freezeRejectedBeforeKickoffOnBothPaths() public {
+        // Even the resolver cannot close a market people are still pricing
+        // pre-game; a called-off game is void's job.
+        vm.prank(resolver);
+        vm.expectRevert(Market.TooEarlyToFreeze.selector);
+        market.freeze();
+
+        vm.prank(alice);
         vm.expectRevert(Market.TooEarlyToFreeze.selector);
         market.freeze();
     }
 
-    function test_freezeIsPermissionlessAfterKickoff() public {
+    function test_resolverFreezesFromKickoff() public {
+        // The data-driven freeze: the resolver closes trading on "final" (or
+        // any time the event is underway).
         vm.warp(startsAt);
-        // Deliberately not the resolver: freezing is a time-based fact, and
-        // a market must not stay tradeable past kickoff because a service is
-        // down.
+        vm.prank(resolver);
+        market.freeze();
+        assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
+        assertFalse(market.isTradeable());
+    }
+
+    function test_strangerCannotFreezeDuringTheEventWindow() public {
+        // In-play trading: kickoff no longer opens a permissionless freeze.
+        // A griefer must not be able to close a live market early.
+        vm.warp(startsAt);
+        vm.prank(alice);
+        vm.expectRevert(Market.TooEarlyToFreeze.selector);
+        market.freeze();
+
+        vm.warp(startsAt + market.MAX_EVENT_DURATION() - 1);
+        vm.prank(alice);
+        vm.expectRevert(Market.TooEarlyToFreeze.selector);
+        market.freeze();
+    }
+
+    function test_freezeIsPermissionlessAfterTheBackstop() public {
+        // Deliberately not the resolver: past startsAt + MAX_EVENT_DURATION
+        // the event cannot still be running, and a market must not stay
+        // tradeable forever because the service is down.
+        vm.warp(startsAt + market.MAX_EVENT_DURATION());
         vm.prank(alice);
         market.freeze();
         assertEq(uint8(market.state()), uint8(Market.State.FROZEN));
+        assertFalse(market.isTradeable());
+    }
+
+    function test_tradingStaysOpenDuringTheGame() public {
+        // The point of D-103: split/merge (and swaps, gated by the hook) run
+        // through the event until the resolver freezes on final.
+        vm.warp(startsAt + 1 hours);
+        assertTrue(market.isTradeable());
+
+        vm.startPrank(alice);
+        market.split(100e6);
+        market.merge(40e6);
+        vm.stopPrank();
+        assertEq(market.outstandingSets(), 60e6);
+    }
+
+    function test_backstopMatchesTheHook() public view {
+        // The market's permissionless freeze() must unlock at the same
+        // instant the hook's time backstop halts swaps — one clock, two
+        // enforcement layers (D-103).
+        assertEq(market.MAX_EVENT_DURATION(), RiskPolicy.MAX_EVENT_DURATION, "market and hook backstops diverged");
+    }
+
+    function test_isTradeableFalsePastBackstopEvenBeforeAnyoneFreezes() public {
+        // The view must not report an un-frozen zombie as tradeable — the
+        // hook has already halted swaps on the same clock.
+        vm.warp(startsAt + market.MAX_EVENT_DURATION());
+        assertEq(uint8(market.state()), uint8(Market.State.OPEN));
         assertFalse(market.isTradeable());
     }
 
@@ -152,6 +212,7 @@ contract MarketTest is Test {
         market.split(100e6);
 
         vm.warp(startsAt);
+        vm.prank(resolver);
         market.freeze();
 
         // Minting sets against a known result must be impossible.
@@ -174,6 +235,7 @@ contract MarketTest is Test {
 
     function test_onlyResolverMayResolve() public {
         vm.warp(startsAt);
+        vm.prank(resolver);
         market.freeze();
 
         vm.prank(alice);
@@ -183,6 +245,7 @@ contract MarketTest is Test {
 
     function test_resolveRejectsOutOfRangeOutcome() public {
         vm.warp(startsAt);
+        vm.prank(resolver);
         market.freeze();
 
         vm.prank(resolver);
@@ -394,7 +457,9 @@ contract MarketTest is Test {
     // ─── Helpers ─────────────────────────────────────────────────────────
 
     function _freezeAndResolve(uint8 outcome) private {
+        // The data-driven path: the resolver freezes on final, then resolves.
         vm.warp(startsAt);
+        vm.prank(resolver);
         market.freeze();
         vm.prank(resolver);
         market.resolve(outcome);

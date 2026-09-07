@@ -9,6 +9,9 @@ import {OutcomeToken} from "./OutcomeToken.sol";
 /// @notice A single binary prediction market: YES/NO outcome tokens fully
 ///         collateralised 1:1 by USDC, with a lifecycle that runs
 ///         OPEN → FROZEN → RESOLVED → SETTLED, or diverts to INVALID.
+///         Trading is in-play (D-103): OPEN runs through the game, the
+///         resolver freezes on final, and a permissionless time backstop at
+///         `startsAt + MAX_EVENT_DURATION` catches a downed service.
 ///
 /// @dev Implements B1-001 … B1-006. Behaviour is specified in
 ///      `docs/specs/market-lifecycle.md`; the state table there is the
@@ -39,15 +42,25 @@ contract Market {
         INVALID
     }
 
+    /// @notice How long after `startsAt` an event can possibly run. Past
+    ///         `startsAt + MAX_EVENT_DURATION` anyone may freeze — the
+    ///         permissionless backstop that guarantees no market outlives its
+    ///         event if the resolution service is down (D-103). A constant,
+    ///         not a per-market value: the factory passes no duration and no
+    ///         NFL game approaches 12 hours.
+    uint64 public constant MAX_EVENT_DURATION = 12 hours;
+
     /// @notice Deterministic id from `server/src/lib/market-id.ts` (B0-004).
     bytes32 public immutable marketId;
     /// @notice USDC. 6-decimal ERC-20 on Base.
     ERC20 public immutable collateral;
     OutcomeToken public immutable yesToken;
     OutcomeToken public immutable noToken;
-    /// @notice Scheduled kickoff. Freeze is time-based, never data-based.
+    /// @notice Scheduled kickoff. Anchors the freeze backstop; trading stays
+    ///         open through the game itself (in-play trading, D-103).
     uint64 public immutable startsAt;
-    /// @notice May freeze, resolve, and void. Identity is DM-103, still open.
+    /// @notice May freeze (data-driven, from kickoff), resolve, and void.
+    ///         The Resolver contract per D-104.
     address public immutable resolver;
 
     State public state;
@@ -126,15 +139,23 @@ contract Market {
 
     // ─── Lifecycle ───────────────────────────────────────────────────────
 
-    /// @notice B1-005 / B4-002. Close trading at kickoff.
-    /// @dev Permissionless once `startsAt` has passed: freezing is a
-    ///      time-based fact, and making it depend on the resolver being
-    ///      online would leave a market tradeable after kickoff if the
-    ///      service were down. The resolver may freeze early only in that it
-    ///      cannot — there is no early path, deliberately.
+    /// @notice B1-005 / B4-002 / D-103. Close trading when the event is over.
+    /// @dev Two paths in, deliberately:
+    ///        - The **resolver** may freeze any time from `startsAt` — the
+    ///          data-driven freeze on "final" (in-play trading runs through
+    ///          the game, so kickoff no longer closes anything).
+    ///        - **Anyone** may freeze once `startsAt + MAX_EVENT_DURATION`
+    ///          has passed — the time backstop, so no market outlives its
+    ///          event when the service is down. Freezing must never depend
+    ///          on the resolver being online forever.
+    ///      There is no freeze before kickoff on either path: the resolver
+    ///      cannot pre-emptively close a market people are still pricing,
+    ///      and a called-off game is `voidMarket`'s job, not freeze's.
     function freeze() external {
         if (state != State.OPEN) revert NotOpen();
-        if (block.timestamp < startsAt) revert TooEarlyToFreeze();
+        uint256 openUntil =
+            msg.sender == resolver ? startsAt : uint256(startsAt) + MAX_EVENT_DURATION;
+        if (block.timestamp < openUntil) revert TooEarlyToFreeze();
 
         state = State.FROZEN;
         emit Frozen(uint64(block.timestamp));
@@ -222,10 +243,13 @@ contract Market {
 
     // ─── Views ───────────────────────────────────────────────────────────
 
-    /// @notice True while swaps are permitted. The Dynamic Market Hook reads
-    ///         this to enforce the freeze on-chain (B2-003).
+    /// @notice True while swaps are permitted: OPEN and not past the time
+    ///         backstop. The hook enforces the same rule from the registry's
+    ///         immutable kickoff (B2-003, D-103); this view is the market's
+    ///         own honest answer for off-chain readers, so a market awaiting
+    ///         its backstop freeze does not report as tradeable.
     function isTradeable() external view returns (bool) {
-        return state == State.OPEN;
+        return state == State.OPEN && block.timestamp < uint256(startsAt) + MAX_EVENT_DURATION;
     }
 
     /// @notice Collateral held minus what holders can still redeem. The

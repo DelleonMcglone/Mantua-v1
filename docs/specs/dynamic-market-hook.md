@@ -34,12 +34,14 @@ registry keeper and `Market.resolver` are the same address.
 
 > This couples fee-input authority to settlement authority — one compromised
 > key can both skew fees and resolve markets. The §27 bounds still hold and the
-> §6 kickoff freeze fires from the registration timestamp regardless of keeper
+> §6 time backstop fires from the registration timestamp regardless of keeper
 > activity, so the blast radius is bounded to fee skew within bounds plus
-> settlement. DM-103 remains open on that key's arrangement; closing it as a
-> multisig would mitigate the coupling. Per §25 the keeper and **operator**
-> roles stay distinct regardless, so keeper compromise cannot register pools,
-> change limits, or pause.
+> settlement (and, under D-103, an early data-driven freeze — a halt, never a
+> theft). D-104 closed the key arrangement: signer and operator are rotatable
+> seats on the `Resolver` contract; sign-off I-01 carries until the keys are
+> split at mainnet deploy. Per §25 the keeper and **operator** roles stay
+> distinct regardless, so keeper compromise cannot register pools, change
+> limits, or pause.
 
 ### 0.2 Verified constants
 
@@ -73,7 +75,7 @@ condition if any path can raise `MAX_FEE` or `ABS_MAX_TRADE`.
 | `ABS_MAX_TRADE` | `10_000e6` | $10,000 USDC      | Large enough not to bind in normal flow, small enough that the §35 "above cap → reverts" test is reachable                                                                                                                          |
 | `MIN_TRADE_CAP` | `100e6`    | $100 USDC         | The §21 floor, and where §22 clamps a stale market                                                                                                                                                                                  |
 | `STALE_AFTER`   | `900`      | 15 minutes        | Keeper cadence tolerance before §22 fail-closed behaviour engages                                                                                                                                                                   |
-| `FREEZE_LEAD`   | `0`        | freeze at kickoff | **Zero deliberately.** `Market.freeze()` fires exactly at `startsAt`; any non-zero lead would have the hook halt trading before the market contract considers itself frozen, so the two would disagree about when the market closed |
+| `MAX_EVENT_DURATION` | `43_200` | 12-hour backstop | **D-103 in-play trading** (supersedes `FREEZE_LEAD = 0`, which froze at kickoff). Trading runs through the game; the halt is the keeper's `FINAL` write, and this backstop — `kickoff + MAX_EVENT_DURATION`, keeper-independent — guarantees the halt even with the service down. Must equal `Market.MAX_EVENT_DURATION`, so the hook halts swaps at the same instant the market's permissionless `freeze()` unlocks (asserted in `Market.t.sol`) |
 
 Fees are in v4 pips — `1_000_000` = 100%, so `3_000` = 0.30%. Note this differs
 from the basis-point convention used for probability and confidence (§10, §12),
@@ -327,22 +329,34 @@ transition the market into this state.
 
 **VOID** — the market has been voided. Trading is permanently halted.
 
-## 6. Kickoff Freeze
+## 6. Freeze — In-Play Trading with a Time Backstop
 
-Kickoff protection must be deterministic and independent of the keeper.
+> Revised per D-103 (2026-09-06). The original section froze at kickoff; that
+> design shipped and was superseded by the owner's in-play decision.
 
-Each market stores its kickoff timestamp at registration. The hook must reject
-swaps once the configured kickoff freeze threshold has been reached. The keeper
-does not need to submit an update for the freeze to activate.
+Trading is **in-play**: kickoff halts nothing, and swaps continue through
+`LIVE` and `CRITICAL`. The halt has two layers, and both must be evaluated
+on-chain in `beforeSwap` (and `beforeAddLiquidity`, §23):
 
-This requirement exists specifically to prevent a stale or offline keeper from
-leaving a market tradable after its freeze time.
+1. **State-driven (normal path).** The keeper writes
+   `eventState = FINAL` when the event ends; the hook rejects swaps from that
+   write on. This mirrors the resolver's data-driven `Market.freeze()` on the
+   markets side.
+2. **Time backstop (failure path).** The hook must reject swaps once
+   `kickoffTimestamp + MAX_EVENT_DURATION` has been reached, using only the
+   registration timestamp and the block clock. The keeper does not need to
+   submit an update for the backstop to activate.
+
+The backstop exists specifically to prevent a stale or offline keeper from
+leaving a market tradable after its event can possibly still be running.
 
 ```text
-registration → kickoffTimestamp → current timestamp → freeze threshold → trading halted
+registration → kickoffTimestamp → … in-play trading … → FINAL write → halted
+                                └→ kickoff + MAX_EVENT_DURATION reached → halted (keeper-independent)
 ```
 
-The timestamp-based freeze must be evaluated on-chain in `beforeSwap`.
+The kickoff timestamp stays registered and immutable — it anchors this
+backstop and the fee dynamics, even though it no longer halts trading itself.
 
 ## 7. Hook Permissions
 
@@ -602,7 +616,8 @@ trade cap         → MIN_TRADE_CAP
 deviation premium → excluded
 ```
 
-The deterministic kickoff freeze continues to operate normally.
+The deterministic §6 time backstop continues to operate normally — stale
+state degrades pricing, it never extends the trading window.
 
 This provides a fail-closed risk posture without making the market permanently
 dependent on keeper availability.
@@ -612,7 +627,8 @@ dependent on keeper availability.
 Trading must halt when any of the following is true:
 
 ```text
-kickoff freeze reached
+event FINAL (keeper write — the data-driven freeze, D-103)
+kickoff + MAX_EVENT_DURATION reached (time backstop, keeper-independent)
 market resolved
 market voided
 market paused
@@ -683,7 +699,7 @@ MAX_FEE
 ABS_MAX_TRADE
 MIN_TRADE_CAP
 STALE_AFTER
-kickoff freeze configuration
+MAX_EVENT_DURATION (the §6 time backstop)
 ```
 
 Risk checks should be pure where possible. No external caller may increase
@@ -819,7 +835,7 @@ All sixteen edge cases must have explicit tests:
 12. Opposite-direction swaps
 13. Keeper-offline state
 14. Stale keeper state
-15. Kickoff freeze without keeper update
+15. Time-backstop halt without keeper update (kickoff + MAX_EVENT_DURATION)
 16. Paused / resolved / void market
 
 No edge case may rely solely on incidental coverage from another test.
@@ -867,14 +883,16 @@ at cap    → succeeds
 above cap → reverts
 ```
 
-**Halt**
+**Halt** (D-103 in-play semantics)
 
 ```text
-before freeze → trade permitted
-after freeze  → trade rejected
-resolved      → trade rejected
-void          → trade rejected
-paused        → trade rejected
+pre-kickoff        → trade permitted
+in-play (LIVE)     → trade permitted
+event FINAL        → trade rejected
+past kickoff + MAX_EVENT_DURATION → trade rejected (no keeper write needed)
+resolved           → trade rejected
+void               → trade rejected
+paused             → trade rejected
 ```
 
 **Liquidity**
@@ -897,12 +915,15 @@ state becomes stale
 fee clamps to MAX_FEE
 trade cap clamps to MIN_TRADE_CAP
         ↓
-kickoff timestamp arrives
+trading continues in-play, clamped (D-103)
         ↓
-trading freezes regardless of keeper availability
+kickoff + MAX_EVENT_DURATION arrives
+        ↓
+trading halts regardless of keeper availability
 ```
 
-The keeper must never be a single point of failure for kickoff protection.
+The keeper must never be a single point of failure for the freeze: a dead
+keeper degrades pricing, and the time backstop still closes the market.
 
 ## 37. Deployment
 
@@ -973,7 +994,7 @@ must explain:
 2. Why market state is keyed by `PoolId`.
 3. Why the keeper cannot directly control pricing.
 4. Why risk bounds are immutable.
-5. Why kickoff protection is timestamp-driven.
+5. Why the freeze backstop is timestamp-driven (and the freeze itself data-driven, D-103).
 6. Why stale keeper state fails closed instead of reverting.
 7. Why LP removal remains available during a halt.
 8. Why the initial implementation limits itself to fee, size cap, and halt.
@@ -987,7 +1008,7 @@ The implementation is considered failed if any of the following occurs:
 - An unregistered pool can initialize.
 - A static-fee pool can use the hook.
 - A user can directly invoke hook callbacks.
-- Kickoff freeze depends on a keeper update.
+- The freeze backstop depends on a keeper update (the backstop must fire keeper-offline).
 - Stale keeper state permanently bricks the market.
 - LPs cannot remove liquidity during a halt.
 - `BEFORE_REMOVE_LIQUIDITY` is enabled.
@@ -1029,7 +1050,7 @@ Complete only when all of the following are true:
 - Zero-liquidity behavior passes.
 - Same-block behavior passes.
 - Stale keeper behavior passes.
-- Keeper-offline kickoff freeze passes.
+- Keeper-offline backstop halt passes.
 - Pause behavior passes.
 - Resolution behavior passes.
 - Void behavior passes.
@@ -1108,7 +1129,7 @@ Complete only when all of the following are true:
 - [ ] Execute test swaps
 - [ ] Test dynamic fee
 - [ ] Test size cap
-- [ ] Test kickoff freeze
+- [ ] Test freeze (FINAL halt + time backstop)
 - [ ] Verify contracts
 - [ ] Record addresses
 
