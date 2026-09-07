@@ -20,6 +20,7 @@ import { logger } from "../logger.ts";
 import { computeMarketId } from "../market-id.ts";
 import { type Corroboration, type CorroborationPolicy, corroborate } from "./consensus.ts";
 import { type SettlementAction, decideSettlement } from "./ingest.ts";
+import { MAX_EVENT_DURATION_SECONDS } from "./provider.ts";
 import type { ProviderEvent, ProviderSlate } from "./provider.ts";
 import {
   type ConfidenceState,
@@ -82,7 +83,9 @@ export interface EventAssessment {
 }
 
 export interface ResolutionPlan {
-  /** Markets whose kickoff has passed — freeze is idempotent and permissionless. */
+  /** Markets whose event has CLOSED under D-103 — the game is final, or the
+   *  `startsAt + MAX_EVENT_DURATION_SECONDS` backstop elapsed. Never at
+   *  kickoff: trading runs through the game. Freeze is idempotent. */
   freezes: MarketSubmission["marketId"][];
   submissions: MarketSubmission[];
   /** Events deliberately not settled this pass, with the reason logged. */
@@ -197,13 +200,29 @@ export function planResolution(
     : null;
 
   for (const event of primary.events) {
-    // B4-002: kickoff passed and the game is (or should be) underway — the
-    // markets' on-chain freeze can be swept. Idempotent; already-frozen
-    // markets simply revert and the submitter treats that as done.
-    if (
-      event.startsAt <= nowSeconds &&
-      (event.status === "scheduled" || event.status === "in_progress")
-    ) {
+    // B4-002, rewritten for D-103: trading runs THROUGH the event, so the
+    // freeze is no longer swept at kickoff. It closes the market on the DATA
+    // (the game went final — this is what the resolver role exists for), with
+    // the permissionless time backstop underneath for a final that never
+    // arrives.
+    //
+    // Contract shape (045): `Market.freeze()` reverts before `startsAt`, is
+    // **resolver-only** from `startsAt`, and becomes permissionless at
+    // `startsAt + MAX_EVENT_DURATION` (12 h, the shared constant). Sweeping
+    // at kickoff would therefore close markets the contracts, the trade gate
+    // and the UI all treat as in-play.
+    //
+    // A delayed slate still freezes on `final`: finality is monotonic — a
+    // stale snapshot reporting a final was true when it was fetched, and
+    // finals do not un-happen — so unlike a settlement, this freeze cannot be
+    // wrong in the direction stale data makes things wrong (B10-004's
+    // asymmetry, now expressed on the right clock). Freeze is idempotent;
+    // already-frozen markets simply revert and the submitter treats that as
+    // done. A called-off game needs no freeze at all — `voidMarket` accepts
+    // OPEN — and the executor sweeps one in-line anyway before settling.
+    const kickedOff = event.startsAt <= nowSeconds;
+    const pastBackstop = event.startsAt + MAX_EVENT_DURATION_SECONDS <= nowSeconds;
+    if ((kickedOff && event.status === "final") || pastBackstop) {
       plan.freezes.push(...marketIdsFor(event.providerEventId, chainId));
     }
 
@@ -467,11 +486,15 @@ export async function executeResolution(
 
   for (const s of plan.submissions) {
     try {
-      // The Resolver requires FROZEN before resolve/void, and a market that
-      // missed its freeze window (a game finishing between sweeps, or the
-      // sweep being down over kickoff) would otherwise be stuck NotFrozen
-      // forever. Freeze is idempotent — already-frozen reverts are treated
-      // as done by the submitter — so sweep it in-line before settling.
+      // The Resolver requires FROZEN before resolve, and a market whose
+      // D-103 freeze never landed — the sweep was down when the final
+      // arrived, or this plan was built from a slate whose freeze the
+      // executor is only reaching now — would otherwise be stuck NotFrozen
+      // forever. Same rule as the planner: by the time a submission exists
+      // the event is final (or void), so this is the data-driven close, not
+      // a kickoff freeze. Freeze is idempotent — already-frozen reverts are
+      // treated as done by the submitter — so sweep it in-line before
+      // settling. (Voids do not need it; `voidMarket` accepts OPEN.)
       await submitter.freeze(s.marketId).catch(() => null);
 
       let txHash: string;

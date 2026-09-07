@@ -71,7 +71,9 @@ async function resolutionSlateFor(league: LeagueSlug, dates: string | null): Pro
  * Task-040 pipeline, in order:
  *  1. S-022 stale-data breaker: a slate that is delayed or older than
  *     MAX_RESOLUTION_FEED_AGE_MS is demoted to `delayed` before planning —
- *     freezes still sweep, settlement holds — with a loud log + audit row.
+ *     freezes still sweep (finality is monotonic, so a stale `final` cannot
+ *     close a market that is still live), settlement holds — with a loud log
+ *     + audit row.
  *  2. S-024: each final's assessment advances the persisted confidence state
  *     machine (`resolution_reviews`); timed-out PENDING rows escalate to
  *     MANUAL_REVIEW; DISPUTED/MANUAL_REVIEW never reach the submitter.
@@ -120,8 +122,11 @@ cronResolutionRouter.get(
         const nowSeconds = Math.floor(nowMs / 1000);
 
         // S-022 — the stale-data circuit breaker. Not fresh → treat exactly
-        // like a delayed slate: the freeze sweep (timestamp-driven, cannot
-        // be wrong) proceeds, settlement refuses, and the refusal is loud.
+        // like a delayed slate: the D-103 freeze sweep proceeds (it closes on
+        // a `final` or the 12 h backstop, and neither can be wrong on stale
+        // data the way a settlement can — finals do not un-happen and the
+        // backstop is pure clock), settlement refuses, and the refusal is
+        // loud.
         const freshness = checkFeedFreshness(slate, nowMs);
         if (!freshness.fresh) {
           logger.error(
