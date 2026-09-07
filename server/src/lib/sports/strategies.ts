@@ -9,8 +9,10 @@
  *
  * Safety precedence (B9-007 is P0): disarm conditions are evaluated BEFORE
  * trigger conditions, so a strategy on a frozen or resolved market can never
- * fire — kickoff auto-disarms it in the same tick that might otherwise have
- * triggered it. The global kill switch is checked by the engine before any
+ * fire — the D-103 close (the event going FINAL/void, or the 12 h backstop)
+ * auto-disarms it in the same tick that might otherwise have triggered it.
+ * A strategy stays armed *through* the game; kickoff is not a disarm signal.
+ * The global kill switch is checked by the engine before any
  * evaluation at all; disarming remains allowed under kill, firing does not.
  */
 

@@ -204,9 +204,11 @@ keeper cannot register pools, pause, move a kickoff timestamp, change risk
 limits, or rotate any role — those are the operator's, and the split is what
 contains a compromised keeper (spec §25).
 
-Nothing the keeper writes can breach the immutable bounds in `RiskPolicy`, and
-the kickoff freeze reads the registration timestamp, so it fires whether or not
-the keeper is alive.
+Nothing the keeper writes can breach the immutable bounds in `RiskPolicy`. The
+halt does depend on the keeper's `eventState = FINAL` write, which is why there
+is a second path that does not: `kickoff + MAX_EVENT_DURATION` (12 h) reads the
+registration timestamp, so swaps halt whether or not the keeper is alive — the
+same instant `Market.freeze()` turns permissionless (D-103).
 
 ## Fee decomposition event
 

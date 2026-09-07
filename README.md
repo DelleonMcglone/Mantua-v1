@@ -76,8 +76,10 @@ create → seed → trade → freeze → resolve → redeem
 
 - **split** 1 USDC in → 1 YES + 1 NO out. **merge** reverses it. Both are fee-free, and
   together they are the arbitrage floor that keeps the pool price inside [0, 1].
-- **freeze** at scheduled kickoff, enforced by the hook so it holds even if the interface is
-  bypassed.
+- **trade in play** buy and sell run before **and** during the game (D-103).
+- **freeze** when the game goes final, plus a permissionless backstop 12 hours after kickoff so
+  no market outlives its event even if the service is down. Both are enforced by the hook, so
+  they hold even if the interface is bypassed.
 - **resolve** from live game data, with provider disagreement flagged for review and a manual
   override so a bad feed cannot auto-settle a market.
 - **redeem** the winning token 1:1 for USDC. A voided game returns collateral instead.
@@ -126,8 +128,8 @@ Programmable money buying programmable intelligence, then acting on it in one au
   server-side), after which chat and every transaction require login.
 - **Automated hedging strategies.** Describe one in plain language ("take profit at 80% on the
   Chiefs"), confirm the structured preview, and it arms: evaluated on price and game-state
-  ticks, sized under its own USDC cap, auto-disarmed at kickoff freeze. Kill switches at every
-  level; every transition audited.
+  ticks, sized under its own USDC cap, armed straight through the game and auto-disarmed when
+  the market closes. Kill switches at every level; every transition audited.
 - **State-aware Mantua hooks.** Custom hooks embed pricing, fee logic, and circuit breakers
   directly into pool execution. Stable Protection is **FX-aware**: its circuit breaker anchors
   to the live EUR/USD rate (Pyth) instead of assuming 1:1, so USDC/EURC trades at the true
@@ -298,9 +300,9 @@ git clone --recurse-submodules https://github.com/DelleonMcglone/Mantua-Intellig
 
 > The Dynamic Market Hook shipped against the authoritative spec in
 > [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md): a 0.30%–5% adaptive
-> fee band (five weighted premiums + a directional adjustment), per-risk trade caps,
-> timestamp-driven kickoff freeze that fires even with no keeper write, and fail-closed
-> behaviour on stale keeper state. Security review: 0 HIGH / 0 MEDIUM open
+> fee band (five weighted premiums + a directional adjustment), per-risk trade caps, in-play
+> trading that halts on the event's `FINAL` state with a keeper-independent 12-hour backstop
+> that fires even with no keeper write, and fail-closed behaviour on stale keeper state. Security review: 0 HIGH / 0 MEDIUM open
 > ([`docs/security/sign-off.md`](docs/security/sign-off.md), owner-signed).
 
 > Two further hooks **RWA Gate** (permissioned pools via a ComplianceRegistry) and

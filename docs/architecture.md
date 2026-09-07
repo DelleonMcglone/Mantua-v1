@@ -433,7 +433,7 @@ AMM / native USDC — but the _economic_ conventions transfer intact. Verdicts:
 | Invalid/void outcome: "market resolves 50/50 — each token redeems for $0.50"                                                                                                                 | concepts/resolution.md                         | **Adopt** — this is exactly what Mantua's INVALID state should pay (postponed/abandoned games); preserves the $1-per-pair invariant.                                                                                                                                                                                           |
 | One canonical display price with a documented fallback (midpoint; last trade when spread > $0.10; "0.5" placeholder for never-traded)                                                        | concepts/prices-orderbook.md                   | **Adapt** — AMM spot is the midpoint analogue; document the stale/empty-pool fallback; use the 0.5 placeholder for capture-less markets.                                                                                                                                                                                       |
 | Taker fee = C × rate × p × (1 − p), sports rate 0.05; symmetric, maximal at 50¢, vanishing at extremes                                                                                       | trading/fees.md                                | **Adapt** — a flat AMM fee is proportionally brutal on longshots (1¢ on a 3¢ share ≈ 33%). The p(1−p) curve is implementable as a v4 dynamic-fee hook; 0.05 is a documented sports calibration point.                                                                                                                          |
-| Sports in-play defense: outstanding orders cleared at game start (`clearBookOnStart`); live orders wait a configured `secondsDelay` before matching                                          | concepts/markets-events.md, order-lifecycle.md | **Adapt** — validates Mantua's freeze-at-kickoff (the AMM analog of the delay window; you can't "delay" a swap). If live in-game trading ever ships, a disclosed commit delay is the trust mechanic.                                                                                                                           |
+| Sports in-play defense: outstanding orders cleared at game start (`clearBookOnStart`); live orders wait a configured `secondsDelay` before matching                                          | concepts/markets-events.md, order-lifecycle.md | **Superseded by D-103** — this row originally read the `clearBookOnStart` convention as validating Mantua's freeze-at-kickoff. In-play trading shipped instead (2026-09-06): markets trade before **and** during the event and close on final, with a 12 h permissionless backstop. Mantua's live-play defence is priced, not gated — the hook's dynamic fee / per-trade cap / stale-keeper clamp, plus the server's in-play quoting halt on a stale feed. A disclosed commit delay remains the unbuilt alternative if the fee ladder proves insufficient.                                                                                                                           |
 | Resolution pipeline (UMA optimistic oracle: $750 bond, 2-hour challenge, escalating disputes)                                                                                                | concepts/resolution.md                         | **N/A on mechanism** (Mantua resolves server-signed), **adapt three conventions**: a sanity window between RESOLVED and SETTLED before redemptions open; a signer-enforced can't-resolve-before-gameStartTime check; user-visible pipeline states (Trading → Result in → Resolved → Claimable).                                |
 | Negative-risk groups for mutually exclusive outcomes ("exactly one resolves Yes"); NO-in-one ↔ YES-in-all-others conversion                                                                  | concepts/negative-risk.md                      | **N/A for binary v1.** If 3-way soccer ships: three linked binary markets with the exactly-one-YES invariant enforced server-side; the conversion mechanic needs shared collateral and doesn't map to per-outcome AMM pools.                                                                                                   |
 | Market lifecycle is flags (`active/closed/archived/acceptingOrders/restricted/live/ended`), and markets exist before trading opens and stay queryable after close                            | market-data/market-details.md                  | **Adapt** — Mantua's OPEN/FROZEN/RESOLVED/SETTLED/INVALID enum is cleaner; borrow: `gameStartTime` distinct from endDate, a per-market `restricted` geo flag, and decoupling API existence from pool deployment.                                                                                                               |
@@ -625,12 +625,23 @@ The eight questions §43 requires answering:
    every key still cannot charge 50% or lift the size cap. Storage plus an
    owner check would have made those the same class of risk as the keys.
 
-5. **Kickoff protection is timestamp-driven.** The freeze reads the timestamp
-   stored at registration and compares it to `block.timestamp`. A keeper-driven
-   freeze would fail exactly when it matters most — a crashed or lagging keeper
-   at kickoff would leave a started game tradeable against people who can see
-   the field. Registration is once-only and there is no kickoff setter, so
-   nobody can push the deadline out either.
+5. **The close is state-driven, with a timestamp backstop.** _Superseded by
+   D-103 (2026-09-06) — see `docs/decisions/v2-open-decisions.md`._ This item
+   originally argued that kickoff protection must be timestamp-driven, because
+   a crashed or lagging keeper at kickoff would leave a started game tradeable
+   against people who can see the field. That hazard was accepted, not
+   refuted: the owner decided in-play trading, so a started game **is**
+   tradeable by design, and the live-play defence moved to the hook's
+   degradation ladder (dynamic fees, per-trade caps, and the stale-keeper
+   clamp to `MAX_FEE` / `MIN_TRADE_CAP`) plus the server-side quoting halt on
+   a dark feed (P-012) — priced and sized, not forbidden. What survives from
+   the original argument is its real point, that a close must not depend on
+   keeper liveness: the halt is the keeper's `FINAL` write, and
+   `kickoff + MAX_EVENT_DURATION` (12 h) is a keeper-independent backstop that
+   fires with no keeper write at all, matching `Market.MAX_EVENT_DURATION` so
+   the hook halts swaps at the same instant `freeze()` turns permissionless.
+   The kickoff timestamp itself is unchanged: registration is once-only and
+   there is no kickoff setter, so nobody can push the backstop out either.
 
 6. **Stale keeper state fails closed, not shut.** Past `STALE_AFTER` the fee
    clamps to `MAX_FEE` and the cap to `MIN_TRADE_CAP`, and the model-deviation

@@ -22,13 +22,15 @@ const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
  * GET /api/cron/strategies — B9-005's evaluation + execution tick.
  *
  * Loads every armed strategy and evaluates it against BOTH tick classes:
- * game-state ticks (freeze at kickoff / in-progress / final, resolution —
+ * game-state ticks (D-103 in-play: a game runs on through kickoff, and the
+ * freeze arrives on final/void or at the 12 h backstop, then resolution —
  * from the non-delayed slates) and price ticks (the pool's OWN price where
  * one trades, overlaid per event; the provider line only as the pre-trading
  * seed; a failed pool read drops the price so nothing fires on stale data).
  *
  * Per strategy the engine (strategy-engine.ts): auto-disarms per B9-007
- * (kickoff freeze, resolution, expiry, kill switch, unparseable config);
+ * (market freeze on final/backstop, resolution, expiry, kill switch,
+ * unparseable config);
  * claims armed→triggered atomically before executing so overlapping crons
  * can't double-execute; closes through the capped agent path (strategy
  * capUsd + the wallet's daily cap both bind, C-015 receipt before

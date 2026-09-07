@@ -76,12 +76,17 @@ Symptoms: `breakers` non-zero in `/api/cron/sports-sync` output; slates
 flagged `delayed`; resolution cron holding everything.
 
 1. **No action is usually required.** The system's designed response is:
-   stale-serve flagged `delayed`, markets freeze on time, nothing settles.
-   Settlement resumes by itself when fresh data returns (`resolution.test.ts`
-   B10-004 proves both halves).
+   stale-serve flagged `delayed`, in-play markets keep trading but the
+   server refuses to quote new BUYS on a live game while its feed is dark
+   (P-012 — sells stay open), a game the feed already reported `final`
+   still freezes (finals do not un-happen), and nothing settles. Settlement
+   resumes by itself when fresh data returns (`resolution.test.ts` B10-004
+   proves both halves).
 2. If the outage outlasts a slate's grace window, boards show the delayed
    banner and finals stay unsettled — that is correct, not an incident.
-   Users' funds sit in frozen markets; nothing is at risk but latency.
+   Positions sit in markets that are either frozen (final seen) or open
+   with buys paused; nothing is at risk but latency, and no market can
+   outlive its event — `startsAt + 12 h` closes it permissionlessly.
 3. Extended outage (> a few hours): manually verify finals from a second
    source; the operator may settle individual markets via the override —
    `cast send <RESOLVER> "resolve(bytes32,uint8)" <MARKET_ID> <0|1> --account mantua-deployer`
@@ -96,17 +101,23 @@ Channels: X (@Mantua_AI), Discord announcement channel.
 
 Template — degraded data:
 
-> Live game data is currently delayed. Markets freeze automatically at
-> kickoff and no market will settle until data is confirmed fresh. Funds
-> are safe; settlement resumes automatically.
+> Live game data is currently delayed. New buys on affected live games are
+> paused while the feed is stale — you can still sell out of a position —
+> and no market will settle until data is confirmed fresh. Every market
+> closes automatically no later than 12 hours after its scheduled start.
+> Funds are safe; trading and settlement resume automatically.
 
 Template — settlement paused:
 
-> We've paused automated settlement while we investigate <X>. Open markets
-> remain frozen; resolutions will be posted with tx hashes when settlement
-> resumes.
+> We've paused automated settlement while we investigate <X>. Markets that
+> have already closed stay closed and unresolved, and any market still in
+> play keeps trading; resolutions will be posted with tx hashes when
+> settlement resumes.
 
-Rules: state what is frozen, what is safe, what happens next; link tx
+Rules: state what is closed, what is still trading, what is safe, what
+happens next — never promise a freeze at kickoff, because trading runs
+through the game (D-103); the guarantee we can make is the 12-hour
+permissionless backstop. Link tx
 hashes for anything already on-chain; never promise a resolution outcome
 while data is unconfirmed.
 
