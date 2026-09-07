@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import { marketIdsFor } from "./resolution.ts";
-import { isVoidStatus } from "./provider.ts";
+import { MAX_EVENT_DURATION_SECONDS, isVoidStatus } from "./provider.ts";
 import type { ProviderSlate } from "./provider.ts";
 
 // ─── B9-001: strategy configs ───────────────────────────────────────────────
@@ -199,11 +199,13 @@ export function evaluateStrategy(
 // ─── Ticks from slates ──────────────────────────────────────────────────────
 
 /**
- * D-103's permissionless time backstop: no market outlives its event by
- * more than this, even if the resolver never observes a final. Mirrors the
- * contract-side `MAX_EVENT_DURATION` default (12 h after kickoff).
+ * D-103's permissionless time backstop (12 h after kickoff). Defined in
+ * `provider.ts` — the resolution freeze sweep needs the same value and
+ * `strategies.ts` imports FROM `resolution.ts`, so the single definition
+ * lives in the leaf module both sides can reach. Re-exported here because
+ * this is where the trade gate, the store and the tests already read it.
  */
-export const MAX_EVENT_DURATION_SECONDS = 12 * 3600;
+export { MAX_EVENT_DURATION_SECONDS };
 
 /**
  * Build market ticks from provider slates (B9-005: "price and game-state

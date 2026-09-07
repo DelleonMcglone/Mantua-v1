@@ -267,6 +267,21 @@ export function teamKey(league: LeagueSlug, abbreviation: string): string {
   return `${league}:${abbreviation.trim().toUpperCase()}`;
 }
 
+/**
+ * D-103's permissionless time backstop: no market outlives its event by more
+ * than this, even if the resolver never observes a final. Mirrors the
+ * contract-side `Market.MAX_EVENT_DURATION` / `RiskPolicy.MAX_EVENT_DURATION`
+ * default (12 h after kickoff), which the two contract layers assert equal.
+ *
+ * Lives here, in the leaf event vocabulary, because BOTH sides of the D-103
+ * clock need it: the hedging engine's tick freeze and the trade gate
+ * (`strategies.ts`, `market-trade-build.ts`, `store.ts`) and the resolution
+ * freeze sweep (`resolution.ts`, which `strategies.ts` itself imports from —
+ * so the constant cannot live there without a cycle). `strategies.ts`
+ * re-exports it for the modules that already read it from there.
+ */
+export const MAX_EVENT_DURATION_SECONDS = 12 * 3600;
+
 /** Whether a status means the game will not be played (spec §3.7 void path). */
 export function isVoidStatus(status: ProviderEventStatus): boolean {
   return status === "postponed" || status === "cancelled";

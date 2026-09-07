@@ -146,7 +146,8 @@ export const DOCS_GROUPS: DocsGroup[] = [
             </P>
             <Note>
               Each day&apos;s games mint their markets automatically; their pools open at the
-              implied odds and trade under this hook until kickoff freezes them. The production
+              implied odds and trade under this hook before and during the game, closing when the
+              game goes final. The production
               deployment is pending — addresses will be published here once live.
             </Note>
 

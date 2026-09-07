@@ -113,7 +113,8 @@ export function StrategiesSection() {
       {rows.length === 0 ? (
         <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-dim">
           None yet. Describe one below — e.g. &ldquo;take profit at 80% on the Chiefs&rdquo; or
-          &ldquo;stop loss at 30%&rdquo;. Strategies auto-disarm at kickoff.
+          &ldquo;stop loss at 30%&rdquo;. Strategies stay armed through the game and auto-disarm
+          when it goes final.
         </p>
       ) : (
         <ul className="mt-2 flex flex-col gap-1.5">

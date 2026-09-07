@@ -12,6 +12,7 @@ import {
   type ResolutionSubmitter,
 } from "./resolution.ts";
 import { computeMarketId } from "../market-id.ts";
+import { MAX_EVENT_DURATION_SECONDS } from "./provider.ts";
 import type { ProviderEvent, ProviderSlate } from "./provider.ts";
 
 const NOW = 1_800_000_000;
@@ -141,18 +142,70 @@ void describe("planResolution", () => {
     assert.equal(plan.submissions.filter((s) => s.kind === "void").length, 2);
   });
 
-  void it("sweeps freezes for games past kickoff, in play or not yet marked", () => {
+  // ─── D-103 freeze sweep (task 047) ──────────────────────────────────────
+  //
+  // The owner's in-play decision moved the close from kickoff to the data.
+  // These four tests are the whole rule: kickoff freezes NOTHING, a final
+  // freezes, the 12 h backstop freezes a game whose final never arrived, and
+  // a game that has not started is never touched.
+
+  void it("never freezes a game that is merely past kickoff — trading runs through the event", () => {
     const plan = planResolution(
       slate([
         event({ providerEventId: "live", status: "in_progress", startsAt: NOW - 600 }),
+        event({ providerEventId: "deep-in-play", status: "in_progress", startsAt: NOW - 3 * 3600 }),
+        // Kicked off, feed has not flipped the status yet — still not closed.
         event({ providerEventId: "late-feed", status: "scheduled", startsAt: NOW - 60 }),
-        event({ providerEventId: "future", status: "scheduled", startsAt: NOW + 3600 }),
       ]),
       null,
       NOW,
     );
-    // Two games past kickoff × two markets each; the future game untouched.
-    assert.equal(plan.freezes.length, 4);
+    assert.equal(plan.freezes.length, 0, "in-play markets stay open (D-103)");
+  });
+
+  void it("freezes both markets of a game that has gone final — the data-driven close", () => {
+    const plan = planResolution(
+      slate([event({ providerEventId: "done", status: "final", startsAt: NOW - 4 * 3600 })]),
+      null,
+      NOW,
+    );
+    assert.deepEqual(plan.freezes, [...marketIdsFor("done")]);
+  });
+
+  void it("freezes a stale in-progress game once the 12 h backstop elapses", () => {
+    const plan = planResolution(
+      slate([
+        // The feed never reported the final; the backstop closes it anyway.
+        event({
+          providerEventId: "zombie",
+          status: "in_progress",
+          startsAt: NOW - MAX_EVENT_DURATION_SECONDS,
+        }),
+        // One second short of the backstop: still in play.
+        event({
+          providerEventId: "still-live",
+          status: "in_progress",
+          startsAt: NOW - MAX_EVENT_DURATION_SECONDS + 1,
+        }),
+      ]),
+      null,
+      NOW,
+    );
+    assert.deepEqual(plan.freezes, [...marketIdsFor("zombie")]);
+  });
+
+  void it("never freezes before kickoff — the contract's early window is resolver-only from startsAt", () => {
+    const plan = planResolution(
+      slate([
+        event({ providerEventId: "future", status: "scheduled", startsAt: NOW + 3600 }),
+        // Bad data: a "final" for a game that has not started. Freezing it
+        // would revert on-chain (Market.freeze is closed before startsAt).
+        event({ providerEventId: "impossible", status: "final", startsAt: NOW + 3600 }),
+      ]),
+      null,
+      NOW,
+    );
+    assert.equal(plan.freezes.length, 0);
   });
 
   void it("with a secondary configured, agreement settles", () => {
@@ -239,13 +292,42 @@ void describe("executeResolution", () => {
   void it("freeze sweep counts and tolerates already-frozen markets", async () => {
     const { submitter } = fakeSubmitter();
     const { log } = fakeLog();
+    // The fake's freeze resolves null for every call — exactly what the live
+    // submitter does for an already-frozen market. Both still count.
     const plan = planResolution(
-      slate([event({ providerEventId: "live", status: "in_progress", startsAt: NOW - 600 })]),
+      slate([
+        event({
+          providerEventId: "zombie",
+          status: "in_progress",
+          startsAt: NOW - MAX_EVENT_DURATION_SECONDS,
+        }),
+      ]),
       null,
       NOW,
     );
     const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
     assert.equal(summary.frozen, 2);
+  });
+
+  void it("a resolve still freezes first — the Resolver refuses an unfrozen market", async () => {
+    // S-025's `market_frozen` criterion plus the on-chain precondition: the
+    // executor sweeps the freeze in-line before every submission, so a final
+    // that arrived between sweeps can never resolve from OPEN.
+    const { submitter, calls } = fakeSubmitter();
+    const { log } = fakeLog();
+    const plan = planResolution(slate([event()]), null, NOW);
+    const summary = await executeResolution(plan, submitter, log, "espn", { nowSeconds: NOW });
+
+    assert.equal(summary.resolved, 2);
+    for (const marketId of marketIdsFor("401671789")) {
+      const short = marketId.slice(0, 10);
+      const firstFreeze = calls.indexOf(`freeze:${short}`);
+      const resolveAt = calls.findIndex((c) => c.startsWith(`resolve:${short}`));
+      assert.ok(firstFreeze >= 0, "the market was frozen");
+      assert.ok(firstFreeze < resolveAt, "freeze precedes resolve for this market");
+    }
+    // And the plan itself already carried the freeze: the game is final.
+    assert.equal(plan.freezes.length, 2);
   });
 });
 
@@ -253,9 +335,9 @@ void describe("B10-004 — provider outage mid-game", () => {
   // The outage scenario: the game kicked off, then the data provider went
   // down. The resilience layer stale-serves the last slate flagged
   // `delayed`. The correct behaviour is asymmetric: the freeze (safety)
-  // still happens — it is timestamp-driven and cannot be wrong — while
-  // settlement (irreversible) waits for fresh data, even if the stale
-  // cache happens to contain a "final".
+  // still happens — finality is monotonic, so a stale "final" was true when
+  // it was fetched and cannot close a market that is still live — while
+  // settlement (irreversible) waits for fresh data.
   void it("still freezes on delayed data, but never settles from it", () => {
     const outage = slate(
       [
@@ -267,8 +349,9 @@ void describe("B10-004 — provider outage mid-game", () => {
     );
     const plan = planResolution(outage, null, NOW);
 
-    // Freeze: yes — the in-play game's markets stop trading.
-    assert.equal(plan.freezes.length, 2, "both markets of the live game freeze");
+    // Freeze: the FINISHED game's markets close (D-103 — the close follows
+    // the data, not the clock); the game still in play keeps trading.
+    assert.deepEqual(plan.freezes, [...marketIdsFor("finished-game")]);
     // Settle: no — the cached final is held, loudly, until data is fresh.
     assert.equal(plan.submissions.length, 0, "nothing settles on delayed data");
     assert.equal(plan.held.length, 1);
