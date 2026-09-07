@@ -265,6 +265,18 @@ export const markets = pgTable(
     outcomeIndex: smallint("outcome_index").notNull(),
     /** Chain this market lives on (8453 = Base Mainnet). */
     chainId: integer("chain_id").notNull().default(8453),
+    /**
+     * P-002 — the persisted keccak preimage binding. `marketId` commits to
+     * (providerEventId, marketType, outcomeIndex[, chainId]) per
+     * docs/specs/market-id.md; the hash inputs NOT already columns here are
+     * stored at creation so the binding is independently recomputable
+     * without trusting the mutable `events` row the FK points at.
+     * `provider` records the resolution source the market was minted
+     * against. Write-once: the creation sweep never overwrites a non-null
+     * value. Nullable only for rows minted before task 046.
+     */
+    provider: varchar("provider", { length: 32 }),
+    providerEventId: varchar("provider_event_id", { length: 128 }),
     /** OPEN | FROZEN | RESOLVED | SETTLED | INVALID — see the lifecycle spec. */
     state: varchar("state", { length: 16 }).notNull().default("OPEN"),
     yesToken: varchar("yes_token", { length: 42 }),
@@ -327,6 +339,15 @@ export type NewMarketOutcome = typeof marketOutcomes.$inferInsert;
  * A user's position in a market. Server-side mirror of on-chain balances,
  * kept so the portfolio can show entry price and P/L — which the chain does
  * not record. The chain remains authoritative for the balance itself.
+ *
+ * Shape (task 046): one AGGREGATE row per (market, wallet, side) — the
+ * unique below — written by the receipt-verified fill path. Buys grow
+ * `size` and re-average `entryPrice`; sells shrink `size` at average cost.
+ * Settlement (P-006) stamps `settledAt`/`settlementPrice` when the market
+ * resolves ($1 winning side, $0 losing, $0.50 on INVALID); `redeemedAt`
+ * stays the separate "the tokens were actually cashed in" marker, so a
+ * settled-but-unclaimed position is exactly `settledAt` set + `redeemedAt`
+ * null — no double-counting between realized P/L and claimables.
  */
 export const marketPositions = pgTable(
   "market_positions",
@@ -350,10 +371,17 @@ export const marketPositions = pgTable(
     /** Set once redeemed, so the portfolio can show realised P/L. */
     redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
     redeemTxHash: varchar("redeem_tx_hash", { length: 66 }),
+    /** P-006 — stamped by the post-resolution settlement pass. */
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    /** Settlement value per token: 1 winning side, 0 losing, 0.5 INVALID. */
+    settlementPrice: numeric("settlement_price", { precision: 6, scale: 5 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    // One aggregate row per (market, wallet, side) — what makes the fill
+    // writer's upsert race-safe (two concurrent fills settle to one row).
+    unique("market_positions_market_wallet_side_uq").on(t.marketId, t.walletAddress, t.side),
     index("market_positions_user_idx").on(t.userId),
     index("market_positions_market_idx").on(t.marketId),
     index("market_positions_wallet_idx").on(t.walletAddress),
@@ -365,11 +393,12 @@ export type NewMarketPosition = typeof marketPositions.$inferInsert;
 
 /**
  * Price history — one row per capture of a market's implied probability,
- * written by the sports-sync sweep and read by the detail-page chart.
- * Append-only time series: no updates, no unique key beyond the id, and the
- * composite index is (market, time desc) because every read is "latest N
- * for one market". Retention/downsampling is the sweep's job, not the
- * schema's.
+ * written by the sports-sync pool-snapshot sweep and by the receipt-verified
+ * fill path (P-011, task 046), read by the detail-page chart, history.ts,
+ * and the agent's market tools. Append-only time series: no updates, no
+ * unique key beyond the id, and the composite index is (market, time desc)
+ * because every read is "latest N for one market". Retention/downsampling
+ * is the sweep's job, not the schema's.
  */
 export const marketPrices = pgTable(
   "market_prices",
@@ -382,7 +411,8 @@ export const marketPrices = pgTable(
       .references(() => markets.marketId, { onDelete: "cascade" }),
     /** Implied probability of the YES outcome, 0–1. */
     impliedProbability: numeric("implied_probability", { precision: 6, scale: 5 }).notNull(),
-    /** pool | consensus | opening — where the observation came from. */
+    /** pool | consensus | opening | fill — where the observation came from
+     *  (`fill` = the effective price of one receipt-verified trade). */
     source: varchar("source", { length: 16 }).notNull().default("pool"),
     /** Pool depth at capture, USDC 6dp raw units — context for the chart. */
     liquidityRaw: numeric("liquidity_raw", { precision: 78, scale: 0 }),

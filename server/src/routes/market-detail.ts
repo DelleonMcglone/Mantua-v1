@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { asc, desc, eq, inArray, and } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.ts";
-import { events, marketComments, marketFills, markets } from "../db/schema/index.ts";
+import { events, marketComments, marketFills, marketPrices, markets } from "../db/schema/index.ts";
 import { logger } from "../lib/logger.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
@@ -31,8 +31,13 @@ interface ActivityRow {
 
 /**
  * GET /api/markets/detail?providerEventId=… — everything the market detail
- * view needs beyond the slate: the fill-derived price series (chart), the
- * recent trades (activity), and the top YES-token holders per outcome.
+ * view needs beyond the slate: the price series (chart), the recent trades
+ * (activity), and the top YES-token holders per outcome.
+ *
+ * The chart prefers the recorded `market_prices` series (P-011: fill ticks
+ * + periodic pool snapshots — a real time series even between trades); the
+ * fill-derived series remains as the fallback for markets recorded before
+ * the tick writers existed.
  *
  * Public by design, like the slate — all of it is public chain data. A game
  * with no on-chain markets yet returns empty collections, not an error.
@@ -65,23 +70,47 @@ marketDetailRouter.get("/api/markets/detail", async (req: Request, res: Response
     const outcomeByMarket = new Map(rows.map((r) => [r.marketId, r.outcomeIndex]));
     const marketIds = rows.map((r) => r.marketId);
 
-    const fills = await db
-      .select()
-      .from(marketFills)
-      .where(inArray(marketFills.marketId, marketIds))
-      .orderBy(asc(marketFills.createdAt))
+    // Preferred: the recorded market_prices series (implied YES
+    // probability, 0–1 → bps). Fallback: derive from indexed fills, for
+    // markets that predate the tick writers.
+    const recorded = await db
+      .select({
+        marketId: marketPrices.marketId,
+        impliedProbability: marketPrices.impliedProbability,
+        capturedAt: marketPrices.capturedAt,
+      })
+      .from(marketPrices)
+      .where(inArray(marketPrices.marketId, marketIds))
+      .orderBy(asc(marketPrices.capturedAt))
       .limit(500);
 
     const prices: PricePoint[] = [];
-    for (const f of fills) {
-      const tokens = Number(f.tokensRaw);
-      const usdc = Number(f.usdcRaw);
-      if (!(tokens > 0) || !(usdc >= 0)) continue;
+    for (const r of recorded) {
+      const p = Number(r.impliedProbability);
+      if (!Number.isFinite(p)) continue;
       prices.push({
-        t: Math.floor(f.createdAt.getTime() / 1000),
-        outcomeIndex: outcomeByMarket.get(f.marketId) ?? 0,
-        priceBps: Math.round((usdc / tokens) * 10_000),
+        t: Math.floor(r.capturedAt.getTime() / 1000),
+        outcomeIndex: outcomeByMarket.get(r.marketId) ?? 0,
+        priceBps: Math.round(Math.min(1, Math.max(0, p)) * 10_000),
       });
+    }
+    if (prices.length === 0) {
+      const fills = await db
+        .select()
+        .from(marketFills)
+        .where(inArray(marketFills.marketId, marketIds))
+        .orderBy(asc(marketFills.createdAt))
+        .limit(500);
+      for (const f of fills) {
+        const tokens = Number(f.tokensRaw);
+        const usdc = Number(f.usdcRaw);
+        if (!(tokens > 0) || !(usdc >= 0)) continue;
+        prices.push({
+          t: Math.floor(f.createdAt.getTime() / 1000),
+          outcomeIndex: outcomeByMarket.get(f.marketId) ?? 0,
+          priceBps: Math.round((usdc / tokens) * 10_000),
+        });
+      }
     }
 
     const recent = await db

@@ -1,3 +1,4 @@
+import { isTradableStatus } from "./market-trade-core.ts";
 import type { Sport } from "./sports.ts";
 import type { Slate, SlateEvent, SlateTeam } from "./use-slate.ts";
 
@@ -66,7 +67,8 @@ export function SlateList({ sport, slate, loading, onAnalyze, onTrade }: SlateLi
             onAnalyze(event, sport);
           }}
           onTrade={
-            onTrade && event.liveOdds && event.status === "scheduled"
+            // D-103 in-play: the trade control stays through the game.
+            onTrade && event.liveOdds && isTradableStatus(event.status)
               ? () => {
                   onTrade(event, sport);
                 }

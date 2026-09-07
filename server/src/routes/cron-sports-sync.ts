@@ -6,6 +6,7 @@ import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
+  planMarketsFromCanonical,
   refreshPlayByPlay,
   refreshReferenceData,
   upsertEvents,
@@ -15,7 +16,9 @@ import {
   createMarketsOnChain,
   rebandOpenMarkets,
   reclaimSettledMarkets,
+  settleResolvedPositions,
 } from "../lib/sports/markets-onchain.ts";
+import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
@@ -32,8 +35,10 @@ function marketChains(): SupportedChainId[] {
 
 /**
  * GET /api/cron/sports-sync — B3-005's slate-refresh pass. For each covered
- * league: fetch the slate through the resilient ESPN adapter, upsert the
- * normalized events, and report the markets the generator says should exist.
+ * league: fetch the slate through the resilient provider adapter, upsert the
+ * normalized events, and plan markets FROM the persisted canonical rows
+ * (P-002). The tick also runs the reclaim/reband sweeps, the P-006
+ * position-settlement pass, and the P-011 pool-price snapshot.
  *
  * GET because Vercel Cron uses GET; guarded by the shared cron secret.
  *
@@ -90,20 +95,30 @@ cronSportsSyncRouter.get(
         // per league — NFL can be on Sportradar while WNBA stays on ESPN.
         const provider = providerFor(league);
         const perChain: Record<string, unknown> = {};
-        let eventsPersisted: unknown = null;
+        const nowSeconds = Math.floor(Date.now() / 1000);
+        // One slate fetch per league feeds ingestion; planning happens
+        // below, per chain, FROM the canonical rows this upsert persists
+        // (P-002/041 rule: consumers read the DB, providers only feed
+        // ingestion — the feed contributes labels and opening odds only).
+        const refresh = await refreshSlate(provider, league, nowSeconds);
+        const eventsPersisted: unknown = await upsertEvents(
+          db,
+          refresh.provider,
+          league,
+          refresh.events,
+        );
         for (const chainId of chains) {
           // Market ids are chain-distinct (market-id.ts), so each chain
-          // gets its own plan against the same slate fetch (provider-cached).
-          const refresh = await refreshSlate(
-            provider,
+          // gets its own canonical plan against the same slate fetch.
+          const plan = await planMarketsFromCanonical(
+            db,
+            refresh.provider,
             league,
-            Math.floor(Date.now() / 1000),
+            refresh.events,
+            nowSeconds,
             chainId,
           );
-          if (eventsPersisted === null) {
-            eventsPersisted = await upsertEvents(db, refresh.provider, league, refresh.events);
-          }
-          const creation = await createMarketsOnChain(refresh.marketsPlanned, chainId);
+          const creation = await createMarketsOnChain(plan.planned, chainId);
           // Markets rows must exist before settlement can log (FK): persist
           // everything the sweep touched, every tick.
           const marketRows = creation
@@ -112,7 +127,8 @@ cronSportsSyncRouter.get(
           perChain[String(chainId)] = {
             marketRowsPersisted: marketRows,
             delayed: refresh.delayed,
-            marketsPlanned: refresh.marketsPlanned.length,
+            marketsPlanned: plan.planned.length,
+            planSkipped: { noFeed: plan.skippedNoFeed, sideMismatch: plan.skippedSideMismatch },
             marketsOnChain: creation ?? "disabled (no signer for this chain)",
           };
         }
@@ -148,12 +164,45 @@ cronSportsSyncRouter.get(
       }
     }
 
+    // P-006 — the post-resolution settlement pass: stamp settled prices on
+    // the position mirror and auto-redeem agent-wallet (Circle DCW)
+    // positions. Runs after reclaim so freshly-resolved markets settle on
+    // the same tick that recycles their liquidity.
+    const settlement: Record<string, unknown> = {};
+    for (const chainId of chains) {
+      try {
+        settlement[String(chainId)] = await settleResolvedPositions(db, chainId);
+      } catch (err) {
+        logger.warn({ chainId, err }, "sports-sync: position settlement failed");
+        settlement[String(chainId)] = { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+
+    // P-011 — periodic pool-price snapshot into `market_prices` (the tick
+    // the chart/history/agent tools read between fills). Null means the
+    // market stack isn't deployed on the chain — planning-only degrade,
+    // like every other on-chain pass.
+    const priceSnapshots: Record<string, unknown> = {};
+    for (const chainId of chains) {
+      try {
+        const snap = await snapshotMarketPoolPrices(db, chainId);
+        priceSnapshots[String(chainId)] = snap ?? "disabled (markets not deployed on this chain)";
+      } catch (err) {
+        logger.warn({ chainId, err }, "sports-sync: pool-price snapshot failed");
+        priceSnapshots[String(chainId)] = {
+          error: err instanceof Error ? err.message : String(err),
+        };
+      }
+    }
+
     res.status(failures === LEAGUES.length ? 502 : 200).json({
       ok: failures < LEAGUES.length,
       breakers: activeBreakerState(),
       feeds: feedFreshnessSnapshot(),
       reclaimed,
       rebanded,
+      settlement,
+      priceSnapshots,
       leagues: results,
     });
   },

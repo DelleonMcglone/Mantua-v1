@@ -28,11 +28,15 @@ import { getTableColumns } from "drizzle-orm";
  *   5. FAILURE HONESTY — a Circle execution stuck at SENT never counts as
  *      success: the poll times out, the attempt is counted, and after
  *      MAX_EXECUTE_ATTEMPTS (3) the strategy auto-disarms (`execute-failed`).
- *   6. DISARM ON FREEZE — the freeze signal the engine really consults
- *      (`ticksFromSlates`: startsAt <= now, or in_progress/final — the same
- *      timestamp-driven clock as the contract's kickoff freeze) disarms the
- *      strategy BEFORE trigger evaluation; a price past take-profit arriving
- *      with the freeze produces zero executions and zero spend.
+ *   6. IN-PLAY + DISARM ON FREEZE (D-103) — the freeze signal the engine
+ *      really consults (`ticksFromSlates`: event FINAL/void, or past the
+ *      `startsAt + MAX_EVENT_DURATION_SECONDS` backstop — the same
+ *      state-driven clock the contract freeze moved to) keeps the strategy
+ *      ARMED and executing during a live game, and disarms it BEFORE
+ *      trigger evaluation once the game goes final; a price past
+ *      take-profit arriving with the freeze produces zero executions and
+ *      zero spend. (B10-006's "disarms on freeze" survives — the freeze
+ *      moved from kickoff to final.)
  *
  * What is real vs stubbed: strategies.ts, strategy-engine.ts,
  * strategy-store.ts (arm/claim/release/executed/disarm + audit rows),
@@ -60,6 +64,7 @@ import {
 } from "../circle/execute.ts";
 import { parseStrategyDraft, previewLines } from "./strategy-parse.ts";
 import {
+  MAX_EVENT_DURATION_SECONDS,
   strategyConfigSchema,
   ticksFromSlates,
   type StrategyConfig,
@@ -602,17 +607,65 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
     assert.equal((await listArmed(db)).some((r) => r.id === armed.id), false);
   });
 
-  it("disarms on the freeze tick — a take-profit-crossing price at kickoff produces zero executions and zero spend", async () => {
+  it("stays armed and executes DURING the game (D-103 in-play) — kickoff no longer disarms", async () => {
+    const EVT_E = "401e2ee";
+    const [MARKET_E] = marketIdsFor(EVT_E);
+    // Kickoff has passed and the game is LIVE — under in-play trading this
+    // is exactly the window hedging exists for.
+    const slates = [
+      slateOf([
+        event({ providerEventId: EVT_E, startsAt: NOW - 60, status: "in_progress" }),
+      ]),
+    ];
+    const config: StrategyConfig = strategyConfigSchema.parse({
+      kind: "take-profit-stop",
+      marketId: MARKET_E,
+      side: "yes",
+      takeProfitBps: 8000,
+    });
+    const armed = await armStrategy(db, USER_ID, config, 100, null);
+    joinedMarkets.push({
+      marketId: MARKET_E,
+      yesToken: "0xyes00000000000000000000000000000000000e",
+      outcomeIndex: 0,
+      providerEventId: EVT_E,
+    });
+
+    const ledger = makeDailyLedger(500);
+    const { deps: execDeps, tradeCalls } = makeExecDeps({
+      balance: 50_000_000n,
+      ledger,
+      circleStates: [{ state: "CONFIRMED", txHash: TX_CONFIRMED }],
+      pollTimeoutMs: 2_000,
+    });
+    // The live pool runs past take-profit MID-GAME: the strategy fires and
+    // the close executes — in-play means armed through the whistle.
+    const [result] = await sweep(
+      slates,
+      () => Promise.resolve({ kind: "price", bps: 8500 }),
+      engineDeps(execDeps),
+      armed.id,
+    );
+    assert.equal(result.decision, "trigger");
+    assert.equal(result.execution, "executed");
+    assert.equal(tradeCalls.length, 1, "the in-play trigger reaches the executor");
+    assert.equal(strategyRow(armed.id)["status"], "executed");
+  });
+
+  it("disarms on the freeze tick — a take-profit-crossing price past the event's end produces zero executions and zero spend", async () => {
     const EVT_D = "401e2ed";
     const [MARKET_D] = marketIdsFor(EVT_D);
-    // Kickoff has passed and the game is live — the same timestamp-driven
-    // freeze signal the on-chain market uses (ticksFromSlates).
+    // D-103's freeze is state-driven: a reported FINAL disarms as
+    // market-resolved (strategies.test.ts covers that leg); THIS leg
+    // exercises the permissionless time backstop — the feed never reported
+    // a final, but `startsAt + MAX_EVENT_DURATION_SECONDS` elapsed, so the
+    // market is frozen no matter what the feed says.
     const slates = [
       slateOf([
         event({
           providerEventId: EVT_D,
-          startsAt: NOW - 60,
-          status: "in_progress",
+          startsAt: NOW - MAX_EVENT_DURATION_SECONDS,
+          status: "in_progress", // feed stuck mid-game — the backstop wins
           homeWinProbabilityBps: 9000, // way past take-profit — must NOT matter
         }),
       ]),

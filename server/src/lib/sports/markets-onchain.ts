@@ -13,10 +13,26 @@
 import { createWalletClient, encodePacked, http, keccak256, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { env } from "../../env.ts";
+import type { DB } from "../../db/client.ts";
+import {
+  agentWallets,
+  marketPositions,
+  markets as marketsSchema,
+  resolutions,
+} from "../../db/schema/index.ts";
+import { logAudit } from "../audit.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { registerDynamicTargets } from "../circle/allowed-targets.ts";
+import { executeAgentCalldata } from "../circle/execute.ts";
 import { logger } from "../logger.ts";
 import { getRpcClient } from "../rpc-client.ts";
+import {
+  redeemCalldata,
+  redeemFunctionForOnchainState,
+  settlementPriceFor,
+} from "./market-redeem.ts";
 import {
   ERC20_APPROVE_ABI,
   LP_ROUTER_ABI,
@@ -824,6 +840,312 @@ export async function rebandOpenMarkets(
         error: err instanceof Error ? err.message : String(err),
       });
     }
+  }
+  return summary;
+}
+
+// ─── P-006: automatic position settlement (post-resolution sweep) ────────
+
+/** A position row as the settlement planner sees it (store supplies rows). */
+export interface SettleablePositionRow {
+  id: string;
+  marketId: string;
+  walletAddress: string;
+  /** yes | no */
+  side: string;
+  /** The market's DB state: RESOLVED | SETTLED | INVALID (pre-filtered). */
+  state: string;
+  redeemedAt: Date | null;
+}
+
+export interface PositionSettlementPlan {
+  /** Rows to stamp settled, with the per-token settlement value. */
+  marks: { id: string; marketId: string; settlementPrice: string }[];
+  /** Distinct (market, wallet) pairs holding claimable value and not yet
+   *  redeemed — the auto-redeem leg's candidates. */
+  redeemCandidates: { marketId: string; walletAddress: string }[];
+  /** RESOLVED rows whose winner the resolutions log doesn't know yet —
+   *  held for a later tick, never guessed. */
+  heldUnknownWinner: number;
+}
+
+/**
+ * Decide the settlement writes for one pass, pure: each unsettled position
+ * on a finished market settles at $1/$0 per side ($0.50 on INVALID) per
+ * `settlementPriceFor`; positions whose settled value is positive and that
+ * were never redeemed become auto-redeem candidates. A market whose winner
+ * is unknown holds — the asymmetry doctrine again (a wrong settlement
+ * price in the mirror misreports P/L; a late one is just late).
+ */
+export function planPositionSettlement(
+  rows: readonly SettleablePositionRow[],
+  winnerByMarket: ReadonlyMap<string, number>,
+): PositionSettlementPlan {
+  const plan: PositionSettlementPlan = { marks: [], redeemCandidates: [], heldUnknownWinner: 0 };
+  const candidateKeys = new Set<string>();
+  for (const row of rows) {
+    if (row.side !== "yes" && row.side !== "no") continue;
+    const price = settlementPriceFor(
+      row.side,
+      row.state,
+      winnerByMarket.get(row.marketId) ?? null,
+    );
+    if (price === null) {
+      plan.heldUnknownWinner += 1;
+      continue;
+    }
+    plan.marks.push({ id: row.id, marketId: row.marketId, settlementPrice: price });
+    if (Number(price) > 0 && row.redeemedAt === null) {
+      const key = `${row.marketId}:${row.walletAddress}`;
+      if (!candidateKeys.has(key)) {
+        candidateKeys.add(key);
+        plan.redeemCandidates.push({ marketId: row.marketId, walletAddress: row.walletAddress });
+      }
+    }
+  }
+  return plan;
+}
+
+export interface AgentRedeemSummary {
+  attempted: number;
+  redeemed: number;
+  skippedNoBalance: number;
+  skippedNotRedeemable: number;
+  failures: { marketId: string; error: string }[];
+}
+
+export interface SettlementSummary {
+  scanned: number;
+  positionsSettled: number;
+  heldUnknownWinner: number;
+  /** Circle auto-redeem leg, or a string explaining why it didn't run. */
+  agentRedeems: AgentRedeemSummary | string;
+}
+
+/** Injectable seam for tests: the Circle redemption executor. */
+export interface SettlementDeps {
+  executeRedeem?: (args: {
+    walletId: string;
+    to: `0x${string}`;
+    callData: `0x${string}`;
+  }) => Promise<{ txHash: `0x${string}` }>;
+}
+
+/**
+ * The post-resolution settlement pass (P-006), extending the reclaim sweep
+ * pattern: after a market resolves,
+ *
+ *  (a) every unsettled `market_positions` row on it is stamped
+ *      `settledAt`/`settlementPrice` ($1 winning side, $0 losing, $0.50
+ *      INVALID) so portfolio P/L can realize without waiting for a claim;
+ *  (b) positions held by AGENT wallets (Circle DCW — server-controlled)
+ *      auto-redeem through the existing redeem machinery: the market's
+ *      LIVE on-chain state picks redeem vs redeemInvalid (exactly like the
+ *      user route), the market address is admitted to the Circle target
+ *      allowlist from OUR factory read, and the confirmed receipt stamps
+ *      `redeemedAt`/`redeemTxHash` plus a `market_redeem` audit row.
+ *      Redemption is an inflow, so no spending cap is involved — the same
+ *      posture as the user redeem route;
+ *  (c) user-custody positions cannot be force-redeemed (the user must
+ *      sign) — they stay `settledAt` set + `redeemedAt` null, which is
+ *      precisely what the redeemable API surfaces as claimable. No
+ *      double-count: realized P/L reads settlement fields, claims read
+ *      redemption fields.
+ *
+ * Idempotent: settled rows (settledAt NOT null) never re-enter, the redeem
+ * leg is gated on live token balances (a redeemed wallet reads zero), and
+ * every leg isolates per-item failures.
+ */
+export async function settleResolvedPositions(
+  db: DB,
+  chainId: SupportedChainId = BASE_CHAIN_ID,
+  deps: SettlementDeps = {},
+): Promise<SettlementSummary> {
+  const rows = await db
+    .select({
+      id: marketPositions.id,
+      marketId: marketPositions.marketId,
+      walletAddress: marketPositions.walletAddress,
+      side: marketPositions.side,
+      redeemedAt: marketPositions.redeemedAt,
+      state: marketsSchema.state,
+      yesToken: marketsSchema.yesToken,
+      noToken: marketsSchema.noToken,
+    })
+    .from(marketPositions)
+    .innerJoin(marketsSchema, eq(marketPositions.marketId, marketsSchema.marketId))
+    .where(
+      and(
+        eq(marketsSchema.chainId, chainId),
+        inArray(marketsSchema.state, ["RESOLVED", "SETTLED", "INVALID"]),
+        isNull(marketPositions.settledAt),
+      ),
+    );
+
+  const summary: SettlementSummary = {
+    scanned: rows.length,
+    positionsSettled: 0,
+    heldUnknownWinner: 0,
+    agentRedeems: "nothing to redeem",
+  };
+  if (rows.length === 0) return summary;
+
+  // Winner per market (market vocabulary: 0 = YES pays) from the
+  // resolutions log; later rows win so overrides supersede.
+  const marketIds = [...new Set(rows.map((r) => r.marketId))];
+  const winnerByMarket = new Map<string, number>();
+  const resRows = await db
+    .select({
+      marketId: resolutions.marketId,
+      winningOutcomeIndex: resolutions.winningOutcomeIndex,
+    })
+    .from(resolutions)
+    .where(inArray(resolutions.marketId, marketIds))
+    .orderBy(asc(resolutions.createdAt));
+  for (const r of resRows) {
+    if (r.winningOutcomeIndex !== null) winnerByMarket.set(r.marketId, r.winningOutcomeIndex);
+  }
+
+  const plan = planPositionSettlement(rows, winnerByMarket);
+  summary.heldUnknownWinner = plan.heldUnknownWinner;
+
+  const now = new Date();
+  for (const mark of plan.marks) {
+    await db
+      .update(marketPositions)
+      .set({ settledAt: now, settlementPrice: mark.settlementPrice, updatedAt: now })
+      .where(and(eq(marketPositions.id, mark.id), isNull(marketPositions.settledAt)));
+    summary.positionsSettled += 1;
+  }
+
+  if (plan.redeemCandidates.length === 0) return summary;
+
+  // (b) — the agent auto-redeem leg. Wallets in `agent_wallets` are Circle
+  // DCW (server-controlled); anything else is user custody and stays (c).
+  const wallets = [...new Set(plan.redeemCandidates.map((c) => c.walletAddress))];
+  const agentRows = await db
+    .select({ address: agentWallets.address, circleWalletId: agentWallets.circleWalletId })
+    .from(agentWallets)
+    .where(inArray(agentWallets.address, wallets));
+  const agentByAddress = new Map(agentRows.map((w) => [w.address.toLowerCase(), w]));
+  const agentCandidates = plan.redeemCandidates.filter((c) =>
+    agentByAddress.has(c.walletAddress.toLowerCase()),
+  );
+  if (agentCandidates.length === 0) return summary;
+
+  let cfg: ReturnType<typeof marketsCfg>;
+  try {
+    cfg = marketsCfg(chainId);
+  } catch {
+    summary.agentRedeems = "disabled (markets not deployed on this chain)";
+    return summary;
+  }
+  const client = getRpcClient(chainId);
+  const tokensByMarket = new Map(
+    rows.map((r) => [r.marketId, { yesToken: r.yesToken, noToken: r.noToken }]),
+  );
+  const executeRedeem =
+    deps.executeRedeem ??
+    (async (args: { walletId: string; to: `0x${string}`; callData: `0x${string}` }) => {
+      const result = await executeAgentCalldata(args);
+      return { txHash: result.txHash };
+    });
+
+  const redeems: AgentRedeemSummary = {
+    attempted: 0,
+    redeemed: 0,
+    skippedNoBalance: 0,
+    skippedNotRedeemable: 0,
+    failures: [],
+  };
+  summary.agentRedeems = redeems;
+
+  for (const candidate of agentCandidates) {
+    const wallet = agentByAddress.get(candidate.walletAddress.toLowerCase());
+    const tokens = tokensByMarket.get(candidate.marketId);
+    if (!wallet || !tokens?.yesToken || !tokens.noToken) continue;
+    redeems.attempted += 1;
+    try {
+      const market = await client.readContract({
+        address: cfg.markets.factory,
+        abi: MARKET_FACTORY_ABI,
+        functionName: "marketOf",
+        args: [candidate.marketId as `0x${string}`],
+      });
+      if (market === "0x0000000000000000000000000000000000000000") continue;
+      // The LIVE on-chain state picks the function — the DB row can lead
+      // the chain briefly right after a resolve tx; wait for the chain.
+      const state = await client.readContract({
+        address: market,
+        abi: MARKET_ABI,
+        functionName: "state",
+      });
+      const fn = redeemFunctionForOnchainState(state);
+      if (fn === null) {
+        redeems.skippedNotRedeemable += 1;
+        continue;
+      }
+      const [yesBal, noBal] = await Promise.all(
+        [tokens.yesToken, tokens.noToken].map((t) =>
+          client.readContract({
+            address: t as `0x${string}`,
+            abi: ERC20_BALANCE_OF_ABI,
+            functionName: "balanceOf",
+            args: [wallet.address as `0x${string}`],
+          }),
+        ),
+      );
+      if (yesBal === 0n && noBal === 0n) {
+        // Already redeemed on-chain (or never held) — stamp the mirror so
+        // the pass converges instead of retrying forever.
+        redeems.skippedNoBalance += 1;
+        await db
+          .update(marketPositions)
+          .set({ redeemedAt: now, updatedAt: now })
+          .where(
+            and(
+              eq(marketPositions.marketId, candidate.marketId),
+              eq(marketPositions.walletAddress, candidate.walletAddress),
+              isNull(marketPositions.redeemedAt),
+            ),
+          );
+        continue;
+      }
+      // Server-trusted read → allowlist admission (the agent-trade pattern).
+      registerDynamicTargets([market]);
+      const { txHash } = await executeRedeem({
+        walletId: wallet.circleWalletId,
+        to: market,
+        callData: redeemCalldata(fn),
+      });
+      await db
+        .update(marketPositions)
+        .set({ redeemedAt: now, redeemTxHash: txHash.toLowerCase(), updatedAt: now })
+        .where(
+          and(
+            eq(marketPositions.marketId, candidate.marketId),
+            eq(marketPositions.walletAddress, candidate.walletAddress),
+            isNull(marketPositions.redeemedAt),
+          ),
+        );
+      await logAudit({
+        walletAddress: candidate.walletAddress,
+        action: "market_redeem",
+        outcome: "success",
+        txHash: txHash.toLowerCase(),
+        chainId,
+        params: { marketId: candidate.marketId, automated: true, trigger: "settlement-sweep" },
+      });
+      redeems.redeemed += 1;
+    } catch (err) {
+      redeems.failures.push({
+        marketId: candidate.marketId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  if (redeems.redeemed > 0) {
+    logger.info({ chainId, ...redeems }, "markets: auto-redeemed agent positions");
   }
   return summary;
 }

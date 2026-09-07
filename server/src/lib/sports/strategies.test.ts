@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  MAX_EVENT_DURATION_SECONDS,
   evaluateStrategy,
   strategyConfigSchema,
   ticksFromSlates,
@@ -118,7 +119,7 @@ void describe("take-profit / stop evaluation (B9-002)", () => {
 });
 
 void describe("safety precedence (B9-007 — P0)", () => {
-  void it("kickoff freeze disarms even on the tick that would have fired", () => {
+  void it("the freeze (event final, D-103) disarms even on the tick that would have fired", () => {
     // 9000bps would trigger take-profit — but the market froze this tick.
     const d = evaluateStrategy(armed(tpStop), [tick({ impliedProbBps: 9000, frozen: true })], NOW);
     assert.deepEqual(d, { kind: "disarm", reason: "market-frozen" });
@@ -245,12 +246,20 @@ void describe("ticksFromSlates — game-state ticks (B9-005)", () => {
     assert.equal(away.frozen, false);
   });
 
-  void it("game-state transitions: kickoff time, in_progress, and final all freeze", () => {
+  void it("game-state transitions (D-103 in-play): kickoff and in_progress stay LIVE; final and the 12h backstop freeze", () => {
+    // In-play trading: neither kickoff nor a live game freezes anything.
     for (const e of [
-      event({ startsAt: NOW }), // kickoff moment — same clock as the contract freeze
-      event({ startsAt: NOW - 60 }),
-      event({ status: "in_progress" }),
-      event({ status: "final" }),
+      event({ startsAt: NOW }), // kickoff moment
+      event({ startsAt: NOW - 60, status: "in_progress" }), // mid-game
+    ]) {
+      const ticks = ticksFromSlates([slate([e])], NOW);
+      assert.equal(ticks[0].frozen, false);
+      assert.equal(ticks[1].frozen, false);
+    }
+    // Freeze fires on FINAL (data-driven) or the permissionless backstop.
+    for (const e of [
+      event({ status: "final", startsAt: NOW - 3600 }),
+      event({ startsAt: NOW - MAX_EVENT_DURATION_SECONDS, status: "in_progress" }),
     ]) {
       const ticks = ticksFromSlates([slate([e])], NOW);
       assert.equal(ticks[0].frozen, true);
@@ -281,24 +290,24 @@ void describe("ticksFromSlates — game-state ticks (B9-005)", () => {
 });
 
 void describe("B10-006 — hedging lifecycle scenario", () => {
-  // One strategy across a game day: pre-game drift (hold), a line move
-  // (trigger, sized under cap), and kickoff (disarm). The execution leg —
-  // turning the trigger into a swap — is gated on the periphery deploy;
-  // the decision layer this covers is what will drive it.
-  void it("holds through drift, fires on the cross, disarms at kickoff", () => {
+  // One strategy across a game day (D-103 in-play): pre-game drift (hold),
+  // an IN-GAME price move (trigger, sized under cap), and the final whistle
+  // (disarm). The freeze moved from kickoff to final — the strategy stays
+  // armed and can fire while the game runs.
+  void it("holds through drift, fires on an in-game cross, disarms on the final", () => {
     const strategy = armed(tpStop, { capUsd: 50 });
 
     // Morning: 62% — inside thresholds.
     assert.equal(evaluateStrategy(strategy, [tick({ impliedProbBps: 6200 })], NOW).kind, "hold");
-    // Afternoon line move: 81% — take-profit fires.
+    // Third quarter, the pool runs to 81% — take-profit fires MID-GAME.
     const fired = evaluateStrategy(strategy, [tick({ impliedProbBps: 8100 })], NOW + 3600);
     assert.equal(fired.kind, "trigger");
-    // Kickoff: even at 90%, the freeze wins.
-    const atKickoff = evaluateStrategy(
+    // Final whistle: even at 90%, the freeze wins.
+    const atFinal = evaluateStrategy(
       strategy,
       [tick({ impliedProbBps: 9000, frozen: true })],
       NOW + 7200,
     );
-    assert.deepEqual(atKickoff, { kind: "disarm", reason: "market-frozen" });
+    assert.deepEqual(atFinal, { kind: "disarm", reason: "market-frozen" });
   });
 });

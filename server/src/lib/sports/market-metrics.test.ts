@@ -15,9 +15,14 @@ process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
 process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
 
-const { aggregateFills, derivePriceMetrics, deriveOpenInterest, secondsToKickoff } = await import(
-  "./market-metrics.ts"
-);
+const {
+  aggregateFills,
+  derivePriceMetrics,
+  deriveOpenInterest,
+  fillImpliedProbability,
+  poolSnapshotDue,
+  secondsToKickoff,
+} = await import("./market-metrics.ts");
 type FillRow = import("./market-metrics.ts").FillRow;
 type PriceRow = import("./market-metrics.ts").PriceRow;
 type PositionRow = import("./market-metrics.ts").PositionRow;
@@ -167,5 +172,37 @@ void describe("secondsToKickoff", () => {
   void it("counts down and floors at zero after kickoff", () => {
     assert.equal(secondsToKickoff(NOW + 90, NOW), 90);
     assert.equal(secondsToKickoff(NOW - 90, NOW), 0);
+  });
+});
+
+void describe("fillImpliedProbability (P-011 fill ticks)", () => {
+  void it("is the trade's effective price usdc/tokens, 5dp", () => {
+    assert.equal(fillImpliedProbability("650000", "1000000"), "0.65000");
+    assert.equal(fillImpliedProbability("1234567", "2000000"), "0.61728");
+  });
+
+  void it("clamps into the contract's [0, 1] band", () => {
+    assert.equal(fillImpliedProbability("2000000", "1000000"), "1.00000");
+    assert.equal(fillImpliedProbability("0", "1000000"), "0.00000");
+  });
+
+  void it("refuses malformed or zero-token fills — no fabricated tick", () => {
+    assert.equal(fillImpliedProbability("100", "0"), null);
+    assert.equal(fillImpliedProbability("abc", "1000000"), null);
+    assert.equal(fillImpliedProbability("-5", "1000000"), null);
+  });
+});
+
+void describe("poolSnapshotDue (P-011 snapshot cadence — cron idempotency)", () => {
+  const NOW_MS = 1_800_000_000_000;
+  void it("always due with no prior pool capture", () => {
+    assert.equal(poolSnapshotDue(null, NOW_MS, 60), true);
+  });
+  void it("not due inside the minimum interval — a re-run cannot stack duplicates", () => {
+    assert.equal(poolSnapshotDue(NOW_MS - 59_000, NOW_MS, 60), false);
+  });
+  void it("due once the interval has elapsed", () => {
+    assert.equal(poolSnapshotDue(NOW_MS - 60_000, NOW_MS, 60), true);
+    assert.equal(poolSnapshotDue(NOW_MS - 61_000, NOW_MS, 60), true);
   });
 });

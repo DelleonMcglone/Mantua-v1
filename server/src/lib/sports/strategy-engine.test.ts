@@ -158,7 +158,9 @@ describe("overlayPoolTicks (B9-005 price ticks)", () => {
   });
 
   it("reads only events that are live AND referenced by some strategy", async () => {
-    const frozenEvent = event({ providerEventId: EVENT_ID, status: "in_progress" });
+    // D-103 in-play: a live (in_progress) game is NOT frozen any more —
+    // only a FINAL one is out of the read set.
+    const frozenEvent = event({ providerEventId: EVENT_ID, status: "final" });
     const unreferenced = event({ providerEventId: "401other" });
     const slates = [slate([frozenEvent, unreferenced])];
     let reads = 0;
