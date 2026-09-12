@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
-import { env } from "../env.ts";
 import { logger } from "../lib/logger.ts";
+import { RPC_UPSTREAMS, recordRpcOutcome } from "../lib/rpc-client.ts";
 
 export const rpcProxyRouter = Router();
 
@@ -21,12 +21,11 @@ export const rpcProxyRouter = Router();
  * whitelist, and the global per-IP rate limiter still applies.
  */
 
-const UPSTREAMS = [
-  env.BASE_RPC_URL,
-  ...["https://mainnet.base.org", "https://base-rpc.publicnode.com"].filter(
-    (u) => u !== env.BASE_RPC_URL,
-  ),
-];
+// Phase 7 / R-006 — the same ordered list the viem client uses (primary,
+// dedicated fallbacks, public backstop only where allowed), so the wallet
+// path and the server path never diverge; outcomes score the shared
+// per-host health that /api/status reports.
+const UPSTREAMS = RPC_UPSTREAMS;
 
 const ALLOWED_METHODS = new Set([
   "eth_chainId",
@@ -73,7 +72,7 @@ function setCors(res: Response): void {
 
 async function forward(body: unknown): Promise<unknown> {
   let lastErr: unknown = null;
-  for (const url of UPSTREAMS) {
+  for (const [index, url] of UPSTREAMS.entries()) {
     try {
       const res = await fetch(url, {
         method: "POST",
@@ -84,6 +83,7 @@ async function forward(body: unknown): Promise<unknown> {
       const json: unknown = await res.json().catch(() => null);
       if (json === null) {
         lastErr = new Error(`upstream ${url} returned non-JSON (${String(res.status)})`);
+        recordRpcOutcome(index, false, lastErr);
         continue;
       }
       // Rotate to the next host on a rate-limit response (HTTP 429 or a
@@ -95,11 +95,14 @@ async function forward(body: unknown): Promise<unknown> {
         /request limit/i.test(rpcErr?.message ?? "")
       ) {
         lastErr = new Error(`upstream ${url} rate-limited`);
+        recordRpcOutcome(index, false, lastErr);
         continue;
       }
+      recordRpcOutcome(index, true);
       return json;
     } catch (err) {
       lastErr = err;
+      recordRpcOutcome(index, false, err);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error("all Base RPC upstreams failed");

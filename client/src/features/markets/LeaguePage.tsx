@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu.tsx";
 import { getSport, SPORTS, type SportId } from "./sports.ts";
 import { useSlate, type SlateEvent } from "./use-slate.ts";
-import { useMarketTrade } from "./use-market-trade.ts";
+import { useMarketTrade, type TradeQuote } from "./use-market-trade.ts";
+import { usePendingTrades } from "./PendingTradesProvider.tsx";
+import { usePlatformStatus } from "@/features/status/PlatformStatusProvider.tsx";
+import { buysBlockedByStatus } from "@/features/status/connection-status-core.ts";
 import { feeSummary, isTradableStatus, rawToHuman6, usdcCeil2 } from "./market-trade-core.ts";
 import { MarketDetail } from "./MarketDetail.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
@@ -444,12 +447,38 @@ function TradeSidebar({
   });
 
   const chosen = outcomeIndex === 0 ? event.home : event.away;
-  const calldata = phase.kind === "quoted" || phase.kind === "done" ? phase.calldata : null;
+  // What the ticket renders: the (cap-free) quote while the user is
+  // choosing, the issued calldata's own quote once the trade is done.
+  const view: TradeQuote | null =
+    phase.kind === "quoted" || phase.kind === "building"
+      ? phase.quote
+      : phase.kind === "quoting"
+        ? phase.previous
+        : phase.kind === "done" || phase.kind === "pending" || phase.kind === "failed"
+          ? phase.calldata
+          : null;
+  // Phase 7 / R-004 + R-005 — trades from earlier sessions still settling,
+  // and the platform's own trading state (an operator pause disables buys
+  // here; per-game halts are refused by the server with a typed message).
+  const register = usePendingTrades();
+  const { status: platformStatus } = usePlatformStatus();
+  const currentHash =
+    phase.kind === "confirming" ||
+    phase.kind === "pending" ||
+    phase.kind === "done" ||
+    phase.kind === "failed"
+      ? phase.txHash.toLowerCase()
+      : null;
+  const earlierPending = register.pending.filter((t) => t.txHash.toLowerCase() !== currentHash);
+  const earlierSettled = register.settled.filter(
+    (t) => t.trade.txHash.toLowerCase() !== currentHash,
+  );
+  const buysPaused = direction === "buy" && buysBlockedByStatus(platformStatus);
 
   // Once a quote reveals the YES token, show the user's holdings so Sell
   // has a truthful Max.
   const walletAddress = user?.wallet?.address as `0x${string}` | undefined;
-  const yesToken = calldata?.yesToken;
+  const yesToken = view?.yesToken;
   useEffect(() => {
     if (!yesToken || !walletAddress) return;
     publicClient
@@ -465,10 +494,10 @@ function TradeSidebar({
       });
   }, [yesToken, walletAddress, phase.kind]);
 
-  const quote = calldata?.quote ?? null;
+  const quote = view?.quote ?? null;
   const out = quote ? Number(quote.amountOut) / 1e6 : null;
   // T-008 — the transparent fee line, from the hook's own quote (D-105).
-  const fee = calldata?.fee ?? null;
+  const fee = view?.fee ?? null;
   const feeLine = quote && fee ? feeSummary(quote.amountIn, fee) : null;
   // Server-quoted floor (quote − slippage tolerance); the matching price
   // bound is already inside the calldata the wallet will sign.
@@ -477,7 +506,20 @@ function TradeSidebar({
       ? Number(quote.amountOutMinimum) / 1e6
       : null;
   const busy =
-    phase.kind === "approving" || phase.kind === "signing" || phase.kind === "confirming";
+    phase.kind === "building" ||
+    phase.kind === "approving" ||
+    phase.kind === "signing" ||
+    phase.kind === "confirming";
+  const explorer = (hash: `0x${string}`) => (
+    <a
+      href={getExplorerTxUrl(BASE_CHAIN_ID, hash)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="underline"
+    >
+      View transaction
+    </a>
+  );
 
   const bump = (n: number) => {
     setAmount(String((Number(amount) || 0) + n));
@@ -580,8 +622,13 @@ function TradeSidebar({
         ))}
       </div>
 
-      <div className="mt-3 min-h-[38px] text-[12px] leading-relaxed text-text-dim">
-        {phase.kind === "quoting" && <span role="status">Quoting…</span>}
+      <div
+        className={`mt-3 min-h-[38px] text-[12px] leading-relaxed text-text-dim transition-opacity ${
+          phase.kind === "quoting" && phase.previous !== null ? "opacity-60" : ""
+        }`}
+        aria-busy={phase.kind === "quoting"}
+      >
+        {phase.kind === "quoting" && phase.previous === null && <span role="status">Quoting…</span>}
         {quote && out !== null && direction === "buy" && (
           <>
             You receive <span className="font-mono text-text">{out.toFixed(2)}</span>{" "}
@@ -618,31 +665,73 @@ function TradeSidebar({
           </div>
         )}
         {phase.kind === "error" && (
-          <span role="alert" className="text-yellow">
+          <span role={phase.errorKind === "rejected" ? "status" : "alert"} className="text-yellow">
             {phase.message}
           </span>
         )}
         {busy && (
           <span role="status" className="text-accent">
+            {phase.kind === "building" && "Preparing your trade…"}
             {phase.kind === "approving" && "Approve in your wallet…"}
             {phase.kind === "signing" && "Sign the trade in your wallet…"}
-            {phase.kind === "confirming" && "Confirming on-chain…"}
+            {phase.kind === "confirming" && (
+              <>Submitted — confirming on-chain… {explorer(phase.txHash)}</>
+            )}
+          </span>
+        )}
+        {phase.kind === "pending" && (
+          <span role="status" className="text-yellow" data-testid="trade-pending">
+            Submitted and still confirming{register.slow ? " — the network is slow" : ""}. We keep
+            checking; you can leave this page. {explorer(phase.txHash)}
+          </span>
+        )}
+        {phase.kind === "failed" && (
+          <span role="alert" className="text-red" data-testid="trade-failed">
+            The transaction reverted on-chain — nothing was traded and no funds moved.{" "}
+            {explorer(phase.txHash)}
           </span>
         )}
         {phase.kind === "done" && (
           <span role="status" className="text-green">
-            Done.{" "}
-            <a
-              href={getExplorerTxUrl(BASE_CHAIN_ID, phase.txHash)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline"
-            >
-              View transaction
-            </a>
+            Confirmed.{phase.recorded ? "" : " (Recording the fill…)"} {explorer(phase.txHash)}
           </span>
         )}
       </div>
+      {(earlierPending.length > 0 || earlierSettled.length > 0) && (
+        <div
+          className="mt-2 flex flex-col gap-1 text-[11px] leading-relaxed text-text-dim"
+          data-testid="earlier-trades"
+        >
+          {earlierPending.map((t) => (
+            <span key={t.txHash} role="status">
+              An earlier {t.direction} is still confirming{register.slow ? " (slow)" : ""}.{" "}
+              {explorer(t.txHash)}
+            </span>
+          ))}
+          {earlierSettled.map((s) => (
+            <span
+              key={s.trade.txHash}
+              role="status"
+              className={s.outcome === "confirmed" ? "text-green" : "text-yellow"}
+            >
+              {s.outcome === "confirmed" && "An earlier trade confirmed."}
+              {s.outcome === "failed" && "An earlier trade reverted — nothing was traded."}
+              {s.outcome === "dropped" &&
+                "An earlier trade was never mined — nothing was traded."}{" "}
+              {explorer(s.trade.txHash)}{" "}
+              <button
+                type="button"
+                className="cursor-pointer underline"
+                onClick={() => {
+                  register.dismiss(s.trade.txHash);
+                }}
+              >
+                Dismiss
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {authenticated ? (
         <Button
@@ -651,12 +740,18 @@ function TradeSidebar({
           className="mt-2 w-full"
           aria-live="polite"
           aria-atomic="true"
-          disabled={phase.kind !== "quoted"}
+          disabled={phase.kind !== "quoted" || buysPaused}
           onClick={() => {
             void execute();
           }}
         >
-          {busy ? "Working…" : direction === "sell" ? "Sell" : "Trade"}
+          {busy
+            ? "Working…"
+            : buysPaused
+              ? "Trading paused"
+              : direction === "sell"
+                ? "Sell"
+                : "Trade"}
         </Button>
       ) : (
         <Button

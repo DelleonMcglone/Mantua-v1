@@ -9,6 +9,7 @@
 import { computeMarketId } from "../market-id.ts";
 import { sqrtPriceX96ToRawProbability } from "../probability.ts";
 import { getRpcClient } from "../rpc-client.ts";
+import { sharedCache } from "../shared-cache.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import {
   MARKETS_BY_CHAIN,
@@ -21,8 +22,11 @@ import { DYNAMIC_MARKET_BY_CHAIN } from "../v4-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
 import type { PublicSlate } from "./public-slate.ts";
 
+/** Phase 7 / R-007 — the overlay is the board's RPC amplifier (3 reads per
+ *  event); it lives in the SHARED cache so every instance serves one
+ *  computation per league per window. Keyed on the ingest time so a fresh
+ *  ingest invalidates it, like the old per-instance Map did. */
 const CACHE_TTL_MS = 15_000;
-const cache = new Map<string, { at: number; value: PublicSlate }>();
 
 /** Chains probed for a live pool price, in order — single chain today. */
 export const LIVE_ODDS_CHAINS: readonly SupportedChainId[] = [BASE_CHAIN_ID];
@@ -99,15 +103,14 @@ async function liveHomeProbabilityBps(providerEventId: string): Promise<number |
  * UI can label market prices as the market's own.
  */
 export async function withLiveOdds(slate: PublicSlate): Promise<PublicSlate> {
-  const cached = cache.get(slate.league);
-  if (
-    cached &&
-    Date.now() - cached.at < CACHE_TTL_MS &&
-    cached.value.fetchedAt === slate.fetchedAt
-  ) {
-    return cached.value;
-  }
+  return sharedCache.getOrCompute(
+    `live-odds:${slate.league}:${String(slate.fetchedAt)}:${String(slate.events.length)}`,
+    CACHE_TTL_MS,
+    () => overlayLiveOdds(slate),
+  );
+}
 
+async function overlayLiveOdds(slate: PublicSlate): Promise<PublicSlate> {
   const events = await Promise.all(
     slate.events.map(async (event) => {
       try {
@@ -120,7 +123,5 @@ export async function withLiveOdds(slate: PublicSlate): Promise<PublicSlate> {
     }),
   );
 
-  const enriched: PublicSlate = { ...slate, events };
-  cache.set(slate.league, { at: Date.now(), value: enriched });
-  return enriched;
+  return { ...slate, events };
 }

@@ -1022,3 +1022,78 @@ export async function listReclaimCandidates(
       ),
     );
 }
+
+// ─── Platform status inputs (Phase 7 / R-005) ───────────────────────────────
+
+/**
+ * Per-league feed freshness for `/api/status` and the live stream: the most
+ * recent `last_polled_at` (the same `dataAsOf` the slate read reports) and
+ * how many games are in play right now — kicked off and not final, the
+ * `assessMarketTradability` notion of in-play, so "buys halted" is judged
+ * on the same population the trade gate refuses. One aggregate query.
+ */
+export async function readLeagueFeedInputs(
+  db: DB,
+  now: Date = new Date(),
+): Promise<{ league: string; dataAsOf: number | null; liveGames: number }[]> {
+  const rows = await db
+    .select({
+      league: leagues.slug,
+      dataAsOf: sql<Date | string | null>`max(${events.lastPolledAt})`,
+      liveGames: sql<
+        number | string
+      >`count(*) filter (where ${events.status} in ('scheduled', 'in_progress') and ${events.startsAt} <= ${now})`,
+    })
+    .from(leagues)
+    .leftJoin(events, eq(events.leagueId, leagues.id))
+    .groupBy(leagues.slug);
+  return rows.map((r) => {
+    const raw = r.dataAsOf;
+    const t = raw === null ? NaN : raw instanceof Date ? raw.getTime() : Date.parse(raw);
+    return {
+      league: r.league,
+      dataAsOf: Number.isFinite(t) ? t : null,
+      liveGames: Number(r.liveGames),
+    };
+  });
+}
+
+// ─── M-01 divergence (Phase 7 / R-010) ──────────────────────────────────────
+
+/**
+ * Markets Mantua's records show FROZEN while the canonical event is NOT
+ * final/void — the M-01 half-operating-service signature (the freeze
+ * landed, the registry/event state did not). The alert evaluator pages on
+ * rows older than its grace window. The strict on-chain form (reading the
+ * hook's event state per frozen market) is a follow-up; this catches the
+ * divergence the service itself can see.
+ */
+export async function readFrozenNotFinal(
+  db: DB,
+  now: Date = new Date(),
+): Promise<
+  { marketId: string; providerEventId: string; eventStatus: string; frozenForMs: number }[]
+> {
+  const rows = await db
+    .select({
+      marketId: markets.marketId,
+      providerEventId: events.providerEventId,
+      eventStatus: events.status,
+      frozenAt: markets.frozenAt,
+    })
+    .from(markets)
+    .innerJoin(events, eq(markets.eventId, events.id))
+    .where(
+      and(
+        eq(markets.state, "FROZEN"),
+        sql`${events.status} not in ('final', 'postponed', 'cancelled')`,
+      ),
+    )
+    .limit(100);
+  return rows.map((r) => ({
+    marketId: r.marketId,
+    providerEventId: r.providerEventId,
+    eventStatus: r.eventStatus,
+    frozenForMs: r.frozenAt ? Math.max(0, now.getTime() - r.frozenAt.getTime()) : 0,
+  }));
+}

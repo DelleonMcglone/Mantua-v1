@@ -7,6 +7,7 @@ import { events, leagues, marketFills, markets } from "../db/schema/index.ts";
 import { logger } from "../lib/logger.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { getRpcClient } from "../lib/rpc-client.ts";
+import { sharedCache } from "../lib/shared-cache.ts";
 import { BASE_CHAIN_ID } from "../lib/chains.ts";
 import {
   MARKETS_BY_CHAIN,
@@ -16,6 +17,15 @@ import {
 import { sqrtPriceX96ToProbability } from "../lib/probability.ts";
 
 export const marketPositionsRouter = Router();
+
+/** Phase 7 / R-007 — the wallet's marked positions: ~3 RPC reads per market
+ *  row (two balances + slot0), so one computation per wallet per window is
+ *  shared across instances; a verified fill for the wallet invalidates it
+ *  (market-fills.ts) so the number moves the moment the trade lands. */
+export const POSITIONS_CACHE_MS = 10_000;
+export function positionsCacheKey(owner: string): string {
+  return `positions:${owner.toLowerCase()}`;
+}
 
 const BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
@@ -69,133 +79,12 @@ marketPositionsRouter.get(
     const periphery = MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID];
 
     try {
-      const rows = await db
-        .select({
-          marketId: markets.marketId,
-          outcomeIndex: markets.outcomeIndex,
-          state: markets.state,
-          yesToken: markets.yesToken,
-          noToken: markets.noToken,
-          poolId: markets.poolId,
-          startsAt: events.startsAt,
-          homeTeam: events.homeTeam,
-          awayTeam: events.awayTeam,
-          providerEventId: events.providerEventId,
-          league: leagues.slug,
-        })
-        .from(markets)
-        .innerJoin(events, eq(markets.eventId, events.id))
-        .innerJoin(leagues, eq(events.leagueId, leagues.id))
-        .where(isNotNull(markets.yesToken))
-        .orderBy(desc(markets.createdAt))
-        .limit(40);
-
-      // Avg-cost basis per market from indexed fills (YES-side trades).
-      const fills = await db
-        .select()
-        .from(marketFills)
-        .where(eq(marketFills.address, owner.toLowerCase()));
-      const basis = new Map<string, { tokens: bigint; usdc: bigint }>();
-      for (const f of fills) {
-        const b = basis.get(f.marketId) ?? { tokens: 0n, usdc: 0n };
-        if (f.direction === "buy") {
-          b.tokens += BigInt(f.tokensRaw);
-          b.usdc += BigInt(f.usdcRaw);
-        } else if (b.tokens > 0n) {
-          // Selling reduces basis at average cost.
-          const sold = BigInt(f.tokensRaw) > b.tokens ? b.tokens : BigInt(f.tokensRaw);
-          b.usdc -= (b.usdc * sold) / b.tokens;
-          b.tokens -= sold;
-        }
-        basis.set(f.marketId, b);
-      }
-
-      const positions: MarketPositionRow[] = [];
-      await Promise.all(
-        rows.map(async (row) => {
-          if (!row.yesToken || !row.noToken) return;
-          const [yesBal, noBal] = await Promise.all([
-            client.readContract({
-              address: row.yesToken as `0x${string}`,
-              abi: BALANCE_ABI,
-              functionName: "balanceOf",
-              args: [owner],
-            }),
-            client.readContract({
-              address: row.noToken as `0x${string}`,
-              abi: BALANCE_ABI,
-              functionName: "balanceOf",
-              args: [owner],
-            }),
-          ]);
-          if (yesBal === 0n && noBal === 0n) return;
-
-          let yesProbBps: number | null = null;
-          if (row.poolId && deployment && periphery) {
-            try {
-              const [sqrtPriceX96] = await client.readContract({
-                address: periphery.stateView,
-                abi: STATE_VIEW_ABI,
-                functionName: "getSlot0",
-                args: [row.poolId as `0x${string}`],
-              });
-              if (sqrtPriceX96 > 0n) {
-                const yesIsToken0 =
-                  row.yesToken.toLowerCase() < deployment.collateral.toLowerCase();
-                yesProbBps = Math.round(
-                  sqrtPriceX96ToProbability(sqrtPriceX96, yesIsToken0) * 10_000,
-                );
-              }
-            } catch {
-              // price unavailable — report the balance unmarked
-            }
-          }
-
-          const winner = row.outcomeIndex === 0 ? row.homeTeam : row.awayTeam;
-          const opponent = row.outcomeIndex === 0 ? row.awayTeam : row.homeTeam;
-          const label = `${winner} to beat ${opponent}`;
-
-          for (const [side, bal] of [
-            ["yes", yesBal],
-            ["no", noBal],
-          ] as const) {
-            if (bal === 0n) continue;
-            const sideProb =
-              yesProbBps === null ? null : side === "yes" ? yesProbBps : 10_000 - yesProbBps;
-            const valueRaw =
-              sideProb === null ? "0" : ((bal * BigInt(sideProb)) / 10_000n).toString();
-
-            // Entry/P&L only for the YES side, where fills are indexed.
-            let entryPriceBps: number | null = null;
-            let pnlRaw: string | null = null;
-            const b = side === "yes" ? basis.get(row.marketId) : undefined;
-            if (b && b.tokens > 0n && sideProb !== null) {
-              entryPriceBps = Number((b.usdc * 10_000n) / b.tokens);
-              const held = bal < b.tokens ? bal : b.tokens;
-              const costOfHeld = (b.usdc * held) / b.tokens;
-              const markOfHeld = (held * BigInt(sideProb)) / 10_000n;
-              pnlRaw = (markOfHeld - costOfHeld).toString();
-            }
-
-            positions.push({
-              marketId: row.marketId,
-              label,
-              state: row.state,
-              startsAt: Math.floor(new Date(row.startsAt).getTime() / 1000),
-              side,
-              balance: bal.toString(),
-              impliedProbBps: sideProb,
-              valueRaw,
-              league: row.league,
-              providerEventId: row.providerEventId,
-              entryPriceBps,
-              pnlRaw,
-            });
-          }
-        }),
+      const positions = await sharedCache.getOrCompute(
+        positionsCacheKey(owner),
+        POSITIONS_CACHE_MS,
+        () => computePositions(owner, client, deployment, periphery),
       );
-
-      positions.sort((a, b) => b.startsAt - a.startsAt);
+      res.setHeader("Cache-Control", "private, no-store");
       res.json({ positions });
     } catch (err) {
       logger.warn({ err }, "market-positions: failed");
@@ -203,3 +92,135 @@ marketPositionsRouter.get(
     }
   },
 );
+
+async function computePositions(
+  owner: `0x${string}`,
+  client: ReturnType<typeof getRpcClient>,
+  deployment: (typeof MARKETS_BY_CHAIN)[typeof BASE_CHAIN_ID],
+  periphery: (typeof MARKETS_PERIPHERY_BY_CHAIN)[typeof BASE_CHAIN_ID],
+): Promise<MarketPositionRow[]> {
+  const rows = await db
+    .select({
+      marketId: markets.marketId,
+      outcomeIndex: markets.outcomeIndex,
+      state: markets.state,
+      yesToken: markets.yesToken,
+      noToken: markets.noToken,
+      poolId: markets.poolId,
+      startsAt: events.startsAt,
+      homeTeam: events.homeTeam,
+      awayTeam: events.awayTeam,
+      providerEventId: events.providerEventId,
+      league: leagues.slug,
+    })
+    .from(markets)
+    .innerJoin(events, eq(markets.eventId, events.id))
+    .innerJoin(leagues, eq(events.leagueId, leagues.id))
+    .where(isNotNull(markets.yesToken))
+    .orderBy(desc(markets.createdAt))
+    .limit(40);
+
+  // Avg-cost basis per market from indexed fills (YES-side trades).
+  const fills = await db
+    .select()
+    .from(marketFills)
+    .where(eq(marketFills.address, owner.toLowerCase()));
+  const basis = new Map<string, { tokens: bigint; usdc: bigint }>();
+  for (const f of fills) {
+    const b = basis.get(f.marketId) ?? { tokens: 0n, usdc: 0n };
+    if (f.direction === "buy") {
+      b.tokens += BigInt(f.tokensRaw);
+      b.usdc += BigInt(f.usdcRaw);
+    } else if (b.tokens > 0n) {
+      // Selling reduces basis at average cost.
+      const sold = BigInt(f.tokensRaw) > b.tokens ? b.tokens : BigInt(f.tokensRaw);
+      b.usdc -= (b.usdc * sold) / b.tokens;
+      b.tokens -= sold;
+    }
+    basis.set(f.marketId, b);
+  }
+
+  const positions: MarketPositionRow[] = [];
+  await Promise.all(
+    rows.map(async (row) => {
+      if (!row.yesToken || !row.noToken) return;
+      const [yesBal, noBal] = await Promise.all([
+        client.readContract({
+          address: row.yesToken as `0x${string}`,
+          abi: BALANCE_ABI,
+          functionName: "balanceOf",
+          args: [owner],
+        }),
+        client.readContract({
+          address: row.noToken as `0x${string}`,
+          abi: BALANCE_ABI,
+          functionName: "balanceOf",
+          args: [owner],
+        }),
+      ]);
+      if (yesBal === 0n && noBal === 0n) return;
+
+      let yesProbBps: number | null = null;
+      if (row.poolId && deployment && periphery) {
+        try {
+          const [sqrtPriceX96] = await client.readContract({
+            address: periphery.stateView,
+            abi: STATE_VIEW_ABI,
+            functionName: "getSlot0",
+            args: [row.poolId as `0x${string}`],
+          });
+          if (sqrtPriceX96 > 0n) {
+            const yesIsToken0 = row.yesToken.toLowerCase() < deployment.collateral.toLowerCase();
+            yesProbBps = Math.round(sqrtPriceX96ToProbability(sqrtPriceX96, yesIsToken0) * 10_000);
+          }
+        } catch {
+          // price unavailable — report the balance unmarked
+        }
+      }
+
+      const winner = row.outcomeIndex === 0 ? row.homeTeam : row.awayTeam;
+      const opponent = row.outcomeIndex === 0 ? row.awayTeam : row.homeTeam;
+      const label = `${winner} to beat ${opponent}`;
+
+      for (const [side, bal] of [
+        ["yes", yesBal],
+        ["no", noBal],
+      ] as const) {
+        if (bal === 0n) continue;
+        const sideProb =
+          yesProbBps === null ? null : side === "yes" ? yesProbBps : 10_000 - yesProbBps;
+        const valueRaw = sideProb === null ? "0" : ((bal * BigInt(sideProb)) / 10_000n).toString();
+
+        // Entry/P&L only for the YES side, where fills are indexed.
+        let entryPriceBps: number | null = null;
+        let pnlRaw: string | null = null;
+        const b = side === "yes" ? basis.get(row.marketId) : undefined;
+        if (b && b.tokens > 0n && sideProb !== null) {
+          entryPriceBps = Number((b.usdc * 10_000n) / b.tokens);
+          const held = bal < b.tokens ? bal : b.tokens;
+          const costOfHeld = (b.usdc * held) / b.tokens;
+          const markOfHeld = (held * BigInt(sideProb)) / 10_000n;
+          pnlRaw = (markOfHeld - costOfHeld).toString();
+        }
+
+        positions.push({
+          marketId: row.marketId,
+          label,
+          state: row.state,
+          startsAt: Math.floor(new Date(row.startsAt).getTime() / 1000),
+          side,
+          balance: bal.toString(),
+          impliedProbBps: sideProb,
+          valueRaw,
+          league: row.league,
+          providerEventId: row.providerEventId,
+          entryPriceBps,
+          pnlRaw,
+        });
+      }
+    }),
+  );
+
+  positions.sort((a, b) => b.startsAt - a.startsAt);
+  return positions;
+}

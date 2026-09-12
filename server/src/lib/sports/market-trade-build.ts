@@ -46,10 +46,7 @@ import { assertSwapRoute } from "../swap-route.ts";
  * the exact USDC input as the USD value), and settlement. Fail loudly at
  * the trade/seed choke points instead.
  */
-export function assertUsdcCollateral(
-  chainId: SupportedChainId,
-  collateral: `0x${string}`,
-): void {
+export function assertUsdcCollateral(chainId: SupportedChainId, collateral: `0x${string}`): void {
   const usdc = getToken("USDC", chainId).address;
   if (collateral.toLowerCase() !== usdc.toLowerCase()) {
     throw new Error(
@@ -126,14 +123,18 @@ export class MarketDataOutageError extends Error {
 
 /**
  * How stale the ingest pipeline's view of an in-play event may be before
- * new buys halt. The sports-sync cron ticks every few minutes; ten minutes
- * of silence during a LIVE game means at least two consecutive ticks were
- * missed — an outage, not jitter. Deliberately looser than the resolution
+ * new buys halt. The game-time ingest tick (`/api/cron/live-sync`, Phase 7)
+ * fires every five minutes from the GitHub scheduler, whose firing drifts by
+ * a few minutes; fifteen minutes of silence during a LIVE game means at
+ * least two consecutive ticks were missed — an outage, not jitter. (Before
+ * Phase 7 this was ten minutes against a sync that only ran daily, so the
+ * halt was effectively permanent.) Deliberately looser than the resolution
  * path's MAX_RESOLUTION_FEED_AGE_MS (settling needs fresher data than
  * quoting) and tighter than STORE_POLL_MAX_AGE_MS (a pre-game lull is
- * harmless; a live-game lull is not).
+ * harmless; a live-game lull is not). `/api/status` applies the same
+ * number so the banner and the refusal agree.
  */
-export const IN_PLAY_FEED_MAX_AGE_MS = 10 * 60_000;
+export const IN_PLAY_FEED_MAX_AGE_MS = 15 * 60_000;
 
 /** What the tradability gate needs to know — the canonical DB's view. */
 export interface TradeGateRow {
@@ -187,8 +188,7 @@ export function assessMarketTradability(
     if (age === null || age > IN_PLAY_FEED_MAX_AGE_MS) {
       return {
         kind: "halted",
-        reason:
-          age === null ? "no ingest record for a live game" : `feed ${String(age)}ms behind`,
+        reason: age === null ? "no ingest record for a live game" : `feed ${String(age)}ms behind`,
       };
     }
   }
@@ -341,6 +341,39 @@ export interface BuiltMarketTrade {
 }
 
 /**
+ * Task 050 — the pre-trade QUOTE: what the trade ticket renders while the
+ * user is still choosing an amount. Everything `BuiltMarketTrade` carries
+ * EXCEPT what makes it executable — no `to`/`data`/`value`, no approval
+ * target, no encoded price bound. Nothing in this shape can be signed into
+ * a transaction, which is exactly why the quote route may hand it out after
+ * a read-only cap check and without inking the daily ledger (C-019 ink is
+ * reserved for calldata issuance).
+ */
+export type MarketTradeQuote = Pick<
+  BuiltMarketTrade,
+  "marketId" | "marketAddress" | "yesToken" | "quote" | "fee"
+>;
+
+/** Strip a built trade down to its non-executable quote. Pure. */
+export function toMarketTradeQuote(built: BuiltMarketTrade): MarketTradeQuote {
+  const { marketId, marketAddress, yesToken, quote, fee } = built;
+  return { marketId, marketAddress, yesToken, quote, fee };
+}
+
+/**
+ * Quote one trade without issuing calldata — the same builder, the same
+ * on-chain quoter and hook fee, so the number on the ticket is the number
+ * the later `buildMarketTrade` call executes against (modulo pool movement
+ * in between, which the calldata's own quote and price bound cover).
+ */
+export async function quoteMarketTrade(
+  args: Parameters<typeof buildMarketTrade>[0],
+  deps: { db?: DB } = {},
+): Promise<MarketTradeQuote> {
+  return toMarketTradeQuote(await buildMarketTrade(args, deps));
+}
+
+/**
  * Quote + encode one trade. `direction` "buy" spends USDC for YES;
  * "sell" spends YES for USDC. `amountRaw` is the exact input (6dp).
  * `slippageBps` (default `DEFAULT_SLIPPAGE_BPS`, hard-capped at
@@ -456,7 +489,14 @@ export async function buildMarketTrade(
   // D-105 — the fee quote comes from the hook itself (H-012). A revert here
   // is a trade the hook would refuse (halt, size cap), surfaced before any
   // calldata is built.
-  const fee = await quoteMarketFee(client, dm.hook, plan.key, zeroForOne, args.amountRaw, inputIsYes);
+  const fee = await quoteMarketFee(
+    client,
+    dm.hook,
+    plan.key,
+    zeroForOne,
+    args.amountRaw,
+    inputIsYes,
+  );
 
   const calldata = buildPoolSwapTestCalldata({
     poolKey: plan.key,
