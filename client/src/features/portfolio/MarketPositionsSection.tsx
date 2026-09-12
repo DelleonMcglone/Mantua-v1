@@ -43,8 +43,12 @@ export function MarketPositionsSection() {
 
   useEffect(() => {
     reload();
+    // T-007: every fill dispatches the refresh event; the poll covers
+    // price moves between fills so the mark-to-market stays live.
     window.addEventListener("mantua:refresh-portfolio", reload);
+    const timer = setInterval(reload, 30_000);
     return () => {
+      clearInterval(timer);
       window.removeEventListener("mantua:refresh-portfolio", reload);
     };
   }, [reload]);
@@ -82,14 +86,14 @@ export function MarketPositionsSection() {
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center justify-between text-text-dim">
-                  <span className="font-mono">{tokens.toFixed(2)} tokens</span>
+                  <span className="font-mono">{tokens.toFixed(2)} contracts</span>
                   <span>
                     {row.impliedProbBps !== null && (
                       <span className="mr-2 font-mono">
                         {(row.impliedProbBps / 100).toFixed(0)}%
                       </span>
                     )}
-                    <span className="font-mono text-text">≈ {value.toFixed(2)} USDC</span>
+                    <span className="font-mono text-text">≈ ${value.toFixed(2)}</span>
                   </span>
                 </div>
                 <div className="mt-0.5 flex items-center justify-between">
@@ -127,7 +131,7 @@ export function MarketPositionsSection() {
                         }}
                         className="rounded-sm border border-border-soft px-2 py-0.5 text-[10px] text-text-dim hover:text-text cursor-pointer"
                       >
-                        Close
+                        {row.pnlRaw !== null && Number(row.pnlRaw) > 0 ? "Lock in profit" : "Close"}
                       </button>
                     );
                   })()}

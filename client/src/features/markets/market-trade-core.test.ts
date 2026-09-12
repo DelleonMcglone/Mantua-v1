@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
+import { MAX_FEE_PIPS, feeExceedsCeiling, feeLines } from "./fee-lines.ts";
 import {
   closePositionDetail,
   feeSummary,
@@ -109,4 +110,58 @@ test("feeSummary reports a regular-season quote as free", () => {
 test("feeSummary prints three decimals when the pip rate needs them", () => {
   assert.equal(feeSummary(1_000_000n, { ...PLAYOFF_FEE, feePips: 6999 }).ratePct, "0.700%");
   assert.equal(feeSummary(1_000_000n, { ...PLAYOFF_FEE, feePips: 7000 }).ratePct, "0.70%");
+});
+
+// ─── T-008 — fee lines and the ceiling guard (task 050) ─────────────────────
+
+test("feeLines renders four lines in every season, 0% in the regular season", () => {
+  const free = {
+    ...PLAYOFF_FEE,
+    feePips: 0,
+    ratePips: 0,
+    playoffs: false,
+    feeRaw: "0",
+    feeUsdcRaw: "0",
+  };
+  const lines = feeLines(feeSummary(50_000_000n, free), "buy");
+  assert.deepEqual(
+    lines.map((l) => l.label),
+    ["Position", "Fee", "Fee rate", "Total"],
+  );
+  assert.deepEqual(
+    lines.map((l) => l.value),
+    ["$50.00", "$0.00", "0.00%", "$50.00"],
+  );
+});
+
+test("the spec numbers: $100 at 50/50 and the ceiling → $0.35; 100 contracts at 50¢ → $0.18", () => {
+  const hundredDollars = feeSummary(100_000_000n, PLAYOFF_FEE);
+  assert.equal(hundredDollars.fee, "0.35");
+  assert.equal(hundredDollars.total, "100.00");
+  // 100 contracts at $0.50 cost $50; the hook's fee is 50 × 0.35% = $0.175.
+  const hundredContracts = feeSummary(50_000_000n, {
+    ...PLAYOFF_FEE,
+    feeRaw: "175000",
+    feeUsdcRaw: "175000",
+  });
+  assert.equal(hundredContracts.fee, "0.18");
+  assert.equal(hundredContracts.total, "50.00");
+});
+
+test("a quote above the 0.70% ceiling is refused, never displayed", () => {
+  assert.equal(feeExceedsCeiling(PLAYOFF_FEE), false);
+  assert.equal(feeExceedsCeiling({ ...PLAYOFF_FEE, feePips: 7000, ratePips: 7000 }), false);
+  assert.equal(feeExceedsCeiling({ ...PLAYOFF_FEE, feePips: 7001 }), true);
+  assert.equal(feeExceedsCeiling({ ...PLAYOFF_FEE, ratePips: 7001 }), true);
+  assert.equal(MAX_FEE_PIPS, 7000);
+});
+
+test("sell lines value the fee taken from the contracts sold", () => {
+  const lines = feeLines(feeSummary(10_000_000n, PLAYOFF_FEE), "sell");
+  assert.deepEqual(
+    lines.map((l) => l.label),
+    ["Contracts sold", "Fee", "Fee rate"],
+  );
+  assert.equal(lines[0].value, "10.00");
+  assert.equal(lines[1].value, "$0.35");
 });

@@ -40,7 +40,9 @@ export type TradePhase =
   | { kind: "quoted"; calldata: TradeCalldata }
   | { kind: "approving" | "signing" | "confirming"; calldata: TradeCalldata }
   | { kind: "done"; txHash: `0x${string}`; calldata: TradeCalldata }
-  | { kind: "error"; message: string };
+  /** `error` is the thrown value itself so the ticket can map its code to
+   *  owner-readable copy (T-012); `message` stays for logging. */
+  | { kind: "error"; message: string; error: unknown };
 
 interface Args {
   eventId: string;
@@ -83,7 +85,11 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
           setPhase({ kind: "quoted", calldata });
         })
         .catch((err: unknown) => {
-          setPhase({ kind: "error", message: err instanceof Error ? err.message : "Quote failed" });
+          setPhase({
+            kind: "error",
+            message: err instanceof Error ? err.message : "Quote failed",
+            error: err,
+          });
         });
     }, 400);
     return () => {
@@ -145,7 +151,11 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
         .catch(() => undefined);
       window.dispatchEvent(new Event("mantua:refresh-portfolio"));
     } catch (err) {
-      setPhase({ kind: "error", message: err instanceof Error ? err.message : "Trade failed" });
+      setPhase({
+        kind: "error",
+        message: err instanceof Error ? err.message : "Trade failed",
+        error: err,
+      });
     }
   };
 

@@ -9,6 +9,7 @@ import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
 import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
+import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
 
 /**
  * "Your Circle Agent" — a free-form, autonomous conversational agent.
@@ -299,6 +300,8 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
           {msg.streaming && <Caret />}
         </div>
       )}
+      {/* T-022: the agent's read is an estimate, never a certainty. */}
+      {!msg.streaming && msg.text && <PredictionNote className="max-w-[92%]" />}
 
       {msg.failed && (
         <Banner tone="error" icon="⊘" title="Something went wrong">
@@ -479,15 +482,16 @@ function renderResult(step: ToolStep): ReactNode {
       const label = d.destinationChain.replace(/_/g, " ");
       return (
         <div className="flex flex-col gap-2.5">
-          <Banner tone="success" icon={<Check className="h-3.5 w-3.5" aria-hidden />} title={`Bridged ${fmtNum(d.amount)} USDC → ${label}`}>
+          <Banner
+            tone="success"
+            icon={<Check className="h-3.5 w-3.5" aria-hidden />}
+            title={`Bridged ${fmtNum(d.amount)} USDC → ${label}`}
+          >
             Recipient {shortAddr(d.recipient)} on {label}. Circle&apos;s forwarding fee is deducted
             from the minted amount.
           </Banner>
           {d.burnTxHash && (
-            <TxRow
-              hash={d.burnTxHash}
-              explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`}
-            />
+            <TxRow hash={d.burnTxHash} explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`} />
           )}
         </div>
       );
@@ -623,9 +627,7 @@ function renderResult(step: ToolStep): ReactNode {
             ]}
           />
           {(d.signals?.notes.length ?? 0) > 0 && (
-            <span className="text-[12px] text-text-dim">
-              {d.signals?.notes.join(" ")}
-            </span>
+            <span className="text-[12px] text-text-dim">{d.signals?.notes.join(" ")}</span>
           )}
         </div>
       );
@@ -796,10 +798,9 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
   return (
     <div className="flex flex-col gap-3.5">
       <div className="text-[13px] leading-[1.6] text-text-dim">
-        Hi — I'm your Circle agent. Tell
-        me what to do in plain language and I'll handle it: check balances, swap or send tokens,
-        evaluate sports markets and place bets, or look up market &amp; on-chain data. I act
-        autonomously within your daily spending cap.
+        Hi — I'm your Circle agent. Tell me what to do in plain language and I'll handle it: check
+        balances, swap or send tokens, evaluate sports markets and place bets, or look up market
+        &amp; on-chain data. I act autonomously within your daily spending cap.
       </div>
       <div className="flex flex-nowrap gap-2 overflow-x-auto pb-0.5">
         {SUGGESTIONS.map((s) => (

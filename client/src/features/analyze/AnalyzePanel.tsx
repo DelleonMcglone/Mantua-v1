@@ -12,6 +12,7 @@ import {
   type AnalyzeHistoryTurn,
 } from "./analyze-stream.ts";
 import { resolveAnalyzeQuestion } from "./question-router.ts";
+import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
 
 interface AnalyzeMetric {
   label: string;
@@ -385,6 +386,8 @@ function TurnView({
             {turn.failed}
           </Banner>
         )}
+        {/* T-022: an analysis is a view, never a promise. */}
+        {!turn.streaming && turn.text && <PredictionNote />}
       </div>
     );
   }

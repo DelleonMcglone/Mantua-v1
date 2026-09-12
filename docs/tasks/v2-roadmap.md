@@ -491,6 +491,38 @@ Use Uniswap Trading API response — it returns permit data when needed. Sign wi
 | H-016 | Rounding / overflow / precision (`MarketFeeFormula.t.sol`)                               | ✅     |
 | H-017 | Manipulation resistance (`FeeManipulation.t.sol`)                                        | ✅     |
 
+### Core Trading UX — consumer layer (Phase 6 📱, task 050)
+
+> Owner directive 2026-09-12. Feels like a modern sports app; complexity
+> underneath; the conversational dock stays the primary surface. Detail and
+> the reconciled evidence table: `docs/tasks/050-core-trading-ux.md`.
+
+| ID    | Task                                                                                | Status |
+| ----- | ----------------------------------------------------------------------------------- | ------ |
+| T-001 | Market discovery home; a new sport is one catalog row, no navigation layer          | ✅     |
+| T-002 | ≤3-tap trade flow (`trade-ticket-core.ts`, tap budget asserted)                     | ✅     |
+| T-003 | Instant buy and sell before or during the event                                     | ✅     |
+| T-004 | Clean sports-app interface, no DeFi terminology in the primary UX                   | ✅     |
+| T-005 | Gasless UX surface (`chainless-copy.test.ts`)                                       | ✅     |
+| T-006 | Explicit "Trade executed" state (`TicketExecuted`)                                  | ✅     |
+| T-007 | Real-time position and balance updates (`use-live-balance.ts`)                      | ✅     |
+| T-008 | Transparent fee display identical to the hook quote; ceiling guard; $0.35 / $0.18   | ✅     |
+| T-009 | Fee-structure explainer (`FeeExplainer`)                                            | ✅     |
+| T-010 | Market page simple layer (`MarketSummary`); deeper data behind "More"               | ✅     |
+| T-011 | ≤3-tap exit / profit-lock (Close → Confirm)                                         | ✅     |
+| T-012 | Error copy for every state (`trade-errors.ts`)                                      | ✅     |
+| T-013 | Onboarding: bank-connect + deposit inside the ticket, skippable (`TicketFunding`)   | ✅     |
+| T-014 | E2E loop over the shipped modules (`consumer-loop.e2e.test.ts`); on-chain leg D-112 | ✅     |
+| T-015 | Universal command bar preserved as the primary surface                              | ✅     |
+| T-016 | Contextual quick actions (`lib/quick-actions.ts`, `QuickActions`)                   | ✅     |
+| T-017 | Natural-language intent switching incl. team hints (`team-select.ts`)               | ✅     |
+| T-018 | Discovery filters (`discovery.ts`, `GET /api/markets/discover`)                     | ✅     |
+| T-019 | Natural-language discovery (`discover` intent)                                      | ✅     |
+| T-020 | Never requires a market id or address                                               | ✅     |
+| T-021 | Market-implied vs model probability labelled everywhere (`ProbabilityTag`)          | ✅     |
+| T-022 | No prediction presented as certainty (`PredictionNote`)                             | ✅     |
+| T-023 | Freshness stamp on every live-data surface (`Freshness`)                            | ✅     |
+
 ### AI-Assisted Security Analysis (replaces external audit per project decision)
 
 > Methodology: Trail of Bits Claude Code skills via `https://github.com/DelleonMcglone/AI-assisted-security-analysis`. Install plugin marketplace and run targeted analyses against each hook's source before wiring into pool creation flow. Findings logged in `docs/security/` with status (fix / accept / mitigate). All analyses must be re-run after any contract change.

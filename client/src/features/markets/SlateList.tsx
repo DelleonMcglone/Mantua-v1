@@ -1,4 +1,5 @@
 import { isTradableStatus } from "./market-trade-core.ts";
+import { ProbabilityTag } from "./ProbabilityTag.tsx";
 import type { Sport } from "./sports.ts";
 import type { Slate, SlateEvent, SlateTeam } from "./use-slate.ts";
 
@@ -107,12 +108,8 @@ function MatchupCard({
     >
       <div className="mb-2 flex items-center justify-between text-[11px]">
         <StatusChip live={live} final={final} voided={voided} startsAt={event.startsAt} />
-        <span className="text-text-mute">
-          {event.liveOdds && (
-            <span className="mr-2 rounded-[3px] bg-accent/15 px-1 py-px font-mono text-[9px] uppercase tracking-wider text-accent">
-              Market odds
-            </span>
-          )}
+        <span className="inline-flex items-center gap-2 text-text-mute">
+          {typeof homeBps === "number" && <ProbabilityTag liveOdds={event.liveOdds} />}
           Tap to analyze
         </span>
       </div>

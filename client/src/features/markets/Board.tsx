@@ -1,4 +1,5 @@
 import { Card } from "@/components/shell/Card.tsx";
+import { Freshness } from "./Freshness.tsx";
 import { SPORTS, type Sport } from "./sports.ts";
 import { SlateList } from "./SlateList.tsx";
 import { useSlate, type SlateEvent, type SlateState } from "./use-slate.ts";
@@ -11,6 +12,8 @@ interface BoardProps {
   onOpenLeague: (sport: Sport) => void;
   /** Trade click — open the position panel for this game (B7-003). */
   onTrade: (sport: Sport, eventId: string) => void;
+  /** "All markets" — the cross-league Discover page (task 050, T-001). */
+  onDiscover?: (() => void) | undefined;
 }
 
 function ymd(d: Date): string {
@@ -34,7 +37,7 @@ function todayRange(): string {
  * Coming Soon. Browsing is open to everyone — the login gate guards
  * transactions, not this view (B5-007).
  */
-export function Board({ onAnalyze, onOpenLeague, onTrade }: BoardProps) {
+export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardProps) {
   const wnba = useSlate(todayRange(), "wnba");
   const nfl = useSlate(todayRange(), "nfl");
   const states: Partial<Record<string, SlateState>> = { wnba, nfl };
@@ -72,6 +75,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade }: BoardProps) {
                 View markets →
               </span>
             </button>
+            {slate && <Freshness source={slate} className="mb-2" />}
             {state?.error && !slate ? (
               <div className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim">
                 Couldn&apos;t reach the scores service. Retrying automatically.
@@ -90,6 +94,15 @@ export function Board({ onAnalyze, onOpenLeague, onTrade }: BoardProps) {
           </Card>
         );
       })}
+      {onDiscover && (
+        <button
+          type="button"
+          onClick={onDiscover}
+          className="md:col-span-2 rounded-md border border-dashed border-border-soft px-4 py-2.5 text-[13px] font-medium text-text-dim transition-colors hover:border-accent hover:text-text cursor-pointer"
+        >
+          Browse all markets — filter by league, team, time, liquidity →
+        </button>
+      )}
     </>
   );
 }

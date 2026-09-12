@@ -428,8 +428,20 @@ describe("sports intents (B8-003)", () => {
     assert.notEqual(intent?.kind, "market");
   });
 
-  it("'bet on the chiefs' → open position", () => {
-    assert.deepEqual(detectIntent("bet on the chiefs"), { kind: "position", action: "open" });
+  it("'bet on the chiefs' → open position with the team hint (T-017)", () => {
+    assert.deepEqual(detectIntent("bet on the chiefs"), {
+      kind: "position",
+      action: "open",
+      team: "chiefs",
+    });
+  });
+
+  it("'sell my position on the Raiders to lock in profit' → close with the team hint", () => {
+    assert.deepEqual(detectIntent("sell my position on the Raiders to lock in profit"), {
+      kind: "position",
+      action: "close",
+      team: "raiders",
+    });
   });
 
   it("'open a position on the nfl game' → open position with the league", () => {
@@ -458,5 +470,40 @@ describe("sports intents (B8-003)", () => {
     // longer questions must fall through to research.
     const intent = detectIntent("how did the nfl salary cap change this year");
     assert.notEqual(intent?.kind, "market");
+  });
+});
+
+describe("detectIntent: discovery (task 050, T-019)", () => {
+  it("'Show me today's NFL markets' → discover, league + today", () => {
+    assert.deepEqual(detectIntent("Show me today's NFL markets"), {
+      kind: "discover",
+      filters: { league: "nfl", startsWithin: "today" },
+    });
+  });
+
+  it("'Find the most liquid NFL markets' → discover sorted by liquidity", () => {
+    assert.deepEqual(detectIntent("Find the most liquid NFL markets"), {
+      kind: "discover",
+      filters: { league: "nfl", sort: "liquidity" },
+    });
+  });
+
+  it("'What can I trade right now?' → discover, open + now (never the swap panel)", () => {
+    assert.deepEqual(detectIntent("What can I trade right now?"), {
+      kind: "discover",
+      filters: { status: "open", startsWithin: "now" },
+    });
+  });
+
+  it("'What can I trade right now in the NFL?' keeps the league", () => {
+    assert.deepEqual(detectIntent("What can I trade right now in the NFL?"), {
+      kind: "discover",
+      filters: { league: "nfl", status: "open", startsWithin: "now" },
+    });
+  });
+
+  it("a bare league browse stays league nav; research phrasing stays research", () => {
+    assert.deepEqual(detectIntent("nfl markets"), { kind: "market", sport: "nfl" });
+    assert.equal(detectIntent("Analyze today's NFL games and matchups")?.kind, "analyze");
   });
 });

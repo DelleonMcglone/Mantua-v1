@@ -68,11 +68,19 @@ At the 0.10% floor every number above is one seventh as large.
 
 ### What the trade ticket shows
 
-For a buy the ticket lists **Position**, **Estimated fee**, and **Total**.
-Uniswap takes the fee out of the USDC you send, so Total is what leaves
-your wallet, Position is what actually buys contracts, and they differ by
-exactly the fee. For a sell the ticket shows the fee taken from the YES
-tokens you sell, valued at the current price.
+For a buy the ticket lists **Position**, **Fee**, **Fee rate**, and
+**Total** — in every season, so a regular-season trade reads $0.00 / 0.00%
+rather than hiding the lines. Uniswap takes the fee out of the USDC you
+send, so Total is what leaves your wallet, Position is what actually buys
+contracts, and they differ by exactly the fee. For a sell the ticket shows
+the contracts sold and the fee taken from them, valued at the current
+price. A "How fees work" toggle under the lines opens this structure in
+five sentences.
+
+Two checks the ticket makes on every quote: a $100 buy at 50/50 and the
+0.70% ceiling shows a $0.35 fee, and 100 contracts at that price show
+$0.18 — both asserted in the client tests — and a quote whose rate exceeds
+0.70% is refused and reported as an error instead of being displayed.
 
 The fee on the ticket is the hook's own quote for your exact trade in the
 current pool state — the same function that prices the swap when it
