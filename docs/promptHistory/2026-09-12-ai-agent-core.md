@@ -60,6 +60,8 @@ Mid-lane directives, in order:
   `GET/PATCH /api/agent/policy`, the hedge executor's per-user gate, the
   simulation's exposure ceiling, `mantua_get_policy`, the Portfolio → Agent
   policy panel, D-109; ledger 27 ✅ · 12 🟡 · 8 ⬜.
+- Lane 058 landed: the untrusted-data boundary (`lib/agent/untrusted.ts`) in the
+  tool loop + the A-036 adversarial suite; ledger 29 ✅ · 11 🟡 · 7 ⬜.
 - Next lanes: 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.

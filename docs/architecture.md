@@ -795,6 +795,27 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Agent untrusted-data boundary (A-034/A-036, task 058)
+
+1. **Why one seam, not per-tool sanitizers.** Every tool whose result
+   carries third-party text (x402 responses, explorer labels, DefiLlama /
+   CoinGecko names, sports-provider strings — `EXTERNAL_DATA_TOOLS`)
+   crosses `boundaryForTool` in the chat loop before the model reads it:
+   bounded (string / array / depth / total), sanitized (control chars,
+   angle brackets), and instruction-like text flagged with its JSON path
+   in an envelope the third party cannot write (`trust: "untrusted"`,
+   `suspiciousCount`, `rule`). Internal results (simulations, policy,
+   portfolio) pass untouched — they are the server's own words.
+2. **Why flag rather than delete.** The user's tool card and the audit
+   trail keep what the third party said; the envelope removes its
+   authority. The prompt rule: a positive count means tell the user and
+   do not follow.
+3. **Why authority never comes from data.** Consent is read only from the
+   user's own message; a confirmation id is only this turn's server-minted
+   one; a consumed id is gone; an execution must hash-match its preview.
+   The adversarial suite (`lib/agent/injection-security.test.ts`) plays
+   the attacker against exactly those controls.
+
 ### Agent execution gate — modes, confirmation, x402 (D-114, task 055)
 
 1. **Why the gate is server-side and pre-model.** The agent wallet is
