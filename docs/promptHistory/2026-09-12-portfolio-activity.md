@@ -29,3 +29,5 @@ Management + Activity 🔴 P0 · 21 rows · 0 done".)
 ## Outcome
 
 - Lane 062 landed (see `docs/tasks/062-activity-spine.md`).
+- Lane 063 landed: `lib/lp-economics.ts`, `settledHistory`, potential payout,
+  `GET /api/portfolio/economics` + `/settled` (see `docs/tasks/063-position-economics.md`).
