@@ -130,8 +130,11 @@ derivation; `server/src/lib/sports/market-fee.ts` mirrors it bit-for-bit.
 deployer keystore and a BaseScan key, neither of which exists in this
 environment, and D-112 pauses chain-committing work until the owner's
 launch-chain decision after 2026-09-17. `deploy/dynamic-market/README.md`
-carries the exact commands; `SaltMine.t.sol` proves the mine against the new
-initcode. Once deployed, populate `DYNAMIC_MARKET_BY_CHAIN` and re-run
+carries the exact commands (and, since 2026-09-12, a one-command wrapper
+`deploy.sh` plus the record of the local pre-deploy gate run: 238 passed /
+0 failed against the live Base Mainnet fork, deploy script simulated end to
+end with permission bits `0x28C0`); `SaltMine.t.sol` proves the mine against
+the new initcode. Once deployed, populate `DYNAMIC_MARKET_BY_CHAIN` and re-run
 `npm run verify:hooks`.
 
 The external o3 / Gemini review steps in the house process were not run —

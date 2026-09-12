@@ -11,6 +11,20 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 that deploy; record the addresses under
 [Deployment record](#deployment-record) once it lands.
 
+**Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
+populated per the prerequisites, the full suite passed locally against the
+live Base Mainnet fork — 238 passed / 0 failed / 8 skipped (the skips are
+the StableProtection / DynamicFee E2Es and baselines, which skip while
+those hooks have no configured address; every dynamic-market suite, the
+128k-call invariant sweeps, `SaltMineTest`, and `MarketLifecycleForkE2E`
+ran). A no-key fork simulation of `DeployDynamicMarket.s.sol` ran end to
+end: permission bits `10432` (= `0x28C0`), estimated gas `8,163,960`,
+≈ 0.00008 ETH at 0.01 gwei — budget 0.01 ETH still stands for headroom
+plus the periphery step. The earlier "blocked locally by RPC egress" note
+no longer applies from a machine that can reach `mainnet.base.org`.
+`deploy.sh` wraps the preflight, the dry run, an explicit confirmation,
+and the broadcast.
+
 ---
 
 ## Why the salt mine is the load-bearing step
@@ -93,8 +107,22 @@ asserts the deployed address equals the mined one and carries the right bits.
 
 ## Run
 
-From the repo root (the script lives inside the Foundry project at
-`contracts/script/`; running it from anywhere else can't resolve the
+**One command (recommended):** exports first, then the wrapper. It checks the
+chain id, prints the deployer address and balance (keystore password
+prompted, never read from env), runs the salt-mine and hook suites, shows
+the fork dry run with the gas estimate, and only broadcasts after you type
+`yes`:
+
+```bash
+export MARKET_OPERATOR=0x...  MARKET_RESOLVER=0x...  BASESCAN_API_KEY=...
+export BASE_RPC_URL=https://<dedicated-provider>/...   # optional; default is the public host
+deploy/dynamic-market/deploy.sh hook
+# then, with the PoolManager the hook step printed:
+POOL_MANAGER=0x... deploy/dynamic-market/deploy.sh periphery
+```
+
+**By hand**, from the repo root (the script lives inside the Foundry project
+at `contracts/script/`; running it from anywhere else can't resolve the
 remappings):
 
 ```bash
@@ -131,24 +159,24 @@ table from the script logs and on-chain probes (`hook.poolManager()`,
 Foundry's receipt banner, whose contract labels have been observed
 scrambled.
 
-| Field                | Value                       |
-| -------------------- | --------------------------- |
-| Chain                | Base Mainnet                |
-| Chain ID             | `8453`                      |
-| RPC                  | `https://mainnet.base.org`  |
-| Explorer             | <https://basescan.org>      |
-| PoolManager          | _pending_                   |
-| PositionManager      | _pending_                   |
-| StateView            | _pending_                   |
-| V4Quoter             | _pending_                   |
-| PoolSwapTest         | _pending_                   |
-| MarketStateRegistry  | _pending_                   |
-| DynamicMarketHook    | _pending_                   |
-| Deployment salt      | _pending_                   |
+| Field                | Value                                |
+| -------------------- | ------------------------------------ |
+| Chain                | Base Mainnet                         |
+| Chain ID             | `8453`                               |
+| RPC                  | `https://mainnet.base.org`           |
+| Explorer             | <https://basescan.org>               |
+| PoolManager          | _pending_                            |
+| PositionManager      | _pending_                            |
+| StateView            | _pending_                            |
+| V4Quoter             | _pending_                            |
+| PoolSwapTest         | _pending_                            |
+| MarketStateRegistry  | _pending_                            |
+| DynamicMarketHook    | _pending_                            |
+| Deployment salt      | _pending_                            |
 | Hook permission bits | must equal `0x28C0` (asserted in-tx) |
-| Operator             | _pending_                   |
-| Keeper               | _pending_                   |
-| Verification status  | _pending_                   |
+| Operator             | _pending_                            |
+| Keeper               | _pending_                            |
+| Verification status  | _pending_                            |
 
 > **Periphery is a second step.** This script deploys the `PoolManager` only.
 > `PositionManager`, `StateView`, `V4Quoter`, and `PoolSwapTest` follow via
