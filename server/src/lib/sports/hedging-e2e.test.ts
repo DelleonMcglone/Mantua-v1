@@ -53,6 +53,7 @@ import { getTableColumns } from "drizzle-orm";
 
 import type { DB } from "../../db/client.ts";
 import type { HedgeStrategy } from "../../db/schema/markets.ts";
+import { activity } from "../../db/schema/activity.ts";
 import { hedgeStrategies } from "../../db/schema/markets.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
 import { agentWallets, markets } from "../../db/schema/index.ts";
@@ -163,6 +164,7 @@ interface AuditRow {
 
 const strategyRows: Record<string, unknown>[] = [];
 const auditRows: AuditRow[] = [];
+const activityRows: Record<string, unknown>[] = [];
 /** Joined markets×events view served to strategy-execute's market lookup. */
 const joinedMarkets: Record<string, unknown>[] = [];
 let idCounter = 0;
@@ -195,6 +197,12 @@ const db = {
         };
         strategyRows.push(full);
         return thenable([{ ...full }]);
+      }
+      if (table === activity) {
+        // Task 062 — the timeline entry the hedge writes (PF-021: hedge → activity).
+        activityRows.push(row);
+        const p = thenable([{ ...row }]);
+        return Object.assign(p, { onConflictDoNothing: () => p });
       }
       auditRows.push(row as unknown as AuditRow);
       return thenable([{ ...row }]);
@@ -500,6 +508,11 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
     ]);
     const outcomes = [...raceA, ...raceB];
     const executed = outcomes.filter((r) => r.execution === "executed");
+    // Task 062 / PF-021 — "execute hedge → activity appears", linked to its strategy.
+    const hedgeEntries = activityRows.filter((r) => r["kind"] === "hedge");
+    assert.equal(hedgeEntries.length, 1);
+    assert.equal(hedgeEntries[0]?.["actor"], "agent");
+    assert.equal(hedgeEntries[0]?.["positionRef"], executed[0]?.id);
     const skipped = outcomes.filter((r) => r.decision === "skipped");
     assert.equal(executed.length, 1, "exactly one sweep may win the claim and execute");
     assert.equal(skipped.length, 1, "the claim loser must report skipped and touch no money");

@@ -6,6 +6,7 @@
  * from the DB — the dashboard reads the rows, support reads the audit.
  */
 
+import { recordActivity } from "../activity.ts";
 import { and, desc, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { hedgeStrategies, type HedgeStrategy } from "../../db/schema/markets.ts";
@@ -167,6 +168,22 @@ export async function engineExecuted(
     params: { strategyId, ...detail },
     txHash,
     chainId: BASE_CHAIN_ID,
+  });
+  // Task 062 / PF-015, PF-020 — the hedge on the user's timeline, linked to
+  // the position it protected (PF-010's hedge relationship).
+  const row = rows[0];
+  await recordActivity(db, {
+    kind: "hedge",
+    actor: "agent",
+    userId: row.userId,
+    txHash,
+    chainId: BASE_CHAIN_ID,
+    marketId: typeof detail["marketId"] === "string" ? detail["marketId"] : row.marketId,
+    positionRef: strategyId,
+    asset: row.strategyType,
+    amountRaw: typeof detail["soldRaw"] === "string" ? detail["soldRaw"] : null,
+    valueUsd: typeof detail["usdcOutRaw"] === "string" ? Number(detail["usdcOutRaw"]) / 1e6 : null,
+    data: { strategyId, ...detail },
   });
   return true;
 }

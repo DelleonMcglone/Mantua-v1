@@ -1,3 +1,4 @@
+import { recordActivity } from "./activity.ts";
 import { eq } from "drizzle-orm";
 import { parseUnits } from "viem";
 import { db } from "../db/client.ts";
@@ -220,6 +221,24 @@ export async function swapFromAgentWallet(args: AgentSwapArgs): Promise<AgentSwa
       },
       outcome: "success",
       usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
+    });
+    // Task 062 / PF-015 — the agent's timeline entry (best-effort).
+    await recordActivity(db, {
+      kind: "swap",
+      actor: "agent",
+      userId: user.id,
+      walletAddress: wallet.address,
+      txHash,
+      chainId,
+      asset: `${tokenIn} → ${tokenOut}`,
+      amountRaw: amountAtomic.toString(),
+      valueUsd: usdValue > 0 ? usdValue : null,
+      data: {
+        tokenIn,
+        tokenOut,
+        amountInRaw: amountAtomic.toString(),
+        amountOutRaw: quote.amountOut,
+      },
     });
   }
 

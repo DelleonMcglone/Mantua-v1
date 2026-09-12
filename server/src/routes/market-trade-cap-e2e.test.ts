@@ -52,6 +52,7 @@ const MARKET_ID: `0x${string}` = `0x${"11".repeat(32)}`;
 const TX = `0x${"c".repeat(64)}`;
 
 const servers: Server[] = [];
+const activityEntries: import("../lib/activity.ts").ActivityInput[] = [];
 after(() => {
   for (const s of servers) s.close();
 });
@@ -198,6 +199,11 @@ function serve(capUsd: number) {
       hookFor: () => null,
       insertFill: fills.insertFill,
       recordArtifacts: fills.recordArtifacts,
+      // Task 062 / PF-021 — "execute user trade → activity appears".
+      recordActivity: (_db, input) => {
+        activityEntries.push(input);
+        return Promise.resolve(null);
+      },
     }),
   );
   const origin = new Promise<string>((resolve) => {
@@ -413,5 +419,12 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
       "the issuance intent stands; fills never touch the ledger",
     );
     assert.equal(ledger.spent(), 30);
+
+    void it("task 062 / PF-021 — the verified user trade produced a market_buy activity entry", () => {
+      const buys = activityEntries.filter((e) => e.kind === "market_buy");
+      assert.ok(buys.length >= 1, "a fill wrote its timeline entry");
+      assert.equal(buys[0]?.actor, "user");
+      assert.equal(buys[0]?.status ?? "completed", "completed");
+    });
   });
 });

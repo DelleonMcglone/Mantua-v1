@@ -1,3 +1,5 @@
+import { activityUserId, recordActivity } from "../lib/activity.ts";
+import { resolveUserId } from "../lib/sports/strategy-store.ts";
 import { Router, type Request, type Response } from "express";
 import { and, eq, sql } from "drizzle-orm";
 import type { Log } from "viem";
@@ -40,6 +42,8 @@ type NewMarketFill = typeof marketFills.$inferInsert;
  * or a database.
  */
 export interface MarketFillsDeps {
+  /** Task 062 — the timeline entry for a verified fill (best-effort). */
+  recordActivity: typeof recordActivity;
   rpc: (chainId: SupportedChainId) => FillReceiptReader;
   /** Our swap router on this chain — null when markets aren't deployed. */
   swapRouterFor: (chainId: SupportedChainId) => `0x${string}` | null;
@@ -117,6 +121,7 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
     invalidatePositions:
       overrides.invalidatePositions ??
       ((address) => sharedCache.invalidate(positionsCacheKey(address))),
+    recordActivity: overrides.recordActivity ?? recordActivity,
   };
   const router = Router();
 
@@ -239,6 +244,21 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
           // Phase 7 / R-007 — the wallet's cached positions are stale the
           // moment a fill lands; drop them so the next read re-marks.
           await deps.invalidatePositions(address).catch(() => undefined);
+          // Task 062 / PF-015 — the user's timeline entry for the trade.
+          const userId = await activityUserId(db, resolveUserId, req.privyUserId);
+          await deps.recordActivity(db, {
+            kind: direction === "sell" ? "market_sell" : "market_buy",
+            actor: "user",
+            userId,
+            walletAddress: address,
+            txHash: txHash.toLowerCase(),
+            chainId,
+            marketId,
+            asset: "YES",
+            amountRaw: tokensRaw,
+            valueUsd: Number(usdcRaw) / 1e6,
+            data: { direction, usdcRaw, tokensRaw, feeUsdcRaw: fee.feeUsdcRaw ?? null },
+          });
           try {
             // requireAuth guarantees privyUserId; belt-and-braces fallback.
             if (req.privyUserId) {

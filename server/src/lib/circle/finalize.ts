@@ -1,3 +1,4 @@
+import { recordActivity } from "../activity.ts";
 import { and, eq } from "drizzle-orm";
 import type { TransactionState } from "@circle-fin/developer-controlled-wallets";
 import { z } from "zod";
@@ -394,6 +395,24 @@ export async function recordPendingExecution(row: {
       ...(row.circleWalletId ? { circleWalletId: row.circleWalletId } : {}),
     })
     .onConflictDoNothing({ target: circleExecutions.circleTxId });
+  // Task 062 / PF-017 — an agent send enters the timeline as `pending` the
+  // moment Circle accepts it; the webhook or the poll path moves it to
+  // completed / failed (keyed by the Circle tx id until the hash is known).
+  if (row.kind === "agent_send") {
+    const p = (row.payload ?? {}) as Record<string, unknown>;
+    await recordActivity(db, {
+      kind: "send",
+      actor: "agent",
+      status: "pending",
+      userId: row.userId ?? null,
+      walletAddress: row.walletAddress ?? null,
+      refId: row.circleTxId,
+      asset: typeof p["symbol"] === "string" ? p["symbol"] : null,
+      amountRaw: typeof p["amountAtomic"] === "string" ? p["amountAtomic"] : null,
+      valueUsd: typeof p["usdValue"] === "number" ? p["usdValue"] : null,
+      data: { to: typeof p["to"] === "string" ? p["to"] : null, circleTxId: row.circleTxId },
+    });
+  }
 }
 
 /**

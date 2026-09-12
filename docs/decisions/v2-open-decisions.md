@@ -32,6 +32,7 @@
 | D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
 | D-111 | Gasless user transactions (C-005/C-006)                                                                                    | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                                                                                                                                                                 | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                       |
 | D-109 | Agent policies — the user's limits on the agent (A-003/A-012/A-038)                                                        | ✅ CLOSED 2026-09-12 — one `agent_policies` row per user (defaults when absent): status, unprompted-trade permission, per-trade stake, risk level, leagues, and a hedge block (max size, max exposure, min confidence, cooldown, daily budget, market types); written only by the user through `PATCH /api/agent/policy`, read by the simulation, the turn context and the hedge executor — the agent has a read tool and no write tool     | High (shipped, task 057)                                    | None                                                                  |
+| D-115 | Unified Activity model — one timeline table, typed kinds, one-way status, added beside the ledgers (PF-014 … PF-017)       | ✅ CLOSED 2026-09-12 — the dormant `activity` table becomes the user-facing timeline: eighteen typed kinds with categories, `actor` user/agent/system, `pending → completed \| failed` exactly once, `(tx_hash, kind)` unique; written best-effort beside `portfolio_transactions` and the audit log at every money write site, read by `GET /api/activity`                                                                                 | High (shipped, task 062)                                    | None                                                                  |
 | D-114 | Agent execution protocol — modes, preview → confirm → server-minted id; x402 data is the agent's own spend (A-025 … A-035) | ✅ CLOSED 2026-09-12 — `AGENT_MODE` (disabled / simulation / user_testing default / autonomous); money-moving tools need a preview the user saw plus a single-use confirmation id the server mints from the user's own explicit "confirm"; market trades are re-simulated at execution and refused on material drift; `call_paid_service` (x402 data) is exempt — the agent has direct marketplace access under its own per-call/daily caps | High (shipped, task 055)                                    | None                                                                  |
 | D-113 | Live-sports reliability transport & status (R-001/R-004/R-005)                                                             | ✅ CLOSED 2026-09-12 — SSE (not WebSocket) for the live market stream on the single-function API; one public `/api/status` computed from the enforcement points' own inputs and pushed on the stream; trades enter a persisted per-wallet pending register at hash time and leave only on a chain-verified terminal state; game-time ingest every 5 min from GitHub Actions                                                                 | High (shipped, task 051)                                    | None                                                                  |
 
@@ -786,6 +787,40 @@ cap-bound is honest and deterministic). Columns instead of the typed
 **Consequence.** `agent_policies` is live. The Portfolio → Agent tab hosts
 the only editor. A paused policy stops unprompted hedges and every agent
 trade; the kill switch remains the platform-wide stop above it.
+
+## D-115 — Unified Activity model ✅ CLOSED 2026-09-12
+
+**Decision.** The user-facing timeline is one table, `activity`, with a
+typed vocabulary and one status machine (task 062):
+
+1. **Kinds and categories.** market_buy, market_sell, redeem,
+   settlement, swap, liquidity_add, liquidity_remove, send, bridge,
+   deposit, withdraw, gateway_deposit, gateway_spend, hedge,
+   agent_research, agent_simulation, agent_recommendation, resolution —
+   grouped as trade / liquidity / transfer / agent / settlement for the
+   card's icon. Agent activity is therefore self-describing (PF-020).
+2. **Fields.** tx hash, chain, market / pool / related position, asset,
+   raw amount, USD value, actor (user | agent | system), status, a
+   one-line summary and structured data (PF-016).
+3. **Status.** `pending → completed | failed`, exactly once, guarded in
+   SQL; terminal rows never move (PF-017). Circle sends enter pending
+   keyed by the Circle tx id and gain the hash on completion.
+4. **Beside, not instead.** Every write site keeps its ledger row
+   (`portfolio_transactions`, `market_fills`, `market_positions`,
+   `fiat_transfers`, the audit log) and adds a best-effort activity
+   entry; `(tx_hash, kind)` uniqueness absorbs replays and the webhook /
+   poll race.
+
+**Rejected.** A read-time union of the ledgers (no pending state, no
+attribution, seven vocabularies). Replacing `portfolio_transactions`
+now (it backs `/api/portfolio`; retire it after the portfolio reads
+activity). Deriving the timeline from the audit log (attempts and
+refusals are not history).
+
+**Consequence.** `GET /api/activity` serves one feed across the user's
+id, their wallet and their agent wallet. The timeline UI (lane 064)
+renders `txHash` through the neutral tx row only — no chain branding
+(PF-018).
 
 ## D-114 — Agent execution protocol: modes, confirmation, and the x402 exemption ✅ CLOSED 2026-09-12
 

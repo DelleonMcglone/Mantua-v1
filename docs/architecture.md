@@ -795,6 +795,22 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Unified Activity (D-115, task 062)
+
+1. **Why a dedicated table.** The ledgers each answer one question
+   (fills for price ticks, positions for marks, fiat transfers for rails,
+   the audit log for compliance). "What happened to my money, in order"
+   needs one row shape with a status and an actor; `activity` is that,
+   written beside the ledgers, never instead.
+2. **Why best-effort.** A timeline gap is recoverable; a trade record
+   that fails because the timeline insert failed is not. `recordActivity`
+   logs and returns null; nothing upstream awaits its success.
+3. **Why pending is keyed by the Circle tx id.** A sponsored send has no
+   hash until it is mined; the entry exists from acceptance so the user
+   sees "pending", and the hash arrives with the terminal transition.
+4. **Where it lives.** `server/src/lib/activity.ts`, `routes/activity.ts`,
+   `db/schema/activity.ts`, migration `0020_activity_spine`.
+
 ### Agent loop seam, attribution, gate monitoring (A-017/A-039/A-040, task 061)
 
 1. **Why the loop has a dependency bag.** `runAgentChat` is the one place
