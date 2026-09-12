@@ -759,6 +759,23 @@ status`, `/api/markets/fills`). A server-side indexer is the upgrade
    `/api/cron/live-sync` is cheap enough for 5 minutes and exempt from the
    kill switch, so a paused platform still shows live scores.
 
+### Agent tool architecture — the five layers (A-019, task 056)
+
+The agent is a proposer inside a stack where no layer trusts the one
+above it:
+
+| Layer                   | What it is                                                                                                                                                                                                                                                                                                                       | Where                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 1. Skill                | Prompt guidance: how to analyze, which tool first, what to cite. Advice, never authority.                                                                                                                                                                                                                                        | `SYSTEM_PROMPT` in `server/src/lib/agent-chat.ts`                                                            |
+| 2. Tools                | Typed reads (`mantua_search_markets`, `mantua_get_market`, `mantua_get_position`, `mantua_get_portfolio`, the sports detail tools) and typed writes (`mantua_simulate_trade` → `mantua_execute_trade` / `mantua_sell_position`, swap, send, …). Inputs are zod-validated; outputs say `unavailable` / `null` rather than guess. | `TOOLS` + `executeTool`; `lib/sports/agent-sports-tools.ts`; `lib/agent/read-tools.ts`                       |
+| 3. Wallet authorization | The server-custodied Circle wallet signs; the daily cap, the attested cap raise (C-010), the user's `agent_policies` row and the kill switch are checked in code before any signature.                                                                                                                                          | `lib/spending-cap.ts`, `lib/agent-wallet.ts`, `middleware/kill-switch.ts`, `lib/agent/trade-simulation.ts`  |
+| 4. Contract enforcement | Only allowlisted targets (`registerDynamicTargets`), the same market contracts and hook path the user's ticket uses, market state and fee decided on-chain.                                                                                                                                                                      | `lib/sports/market-agent-trade.ts`, `lib/sports/market-trade-build.ts`, the hook                             |
+| 5. User permission      | The D-114 gate: preview → the user's own explicit "confirm" → a server-minted single-use id → matching execution with a fresh simulation.                                                                                                                                                                                       | `lib/agent/execution-gate.ts`                                                                                |
+
+Reads (layers 1–2) run freely and use no user data beyond the agent's
+own wallet address. Writes must pass 3, 4 and 5 in that order; the model
+can neither see nor change `AGENT_MODE`.
+
 ### Agent execution gate — modes, confirmation, x402 (D-114, task 055)
 
 1. **Why the gate is server-side and pre-model.** The agent wallet is

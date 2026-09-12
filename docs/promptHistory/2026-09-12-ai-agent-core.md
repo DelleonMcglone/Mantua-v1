@@ -52,6 +52,10 @@ Mid-lane directives, in order:
   `docs/tasks/ai-agent-core.md` (18 ✅ · 20 🟡 · 9 ⬜), runbook §12.
 - Circle SCA pin: `CIRCLE_SCA_CORE` (default v3) at `createWallets`,
   runbook §11.
-- Next lanes: 056 read tools + A-019 doc; 057 policies (D-109); 058
+- Lane 056 landed: `mantua_search_markets` / `mantua_get_market` /
+  `mantua_get_position` / `mantua_get_portfolio`, positions computation
+  lifted to `lib/sports/market-positions.ts`, A-019 five-layer section;
+  ledger 23 ✅ · 16 🟡 · 8 ⬜.
+- Next lanes: 057 policies (D-109); 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.

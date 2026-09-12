@@ -92,7 +92,7 @@ listed as open.
 
 ### Left for later lanes
 
-- 056 — `mantua_search_markets` / `mantua_get_market` / `mantua_get_position` / `mantua_get_portfolio` with market positions (A-020 … A-024), the A-019 separation doc.
+- ~~056~~ (landed) — `mantua_search_markets` / `mantua_get_market` / `mantua_get_position` / `mantua_get_portfolio` with market positions (A-020 … A-024), the A-019 separation doc.
 - 057 — `agent_policies` writes and UI (A-003, A-012, A-038), D-109.
 - 058 — prompt-injection sanitisation at the x402 / explorer / DefiLlama boundaries + adversarial tests (A-034, A-036).
 - 059 — `sports_intelligence` / `mantua_analyze_market` (A-004, A-005, A-013, A-022), skills reset (A-001).

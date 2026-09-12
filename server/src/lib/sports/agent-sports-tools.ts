@@ -580,7 +580,10 @@ function leagueSlugOf(catalog: Catalog, leagueId: string): string | null {
   return catalog.leagues.find((l) => l.id === leagueId)?.slug ?? null;
 }
 
-function teamSummary(catalog: Catalog, t: TeamRow): { name: string; key: string; league: string | null } {
+function teamSummary(
+  catalog: Catalog,
+  t: TeamRow,
+): { name: string; key: string; league: string | null } {
   return { name: clean(t.name), key: clean(t.key), league: leagueSlugOf(catalog, t.leagueId) };
 }
 
@@ -615,7 +618,12 @@ type LeagueNotFound = {
 
 type TeamLookupFailure =
   | { status: "unavailable"; reason: string }
-  | { status: "not_found"; note: string; suggestions: { name: string; key: string; league: string | null }[]; knownLeagues?: string[] }
+  | {
+      status: "not_found";
+      note: string;
+      suggestions: { name: string; key: string; league: string | null }[];
+      knownLeagues?: string[];
+    }
   | {
       status: "ambiguous";
       note: string;
@@ -632,7 +640,8 @@ function resolveTeamOrFail(
       ok: false,
       error: {
         status: "unavailable",
-        reason: "not yet ingested — the teams table is empty (the provider ingestion wave has not landed)",
+        reason:
+          "not yet ingested — the teams table is empty (the provider ingestion wave has not landed)",
       },
     };
   }
@@ -640,11 +649,18 @@ function resolveTeamOrFail(
   if (!lf.ok) {
     return {
       ok: false,
-      error: { status: "not_found", note: lf.error.note, suggestions: [], knownLeagues: lf.error.knownLeagues },
+      error: {
+        status: "not_found",
+        note: lf.error.note,
+        suggestions: [],
+        knownLeagues: lf.error.knownLeagues,
+      },
     };
   }
   const leagueIds = lf.leagueIds;
-  const pool = leagueIds ? catalog.teams.filter((t) => leagueIds.includes(t.leagueId)) : catalog.teams;
+  const pool = leagueIds
+    ? catalog.teams.filter((t) => leagueIds.includes(t.leagueId))
+    : catalog.teams;
   const res = resolveByScore(
     pool,
     query,
@@ -707,8 +723,10 @@ function publicGame(catalog: Catalog, e: EventRow): PublicGame {
 }
 
 function sideOf(e: EventRow, team: TeamRow): "home" | "away" | null {
-  if (e.homeTeamId === team.id || (e.homeTeamKey !== null && e.homeTeamKey === team.key)) return "home";
-  if (e.awayTeamId === team.id || (e.awayTeamKey !== null && e.awayTeamKey === team.key)) return "away";
+  if (e.homeTeamId === team.id || (e.homeTeamKey !== null && e.homeTeamKey === team.key))
+    return "home";
+  if (e.awayTeamId === team.id || (e.awayTeamKey !== null && e.awayTeamKey === team.key))
+    return "away";
   if (normalize(e.homeTeam) === normalize(team.name)) return "home";
   if (normalize(e.awayTeam) === normalize(team.name)) return "away";
   return null;
@@ -751,7 +769,9 @@ function recordStats(row: TeamRecordRow): StatMap | null {
  * season on file, preferring the regular-season snapshot when several
  * season types exist for it.
  */
-function pickLatestSeason(rows: readonly TeamRecordRow[]): { season: string; seasonType: string } | null {
+function pickLatestSeason(
+  rows: readonly TeamRecordRow[],
+): { season: string; seasonType: string } | null {
   if (rows.length === 0) return null;
   const season = rows.reduce((max, r) => (r.season > max ? r.season : max), rows[0].season);
   const ofSeason = rows.filter((r) => r.season === season);
@@ -815,7 +835,9 @@ export async function getGame(
     const dayStart = new Date(`${input.date}T00:00:00Z`).getTime();
     const from = dayStart - windowDays * 86_400_000;
     const to = dayStart + (windowDays + 1) * 86_400_000;
-    candidates = teamEvents.filter((e) => e.startsAt.getTime() >= from && e.startsAt.getTime() < to);
+    candidates = teamEvents.filter(
+      (e) => e.startsAt.getTime() >= from && e.startsAt.getTime() < to,
+    );
     if (candidates.length === 0) {
       const nearest = [...teamEvents]
         .sort(
@@ -887,9 +909,15 @@ export async function getLiveGameState(
     const found = await dbx.getEventByProviderEventId(input.providerEventId);
     if (!found) {
       if (!(await dbx.hasAnyEvents())) {
-        return { status: "unavailable", reason: `${NOT_YET_INGESTED} — no events in the canonical database yet` };
+        return {
+          status: "unavailable",
+          reason: `${NOT_YET_INGESTED} — no events in the canonical database yet`,
+        };
       }
-      return { status: "not_found", note: `No event with providerEventId ${clean(input.providerEventId)}.` };
+      return {
+        status: "not_found",
+        note: `No event with providerEventId ${clean(input.providerEventId)}.`,
+      };
     }
     event = found;
   } else {
@@ -949,14 +977,19 @@ export async function getLiveGameState(
     period,
     clock: clock === null ? null : clean(clock),
     possession,
-    ...(latestPlay ? { liveStateSource: "derived from the latest ingested play (game_plays)" } : {}),
+    ...(latestPlay
+      ? { liveStateSource: "derived from the latest ingested play (game_plays)" }
+      : {}),
     ...(Object.keys(fieldsNotStored).length > 0 ? { fieldsNotStored } : {}),
   };
 }
 
 // ─── S-013 get_team_stats ───────────────────────────────────────────────────
 
-export async function getTeamStats(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getTeamStats(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(teamInput, raw, "get_team_stats");
   const catalog = await loadCatalog(dbx);
   const resolved = resolveTeamOrFail(catalog, input.team, input.league);
@@ -1018,7 +1051,9 @@ export async function getTeamStats(dbx: SportsToolsDb, raw: unknown): Promise<Re
     team: teamSummary(catalog, team),
     derivedRecord: record,
     ...(record === null
-      ? { derivedRecordNote: `no finished games recorded for this team (${NOT_YET_INGESTED} or season not started)` }
+      ? {
+          derivedRecordNote: `no finished games recorded for this team (${NOT_YET_INGESTED} or season not started)`,
+        }
       : { derivedRecordNote: "derived from finished games in the canonical database" }),
     detailedStats: {
       status: "unavailable",
@@ -1058,7 +1093,10 @@ async function resolvePlayerOrFail(
   query: string,
   teamQuery: string | undefined,
   leagueSlug: string | undefined,
-): Promise<{ ok: true; ctx: PlayerContext; player: PlayerRow } | { ok: false; error: Record<string, unknown> }> {
+): Promise<
+  | { ok: true; ctx: PlayerContext; player: PlayerRow }
+  | { ok: false; error: Record<string, unknown> }
+> {
   const allPlayers = await dbx.listPlayers();
   const ctx: PlayerContext = { catalog, players: allPlayers };
   if (allPlayers.length === 0) {
@@ -1109,7 +1147,10 @@ async function resolvePlayerOrFail(
   }
 }
 
-export async function getPlayerStats(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getPlayerStats(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(playerStatsInput, raw, "get_player_stats");
   const catalog = await loadCatalog(dbx);
   const resolved = await resolvePlayerOrFail(dbx, catalog, input.player, input.team, input.league);
@@ -1170,7 +1211,13 @@ export async function getPlayerInjuryStatus(
   const catalog = await loadCatalog(dbx);
 
   if (input.player !== undefined) {
-    const resolved = await resolvePlayerOrFail(dbx, catalog, input.player, input.team, input.league);
+    const resolved = await resolvePlayerOrFail(
+      dbx,
+      catalog,
+      input.player,
+      input.team,
+      input.league,
+    );
     if (!resolved.ok) return resolved.error;
     const rows = await dbx.listOpenInjuriesForPlayer(resolved.player.id);
     if (rows.length === 0) {
@@ -1214,7 +1261,10 @@ export async function getPlayerInjuryStatus(
 
 // ─── S-016 get_recent_games ─────────────────────────────────────────────────
 
-export async function getRecentGames(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getRecentGames(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(recentGamesInput, raw, "get_recent_games");
   const limit = input.limit ?? 5;
   const catalog = await loadCatalog(dbx);
@@ -1258,7 +1308,10 @@ export async function getRecentGames(dbx: SportsToolsDb, raw: unknown): Promise<
 
 // ─── S-017 get_head_to_head ─────────────────────────────────────────────────
 
-export async function getHeadToHead(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getHeadToHead(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(headToHeadInput, raw, "get_head_to_head");
   const limit = input.limit ?? 10;
   const catalog = await loadCatalog(dbx);
@@ -1281,7 +1334,10 @@ export async function getHeadToHead(dbx: SportsToolsDb, raw: unknown): Promise<R
 
   if (meetings.length === 0) {
     if (!(await dbx.hasAnyEvents())) {
-      return { status: "unavailable", reason: `${NOT_YET_INGESTED} — no events in the canonical database yet` };
+      return {
+        status: "unavailable",
+        reason: `${NOT_YET_INGESTED} — no events in the canonical database yet`,
+      };
     }
     return {
       status: "ok",
@@ -1315,16 +1371,24 @@ export async function getHeadToHead(dbx: SportsToolsDb, raw: unknown): Promise<R
 
 // ─── S-018 get_standings ────────────────────────────────────────────────────
 
-export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getStandings(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(standingsInput, raw, "get_standings");
   const catalog = await loadCatalog(dbx);
   if (catalog.leagues.length === 0) {
-    return { status: "unavailable", reason: `${NOT_YET_INGESTED} — no leagues in the canonical database yet` };
+    return {
+      status: "unavailable",
+      reason: `${NOT_YET_INGESTED} — no leagues in the canonical database yet`,
+    };
   }
   const lf = filterLeague(catalog, input.league);
   if (!lf.ok) return lf.error;
   const leagueIds = lf.leagueIds;
-  const wanted = leagueIds ? catalog.leagues.filter((l) => leagueIds.includes(l.id)) : catalog.leagues;
+  const wanted = leagueIds
+    ? catalog.leagues.filter((l) => leagueIds.includes(l.id))
+    : catalog.leagues;
 
   const perLeague = await Promise.all(
     wanted.map(async (league) => {
@@ -1373,14 +1437,16 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
       const finals = (await dbx.listEventsForLeague(league.id, 1000)).filter(isFinal);
       const table = new Map<
         string,
-        { team: string; wins: number; losses: number; ties: number; pointsFor: number; pointsAgainst: number }
+        {
+          team: string;
+          wins: number;
+          losses: number;
+          ties: number;
+          pointsFor: number;
+          pointsAgainst: number;
+        }
       >();
-      const bump = (
-        key: string | null,
-        name: string,
-        us: number,
-        them: number,
-      ): void => {
+      const bump = (key: string | null, name: string, us: number, them: number): void => {
         const k = key ?? normalize(name);
         const row = table.get(k) ?? {
           team: clean(name),
@@ -1405,7 +1471,10 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
       const rows = [...table.values()]
         .map((r) => {
           const games = r.wins + r.losses + r.ties;
-          return { ...r, winPct: games === 0 ? 0 : Number(((r.wins + r.ties / 2) / games).toFixed(3)) };
+          return {
+            ...r,
+            winPct: games === 0 ? 0 : Number(((r.wins + r.ties / 2) / games).toFixed(3)),
+          };
         })
         .sort((x, y) => y.winPct - x.winPct || y.wins - x.wins || x.team.localeCompare(y.team));
       return { league: clean(league.slug), source: "derived" as const, standings: rows };
@@ -1426,10 +1495,14 @@ export async function getStandings(dbx: SportsToolsDb, raw: unknown): Promise<Re
     leagues: perLeague,
     note: [
       ...(anyOfficial
-        ? ['leagues marked source "team_records" serve the ingested official standings snapshot (asOf = its last refresh)']
+        ? [
+            'leagues marked source "team_records" serve the ingested official standings snapshot (asOf = its last refresh)',
+          ]
         : []),
       ...(anyDerived
-        ? ['leagues marked source "derived" are aggregated from finished games — no official snapshot ingested for them yet']
+        ? [
+            'leagues marked source "derived" are aggregated from finished games — no official snapshot ingested for them yet',
+          ]
         : []),
     ].join("; "),
   };
@@ -1446,7 +1519,10 @@ const playByPlayInput = z
   })
   .strict();
 
-export async function getPlayByPlay(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getPlayByPlay(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(playByPlayInput, raw, "get_play_by_play");
   if (input.team === undefined && input.providerEventId === undefined) {
     throw new Error("get_play_by_play: provide `team` or `providerEventId`");
@@ -1461,9 +1537,15 @@ export async function getPlayByPlay(dbx: SportsToolsDb, raw: unknown): Promise<R
     event = await dbx.getEventByProviderEventId(input.providerEventId);
     if (!event) {
       if (!(await dbx.hasAnyEvents())) {
-        return { status: "unavailable", reason: `${NOT_YET_INGESTED} — no events in the canonical database yet` };
+        return {
+          status: "unavailable",
+          reason: `${NOT_YET_INGESTED} — no events in the canonical database yet`,
+        };
       }
-      return { status: "not_found", note: `No event with providerEventId ${clean(input.providerEventId)}.` };
+      return {
+        status: "not_found",
+        note: `No event with providerEventId ${clean(input.providerEventId)}.`,
+      };
     }
   } else {
     const resolved = resolveTeamOrFail(catalog, input.team ?? "", input.league);
@@ -1519,7 +1601,11 @@ export async function getPlayByPlay(dbx: SportsToolsDb, raw: unknown): Promise<R
 
 const USDC_DECIMALS = 1e6;
 
-export async function getMarketPrice(dbx: SportsToolsDb, raw: unknown, now: Date = new Date()): Promise<Record<string, unknown>> {
+export async function getMarketPrice(
+  dbx: SportsToolsDb,
+  raw: unknown,
+  now: Date = new Date(),
+): Promise<Record<string, unknown>> {
   const input = parseInput(marketIdInput, raw, "get_market_price");
   const market = await dbx.getMarket(input.marketId);
   if (!market) {
@@ -1556,7 +1642,10 @@ export async function getMarketPrice(dbx: SportsToolsDb, raw: unknown, now: Date
   };
 }
 
-export async function getMarketHistory(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+export async function getMarketHistory(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(marketHistoryInput, raw, "get_market_history");
   const market = await dbx.getMarket(input.marketId);
   if (!market) {
@@ -1647,7 +1736,117 @@ export async function getMarketVolume(
   };
 }
 
-export async function getMarketLiquidity(dbx: SportsToolsDb, raw: unknown): Promise<Record<string, unknown>> {
+// ─── task 056 / A-021 mantua_get_market ─────────────────────────────────────
+
+const marketOverviewInput = z
+  .object({
+    providerEventId: z.string().trim().min(1).max(64).optional(),
+    marketId: marketIdSchema.optional(),
+  })
+  .strict()
+  .refine((v) => v.providerEventId !== undefined || v.marketId !== undefined, {
+    message: "providerEventId or marketId is required",
+  });
+
+/**
+ * One call for everything the agent needs to reason about a game's markets
+ * (A-021): the game, and per market — the public row, the latest captured
+ * price with its age, pool depth, and 24 h fill volume. Composes the same
+ * readers the single-purpose tools use; a missing capture is reported
+ * per field, never invented.
+ */
+export async function getMarketOverview(
+  dbx: SportsToolsDb,
+  raw: unknown,
+  now: Date = new Date(),
+): Promise<Record<string, unknown>> {
+  const input = parseInput(marketOverviewInput, raw, "mantua_get_market");
+  const catalog = await loadCatalog(dbx);
+  let event: EventRow | null = null;
+  if (input.providerEventId !== undefined) {
+    event = await dbx.getEventByProviderEventId(input.providerEventId);
+  } else if (input.marketId !== undefined) {
+    const m = await dbx.getMarket(input.marketId);
+    if (!m) {
+      return {
+        status: "not_found",
+        note: "No market with this id in the canonical database — take ids from mantua_search_markets or get_game.",
+      };
+    }
+    // The market's event: walk the league events (the seam has no event-by-id).
+    for (const league of catalog.leagues) {
+      const hit = (await dbx.listEventsForLeague(league.id, 500)).find((e) => e.id === m.eventId);
+      if (hit) {
+        event = hit;
+        break;
+      }
+    }
+  }
+  if (!event) {
+    if (!(await dbx.hasAnyEvents())) {
+      return {
+        status: "unavailable",
+        reason: `${NOT_YET_INGESTED} — no events in the canonical database yet`,
+      };
+    }
+    return {
+      status: "not_found",
+      note: "No game with this id in the canonical database — take providerEventId from mantua_search_markets.",
+    };
+  }
+  const eventMarkets = await dbx.listMarketsForEvent(event.id);
+  const since = new Date(now.getTime() - 24 * 3_600_000);
+  const marketsOut = await Promise.all(
+    eventMarkets.map(async (m) => {
+      const [captures, fills] = await Promise.all([
+        dbx.listMarketPrices(m.marketId, 25),
+        dbx.listMarketFillsSince(m.marketId, since),
+      ]);
+      const latest = captures.at(0);
+      const withDepth = captures.find((c) => c.liquidityRaw !== null);
+      let volume = 0;
+      for (const f of fills) volume += Number(f.usdcRaw) / USDC_DECIMALS;
+      const p = latest ? Number(latest.impliedProbability) : null;
+      return {
+        ...publicMarket(event, m),
+        price:
+          latest && p !== null
+            ? {
+                impliedProbabilityBps: Math.round(p * 10_000),
+                source: latest.source,
+                capturedAt: latest.capturedAt.toISOString(),
+                ageSeconds: Math.max(
+                  0,
+                  Math.round((now.getTime() - latest.capturedAt.getTime()) / 1000),
+                ),
+              }
+            : null,
+        liquidityUsdc:
+          m.poolId === null || !withDepth || withDepth.liquidityRaw === null
+            ? null
+            : Number((Number(withDepth.liquidityRaw) / USDC_DECIMALS).toFixed(6)),
+        volume24hUsdc: Number(volume.toFixed(6)),
+        trades24h: fills.length,
+      };
+    }),
+  );
+  return {
+    status: "ok",
+    game: publicGame(catalog, event),
+    markets: marketsOut,
+    ...(eventMarkets.length === 0
+      ? { marketsNote: "no markets recorded for this game yet (created at market-generation time)" }
+      : {}),
+    notes: [
+      "price null = no capture yet; liquidityUsdc null = pool not deployed or no depth capture; volume counts confirmed app fills only.",
+    ],
+  };
+}
+
+export async function getMarketLiquidity(
+  dbx: SportsToolsDb,
+  raw: unknown,
+): Promise<Record<string, unknown>> {
   const input = parseInput(marketIdInput, raw, "get_market_liquidity");
   const market = await dbx.getMarket(input.marketId);
   if (!market) {
