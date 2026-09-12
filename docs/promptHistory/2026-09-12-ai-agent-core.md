@@ -62,6 +62,9 @@ Mid-lane directives, in order:
   policy panel, D-109; ledger 27 ✅ · 12 🟡 · 8 ⬜.
 - Lane 058 landed: the untrusted-data boundary (`lib/agent/untrusted.ts`) in the
   tool loop + the A-036 adversarial suite; ledger 29 ✅ · 11 🟡 · 7 ⬜.
+- Lane 059 landed: `sports_intelligence` (`lib/agent/sports-intelligence.ts` +
+  `analyzeMarket`), `mantua_analyze_market`, the prompt's built-in skills list
+  (A-001); ledger 34 ✅ · 9 🟡 · 4 ⬜.
 - Next lanes: 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.

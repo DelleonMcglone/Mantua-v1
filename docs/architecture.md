@@ -795,6 +795,24 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Agent skill: sports_intelligence (A-004/A-022, task 059)
+
+1. **Why a transparent additive estimator.** The same facts must give the
+   same number, and the user must be able to see why. `analyzeSide`
+   applies bounded, itemized adjustments (venue, season record, recent
+   form, injuries, head-to-head, live score) on a 50/50 baseline and
+   returns every component with its effect, the market's implied
+   probability, the discrepancy, risks and a confidence grade. It is a
+   reasoning aid; the disclaimers say so.
+2. **Why it never sizes or trades.** The suggested action is
+   consider-buy / consider-fade / hold and hands back the exact
+   `mantua_simulate_trade` arguments; sizing belongs to the simulation
+   under the cap and the policy, and execution to the user's confirm.
+3. **Why skills are a prompt list.** Circle's docs carry no skills
+   registry; Mantua's built-in skills are declared once in the prompt and
+   bound to typed tools, so "what the agent is" and "what it can call"
+   cannot drift apart.
+
 ### Agent untrusted-data boundary (A-034/A-036, task 058)
 
 1. **Why one seam, not per-tool sanitizers.** Every tool whose result

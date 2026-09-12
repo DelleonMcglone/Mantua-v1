@@ -32,6 +32,7 @@
 import { z } from "zod";
 import { and, desc, eq, gte, isNull, or } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
+import { analyzeSide, type AnalysisFacts, type SideFacts } from "../agent/sports-intelligence.ts";
 import {
   events,
   gamePlays,
@@ -1840,6 +1841,218 @@ export async function getMarketOverview(
     notes: [
       "price null = no capture yet; liquidityUsdc null = pool not deployed or no depth capture; volume counts confirmed app fills only.",
     ],
+  };
+}
+
+// ─── task 059 / A-004, A-022 mantua_analyze_market (sports_intelligence) ────
+
+const analyzeMarketInput = z
+  .object({
+    team: z.string().trim().min(1).max(60).optional(),
+    providerEventId: z.string().trim().min(1).max(64).optional(),
+    marketId: marketIdSchema.optional(),
+    /** Which side to analyze when identified by event: 0 home, 1 away. */
+    outcomeIndex: z.union([z.literal(0), z.literal(1)]).optional(),
+    league: z.string().trim().min(1).max(16).optional(),
+  })
+  .strict()
+  .refine(
+    (v) => v.team !== undefined || v.providerEventId !== undefined || v.marketId !== undefined,
+    { message: "team, providerEventId or marketId is required" },
+  );
+
+function recordOf(rows: readonly TeamRecordRow[]): SideFacts["record"] {
+  const pick = pickLatestSeason(rows);
+  if (!pick) return null;
+  const row = rows.find((r) => r.season === pick.season && r.seasonType === pick.seasonType);
+  return row ? { wins: row.wins, losses: row.losses, ties: row.ties } : null;
+}
+
+async function sideFacts(dbx: SportsToolsDb, team: TeamRow, limit = 5): Promise<SideFacts> {
+  const [records, injuries, events] = await Promise.all([
+    dbx.listTeamRecordsForTeam(team.id),
+    dbx.listOpenInjuriesForTeam(team.id),
+    dbx.listEventsForTeam(team, 200),
+  ]);
+  const finals = events.filter(isFinal).slice(0, limit);
+  const recentForm = finals.map((e): "W" | "L" | "T" => {
+    const side = sideOf(e, team) ?? "home";
+    const us = (side === "home" ? e.homeScore : e.awayScore) ?? 0;
+    const them = (side === "home" ? e.awayScore : e.homeScore) ?? 0;
+    return us > them ? "W" : us < them ? "L" : "T";
+  });
+  return {
+    name: clean(team.name),
+    record: recordOf(records),
+    recentForm,
+    injuries: injuries.map((i) => ({
+      status: clean(i.status),
+      player: i.playerName === null ? null : clean(i.playerName),
+      position: i.position === null ? null : clean(i.position),
+    })),
+  };
+}
+
+function teamOnSide(catalog: Catalog, e: EventRow, side: "home" | "away"): TeamRow | undefined {
+  const id = side === "home" ? e.homeTeamId : e.awayTeamId;
+  const key = side === "home" ? e.homeTeamKey : e.awayTeamKey;
+  return catalog.teams.find((t) => t.id === id || (key !== null && t.key === key));
+}
+
+/**
+ * The `sports_intelligence` skill as one tool: identify the game and side,
+ * gather records, form, injuries, head-to-head, live score and the market's
+ * price/depth from the canonical database, and run the transparent
+ * estimator. Returns the analysis with every weight shown, the market
+ * discrepancy, risks, a suggested action and the exact
+ * `mantua_simulate_trade` arguments for it. Never trades.
+ */
+export async function analyzeMarket(
+  dbx: SportsToolsDb,
+  raw: unknown,
+  now: Date = new Date(),
+): Promise<Record<string, unknown>> {
+  const input = parseInput(analyzeMarketInput, raw, "mantua_analyze_market");
+  const catalog = await loadCatalog(dbx);
+
+  // 1. The game and the side.
+  let event: EventRow | null = null;
+  let side: "home" | "away" | null = null;
+  if (input.team !== undefined) {
+    const game = await getGame(
+      dbx,
+      { team: input.team, ...(input.league ? { league: input.league } : {}) },
+      now,
+    );
+    if (game["status"] !== "ok") return game;
+    const pe = (game["game"] as { providerEventId: string }).providerEventId;
+    event = await dbx.getEventByProviderEventId(pe);
+    side = game["teamSide"] === "away" ? "away" : "home";
+  } else if (input.providerEventId !== undefined) {
+    event = await dbx.getEventByProviderEventId(input.providerEventId);
+    side = input.outcomeIndex === 1 ? "away" : "home";
+  } else if (input.marketId !== undefined) {
+    const m = await dbx.getMarket(input.marketId);
+    if (!m)
+      return { status: "not_found", note: "No market with this id in the canonical database." };
+    for (const league of catalog.leagues) {
+      const hit = (await dbx.listEventsForLeague(league.id, 500)).find((e) => e.id === m.eventId);
+      if (hit) {
+        event = hit;
+        break;
+      }
+    }
+    side = m.outcomeIndex === 1 ? "away" : "home";
+  }
+  if (!event || side === null) {
+    return {
+      status: "not_found",
+      note: "No game found for that identifier — take providerEventId from mantua_search_markets.",
+    };
+  }
+  const teamRow = teamOnSide(catalog, event, side);
+  const oppRow = teamOnSide(catalog, event, side === "home" ? "away" : "home");
+  if (!teamRow || !oppRow) {
+    return {
+      status: "unavailable",
+      reason: `${NOT_YET_INGESTED} — one of the teams is not in the canonical catalog yet`,
+      game: publicGame(catalog, event),
+    };
+  }
+
+  // 2. Facts for both sides, head-to-head, market.
+  const [team, opponent, overview] = await Promise.all([
+    sideFacts(dbx, teamRow),
+    sideFacts(dbx, oppRow),
+    getMarketOverview(dbx, { providerEventId: event.providerEventId }, now),
+  ]);
+  const meetings = (await dbx.listEventsForTeam(teamRow, 200))
+    .filter(isFinal)
+    .filter((e) => sideOf(e, oppRow) !== null)
+    .slice(0, 6);
+  let h2h: AnalysisFacts["headToHead"] = null;
+  if (meetings.length > 0) {
+    let tw = 0;
+    let ow = 0;
+    let ties = 0;
+    for (const e of meetings) {
+      const s = sideOf(e, teamRow) ?? "home";
+      const us = (s === "home" ? e.homeScore : e.awayScore) ?? 0;
+      const them = (s === "home" ? e.awayScore : e.homeScore) ?? 0;
+      if (us > them) tw += 1;
+      else if (us < them) ow += 1;
+      else ties += 1;
+    }
+    h2h = { teamWins: tw, opponentWins: ow, ties };
+  }
+  const outcomeIndex: 0 | 1 = side === "home" ? 0 : 1;
+  const marketsOut =
+    overview["status"] === "ok" ? (overview["markets"] as Record<string, unknown>[]) : [];
+  const market = marketsOut.find((m) => m["outcomeIndex"] === outcomeIndex) ?? null;
+  const price = market
+    ? (market["price"] as { impliedProbabilityBps: number; ageSeconds: number } | null)
+    : null;
+  const liquidity = market ? (market["liquidityUsdc"] as number | null) : null;
+  const live =
+    event.status === "in_progress" && event.homeScore !== null && event.awayScore !== null
+      ? side === "home"
+        ? { teamScore: event.homeScore, opponentScore: event.awayScore }
+        : { teamScore: event.awayScore, opponentScore: event.homeScore }
+      : null;
+
+  const analysis = analyzeSide({
+    league: leagueSlugOf(catalog, event.leagueId),
+    side,
+    team,
+    opponent,
+    headToHead: h2h,
+    live,
+    gameStatus: event.status,
+    marketImpliedBps: price ? price.impliedProbabilityBps : null,
+    marketAgeSeconds: price ? price.ageSeconds : null,
+    liquidityUsdc: liquidity,
+    delayed: false,
+  });
+
+  const fadeIndex: 0 | 1 = outcomeIndex === 0 ? 1 : 0;
+  return {
+    status: "ok",
+    skill: "sports_intelligence",
+    game: publicGame(catalog, event),
+    side,
+    team: team.name,
+    opponent: opponent.name,
+    market: market
+      ? {
+          marketId: market["marketId"],
+          outcomeIndex,
+          state: market["state"],
+          impliedProbabilityBps: price ? price.impliedProbabilityBps : null,
+          priceAgeSeconds: price ? price.ageSeconds : null,
+          liquidityUsdc: liquidity,
+          volume24hUsdc: market["volume24hUsdc"],
+        }
+      : null,
+    analysis,
+    inputs: { team, opponent, headToHead: h2h, live },
+    next:
+      analysis.suggestedAction.kind === "consider_buy_yes"
+        ? {
+            tool: "mantua_simulate_trade",
+            args: { providerEventId: event.providerEventId, outcomeIndex, direction: "buy" },
+            note: "Add the amount the user wants; show the simulation; ask for their explicit confirm.",
+          }
+        : analysis.suggestedAction.kind === "consider_fade"
+          ? {
+              tool: "mantua_simulate_trade",
+              args: {
+                providerEventId: event.providerEventId,
+                outcomeIndex: fadeIndex,
+                direction: "buy",
+              },
+              note: "The fade is the other side's YES (or mantua_get_position → sell if the user holds this side).",
+            }
+          : null,
   };
 }
 

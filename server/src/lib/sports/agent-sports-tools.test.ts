@@ -15,6 +15,7 @@ import {
   getMarketVolume,
   getMarketLiquidity,
   getMarketOverview,
+  analyzeMarket,
 } from "./agent-sports-tools.ts";
 import type {
   EventRow,
@@ -1056,5 +1057,53 @@ void describe("task 056 — mantua_get_market (getMarketOverview)", () => {
     const missing = asR(await getMarketOverview(db, { providerEventId: "999" }, NOW));
     assert.equal(missing["status"], "not_found");
     await assert.rejects(getMarketOverview(db, {}, NOW), /providerEventId or marketId/);
+  });
+});
+
+void describe("task 059 — mantua_analyze_market (sports_intelligence)", () => {
+  void it("composes the analysis for 'Falcons' from the canonical fixture and hands back the simulate arguments", async () => {
+    const res = asR(await analyzeMarket(db, { team: "Falcons" }, NOW));
+    assert.equal(res["status"], "ok");
+    assert.equal(res["skill"], "sports_intelligence");
+    assert.equal(res["side"], "home");
+    assert.equal(res["team"], "Atlanta Falcons");
+    assert.equal(res["opponent"], "New Orleans Saints");
+    const market = asR(res["market"]);
+    assert.equal(market["marketId"], M0);
+    assert.equal(market["impliedProbabilityBps"], 6600);
+    assert.equal(market["liquidityUsdc"], 2500);
+    const analysis = asR(res["analysis"]);
+    const p = Number(analysis["probabilityBps"]);
+    assert.ok(p >= 500 && p <= 9500);
+    const factors = asArr(analysis["evidence"]).map((e) => e["factor"]);
+    assert.ok(factors.includes("venue"));
+    assert.ok(factors.includes("recent form"));
+    assert.ok(factors.includes("injuries"), "the open WR injury is evidence");
+    assert.ok(factors.includes("live score"), "the game is in progress");
+    assert.ok(
+      (analysis["riskFactors"] as unknown[]).some(
+        (r) => typeof r === "string" && /in-play/.test(r),
+      ),
+    );
+    const inputs = asR(res["inputs"]);
+    assert.deepEqual(asR(inputs["team"])["recentForm"], ["W", "L", "W", "W"]);
+    assert.equal(asR(inputs["headToHead"])["teamWins"], 1);
+    assert.equal(asR(inputs["headToHead"])["opponentWins"], 1);
+    const next = res["next"];
+    if (next !== null) {
+      assert.equal(asR(next)["tool"], "mantua_simulate_trade");
+    }
+  });
+
+  void it("resolves by providerEventId + outcomeIndex and reports not_found honestly", async () => {
+    const away = asR(
+      await analyzeMarket(db, { providerEventId: "pe-e-live", outcomeIndex: 1 }, NOW),
+    );
+    assert.equal(away["status"], "ok");
+    assert.equal(away["side"], "away");
+    assert.equal(away["team"], "New Orleans Saints");
+    const missing = asR(await analyzeMarket(db, { providerEventId: "nope" }, NOW));
+    assert.equal(missing["status"], "not_found");
+    await assert.rejects(analyzeMarket(db, {}, NOW), /team, providerEventId or marketId/);
   });
 });
