@@ -141,7 +141,7 @@ void describe("A-017 — the agent loop with the execution gate", () => {
     assert.match(result.error ?? "", /requires the user's explicit confirmation/);
     const fedBack = (model.requests[1]["messages"] as { role: string; content: unknown }[]).at(-1);
     assert.equal(fedBack?.role, "user");
-    assert.match(JSON.stringify(fedBack?.content), /is_error/);
+    assert.match(JSON.stringify(fedBack.content), /is_error/);
     // Second round's text streamed and both turns persisted, steps included.
     assert.ok(events.some((e) => e.type === "text" && /explicit confirm/.test(e.delta)));
     assert.equal(events.at(-1)?.type, "done");
