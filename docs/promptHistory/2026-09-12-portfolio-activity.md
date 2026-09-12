@@ -33,3 +33,7 @@ Management + Activity 🔴 P0 · 21 rows · 0 done".)
   `GET /api/portfolio/economics` + `/settled` (see `docs/tasks/063-position-economics.md`).
 - Lane 064 landed: `features/activity/` timeline + Activity tab, the
   chainless-branding sweep and its leak fixes (see `docs/tasks/064-activity-timeline.md`).
+- Lane 065 landed: the ten portfolio surfaces — holdings aggregate, LP
+  economics, grouped market positions with payout, settled history, agent
+  status / positions / recent actions, hedge values (see
+  `docs/tasks/065-portfolio-surfaces.md`).

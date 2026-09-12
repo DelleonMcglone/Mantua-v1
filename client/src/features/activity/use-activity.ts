@@ -23,7 +23,20 @@ const PAGE = 40;
  * at a time (cursor = the oldest loaded entry). Re-fetches from the top when
  * the filter or the wallet changes. Null wallet → empty, no request.
  */
-export function useActivity(walletAddress: string | null, filter: ActivityFilter): UseActivity {
+export interface UseActivityOptions {
+  /** Restrict to one actor (user | agent | system). */
+  actor?: string;
+  /** Explicit server kinds, overriding the category filter. */
+  kinds?: string;
+  limit?: number;
+}
+
+export function useActivity(
+  walletAddress: string | null,
+  filter: ActivityFilter,
+  options: UseActivityOptions = {},
+): UseActivity {
+  const { actor, kinds, limit } = options;
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,9 +52,10 @@ export function useActivity(walletAddress: string | null, filter: ActivityFilter
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams({ limit: String(PAGE) });
-        const kind = kindQueryFor(filter);
+        const params = new URLSearchParams({ limit: String(limit ?? PAGE) });
+        const kind = kinds ?? kindQueryFor(filter);
         if (kind) params.set("kind", kind);
+        if (actor) params.set("actor", actor);
         if (before) params.set("before", before);
         const page = await api.get<ActivityPage>(`/api/activity?${params.toString()}`);
         setItems((prev) => (replace ? page.items : [...prev, ...page.items]));
@@ -52,7 +66,7 @@ export function useActivity(walletAddress: string | null, filter: ActivityFilter
         setLoading(false);
       }
     },
-    [walletAddress, filter],
+    [walletAddress, filter, actor, kinds, limit],
   );
 
   useEffect(() => {

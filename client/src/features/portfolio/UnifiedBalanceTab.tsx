@@ -36,16 +36,14 @@ export function UnifiedBalanceTab({ ub }: { ub: ReturnType<typeof useUnifiedBala
 
   const explorerUrl =
     ub.depositState.explorerUrl ??
-    (ub.depositState.txHash
-      ? getExplorerTxUrl(BASE_CHAIN_ID, ub.depositState.txHash)
-      : undefined);
+    (ub.depositState.txHash ? getExplorerTxUrl(BASE_CHAIN_ID, ub.depositState.txHash) : undefined);
 
   return (
     <div className="p-4 space-y-3">
       <div className="text-[11px] text-text-mute">
         Consolidate USDC across chains into one balance, accessible anywhere — reduces the working
-        capital you tie up per chain. Deposits move USDC from the agent wallet. (Agent
-        treasury · Circle Gateway)
+        capital you tie up per chain. Deposits move USDC from the agent wallet. (Agent treasury ·
+        Circle Gateway)
       </div>
 
       {ub.loading && !ub.data && (
