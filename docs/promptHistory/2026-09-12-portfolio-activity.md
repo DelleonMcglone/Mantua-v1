@@ -37,3 +37,6 @@ Management + Activity 🔴 P0 · 21 rows · 0 done".)
   economics, grouped market positions with payout, settled history, agent
   status / positions / recent actions, hedge values (see
   `docs/tasks/065-portfolio-surfaces.md`).
+- Lane 066 landed: the composed activity end-to-end, the composed portfolio
+  test, the valuation decision D-116 with the observable $0 fallback and its
+  alert (see `docs/tasks/066-portfolio-activity-e2e.md`). Phase 9: 21 ✅.

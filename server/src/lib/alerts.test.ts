@@ -160,6 +160,13 @@ void describe("evaluateAlerts", () => {
     assert.deepEqual(ids(ok), [], "5% failures is under the 10% threshold");
   });
 
+  void it("PF-011: a $0 valuation from the price feeds warns", () => {
+    assert.deepEqual(ids(evaluateAlerts(input({ counters: { "pricing.fallback_zero": 0 } }))), []);
+    const bad = evaluateAlerts(input({ counters: { "pricing.fallback_zero": 3 } }));
+    assert.deepEqual(ids(bad), ["warn:pricing_zero"]);
+    assert.match(bad[0]?.title ?? "", /3×/);
+  });
+
   void it("A-040: the agent gate's refusal rate warns past 50% once enough executions were gated", () => {
     const tooFew = evaluateAlerts(
       input({ counters: { "agent.funnel.refused.CONFIRMATION_REQUIRED": 5 } }),

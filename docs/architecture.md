@@ -795,6 +795,17 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Portfolio valuation (D-116, task 066)
+
+1. **Why Pyth-first with a fallback, and why $0 stays possible.** The
+   read path must degrade, not blank; an outage on both feeds values the
+   token at 0 — visibly (`pricing.fallback_zero`, the `pricing_zero`
+   alert) — while the write path (caps) keeps the strict helpers that
+   refuse to trade on a missing price.
+2. **Why market marks are the pool.** A prediction position's price is
+   the pool's implied probability, read on-chain; no external feed exists
+   for it and none is wanted.
+
 ### Unified Activity (D-115, task 062)
 
 1. **Why a dedicated table.** The ledgers each answer one question

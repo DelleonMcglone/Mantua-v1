@@ -155,6 +155,20 @@ export function evaluateAlerts(input: AlertInput): Alert[] {
     });
   }
 
+  // PF-011 / D-116 — a priced token valued at zero means a feed is dead and
+  // every portfolio total that includes it is silently short.
+  const zeroPrices = input.counters["pricing.fallback_zero"] ?? 0;
+  if (zeroPrices > 0) {
+    alerts.push({
+      id: "pricing_zero",
+      severity: "warn",
+      title: `Price feed returned $0 ${String(zeroPrices)}× this instance`,
+      detail:
+        "Pyth and the DefiLlama fallback both failed for a priced token; portfolio and earnings totals undervalue it until a feed recovers. Cap enforcement is unaffected (strict pricing fails closed).",
+      runbook: "docs/ops/monitoring.md §Pricing",
+    });
+  }
+
   // A-040 — the agent's execution gate: many refusals per execution means
   // the model is calling money tools without the user's confirm (a prompt
   // regression) or previews are drifting; both are worth a look, not a page.

@@ -90,6 +90,12 @@ scenario the security review's M-01 requires monitoring for. The strict
 on-chain form (reading the hook's event state per frozen market) is a
 follow-up; this catches what the service itself can see.
 
+### Pricing (Phase 9, task 066)
+
+| Alert          | Severity | Rule                                                                                          | Runbook                                                                                                       |
+| -------------- | -------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `pricing_zero` | warn     | `pricing.fallback_zero` > 0 this instance (Pyth and DefiLlama both failed for a priced token) | check the Pyth Hermes and DefiLlama Coins endpoints; totals undervalue until a feed recovers; caps unaffected |
+
 ### Agent gate (Phase 8, task 061)
 
 | Alert                | Severity | Rule                                                                                              | Runbook                            |
