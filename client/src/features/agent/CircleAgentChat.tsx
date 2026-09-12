@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ArrowLeft, Bot, Check, ExternalLink, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { Banner } from "@/components/ui/banner.tsx";
@@ -9,6 +17,24 @@ import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
 import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
+import {
+  analysisCard,
+  dailyBriefCard,
+  simulationCard,
+  type AnalysisResult,
+  type DailyBriefResult,
+  type SimulationResult,
+} from "./agent-cards.ts";
+
+/**
+ * Phase 8 / A-043 — cards that offer the user an action (the preview's
+ * Confirm button) send through the same path as typing: the user's own
+ * message "confirm" is the only thing the server accepts as consent.
+ */
+const AgentActionsContext = createContext<{ send: (text: string) => void; busy: boolean }>({
+  send: () => undefined,
+  busy: false,
+});
 
 /**
  * "Your Circle Agent" — a free-form conversational agent.
@@ -75,6 +101,7 @@ const SUGGESTIONS: { label: string; message: string }[] = [
       "Show me today's sports markets with live prices, evaluate the matchups, and recommend a bet.",
   },
   { label: "Swap Tokens", message: "Swap Tokens" },
+  { label: "Add Liquidity", message: "Add liquidity to a USDC/EURC pool — preview it first" },
   { label: "Send Tokens", message: "Send Tokens" },
 ];
 
@@ -86,7 +113,18 @@ const TOOL_VERB: Record<string, string> = {
   send: "Sending tokens",
   get_market_data: "Pulling market data",
   get_sports_slate: "Reading today's games",
-  trade_market: "Trading sports market",
+  mantua_search_markets: "Finding markets",
+  mantua_get_market: "Reading the market",
+  mantua_analyze_market: "Analyzing the matchup",
+  mantua_simulate_trade: "Simulating the trade",
+  mantua_preview_action: "Preparing the preview",
+  mantua_execute_trade: "Placing the trade",
+  mantua_sell_position: "Selling the position",
+  mantua_get_position: "Reading the position",
+  mantua_get_portfolio: "Reading the portfolio",
+  mantua_get_performance: "Reading the track record",
+  mantua_daily_brief: "Assembling the brief",
+  mantua_get_policy: "Reading your policy",
 };
 
 let seq = 0;
@@ -227,56 +265,58 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
   }, []);
 
   return (
-    <>
-      <PanelHeader onNewChat={newChat} />
+    <AgentActionsContext.Provider value={{ send, busy }}>
+      <>
+        <PanelHeader onNewChat={newChat} />
 
-      <div className="flex items-center justify-between border-b border-border-soft bg-bg-elev px-4 py-3.5">
-        <div className="flex items-center gap-2">
-          {messages.length > 0 && (
-            <Button
-              variant="icon"
-              size="icon"
-              className="h-[26px] w-[26px] rounded-[7px]"
-              onClick={newChat}
-              aria-label="Back to suggestions"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          <div className="flex items-center gap-2 text-[13px] font-semibold">
-            <Bot className="h-4 w-4" aria-hidden /> Your Circle Agent
+        <div className="flex items-center justify-between border-b border-border-soft bg-bg-elev px-4 py-3.5">
+          <div className="flex items-center gap-2">
+            {messages.length > 0 && (
+              <Button
+                variant="icon"
+                size="icon"
+                className="h-[26px] w-[26px] rounded-[7px]"
+                onClick={newChat}
+                aria-label="Back to suggestions"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <div className="flex items-center gap-2 text-[13px] font-semibold">
+              <Bot className="h-4 w-4" aria-hidden /> Your Circle Agent
+            </div>
           </div>
+          <Button
+            variant="icon"
+            size="icon"
+            className="h-[26px] w-[26px] rounded-[7px]"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
         </div>
-        <Button
-          variant="icon"
-          size="icon"
-          className="h-[26px] w-[26px] rounded-[7px]"
-          onClick={onClose}
-          aria-label="Close"
-        >
-          <X className="h-3.5 w-3.5" />
-        </Button>
-      </div>
 
-      {agent.agentAddress && (
-        <AgentWalletStrip agent={agent} label={`Agent · ${shortAddr(agent.agentAddress)}`} />
-      )}
-
-      <div className="flex flex-1 flex-col gap-3.5 overflow-auto p-4">
-        {messages.length === 0 ? (
-          <EmptyState onPick={send} disabled={busy} />
-        ) : (
-          messages.map((m) =>
-            m.role === "user" ? (
-              <UserBubble key={m.id} text={m.text} />
-            ) : (
-              <AssistantBubble key={m.id} msg={m} />
-            ),
-          )
+        {agent.agentAddress && (
+          <AgentWalletStrip agent={agent} label={`Agent · ${shortAddr(agent.agentAddress)}`} />
         )}
-        <div ref={endRef} />
-      </div>
-    </>
+
+        <div className="flex flex-1 flex-col gap-3.5 overflow-auto p-4">
+          {messages.length === 0 ? (
+            <EmptyState onPick={send} disabled={busy} />
+          ) : (
+            messages.map((m) =>
+              m.role === "user" ? (
+                <UserBubble key={m.id} text={m.text} />
+              ) : (
+                <AssistantBubble key={m.id} msg={m} />
+              ),
+            )
+          )}
+          <div ref={endRef} />
+        </div>
+      </>
+    </AgentActionsContext.Provider>
   );
 }
 
@@ -379,8 +419,187 @@ function fmtNum(s: string): string {
   return Number.isFinite(n) ? n.toLocaleString(undefined, { maximumFractionDigits: 6 }) : s;
 }
 
+function ConfirmRow({ label }: { label: string }) {
+  const { send, busy } = useContext(AgentActionsContext);
+  return (
+    <div className="flex items-center justify-between gap-3 pt-1">
+      <span className="text-[11px] text-text-mute">
+        Reply &quot;confirm&quot; or press the button — nothing runs until you do.
+      </span>
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={() => {
+          send("confirm");
+        }}
+      >
+        {label}
+      </Button>
+    </div>
+  );
+}
+
 function renderResult(step: ToolStep): ReactNode {
   switch (step.tool) {
+    case "mantua_simulate_trade": {
+      const c = simulationCard(step.data as SimulationResult);
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Preview · {c.title}</Heading>
+          <DetailRows rows={c.rows} />
+          {c.blockers.length > 0 && (
+            <Banner tone="error" icon="⊘" title="Not executable">
+              {c.blockers.join(" ")}
+            </Banner>
+          )}
+          {c.canConfirm && <ConfirmRow label="Confirm trade" />}
+        </div>
+      );
+    }
+    case "mantua_preview_action": {
+      const d = step.data as { tool: string; summary: string };
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Preview · {d.tool.replace(/_/g, " ")}</Heading>
+          <div className="text-[13px] text-text-dim">{d.summary}</div>
+          <ConfirmRow label="Confirm" />
+        </div>
+      );
+    }
+    case "mantua_execute_trade":
+    case "mantua_sell_position": {
+      const d = step.data as {
+        txHash: string;
+        explorer: string;
+        received: string;
+        marketId: string;
+      };
+      return (
+        <Success
+          title={
+            step.tool === "mantua_execute_trade" ? `Bought ${d.received}` : `Sold for ${d.received}`
+          }
+          detail="Executed through your agent wallet after your confirm."
+          txHash={d.txHash}
+          explorerUrl={d.explorer}
+        />
+      );
+    }
+    case "mantua_analyze_market": {
+      const raw = step.data as { status?: string } & AnalysisResult;
+      if (raw.status !== "ok") return null;
+      const c = analysisCard(raw);
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>{c.title}</Heading>
+          <div className="text-[13px] text-text-dim">{c.headline}</div>
+          <DetailRows rows={c.evidence} />
+          {c.risks.length > 0 && (
+            <div className="text-[11px] text-text-mute">Risks: {c.risks.join(" · ")}</div>
+          )}
+          <div className="text-[12px] font-medium">{c.action}</div>
+        </div>
+      );
+    }
+    case "mantua_daily_brief": {
+      const c = dailyBriefCard(step.data as DailyBriefResult);
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Daily Brief</Heading>
+          <DetailRows rows={c.rows} />
+          {c.markets.length > 0 && (
+            <>
+              <div className="text-[11px] uppercase tracking-wide text-text-mute">
+                Markets worth a look
+              </div>
+              <DetailRows rows={c.markets} />
+            </>
+          )}
+        </div>
+      );
+    }
+    case "mantua_get_performance": {
+      const d = step.data as {
+        totals: {
+          realizedPnlUsd: number;
+          winRate: number | null;
+          wins: number;
+          losses: number;
+          voided: number;
+          openMarkets: number;
+          openCostUsd: number;
+        };
+      };
+      const t = d.totals;
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Track record</Heading>
+          <DetailRows
+            rows={[
+              {
+                label: "Realized P&L",
+                value: `${t.realizedPnlUsd >= 0 ? "+" : ""}$${t.realizedPnlUsd.toFixed(2)}`,
+              },
+              {
+                label: "Win rate",
+                value:
+                  t.winRate === null
+                    ? "no resolved markets yet"
+                    : `${(t.winRate * 100).toFixed(0)}% (${String(t.wins)}-${String(t.losses)}${t.voided ? `, ${String(t.voided)} void` : ""})`,
+              },
+              {
+                label: "Open",
+                value: `${String(t.openMarkets)} markets · $${t.openCostUsd.toFixed(2)} at risk`,
+              },
+            ]}
+          />
+        </div>
+      );
+    }
+    case "mantua_get_portfolio": {
+      const d = step.data as PortfolioData & {
+        marketTotals: { count: number; valueUsd: number; pnlUsd: number };
+      };
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Agent portfolio</Heading>
+          <DetailRows
+            rows={[
+              ...d.balances.map((b) => ({
+                label: b.symbol,
+                value: `${fmtNum(b.balance)}${b.usdValue ? ` · $${b.usdValue.toFixed(2)}` : ""}`,
+              })),
+              {
+                label: "Sports positions",
+                value: `${String(d.marketTotals.count)} · $${d.marketTotals.valueUsd.toFixed(2)} · P&L ${d.marketTotals.pnlUsd >= 0 ? "+" : ""}$${d.marketTotals.pnlUsd.toFixed(2)}`,
+              },
+            ]}
+          />
+        </div>
+      );
+    }
+    case "mantua_search_markets": {
+      const d = step.data as {
+        rows: {
+          matchup: string;
+          status: string;
+          homeWinProbabilityBps: number | null;
+          liveOdds: boolean;
+        }[];
+      };
+      if (d.rows.length === 0) return null;
+      return (
+        <div className="flex flex-col gap-2">
+          <Heading>Markets</Heading>
+          <DetailRows
+            rows={d.rows.slice(0, 8).map((r) => ({
+              label: r.status.toUpperCase(),
+              value: `${r.matchup} · home ${r.homeWinProbabilityBps === null ? "—" : `${(r.homeWinProbabilityBps / 100).toFixed(1)}%`}${r.liveOdds ? " (pool)" : ""}`,
+            }))}
+          />
+        </div>
+      );
+    }
     case "swap": {
       const d = step.data as SwapData;
       return (

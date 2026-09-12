@@ -795,6 +795,26 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Agent chat cards, brief, performance, funnel (A-002/A-014/A-016/A-043/A-044, task 060)
+
+1. **Why the Confirm button sends "confirm".** One consent channel: the
+   server reads consent only from the user's own message (D-114). A
+   button that posted to a confirm endpoint would be a second channel with
+   its own audit shape; the button instead submits the literal message
+   through the same path as typing.
+2. **Why the brief is a tool.** `mantua_daily_brief` is the agent's own
+   structured read (wallet, positions, track record, policy, markets worth
+   a look); as a tool result it streams like every other step and the UI
+   renders it as a card, while the model narrates.
+3. **Why performance is server-side and pure.** Realized P&L needs fills
+   and resolutions; `computePerformance` scores a market only after its
+   resolution (payout at par for the winning side, refund on void) so the
+   number the agent cites equals the one the portfolio shows.
+4. **Why counters, not a vendor.** The user-testing funnel (turn → analyze
+   → simulate/preview → confirm minted → execute / refused) rides the
+   per-instance counters already on `/api/ops/metrics`; a product
+   analytics vendor is an owner decision.
+
 ### Agent skill: sports_intelligence (A-004/A-022, task 059)
 
 1. **Why a transparent additive estimator.** The same facts must give the

@@ -43,6 +43,8 @@ import {
 import { readMarketPositions } from "./sports/market-positions.ts";
 import { searchMarkets, summarizeMarketPositions } from "./agent/read-tools.ts";
 import { boundaryForTool } from "./agent/untrusted.ts";
+import { readAgentPerformance } from "./agent/performance.ts";
+import { counters } from "./metrics.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import {
@@ -230,7 +232,7 @@ Decision logic — ground every action in real signals, never assumptions:
 - Paid services (x402 — Circle's agent marketplace): you have access to the FULL marketplace at agents.circle.com/services, not just data feeds — web search, news, weather, sports stats, prediction-market odds, social/twitter lookups, academic papers, SMS and other communication APIs, domain lookups, and more. Stablecoin pay-per-use means no API keys and no accounts — you pay a small pre-capped USDC fee per call from your buyer wallet (settles on the x402 Base rail). BEFORE declining a request because you "can't do that" or lack live data, search_paid_services with a relevant keyword; if a service fits, call_paid_service and use its response. For pure market data still prefer the free tools first. Always state the cost you paid. If a paid call fails, retry once, then search for an alternative provider; if the buyer wallet lacks USDC, relay that plainly and do your best with built-in tools.
 
 Analyst method — you are a crypto research analyst on Base, and the Base explorer (basescan.org) is your blockchain explorer:
-- Daily briefing: when the user asks for a briefing, "what happened", or a market check, run the workflow: (1) market pulse — get_market_data with market-summary and top-stablecoins; (2) stay in the loop — market_research for trending coins, narrative/sector performance, and TVL outliers; (3) peg check — get_signals for USDC/EURC deviations; (4) portfolio review — mantua_get_portfolio (balances + marked sports positions + P&L) and get_user_wallet; (5) anything notable on-chain. Deliver a concise analyst brief: figures first, then interpretation, then recommended actions. HARD LIMIT: keep the whole brief under ~200 words — a handful of tight bullets with headline numbers. Do not narrate tool calls, list raw tool output, or restate data the user didn't ask about; if something is unremarkable, one clause ("pegs healthy") is enough.
+- Daily briefing: when the user asks for a briefing, "what happened", or a market check, call mantua_daily_brief FIRST (wallet, positions, P&L, policy, the markets worth a look — the UI renders it as a card), then run the workflow: (1) market pulse — get_market_data with market-summary and top-stablecoins; (2) stay in the loop — market_research for trending coins, narrative/sector performance, and TVL outliers; (3) peg check — get_signals for USDC/EURC deviations; (4) portfolio review — mantua_get_portfolio (balances + marked sports positions + P&L) and get_user_wallet; (5) anything notable on-chain. Deliver a concise analyst brief: figures first, then interpretation, then recommended actions. HARD LIMIT: keep the whole brief under ~200 words — a handful of tight bullets with headline numbers. Do not narrate tool calls, list raw tool output, or restate data the user didn't ask about; if something is unremarkable, one clause ("pegs healthy") is enough.
 - Monitor metrics (outlier rule): when market_research shows a protocol whose TVL moved sharply in a day (roughly 20%+ either way), flag it explicitly — name, size, move — and offer to dig into WHY (x402 web-search/news if the user wants the follow-up). A big TVL move without a known cause is exactly what deserves research.
 - Alpha hunting: combine narrative strength (market_research) with on-chain confirmation (inspect_address whale signals). Speed of information is an edge — on-chain data is the earliest signal; treat social narratives as later-stage.
 - On-chain analysis: use inspect_address for any wallet (balance, activity, whale signals), inspect_token for tokenomics + holder concentration, inspect_transaction to decode what a tx did. Whale signals to look for: accumulating a token, selling a held token, using a new protocol, rotating stables into tokens (risk-on) or tokens into stables (risk-off). NEVER suggest blindly copying a wallet — treat its activity as a hypothesis, then verify with your own data (pegs, price impact, volumes) before recommending anything.
@@ -418,6 +420,18 @@ const RAW_TOOLS: Anthropic.Tool[] = [
         league: { type: "string", enum: ["nfl", "wnba"] },
       },
     },
+  },
+  {
+    name: "mantua_get_performance",
+    description:
+      "The agent wallet's track record (A-016): realized P&L, win rate, wins/losses/voids, return on resolved cost, open cost at risk, and a per-market ledger (cost, proceeds, payout, realized P&L, tokens held) from indexed fills and market resolutions. Read-only. Use for 'how am I doing', 'what's my P&L', 'win rate'.",
+    input_schema: { type: "object", properties: {} },
+  },
+  {
+    name: "mantua_daily_brief",
+    description:
+      "One structured read for the Daily Brief card (A-014): the agent wallet (USDC balance, daily cap, spent today, remaining), open sports positions with mark value and P&L, the track record (realized P&L, win rate), the user's policy status and per-trade limit, and the live/upcoming markets worth a look (top rows of the canonical slate with prices). Call this FIRST when the user asks for a briefing, then add market pulse / peg / research reads as the workflow says, and narrate in under ~200 words. Read-only.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "mantua_get_policy",
@@ -1362,6 +1376,7 @@ async function executeTool(
   switch (name) {
     case "mantua_simulate_trade": {
       if (!turn) throw new Error("mantua_simulate_trade needs a turn context");
+      counters.inc("agent.funnel.simulate");
       const args = parseSimulationArgs(input);
       const sim = await simulateMarketTrade(
         buildSimulationDeps(privyUserId, chainId),
@@ -1385,6 +1400,7 @@ async function executeTool(
     }
     case "mantua_preview_action": {
       if (!turn) throw new Error("mantua_preview_action needs a turn context");
+      counters.inc("agent.funnel.preview");
       const tool = input["tool"];
       const args = input["args"];
       if (typeof tool !== "string" || !isMoneyCall(tool, (args ?? {}) as Record<string, unknown>)) {
@@ -1431,6 +1447,7 @@ async function executeTool(
         chainId,
       });
       if (direction === "buy") await recordSpending(wallet.address, amountNum);
+      counters.inc("agent.funnel.execute_ok");
       return {
         txHash: result.txHash,
         marketId: result.marketId,
@@ -1751,7 +1768,57 @@ async function executeTool(
         : summary;
     }
     case "mantua_analyze_market":
+      counters.inc("agent.funnel.analyze");
       return await analyzeMarket(sportsToolsDb, input);
+    case "mantua_get_performance": {
+      const wallet = await getAgentWallet(privyUserId, chainId);
+      if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
+      return await readAgentPerformance(db, wallet.address);
+    }
+    case "mantua_daily_brief": {
+      const wallet = await getAgentWallet(privyUserId, chainId);
+      if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
+      const user = await resolveUserId(privyUserId);
+      const owner = wallet.address as `0x${string}`;
+      const [portfolio, positions, performance, policy, cap, spent, slates] = await Promise.all([
+        getAgentPortfolio(privyUserId, 5, chainId),
+        readMarketPositions(owner),
+        readAgentPerformance(db, wallet.address),
+        user ? readPolicy(db, user) : Promise.resolve(null),
+        getDailyCap(wallet.address),
+        getDailySpend(wallet.address),
+        Promise.all(
+          (["nfl", "wnba"] as LeagueSlug[]).map(async (l) =>
+            withLiveOdds(await readCanonicalPublicSlate(db, l)),
+          ),
+        ),
+      ]);
+      const usdc = portfolio.balances.find((b) => b.symbol === "USDC");
+      const markets = summarizeMarketPositions(positions);
+      const live = searchMarkets(slates, { status: "live", limit: 4 }, Date.now());
+      const upcoming = searchMarkets(slates, { status: "upcoming", limit: 6 }, Date.now());
+      return {
+        generatedAt: new Date().toISOString(),
+        wallet: {
+          address: wallet.address,
+          usdcBalance: usdc ? Number(formatUnits(BigInt(usdc.balanceRaw), usdc.decimals)) : 0,
+          dailyCapUsd: cap,
+          spentTodayUsd: Number(spent.toFixed(2)),
+          remainingTodayUsd: Number(Math.max(0, cap - spent).toFixed(2)),
+        },
+        positions: { ...markets.totals, top: markets.positions.slice(0, 5) },
+        performance: performance.totals,
+        policy: policy
+          ? {
+              status: policy.status,
+              maxStakePerTradeUsd: policy.maxStakePerTradeUsd,
+              allowedLeagues: policy.allowedLeagues,
+            }
+          : null,
+        markets: { live: live.rows, upcoming: upcoming.rows, note: live.note ?? upcoming.note },
+        next: "Narrate: wallet → positions & P&L → the two or three markets worth a look (cite the price) → what you'd analyze next with mantua_analyze_market. Under ~200 words.",
+      };
+    }
     case "mantua_get_policy": {
       const user = await resolveUserId(privyUserId);
       if (!user) throw new Error("No user record for this session.");
@@ -2220,6 +2287,10 @@ export async function* runAgentChat(params: {
     message,
     autoTradeEnabled: policy.autoTradeEnabled && policy.status !== "paused",
   });
+  // A-044 — the user-testing funnel, per instance: turns → analyses →
+  // simulations/previews → confirmations minted → executions / refusals.
+  counters.inc("agent.funnel.turn");
+  if (turn.confirmation) counters.inc("agent.funnel.confirm_minted");
 
   const history = await loadHistory(sessionId);
   await db.insert(chatMessages).values({ sessionId, role: "user", content: message });
@@ -2296,6 +2367,7 @@ export async function* runAgentChat(params: {
         });
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
+        if (err instanceof ExecutionRefusedError) counters.inc(`agent.funnel.refused.${err.code}`);
         deferBackground(
           auditChatToolCall({
             walletAddress: agentWallet.address,

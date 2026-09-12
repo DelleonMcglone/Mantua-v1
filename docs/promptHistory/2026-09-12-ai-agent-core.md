@@ -65,6 +65,10 @@ Mid-lane directives, in order:
 - Lane 059 landed: `sports_intelligence` (`lib/agent/sports-intelligence.ts` +
   `analyzeMarket`), `mantua_analyze_market`, the prompt's built-in skills list
   (A-001); ledger 34 ✅ · 9 🟡 · 4 ⬜.
+- Lane 060 landed: typed chat cards (preview with a Confirm button, execution,
+  analysis, Daily Brief, performance, portfolio, markets), Add Liquidity chip,
+  `mantua_daily_brief`, `computePerformance` + `/api/agent/performance`, funnel
+  counters; ledger 40 ✅ · 5 🟡 · 2 ⬜.
 - Next lanes: 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.
