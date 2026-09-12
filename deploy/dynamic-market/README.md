@@ -166,8 +166,8 @@ scrambled.
 
    ```bash
    cast send $REGISTRY \
-     "registerPool(bytes32,uint64,uint64,bool,uint8)" \
-     $MARKET_ID $KICKOFF $RESOLUTION $YES_IS_TOKEN0 6 \
+     "registerPool(bytes32,uint64,uint64,bool,uint8,bool)" \
+     $MARKET_ID $KICKOFF $RESOLUTION $YES_IS_TOKEN0 6 $PLAYOFFS \
      --rpc-url https://mainnet.base.org
    ```
 
@@ -176,16 +176,36 @@ scrambled.
      wrong does not revert**; it inverts every probability the hook reads, so a
      25% market prices as a near-certainty. Compute it, do not guess it.
    - `6` — outcome-token decimals, confirmed in spec §0.1.
+   - `PLAYOFFS` — the D-105 season switch: `true` for a postseason game
+     (dynamic 0.10%–0.70% fee), `false` for the regular season (0%). **Once
+     only** — there is no setter; a wrong value means pause + a new market.
+     The sync cron takes it from the provider's season type
+     (`PlannedMarket.playoffs`), never by hand.
 
 2. **Initialize the pool** with `fee = 0x800000` (`DYNAMIC_FEE_FLAG`). A static
    fee is rejected: without the flag the PoolManager ignores the hook's fee
    override and the pool would silently run at a fixed tier.
 
 3. **Feed the keeper state.** Until the first `updateMarket`, the market reads
-   as stale, so the fee sits at `MAX_FEE` (5%) and the cap at `MIN_TRADE_CAP`
-   ($100). That is the intended fail-closed posture (spec §22), not a bug.
+   as stale, so a playoff pool's rate sits at `MAX_RATE` (0.70%) and the cap
+   at `MIN_TRADE_CAP` ($100); a regular-season pool stays at 0%. That is the
+   intended fail-closed posture (spec §22 / D-105), not a bug.
 
-4. **Record addresses** in the table above, then wire them into the
+4. **Probe the fee model** before opening the market to traders:
+
+   ```bash
+   # (fee, breakdown, notional, cap) for a $1 exact-input buy of YES.
+   cast call $HOOK \
+     "quoteFee((address,address,uint24,int24,address),(bool,int256,uint160))" \
+     "($CURRENCY0,$CURRENCY1,8388608,60,$HOOK)" "($ZERO_FOR_ONE,-1000000,0)" \
+     --rpc-url https://mainnet.base.org
+   ```
+
+   Expect `fee == 0` and `breakdown.playoffs == false` on a regular-season
+   pool; on a playoff pool `fee == breakdown.rate × (10000 − p) / 10000`
+   with `1000 ≤ rate ≤ 7000`. The server's trade build calls exactly this.
+
+5. **Record addresses** in the table above, then wire them into the
    server's env-driven contract registry (`server/src/lib/v4-contracts.ts`)
    and extend `HOOK_NAMES` with `"dynamic-market"` if not already present.
 

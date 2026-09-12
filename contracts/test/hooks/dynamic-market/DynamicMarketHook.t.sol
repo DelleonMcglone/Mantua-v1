@@ -2,8 +2,10 @@
 pragma solidity ^0.8.26;
 
 // Purpose: hook-level tests — permissions, PoolManager-only callbacks,
-// registration gate, halts, size cap, fee override, flow accounting.
-// Spec §7, §8, §19, §20, §23, §24, §28. Edge cases 11-16 from §33.
+// registration gate, halts, size cap, the D-105 season-gated fee read from
+// pool state (both token orderings), quote/execution parity, the fee event,
+// flow accounting. Spec §7, §8, §19, §20, §23, §24, §28. Edge cases 1-4,
+// 11-16 from §33. Task 049: H-004, H-005, H-011, H-012.
 
 import {Test} from "forge-std/Test.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
@@ -22,6 +24,8 @@ import {MarketStateRegistry} from "../../../src/hooks/dynamic-market/MarketState
 import {IMarketStateRegistry as I} from "../../../src/hooks/dynamic-market/IMarketStateRegistry.sol";
 import {MarketErrors} from "../../../src/hooks/dynamic-market/MarketErrors.sol";
 import {RiskPolicy} from "../../../src/hooks/dynamic-market/RiskPolicy.sol";
+import {MarketFeeCalculator as Calc} from "../../../src/hooks/dynamic-market/MarketFeeCalculator.sol";
+import {MarketFeeFormula as F} from "../../../src/hooks/dynamic-market/MarketFeeFormula.sol";
 
 contract DynamicMarketHookTest is Test {
     using PoolIdLibrary for PoolKey;
@@ -41,6 +45,14 @@ contract DynamicMarketHookTest is Test {
     /// @dev The permission set spec §7 requires, and the address bits it implies.
     uint160 constant EXPECTED_BITS = 0x28C0;
     uint160 constant HOOK_MASK = 0x3FFF;
+
+    /// @dev sqrtPriceX96 values that read as exact probabilities through
+    ///      MarketMath.probabilityBps. YES as token0: price = p. YES as token1:
+    ///      price = 1 / p.
+    uint160 constant SQRT_P50 = 56_022_770_974_786_139_918_731_938_228;
+    uint160 constant SQRT_P25_YES0 = 39_614_081_257_132_168_796_771_975_168;
+    uint160 constant SQRT_P25_YES1 = 158_456_325_028_528_675_187_087_900_672;
+    uint160 constant SQRT_P75_YES0 = 68_613_601_432_514_898_801_242_805_945;
 
     function setUp() public {
         vm.warp(1_000_000);
@@ -69,9 +81,20 @@ contract DynamicMarketHookTest is Test {
         id = key.toId();
     }
 
+    /// @dev Playoff pool: the dynamic fee is live.
     function _register() internal {
         vm.prank(operator);
-        registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6);
+        registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6, true);
+    }
+
+    /// @dev Regular-season pool: fee-free by D-105.
+    function _registerRegularSeason() internal {
+        vm.prank(operator);
+        registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6, false);
+    }
+
+    function _fee(uint24 feeWithFlag) internal pure returns (uint24) {
+        return feeWithFlag & ~LPFeeLibrary.OVERRIDE_FEE_FLAG;
     }
 
     function _feed() internal {
@@ -150,15 +173,15 @@ contract DynamicMarketHookTest is Test {
         // the initialize as a result.
         vm.prank(address(manager));
         vm.expectRevert(MarketErrors.PoolNotRegistered.selector);
-        hook.beforeInitialize(address(this), key, 79_228_162_514_264_337_593_543_950_336);
+        hook.beforeInitialize(address(this), key, SQRT_P50);
 
         vm.expectRevert();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
     }
 
     function test_registeredPoolInitializes() public {
         _register();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
         (uint160 sqrtPrice,,,) = _slot0();
         assertGt(sqrtPrice, 0);
     }
@@ -167,14 +190,14 @@ contract DynamicMarketHookTest is Test {
         PoolKey memory staticKey = key;
         staticKey.fee = 3000;
         vm.prank(operator);
-        registry.registerPool(staticKey.toId(), kickoff, kickoff + 4 hours, true, 6);
+        registry.registerPool(staticKey.toId(), kickoff, kickoff + 4 hours, true, 6, true);
 
         vm.prank(address(manager));
         vm.expectRevert(MarketErrors.StaticFeePoolRejected.selector);
-        hook.beforeInitialize(address(this), staticKey, 79_228_162_514_264_337_593_543_950_336);
+        hook.beforeInitialize(address(this), staticKey, SQRT_P50);
 
         vm.expectRevert();
-        manager.initialize(staticKey, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(staticKey, SQRT_P50);
     }
 
     // ─── Halts (§23, §24; edge case 16) ──────────────────────────────────
@@ -183,7 +206,7 @@ contract DynamicMarketHookTest is Test {
         // D-103 in-play trading: kickoff halts nothing. Trading runs through
         // the game until the keeper writes FINAL or the backstop fires.
         _register();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
         vm.warp(kickoff + 1 hours);
         vm.prank(keeper);
         registry.updateMarket(id, 5000, 8000, I.EventState.LIVE); // fresh, in-play
@@ -193,15 +216,15 @@ contract DynamicMarketHookTest is Test {
     }
 
     function test_swapAllowedInPlayEvenWithKeeperOffline() public {
-        // A dead keeper degrades (stale → MAX_FEE, MIN_TRADE_CAP) but must
+        // A dead keeper degrades (stale → MAX_RATE, MIN_TRADE_CAP) but must
         // not halt an in-play market — the halt is FINAL or the backstop.
         _register();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
         vm.warp(kickoff + 1 hours); // no keeper write, ever
 
         vm.prank(address(manager));
         (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
-        assertEq(feeWithFlag & ~LPFeeLibrary.OVERRIDE_FEE_FLAG, RiskPolicy.MAX_FEE, "stale in-play clamps the fee");
+        assertEq(_fee(feeWithFlag), F.effectiveFeePips(RiskPolicy.MAX_RATE, 5000), "stale in-play clamps the rate");
     }
 
     function test_swapRevertsAtBackstopWithoutAnyKeeperUpdate() public {
@@ -286,22 +309,118 @@ contract DynamicMarketHookTest is Test {
     function test_beforeSwapReturnsOverrideFlaggedFeeAndZeroDelta() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         vm.prank(address(manager));
         (bytes4 sel,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
 
         assertEq(sel, IHooks.beforeSwap.selector);
         assertTrue(feeWithFlag & LPFeeLibrary.OVERRIDE_FEE_FLAG != 0, "must set OVERRIDE_FEE_FLAG");
-        uint24 fee = feeWithFlag & ~LPFeeLibrary.OVERRIDE_FEE_FLAG;
-        assertGe(fee, RiskPolicy.BASE_FEE);
-        assertLe(fee, RiskPolicy.MAX_FEE);
+        uint24 fee = _fee(feeWithFlag);
+        assertGt(fee, 0, "a playoff pool charges");
+        assertLe(fee, RiskPolicy.MAX_RATE);
+    }
+
+    // ─── Season gate (D-105, H-004) ──────────────────────────────────────
+
+    function test_regularSeasonPoolIsFeeFreeEvenWhenStaleAndThin() public {
+        _registerRegularSeason(); // never fed: stale, zero liquidity
+        manager.initialize(key, SQRT_P50);
+
+        vm.prank(address(manager));
+        (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
+        assertTrue(feeWithFlag & LPFeeLibrary.OVERRIDE_FEE_FLAG != 0, "override so the pool's own fee never applies");
+        assertEq(_fee(feeWithFlag), RiskPolicy.REGULAR_SEASON_FEE, "0% in the regular season");
+
+        (uint24 quoted, Calc.Breakdown memory b,,) = hook.quoteFee(key, _swap(-1e6));
+        assertEq(quoted, 0);
+        assertFalse(b.playoffs);
+        assertEq(b.rate, 0);
+    }
+
+    // ─── Price-derived p (H-005; edge cases 1-4) ─────────────────────────
+
+    function _priceFor(PoolKey memory k, bool yesIsToken0, uint160 sqrtPrice)
+        internal
+        returns (uint24 fee, Calc.Breakdown memory b)
+    {
+        vm.prank(operator);
+        registry.registerPool(k.toId(), kickoff, kickoff + 4 hours, yesIsToken0, 6, true);
+        vm.prank(keeper);
+        registry.updateMarket(k.toId(), 5000, 8000, I.EventState.PRE_GAME);
+        manager.initialize(k, sqrtPrice);
+        vm.prank(address(manager));
+        (,, uint24 feeWithFlag) = hook.beforeSwap(trader, k, _swap(-1e6), "");
+        fee = _fee(feeWithFlag);
+        (, b,,) = hook.quoteFee(k, _swap(-1e6));
+    }
+
+    function test_feeReadsProbabilityFromPoolStateInBothOrderings() public {
+        // YES as token0 at p = 0.25.
+        (uint24 feeYes0, Calc.Breakdown memory b0) = _priceFor(key, true, SQRT_P25_YES0);
+        assertEq(b0.probabilityBps, 2500, "p read from sqrtPriceX96, YES as token0");
+        assertEq(feeYes0, F.effectiveFeePips(b0.rate, 2500));
+
+        // YES as token1 at the same probability: price is 1 / p, same fee.
+        PoolKey memory flipped = key;
+        flipped.currency0 = Currency.wrap(address(0x3333));
+        flipped.currency1 = Currency.wrap(address(0x4444));
+        (uint24 feeYes1, Calc.Breakdown memory b1) = _priceFor(flipped, false, SQRT_P25_YES1);
+        assertEq(b1.probabilityBps, 2500, "p read from sqrtPriceX96, YES as token1");
+        assertEq(feeYes1, feeYes0, "token ordering must not change the fee");
+    }
+
+    function test_feeDeclinesAsThePoolPriceMovesTowardCertainty() public {
+        PoolKey memory k75 = key;
+        k75.currency0 = Currency.wrap(address(0x5555));
+        k75.currency1 = Currency.wrap(address(0x6666));
+        (uint24 fee25, Calc.Breakdown memory b25) = _priceFor(key, true, SQRT_P25_YES0);
+        (uint24 fee75, Calc.Breakdown memory b75) = _priceFor(k75, true, SQRT_P75_YES0);
+        assertEq(b25.rate, b75.rate, "symmetric deviation from the 0.50 model: same rate");
+        assertEq(fee75, F.effectiveFeePips(b75.rate, 7500));
+        assertLt(fee75, fee25, "rate x (1 - p): the input pays less as p rises");
+        // Per contract the two sit at the same height — 0.25 and 0.75 are mirrors.
+        assertEq(F.contractFee(1e6, b25.rate, 2500), F.contractFee(1e6, b75.rate, 7500));
+    }
+
+    // ─── Quote / execution parity and the fee event (H-011, H-012) ───────
+
+    function test_quoteFeeMatchesBeforeSwapAndTheEmittedBreakdown() public {
+        _register();
+        _feed();
+        manager.initialize(key, SQRT_P50);
+        SwapParams memory params = _swap(-100e6);
+
+        (uint24 quoted, Calc.Breakdown memory b, uint256 notional, uint256 cap) = hook.quoteFee(key, params);
+        assertEq(notional, 50e6, "100 YES valued at p = 0.50");
+        assertGe(cap, notional);
+        assertEq(b.probabilityBps, 5000);
+        assertTrue(b.playoffs);
+
+        vm.expectEmit(true, false, false, true);
+        emit DynamicMarketHook.MarketFeeUpdated(id, b, quoted);
+        vm.prank(address(manager));
+        (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, params, "");
+        assertEq(_fee(feeWithFlag), quoted, "the quote is the execution");
+    }
+
+    function test_quoteFeeRevertsWhereTheSwapWould() public {
+        _register();
+        _feed();
+        manager.initialize(key, SQRT_P50);
+        vm.expectRevert();
+        hook.quoteFee(key, _swap(-int256(RiskPolicy.ABS_MAX_TRADE)));
+
+        vm.prank(operator);
+        registry.setPaused(id, true);
+        vm.expectRevert(MarketErrors.MarketPaused.selector);
+        hook.quoteFee(key, _swap(-1e6));
     }
 
     function test_swapAboveTheCapReverts() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         // Zero liquidity drives the cap to its minimum, so anything larger
         // than MIN_TRADE_CAP in USDC notional must be rejected.
@@ -313,7 +432,7 @@ contract DynamicMarketHookTest is Test {
     function test_swapAtTheCapSucceeds() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         vm.prank(address(manager));
         hook.beforeSwap(trader, key, _swap(-int256(RiskPolicy.MIN_TRADE_CAP)), "");
@@ -323,12 +442,12 @@ contract DynamicMarketHookTest is Test {
         // Edge cases 13, 14 — keeper offline, state stale.
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
         vm.warp(block.timestamp + RiskPolicy.STALE_AFTER + 1);
 
         vm.prank(address(manager));
         (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
-        assertEq(feeWithFlag & ~LPFeeLibrary.OVERRIDE_FEE_FLAG, RiskPolicy.MAX_FEE);
+        assertEq(_fee(feeWithFlag), F.effectiveFeePips(RiskPolicy.MAX_RATE, 5000));
     }
 
     // ─── Flow accounting (§13, §14; edge case 11) ────────────────────────
@@ -336,18 +455,18 @@ contract DynamicMarketHookTest is Test {
     function test_afterSwapRecordsFlow() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         vm.prank(address(manager));
         hook.afterSwap(trader, key, _swap(-5e6), BalanceDeltaLibrary.ZERO_DELTA, "");
         (uint128 buy,,,,) = hook.flowOf(id);
-        assertEq(buy, 5e6);
+        assertEq(buy, 2.5e6, "5 YES at p = 0.50 is $2.50 of flow");
     }
 
     function test_sameBlockSwapsAccumulateWithoutDecay() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         vm.startPrank(address(manager));
         hook.afterSwap(trader, key, _swap(-3e6), BalanceDeltaLibrary.ZERO_DELTA, "");
@@ -355,7 +474,7 @@ contract DynamicMarketHookTest is Test {
         vm.stopPrank();
 
         (uint128 buy,,,,) = hook.flowOf(id);
-        assertEq(buy, 7e6, "no decay within one block");
+        assertEq(buy, 3.5e6, "no decay within one block");
     }
 
     /// @dev Regression: flow used to accumulate raw `amountSpecified`, which is
@@ -365,22 +484,21 @@ contract DynamicMarketHookTest is Test {
     function test_flowAccumulatesUsdcNotionalNotRawAmount() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         // zeroForOne with YES as token0 => the exact-input leg is 1000 YES.
-        // At the seeded parity price that is ~$1000 of notional, not 1000 raw.
+        // At the seeded 0.50 price that is $500 of notional, not 1000 raw.
         vm.prank(address(manager));
         hook.afterSwap(trader, key, _swap(-1000e6), BalanceDeltaLibrary.ZERO_DELTA, "");
 
         (uint128 buy,,,,) = hook.flowOf(id);
-        assertGt(buy, 0, "flow must be recorded");
-        assertLe(buy, 1000e6, "a YES leg is worth at most its face in USDC");
+        assertEq(buy, 500e6, "a YES leg is valued at p");
     }
 
     function test_flowDecaysAcrossBlocks() public {
         _register();
         _feed();
-        manager.initialize(key, 79_228_162_514_264_337_593_543_950_336);
+        manager.initialize(key, SQRT_P50);
 
         vm.prank(address(manager));
         hook.afterSwap(trader, key, _swap(-1000e6), BalanceDeltaLibrary.ZERO_DELTA, "");
@@ -389,7 +507,7 @@ contract DynamicMarketHookTest is Test {
         hook.afterSwap(trader, key, _swap(-0), BalanceDeltaLibrary.ZERO_DELTA, "");
 
         (uint128 buy,,,,) = hook.flowOf(id);
-        assertApproxEqAbs(buy, 500e6, 1e6, "one half-life halves the flow");
+        assertApproxEqAbs(buy, 250e6, 1e6, "one half-life halves the $500 of flow");
     }
 
     function _slot0() internal view returns (uint160, int24, uint24, uint24) {

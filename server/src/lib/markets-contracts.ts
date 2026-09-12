@@ -60,8 +60,21 @@ export const POOL_MANAGER_INIT_ABI = parseAbi([
 ]);
 
 export const REGISTRY_ABI = parseAbi([
-  "function registerPool(bytes32 poolId, uint64 kickoffTimestamp, uint64 resolutionTimestamp, bool yesIsToken0, uint8 outcomeDecimals)",
+  "function registerPool(bytes32 poolId, uint64 kickoffTimestamp, uint64 resolutionTimestamp, bool yesIsToken0, uint8 outcomeDecimals, bool playoffs)",
   "function isRegistered(bytes32 poolId) view returns (bool)",
+]);
+
+/**
+ * The Dynamic Market Hook's read surface for the D-105 fee model: `quoteFee`
+ * runs the same pricing path as `beforeSwap` (H-012), and every swap emits
+ * `MarketFeeUpdated` with the same decomposition (H-011).
+ */
+export const DYNAMIC_MARKET_HOOK_ABI = parseAbi([
+  "struct PoolKey { address currency0; address currency1; uint24 fee; int24 tickSpacing; address hooks; }",
+  "struct SwapParams { bool zeroForOne; int256 amountSpecified; uint160 sqrtPriceLimitX96; }",
+  "struct Breakdown { uint24 minRate; uint24 liquidityPremium; uint24 volatilityPremium; uint24 activityPremium; uint24 uncertaintyPremium; uint24 rate; uint16 probabilityBps; bool playoffs; bool stale; }",
+  "function quoteFee(PoolKey key, SwapParams params) view returns (uint24 fee, Breakdown breakdown, uint256 notional, uint256 cap)",
+  "event MarketFeeUpdated(bytes32 indexed poolId, Breakdown breakdown, uint24 effectiveFee)",
 ]);
 
 export const STATE_VIEW_ABI = parseAbi([

@@ -671,6 +671,18 @@ export const marketFills = pgTable(
     tokensRaw: varchar("tokens_raw", { length: 32 }).notNull(),
     usdcRaw: varchar("usdc_raw", { length: 32 }).notNull(),
     txHash: varchar("tx_hash", { length: 66 }).notNull().unique(),
+    /**
+     * D-105 fee telemetry (H-011), decoded from the hook's `MarketFeeUpdated`
+     * log in the verified receipt. Null when the receipt carried no hook
+     * event (a fill recorded before the hook deployment, or a chain whose
+     * dynamic-market config is absent).
+     */
+    feePips: integer("fee_pips"),
+    feeRatePips: integer("fee_rate_pips"),
+    feeProbabilityBps: integer("fee_probability_bps"),
+    /** The fee valued in USDC raw units (6dp) — a YES-denominated fee at `p`. */
+    feeUsdcRaw: varchar("fee_usdc_raw", { length: 32 }),
+    playoffs: boolean("playoffs"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index("market_fills_addr_market_idx").on(t.address, t.marketId)],

@@ -22,6 +22,7 @@ import {
   type SportsDataProvider,
   ProviderShapeError,
   teamKey,
+  type SeasonType,
 } from "./provider.ts";
 import { LIVE_TTL_MS, PREGAME_TTL_MS, ResilientJson } from "./resilience.ts";
 
@@ -183,6 +184,7 @@ export function parseEvent(raw: unknown, league: LeagueSlug): ProviderEvent {
   const homeScore = asNumber(homeRaw["score"]);
   const awayScore = asNumber(awayRaw["score"]);
   const probBps = parseHomeWinProbabilityBps(competition);
+  const seasonType = mapEspnSeasonType(asRecord(event["season"])?.["type"]);
 
   return {
     providerEventId,
@@ -194,7 +196,22 @@ export function parseEvent(raw: unknown, league: LeagueSlug): ProviderEvent {
     ...(homeScore !== undefined ? { homeScore } : {}),
     ...(awayScore !== undefined ? { awayScore } : {}),
     ...(probBps !== undefined ? { homeWinProbabilityBps: probBps } : {}),
+    ...(seasonType !== null ? { seasonType } : {}),
   };
+}
+
+/**
+ * ESPN's `season.type` on a scoreboard event: 1 preseason, 2 regular season,
+ * 3 postseason (4 is the off-season and never carries a game). Anything else
+ * is null — the D-105 switch defaults to the fee-free regular season, so an
+ * unknown phase can never turn fees on by accident.
+ */
+export function mapEspnSeasonType(raw: unknown): SeasonType | null {
+  const n = typeof raw === "string" ? Number(raw) : raw;
+  if (n === 1) return "preseason";
+  if (n === 2) return "regular";
+  if (n === 3) return "postseason";
+  return null;
 }
 
 /**

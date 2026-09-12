@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  mapSeasonType,
   SportradarProvider,
   mapInjuryStatus,
   mapRosterStatus,
@@ -635,5 +636,25 @@ void describe("SportradarProvider", () => {
     assert.equal(feed.items.length, 2);
     assert.equal(feed.items[0].teamKey, "nfl:KC");
     assert.ok(calls.some((u) => u.includes("/seasons/2026/REG/standings/season.json")));
+  });
+});
+
+// ─── Task 049 / D-105 — season type rides every scheduled game ──────────────
+
+void describe("season type on schedule games (D-105)", () => {
+  void it("stamps the schedule root's type onto each game", () => {
+    const [game] = parseSportradarSchedule(SCHEDULE, "nfl");
+    assert.equal(game.seasonType, "regular");
+    const playoffs = { ...SCHEDULE, type: "PST" };
+    assert.equal(parseSportradarSchedule(playoffs, "nfl")[0]?.seasonType, "postseason");
+    const pre = { ...SCHEDULE, type: "PRE" };
+    assert.equal(parseSportradarSchedule(pre, "nfl")[0]?.seasonType, "preseason");
+  });
+
+  void it("omits the field when the root type is unrecognised — never guesses", () => {
+    const odd = { ...SCHEDULE, type: "XYZ" };
+    assert.equal("seasonType" in (parseSportradarSchedule(odd, "nfl")[0] ?? {}), false);
+    assert.equal(mapSeasonType("pst"), "postseason", "case-insensitive");
+    assert.equal(mapSeasonType(3), null, "numbers are ESPN's convention, not Sportradar's");
   });
 });

@@ -161,7 +161,7 @@ contract MarketLifecycleForkE2E is BaseFork {
             MarketPoolBootstrap.poolKeyFor(market, BASE_USDC, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, address(hook));
         PoolId poolId = key.toId();
         vm.prank(operator);
-        registry.registerPool(poolId, kickoff, kickoff + 4 hours, yesIsToken0, 6);
+        registry.registerPool(poolId, kickoff, kickoff + 4 hours, yesIsToken0, 6, true);
         MarketPoolBootstrap.initializePool(
             IPoolManager(address(manager)), key, yesIsToken0 ? SQRT_HALF_X96 : SQRT_TWO_X96
         );

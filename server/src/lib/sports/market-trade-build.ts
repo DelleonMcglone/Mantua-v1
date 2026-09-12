@@ -29,6 +29,7 @@ import {
   MARKET_FACTORY_ABI,
 } from "../markets-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
+import { quoteMarketFee, type MarketFeeQuote } from "./market-fee.ts";
 import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { getToken } from "../tokens.ts";
 import { DEFAULT_SLIPPAGE_BPS } from "../constants.ts";
@@ -331,6 +332,12 @@ export interface BuiltMarketTrade {
     amountOutMinimum: string;
     effectivePriceBps: number | null;
   };
+  /**
+   * D-105 fee (H-012): what the hook's `beforeSwap` will charge for this
+   * exact input in the current pool state, from `quoteFee` — the same code
+   * path — so the UI's Position / Estimated fee / Total is the execution.
+   */
+  fee: MarketFeeQuote;
 }
 
 /**
@@ -446,6 +453,11 @@ export async function buildMarketTrade(
     slippageBps,
   });
 
+  // D-105 — the fee quote comes from the hook itself (H-012). A revert here
+  // is a trade the hook would refuse (halt, size cap), surfaced before any
+  // calldata is built.
+  const fee = await quoteMarketFee(client, dm.hook, plan.key, zeroForOne, args.amountRaw, inputIsYes);
+
   const calldata = buildPoolSwapTestCalldata({
     poolKey: plan.key,
     zeroForOne,
@@ -471,5 +483,6 @@ export async function buildMarketTrade(
       amountOutMinimum: marketMinOut(amountOut, slippageBps).toString(),
       effectivePriceBps,
     },
+    fee,
   };
 }

@@ -619,10 +619,11 @@ The eight questions §43 requires answering:
    (§2.1): the model's opinion enters as a _risk premium_ weighted by its own
    stated confidence, never as the price.
 
-4. **Risk bounds are immutable.** `BASE_FEE`, `MAX_FEE`, `ABS_MAX_TRADE`,
-   `MIN_TRADE_CAP` are `constant` in a library, not storage, so there is no
-   setter to protect and no governance path to compromise. An attacker holding
-   every key still cannot charge 50% or lift the size cap. Storage plus an
+4. **Risk bounds are immutable.** `MIN_RATE`, `MAX_RATE` (0.70%, per D-105
+   — formerly `BASE_FEE`/`MAX_FEE`), `ABS_MAX_TRADE`, `MIN_TRADE_CAP` are
+   `constant` in a library, not storage, so there is no setter to protect
+   and no governance path to compromise. An attacker holding every key still
+   cannot charge above the ceiling or lift the size cap. Storage plus an
    owner check would have made those the same class of risk as the keys.
 
 5. **The close is state-driven, with a timestamp backstop.** _Superseded by
@@ -643,9 +644,9 @@ The eight questions §43 requires answering:
    The kickoff timestamp itself is unchanged: registration is once-only and
    there is no kickoff setter, so nobody can push the backstop out either.
 
-6. **Stale keeper state fails closed, not shut.** Past `STALE_AFTER` the fee
-   clamps to `MAX_FEE` and the cap to `MIN_TRADE_CAP`, and the model-deviation
-   premium drops out. Reverting instead would let keeper downtime brick a live
+6. **Stale keeper state fails closed, not shut.** Past `STALE_AFTER` the
+   playoff rate clamps to `MAX_RATE` and the cap to `MIN_TRADE_CAP`, and the
+   model-deviation premium drops out (a regular-season pool stays at 0%). Reverting instead would let keeper downtime brick a live
    market, turning an availability problem into a total loss of access;
    ignoring staleness would price against numbers nobody is maintaining.
    Expensive-but-open is the middle, and LPs are compensated for the
@@ -665,12 +666,65 @@ The eight questions §43 requires answering:
    invariants; bundling them into the first deployment would have meant shipping
    an unreviewable surface for a market that has not traded yet.
 
-**Deviations from spec §30:** eight files rather than seven — `MarketFlow.sol`
-was extracted to keep every file inside the 150-line limit. The Nezlobin
+**Deviations from spec §30:** nine files rather than seven — `MarketFlow.sol`
+was extracted to keep every file inside the 150-line limit, and
+`MarketFeeFormula.sol` (D-105) isolates the fee formula so spec-to-code
+compliance can be checked against one 70-line library. The Nezlobin
 directional _shape_ is reused from the dynamic-fee hook, but not its code: that
 library keys off an oracle-deviation zone, and a prediction market has no
 external reference price to deviate from, so the analogue is the pool's own
 imbalance.
+
+### Dynamic Market Hook fee model (D-105, task 049)
+
+Spec: the owner's fee model (2026-09-11), recorded as **D-105** in
+`docs/decisions/v2-open-decisions.md` and superseding spec §16–§18, §27,
+§29 and §34 of `docs/specs/dynamic-market-hook.md`. Code:
+`MarketFeeFormula.sol`, `MarketFeeCalculator.sol`, `RiskPolicy.sol`. User
+page: `docs/fee-model.md`. Review: `docs/security/dynamic-market-fee-review.md`.
+
+1. **Why the hook returns `rate × (1 − p)` and not `rate × p × (1 − p)`.**
+   The formula `Fee = C × rate × p × (1 − p)` is stated per contract, but
+   Uniswap v4 charges the LP fee as a fraction of the swap's gross input.
+   Dividing the per-contract fee by the contract's value `p` gives the pip
+   rate on the input, and with `C` defined as the contract-equivalent of the
+   gross input at the pre-trade price the equality is exact in every swap
+   shape — USDC in, YES in, exact-in, exact-out. Charging `rate × p × (1 − p)`
+   on the input instead would have under-charged every trade by a factor `p`.
+
+2. **Why the season flag is per pool and write-once.** The NFL and WNBA
+   calendars overlap, so a global "playoffs" switch would be wrong for one
+   league at a time; a game's phase is known when its market is created;
+   and a flag no key can flip cannot be used to turn fees on against
+   traders mid-market. It rides `registerPool` next to the kickoff
+   timestamp, which is immutable for the same reason. Unknown season data
+   defaults to the fee-free regular season.
+
+3. **Why the ceiling is a `constant`.** As with `MAX_FEE` before it: no
+   storage, no setter, no governance path, so an attacker holding every key
+   cannot exceed 0.70%; lifting it is a redeploy and a new hook address.
+
+4. **Why the rate has four bounded drivers with shares summing to 100%.**
+   Each driver (liquidity, volatility, activity, uncertainty) owns a quarter
+   of the 0.60% headroom, so a calm, deep, agreed, pre-game market pays
+   exactly the floor and only every driver at maximum reaches the ceiling.
+   Bounded shares are what make the manipulation analysis tractable: an LP
+   pulling all liquidity, a whale leaning on one side, a griefer thrashing
+   the price, or a rogue keeper can each move the rate by at most their
+   share, never below the floor, and never outside the band.
+
+5. **Why the quote is a view on the hook.** `quoteFee` runs the same
+   private pricing path as `beforeSwap`. The server's trade build calls it
+   and the UI prints Position / Estimated fee / Total from that number; the
+   TypeScript mirror of the formula exists only to turn pips into token
+   amounts for display and telemetry, and is pinned to the Solidity library
+   by a shared vector file both test suites read.
+
+6. **Why fee telemetry comes from the receipt, not the client.** The fills
+   route already verifies the transaction receipt before believing a fill;
+   the hook's `MarketFeeUpdated` log in that receipt is the only source the
+   fee columns accept, filtered to the deployed hook address, so a client
+   cannot report a fee it did not pay.
 
 ### Sports pivot (DM-101 … DM-112)
 

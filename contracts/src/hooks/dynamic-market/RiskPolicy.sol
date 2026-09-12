@@ -3,13 +3,14 @@ pragma solidity ^0.8.26;
 
 /// @title RiskPolicy
 /// @notice PURPOSE: the immutable protocol bounds for the Dynamic Market Hook,
-///         plus pure checks that clamp against them. Spec §27; values fixed in
-///         spec §0.3. Every fee and trade-cap path in the hook resolves here.
+///         plus pure checks that clamp against them. Spec §27; fee bounds per
+///         the D-105 fee model. Every fee-rate and trade-cap path resolves here.
 ///
 /// @dev Nothing in this library is settable, and no contract exposes a path to
 ///      change these values. That is the point: spec §44 makes it a failure
-///      condition if a keeper or governor can raise `MAX_FEE` or
-///      `ABS_MAX_TRADE`, so they are `constant`, not storage.
+///      condition if a keeper or governor can raise the fee ceiling or
+///      `ABS_MAX_TRADE`, so they are `constant`, not storage. Lifting the
+///      0.70% ceiling requires a redeploy (H-002).
 ///
 ///      **Two unit systems meet here, and mixing them is the trap.** Fees are
 ///      in Uniswap v4 pips, where 1_000_000 == 100%. Probability and
@@ -17,15 +18,17 @@ pragma solidity ^0.8.26;
 ///      A value that looks like a plausible fee is a wildly wrong probability
 ///      and vice versa. Fee-shaped values never leave this library in bps.
 library RiskPolicy {
-    // ─── Fee bounds (v4 pips: 1_000_000 == 100%) ─────────────────────────
+    // ─── Fee-rate bounds (v4 pips: 1_000_000 == 100%) ────────────────────
 
-    /// @notice Minimum fee under normal conditions — 0.30%. Spec §17.1.
-    uint24 internal constant BASE_FEE = 3000;
+    /// @notice The regular-season fee — 0%. D-105: adoption first.
+    uint24 internal constant REGULAR_SEASON_FEE = 0;
 
-    /// @notice Absolute fee ceiling — 5.00%. Spec §16.
-    ///         Leaves 4.70% of headroom for the five premiums and the
-    ///         directional adjustment, and is where §22 clamps a stale market.
-    uint24 internal constant MAX_FEE = 50_000;
+    /// @notice Floor of the playoff dynamic rate — 0.10%. D-105.
+    uint24 internal constant MIN_RATE = 1000;
+
+    /// @notice Ceiling of the playoff dynamic rate — 0.70%. D-105 (H-002).
+    ///         Mantua never exceeds this; a stale keeper clamps here (§22).
+    uint24 internal constant MAX_RATE = 7000;
 
     // ─── Trade-cap bounds (USDC notional, 6 decimals) ────────────────────
 
@@ -51,14 +54,16 @@ library RiskPolicy {
 
     // ─── Pure checks ─────────────────────────────────────────────────────
 
-    /// @notice Clamp a computed fee into `[BASE_FEE, MAX_FEE]`. Spec §16, §18.
-    /// @dev The single choke point for spec §44's "fee below BASE_FEE" and
-    ///      "fee above MAX_FEE" failure conditions — premium arithmetic is
-    ///      allowed to overshoot as long as it passes through here.
-    function clampFee(uint24 fee) internal pure returns (uint24) {
-        if (fee < BASE_FEE) return BASE_FEE;
-        if (fee > MAX_FEE) return MAX_FEE;
-        return fee;
+    /// @notice Clamp a computed playoff rate into `[MIN_RATE, MAX_RATE]`.
+    /// @dev The single choke point for the "rate below the floor" and "rate
+    ///      above the ceiling" failure conditions — premium arithmetic may
+    ///      overshoot as long as it passes through here. Regular-season
+    ///      pools never reach this function: the season gate short-circuits
+    ///      to `REGULAR_SEASON_FEE` before any rate is computed.
+    function clampRate(uint24 rate) internal pure returns (uint24) {
+        if (rate < MIN_RATE) return MIN_RATE;
+        if (rate > MAX_RATE) return MAX_RATE;
+        return rate;
     }
 
     /// @notice Clamp a computed trade cap into

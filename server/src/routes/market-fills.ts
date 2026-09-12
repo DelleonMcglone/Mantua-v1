@@ -9,7 +9,13 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { getRpcClient } from "../lib/rpc-client.ts";
 import { DEFAULT_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
 import { MARKETS_PERIPHERY_BY_CHAIN } from "../lib/markets-contracts.ts";
+import { DYNAMIC_MARKET_BY_CHAIN } from "../lib/v4-contracts.ts";
 import { fillImpliedProbability } from "../lib/sports/market-metrics.ts";
+import {
+  NO_FEE_TELEMETRY,
+  feeQuoteFromReceiptLogs,
+  fillFeeTelemetry,
+} from "../lib/sports/market-fee-telemetry.ts";
 
 export const marketFillsRouter = Router();
 
@@ -68,6 +74,14 @@ marketFillsRouter.post(
       }
 
       const address = tx.from.toLowerCase();
+      // H-011 — the fee this trade paid, from the hook's own log in the
+      // verified receipt (never from the client). Absent hook config or
+      // absent event → nulls, the row still records the fill.
+      const hook = DYNAMIC_MARKET_BY_CHAIN[chainId]?.hook;
+      const feeQuote = hook
+        ? feeQuoteFromReceiptLogs(receipt.logs, hook, direction, tokensRaw, usdcRaw)
+        : null;
+      const fee = hook ? fillFeeTelemetry(feeQuote) : NO_FEE_TELEMETRY;
       const inserted = await db
         .insert(marketFills)
         .values({
@@ -77,6 +91,7 @@ marketFillsRouter.post(
           tokensRaw,
           usdcRaw,
           txHash: txHash.toLowerCase(),
+          ...fee,
         })
         .onConflictDoNothing({ target: marketFills.txHash })
         .returning({ id: marketFills.id });

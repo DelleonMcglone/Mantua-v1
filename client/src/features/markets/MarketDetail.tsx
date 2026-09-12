@@ -24,6 +24,9 @@ interface ActivityRow {
   usdc: number;
   tokens: number;
   txHash: string;
+  /** D-105 fee the trade paid (H-011); null for fills recorded without it. */
+  feeUsdc: number | null;
+  playoffs: boolean | null;
 }
 
 interface HolderRow {
@@ -408,9 +411,15 @@ function CommentsTab({ providerEventId }: { providerEventId: string }) {
           Log in to join the conversation
         </button>
       )}
-      {error && <p role="alert" className="mb-2 text-[12px] text-yellow">{error}</p>}
+      {error && (
+        <p role="alert" className="mb-2 text-[12px] text-yellow">
+          {error}
+        </p>
+      )}
       {comments === null ? (
-        <p role="status" className="text-[12.5px] text-text-dim">Loading comments…</p>
+        <p role="status" className="text-[12.5px] text-text-dim">
+          Loading comments…
+        </p>
       ) : comments.length === 0 ? (
         <p className="text-[12.5px] text-text-dim">No comments yet — start the thread.</p>
       ) : (
@@ -433,7 +442,12 @@ function CommentsTab({ providerEventId }: { providerEventId: string }) {
 // ─── Top holders ─────────────────────────────────────────────────────────────
 
 function HoldersTab({ event, detail }: { event: SlateEvent; detail: DetailResponse | null }) {
-  if (!detail) return <p role="status" className="text-[12.5px] text-text-dim">Loading holders…</p>;
+  if (!detail)
+    return (
+      <p role="status" className="text-[12.5px] text-text-dim">
+        Loading holders…
+      </p>
+    );
   const sides = [0, 1].map((idx) => ({
     idx,
     team: idx === 0 ? event.home : event.away,
@@ -511,7 +525,12 @@ function PositionsTab({ event }: { event: SlateEvent }) {
       </button>
     );
   }
-  if (rows === null) return <p role="status" className="text-[12.5px] text-text-dim">Loading positions…</p>;
+  if (rows === null)
+    return (
+      <p role="status" className="text-[12.5px] text-text-dim">
+        Loading positions…
+      </p>
+    );
   if (rows.length === 0) {
     return (
       <p className="text-[12.5px] text-text-dim">
@@ -578,7 +597,12 @@ function PositionsTab({ event }: { event: SlateEvent }) {
 // ─── Activity ────────────────────────────────────────────────────────────────
 
 function ActivityTab({ event, detail }: { event: SlateEvent; detail: DetailResponse | null }) {
-  if (!detail) return <p role="status" className="text-[12.5px] text-text-dim">Loading activity…</p>;
+  if (!detail)
+    return (
+      <p role="status" className="text-[12.5px] text-text-dim">
+        Loading activity…
+      </p>
+    );
   if (detail.activity.length === 0) {
     return (
       <p className="text-[12.5px] text-text-dim">
@@ -602,6 +626,13 @@ function ActivityTab({ event, detail }: { event: SlateEvent; detail: DetailRespo
               </span>{" "}
               {a.tokens.toFixed(2)} {team.abbreviation} YES
               <span className="text-text-dim"> for ${a.usdc.toFixed(2)}</span>
+              {a.feeUsdc !== null && (
+                <span className="text-text-dim">
+                  {" "}
+                  · fee ${a.feeUsdc > 0 ? Math.ceil(a.feeUsdc * 100) / 100 : 0}
+                  {a.playoffs === false && " (regular season)"}
+                </span>
+              )}
             </div>
             {/* P-010/D-104: chainless user UI — no public explorer links.
                 The internal ops surface carries the on-chain audit trail. */}

@@ -3,6 +3,7 @@ import { parseAbi } from "viem";
 import { api } from "@/lib/api.ts";
 import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
 import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import type { FeeQuoteWire } from "./market-trade-core.ts";
 
 const ERC20 = parseAbi([
   "function allowance(address owner, address spender) view returns (uint256)",
@@ -29,6 +30,8 @@ export interface TradeCalldata {
     amountOutMinimum: string;
     effectivePriceBps: number | null;
   };
+  /** D-105 fee from the hook's `quoteFee` — the execution's own number (H-012). */
+  fee: FeeQuoteWire;
 }
 
 export type TradePhase =

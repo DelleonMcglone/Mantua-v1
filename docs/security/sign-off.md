@@ -174,3 +174,26 @@ still do not compile standalone in this environment and remain uncovered.
 It does not re-sign the ship gate. The original signing covered the
 kickoff-freeze design; the semantics have since changed, M-01 is unaccepted,
 and the human audit and second-model review remain outstanding as before.
+
+## A7. Fee model change (task 049, D-105) — 2026-09-12
+
+The hook's fee moved from the 0.30%–5.00% premium band this document was
+signed against to the owner's fee model: **0% in the regular season;
+0.10%–0.70% dynamic in the playoffs**, applied as
+`Fee = C × rate × p × (1 − p)` with an immutable 0.70% ceiling. Every
+statement above that names `BASE_FEE` or `MAX_FEE` (the L-01 band, the
+M-01 stale clamp) now reads `MIN_RATE` / `MAX_RATE` for playoff pools and
+0% for regular-season pools; the stale-keeper clamp is otherwise unchanged.
+
+Review: [`dynamic-market-fee-review.md`](./dynamic-market-fee-review.md) —
+**0 HIGH, 0 MEDIUM**, two LOW (L-03 volatility griefing within its bounded
+share; L-04 sell-side telemetry valuation), two informational. Slither
+re-run unchanged from the P-013 baseline. Tests: 236 local contract tests
+(hooks, e2e, markets) green including the 100k-call invariant sweep and an
+on-chain fee proof in `FullLifecycle.t.sol`; the Base Mainnet fork suites
+could not run in the review environment (RPC egress blocked) and must be
+run before deploy.
+
+**This addendum does not re-sign the ship gate.** M-01 remains unaccepted,
+L-03 needs the owner's written note, the fork suites need a run, and the
+human audit and second-model review remain outstanding as before.

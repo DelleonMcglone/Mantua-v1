@@ -464,6 +464,33 @@ Use Uniswap Trading API response — it returns permit data when needed. Sign wi
 | P5-015 | UI: limit order entry form (price, amount, expiry) + pending orders list                      | ⬜     |
 | P5-016 | E2E: place limit order, verify async execution at target price, verify expiry handling        | ⬜     |
 
+### Dynamic Market Hook & Fee Model (task 049, D-105)
+
+> Spec (authoritative): regular season 0%; playoffs dynamic 0.10%–0.70%
+> (immutable 0.70% ceiling) from liquidity, volatility, trading activity
+> and market uncertainty; `Fee = C × fee_rate × p × (1 − p)`, peaking at
+> p = 0.50. Detail: `docs/tasks/049-dynamic-market-fee-model.md`.
+
+| ID    | Task                                                                                     | Status |
+| ----- | ---------------------------------------------------------------------------------------- | ------ |
+| H-001 | Fee = C × fee_rate × p × (1 − p) exactly (`MarketFeeFormula.sol`, shared vectors)        | ✅     |
+| H-002 | 0.70% ceiling as an immutable constant, no admin path (`RiskPolicy.MAX_RATE`)            | ✅     |
+| H-003 | 0.10%–0.70% dynamic range from four bounded drivers (`MarketFeeCalculator.rate`)         | ✅     |
+| H-004 | Season switch: per-pool `playoffs` at registration from the league calendar (D-105)      | ✅     |
+| H-005 | p from pool state, both token orderings; peak-at-0.50 / decline proven                   | ✅     |
+| H-006 | Unit + property tests: ceiling, 0% regular season, fee(0.5) ≥ fee(p), monotone           | ✅     |
+| H-007 | Fuzz + invariant harnesses, 100k-call sweep (`DynamicMarketInvariant.t.sol`)             | ✅     |
+| H-008 | AI-assisted security pass (`docs/security/dynamic-market-fee-review.md`)                 | ✅     |
+| H-009 | Deploy to Base Mainnet + verify — **owner-gated** (funded keystore, BaseScan key, D-112) | ⬜     |
+| H-010 | Pool creation passes `playoffs` to `registerPool` (`markets-onchain.ts`)                 | ✅     |
+| H-011 | Fee telemetry per trade (`market_fills` fee columns, migration 0019, activity feed)      | ✅     |
+| H-012 | Fee quote: hook `quoteFee` → `BuiltMarketTrade.fee` → Position / fee / Total in the UI   | ✅     |
+| H-013 | Live scenario matrix (`FeeScenarios.t.sol`; on-chain fee proof in `FullLifecycle.t.sol`) | ✅     |
+| H-014 | Docs: `docs/fee-model.md`, `docs/architecture.md`, spec §16–§18/§27/§29/§34 updated      | ✅     |
+| H-015 | Probability sweep 0/10/25/50/75/90/100 %, floor and ceiling reached, size extremes       | ✅     |
+| H-016 | Rounding / overflow / precision (`MarketFeeFormula.t.sol`)                               | ✅     |
+| H-017 | Manipulation resistance (`FeeManipulation.t.sol`)                                        | ✅     |
+
 ### AI-Assisted Security Analysis (replaces external audit per project decision)
 
 > Methodology: Trail of Bits Claude Code skills via `https://github.com/DelleonMcglone/AI-assisted-security-analysis`. Install plugin marketplace and run targeted analyses against each hook's source before wiring into pool creation flow. Findings logged in `docs/security/` with status (fix / accept / mitigate). All analyses must be re-run after any contract change.

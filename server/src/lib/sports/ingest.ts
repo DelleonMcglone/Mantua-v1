@@ -46,6 +46,13 @@ export interface PlannedMarket {
   kickoffTimestamp: number;
   /** Opening implied probability, 0–1, for seeding the pool (B1-009). */
   openingProbability: number;
+  /**
+   * D-105 season switch, written once into the hook registry at pool
+   * registration: true for a postseason game (dynamic 0.10%–0.70% fee),
+   * false for everything else (0%). Absent season data means false — the
+   * fee-free default, never the other way round.
+   */
+  playoffs: boolean;
 }
 
 /**
@@ -93,6 +100,7 @@ export function planMarkets(
     label: side.label,
     kickoffTimestamp: event.startsAt,
     openingProbability: probabilityToPrice(side.probability),
+    playoffs: event.seasonType === "postseason",
   }));
 }
 

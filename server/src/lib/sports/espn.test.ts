@@ -2,6 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   EspnProvider,
+  mapEspnSeasonType,
   mapStatus,
   parseEvent,
   parseHomeWinProbabilityBps,
@@ -257,5 +258,24 @@ void describe("void statuses drive the spec §3.7 path", () => {
     assert.equal(isVoidStatus("final"), false);
     assert.equal(isVoidStatus("scheduled"), false);
     assert.equal(isVoidStatus("unknown"), false);
+  });
+});
+
+// ─── Task 049 / D-105 — season type from the scoreboard event ───────────────
+
+void describe("season type (D-105)", () => {
+  void it("maps ESPN's numeric season types and refuses the rest", () => {
+    assert.equal(mapEspnSeasonType(1), "preseason");
+    assert.equal(mapEspnSeasonType(2), "regular");
+    assert.equal(mapEspnSeasonType(3), "postseason");
+    assert.equal(mapEspnSeasonType("3"), "postseason");
+    assert.equal(mapEspnSeasonType(4), null, "off-season carries no games");
+    assert.equal(mapEspnSeasonType(undefined), null);
+  });
+
+  void it("stamps a postseason event and leaves an unlabelled one without the field", () => {
+    const post = parseEvent({ ...espnEvent(), season: { year: 2027, type: 3 } }, "nfl");
+    assert.equal(post.seasonType, "postseason");
+    assert.equal("seasonType" in parseEvent(espnEvent(), "nfl"), false);
   });
 });

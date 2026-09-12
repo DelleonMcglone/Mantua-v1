@@ -1,12 +1,10 @@
-/Users/delleonmcglone/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
-  warnings.warn(
-'forge clean' running (wd: /Users/delleonmcglone/Downloads/mantua-wt-045/contracts)
+'forge clean' running (wd: /home/user/Mantua-v1/contracts)
 'forge config --json' running
-'forge build --build-info --skip ./test/** ./script/** --force' running (wd: /Users/delleonmcglone/Downloads/mantua-wt-045/contracts)
+'forge build --build-info --deny never --skip ./test/** ./script/** --force' running (wd: /home/user/Mantua-v1/contracts)
 
 Detector: incorrect-equality
-MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-97) uses a dangerous strict equality:
-	- inputs = MarketFeeCalculator.Inputs({marketProbBps:probBps,modelProbBps:s.modelProbability,confidenceBps:s.confidence,volatilityBps:d.volatilityBps,imbalanceBps:MarketMath.imbalanceBps(buy,sell,liquidity),liquidity:liquidity,eventState:s.eventState,stale:RiskPolicy.isStale(s.lastUpdate,uint64(block.timestamp)),increasesRisk:buysYes == (buy >= sell)}) (src/hooks/dynamic-market/MarketFlow.sol#85-96)
+MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-98) uses a dangerous strict equality:
+	- inputs = MarketFeeCalculator.Inputs({marketProbBps:probBps,modelProbBps:s.modelProbability,confidenceBps:s.confidence,volatilityBps:d.volatilityBps,imbalanceBps:MarketMath.imbalanceBps(buy,sell,liquidity),liquidity:liquidity,eventState:s.eventState,stale:RiskPolicy.isStale(s.lastUpdate,uint64(block.timestamp)),increasesRisk:buysYes == (buy >= sell),playoffs:s.playoffs}) (src/hooks/dynamic-market/MarketFlow.sol#85-97)
 Market._settleIfDrained() (src/markets/Market.sol#237-242) uses a dangerous strict equality:
 	- outstandingSets == 0 && state != State.SETTLED (src/markets/Market.sol#238)
 Market.redeem() (src/markets/Market.sol#193-206) uses a dangerous strict equality:
@@ -53,15 +51,15 @@ Reentrancy in Market.redeemInvalid() (src/markets/Market.sol#213-233):
 	- Market.split(uint256) (src/markets/Market.sol#111-123)
 	- Market.state (src/markets/Market.sol#66)
 	- Market.voidMarket() (src/markets/Market.sol#179-184)
-Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-1
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
 
 Detector: uninitialized-local
-MarketFlow.record(MarketFlow.Data,SwapParams,uint256,uint160,uint64).move (src/hooks/dynamic-market/MarketFlow.sol#122) is a local variable never initialized
+MarketFlow.record(MarketFlow.Data,SwapParams,uint256,uint160,uint64).move (src/hooks/dynamic-market/MarketFlow.sol#123) is a local variable never initialized
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#uninitialized-local-variables
 
 Detector: unused-return
-DynamicMarketHook.afterSwap(address,PoolKey,SwapParams,BalanceDelta,bytes) (src/hooks/dynamic-market/DynamicMarketHook.sol#116-135) ignores return value by (sqrtPriceX96,None,None,None) = poolManager.getSlot0(id) (src/hooks/dynamic-market/DynamicMarketHook.sol#124)
-MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-97) ignores return value by (sqrtPriceX96,None,None,None) = manager.getSlot0(id) (src/hooks/dynamic-market/MarketFlow.sol#78)
+DynamicMarketHook.afterSwap(address,PoolKey,SwapParams,BalanceDelta,bytes) (src/hooks/dynamic-market/DynamicMarketHook.sol#114-130) ignores return value by (sqrtPriceX96,None,None,None) = poolManager.getSlot0(id) (src/hooks/dynamic-market/DynamicMarketHook.sol#122)
+MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-98) ignores return value by (sqrtPriceX96,None,None,None) = manager.getSlot0(id) (src/hooks/dynamic-market/MarketFlow.sol#78)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#unused-return
 
 Detector: missing-zero-check
@@ -90,7 +88,7 @@ Reentrancy in Market.redeemInvalid() (src/markets/Market.sol#213-233):
 	State variables written after the call(s):
 	- outstandingSets = outstandingSets - setsRetired (src/markets/Market.sol#228)
 	- outstandingSets = 0 (src/markets/Market.sol#228)
-Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-2
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
 
 Detector: reentrancy-events
 Reentrancy in Market.merge(uint256) (src/markets/Market.sol#126-138):
@@ -130,18 +128,18 @@ Reentrancy in Resolver.voidMarket(bytes32) (src/markets/Resolver.sol#104-108):
 	- market.voidMarket() (src/markets/Resolver.sol#106)
 	Event emitted after the call(s):
 	- MarketVoided(marketId,address(market),msg.sender) (src/markets/Resolver.sol#107)
-Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-3
+Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#reentrancy-vulnerabilities-4
 
 Detector: timestamp
-MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-97) uses timestamp for comparisons
+MarketFlow.conditions(MarketFlow.Data,IPoolManager,PoolId,IMarketStateRegistry.MarketState,SwapParams) (src/hooks/dynamic-market/MarketFlow.sol#71-98) uses timestamp for comparisons
 	Dangerous comparisons:
-	- inputs = MarketFeeCalculator.Inputs({marketProbBps:probBps,modelProbBps:s.modelProbability,confidenceBps:s.confidence,volatilityBps:d.volatilityBps,imbalanceBps:MarketMath.imbalanceBps(buy,sell,liquidity),liquidity:liquidity,eventState:s.eventState,stale:RiskPolicy.isStale(s.lastUpdate,uint64(block.timestamp)),increasesRisk:buysYes == (buy >= sell)}) (src/hooks/dynamic-market/MarketFlow.sol#85-96)
-MarketFlow._capAdd(uint256,uint256) (src/hooks/dynamic-market/MarketFlow.sol#144-147) uses timestamp for comparisons
+	- inputs = MarketFeeCalculator.Inputs({marketProbBps:probBps,modelProbBps:s.modelProbability,confidenceBps:s.confidence,volatilityBps:d.volatilityBps,imbalanceBps:MarketMath.imbalanceBps(buy,sell,liquidity),liquidity:liquidity,eventState:s.eventState,stale:RiskPolicy.isStale(s.lastUpdate,uint64(block.timestamp)),increasesRisk:buysYes == (buy >= sell),playoffs:s.playoffs}) (src/hooks/dynamic-market/MarketFlow.sol#85-97)
+MarketFlow._capAdd(uint256,uint256) (src/hooks/dynamic-market/MarketFlow.sol#145-148) uses timestamp for comparisons
 	Dangerous comparisons:
-	- c > type()(uint128).max (src/hooks/dynamic-market/MarketFlow.sol#146)
-MarketStateRegistry.registerPool(PoolId,uint64,uint64,bool,uint8) (src/hooks/dynamic-market/MarketStateRegistry.sol#58-77) uses timestamp for comparisons
+	- c > type()(uint128).max (src/hooks/dynamic-market/MarketFlow.sol#147)
+MarketStateRegistry.registerPool(PoolId,uint64,uint64,bool,uint8,bool) (src/hooks/dynamic-market/MarketStateRegistry.sol#61-82) uses timestamp for comparisons
 	Dangerous comparisons:
-	- kickoffTimestamp <= block.timestamp (src/hooks/dynamic-market/MarketStateRegistry.sol#67)
+	- kickoffTimestamp <= block.timestamp (src/hooks/dynamic-market/MarketStateRegistry.sol#71)
 Market.freeze() (src/markets/Market.sol#154-162) uses timestamp for comparisons
 	Dangerous comparisons:
 	- block.timestamp < openUntil (src/markets/Market.sol#158)
@@ -155,4 +153,5 @@ MarketFactory.createMarketIfAbsent(bytes32,uint64,string) (src/markets/MarketFac
 	Dangerous comparisons:
 	- startsAt <= block.timestamp (src/markets/MarketFactory.sol#71)
 Reference: https://github.com/crytic/slither/wiki/Detector-Documentation#block-timestamp
-. analyzed (37 contracts with 100 detectors), 27 result(s) found
+. analyzed (38 contracts with 102 detectors), 27 result(s) found
+INFO:Slither:../docs/security/slither/markets-dynamic-market.json exists already, the overwrite is prevented

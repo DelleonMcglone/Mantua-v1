@@ -21,6 +21,12 @@ import {DynamicMarketHook} from "../../src/hooks/dynamic-market/DynamicMarketHoo
 import {MarketStateRegistry} from "../../src/hooks/dynamic-market/MarketStateRegistry.sol";
 import {IMarketStateRegistry as I} from "../../src/hooks/dynamic-market/IMarketStateRegistry.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
+import {Vm} from "forge-std/Vm.sol";
+import {StateLibrary} from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {MarketFeeCalculator as Calc} from "../../src/hooks/dynamic-market/MarketFeeCalculator.sol";
+import {MarketFeeFormula as F} from "../../src/hooks/dynamic-market/MarketFeeFormula.sol";
+import {RiskPolicy} from "../../src/hooks/dynamic-market/RiskPolicy.sol";
 
 /// @title B10-002 / B10-003 — full-lifecycle end-to-end proofs.
 ///
@@ -37,8 +43,11 @@ contract FullLifecycleTest is Test {
     using PoolIdLibrary for PoolKey;
 
     uint160 constant EXPECTED_BITS = uint160(0x28C0);
-    // sqrt(0.5) * 2^96 — pool opens at YES = 0.50 USDC (p = 50%).
-    uint160 constant SQRT_HALF_X96 = 56022770974786139918731938227;
+    // sqrt(0.5) * 2^96 — pool opens at YES = 0.50 USDC (p = 50%) when YES is
+    // token0; sqrt(2) * 2^96 is the same probability when USDC sorted first.
+    uint160 constant SQRT_HALF_X96 = 56_022_770_974_786_139_918_731_938_228;
+    uint160 constant SQRT_TWO_X96 = 112_045_541_949_572_279_837_463_876_454;
+    uint128 constant ALICE_LIQUIDITY = 1e9;
 
     address operator = makeAddr("operator");
     address signerKey = makeAddr("signer");
@@ -101,22 +110,22 @@ contract FullLifecycleTest is Test {
         // 1. Positions on both sides via split (B1's mint path).
         vm.startPrank(alice);
         usdc.approve(address(market), type(uint256).max);
-        market.split(2_000e6);
+        market.split(2000e6);
         vm.stopPrank();
         vm.startPrank(bob);
         usdc.approve(address(market), type(uint256).max);
         market.split(500e6);
         vm.stopPrank();
-        assertEq(yes.balanceOf(alice), 2_000e6);
+        assertEq(yes.balanceOf(alice), 2000e6);
         assertEq(no.balanceOf(bob), 500e6);
 
         // 2. Open the YES/USDC pool under the hook at p = 0.50.
         (PoolKey memory key, bool yesIsToken0) =
             MarketPoolBootstrap.poolKeyFor(market, address(usdc), LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, address(hook));
         vm.prank(operator);
-        registry.registerPool(key.toId(), kickoff, kickoff + 4 hours, yesIsToken0, 6);
-        // Price is token1-per-token0; if USDC sorted first, invert p/(1-p)=1 at 0.5 either way.
-        manager.initialize(key, SQRT_HALF_X96);
+        registry.registerPool(key.toId(), kickoff, kickoff + 4 hours, yesIsToken0, 6, true);
+        // Price is token1-per-token0: p when YES is token0, 1/p when USDC is.
+        manager.initialize(key, yesIsToken0 ? SQRT_HALF_X96 : SQRT_TWO_X96);
 
         // 3. Alice provides liquidity across the full range.
         vm.startPrank(alice);
@@ -124,30 +133,37 @@ contract FullLifecycleTest is Test {
         usdc.approve(address(lpRouter), type(uint256).max);
         lpRouter.modifyLiquidity(
             key,
-            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: 1e9, salt: 0}),
+            ModifyLiquidityParams({
+                tickLower: -6000, tickUpper: 6000, liquidityDelta: int128(ALICE_LIQUIDITY), salt: 0
+            }),
             ""
         );
         vm.stopPrank();
 
         // 4. Bob buys YES with USDC — the price moves, the dynamic fee applies.
+        //    H-013 live fee: quote first, then prove the swap charged exactly
+        //    that — from the emitted decomposition and from the LP fee growth.
         bool zeroForOne = !yesIsToken0; // paying USDC, receiving YES
+        SwapParams memory bobBuy = SwapParams({
+            zeroForOne: zeroForOne,
+            amountSpecified: -int256(100e6),
+            sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
+        });
+        (uint24 quotedFee, Calc.Breakdown memory quoted,,) = hook.quoteFee(key, bobBuy);
+        assertTrue(quoted.playoffs, "this is a playoff pool");
+        assertEq(quoted.probabilityBps, 5000, "p read from the pool at open");
+        assertGt(quotedFee, 0, "playoff swaps pay");
+        assertLe(quotedFee, RiskPolicy.MAX_RATE);
         uint256 bobYesBefore = yes.balanceOf(bob);
         vm.startPrank(bob);
         usdc.approve(address(swapRouter), type(uint256).max);
         yes.approve(address(swapRouter), type(uint256).max);
-        swapRouter.swap(
-            key,
-            SwapParams({
-                zeroForOne: zeroForOne,
-                amountSpecified: -int256(100e6),
-                sqrtPriceLimitX96: zeroForOne ? TickMath.MIN_SQRT_PRICE + 1 : TickMath.MAX_SQRT_PRICE - 1
-            }),
-            PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}),
-            ""
-        );
+        vm.recordLogs();
+        swapRouter.swap(key, bobBuy, PoolSwapTest.TestSettings({takeClaims: false, settleUsingBurn: false}), "");
         vm.stopPrank();
         uint256 bobYesBought = yes.balanceOf(bob) - bobYesBefore;
         assertGt(bobYesBought, 0, "swap must deliver YES");
+        _assertLiveFee(key, quotedFee, zeroForOne, 100e6);
 
         // 5. Kickoff — and trading CONTINUES (D-103 in-play). The keeper
         //    marks the game LIVE; Bob trades mid-game, the leg the old
@@ -210,7 +226,9 @@ contract FullLifecycleTest is Test {
         vm.prank(alice);
         lpRouter.modifyLiquidity(
             key,
-            ModifyLiquidityParams({tickLower: -6000, tickUpper: 6000, liquidityDelta: -1e9, salt: 0}),
+            ModifyLiquidityParams({
+                tickLower: -6000, tickUpper: 6000, liquidityDelta: -int128(ALICE_LIQUIDITY), salt: 0
+            }),
             ""
         );
 
@@ -242,14 +260,14 @@ contract FullLifecycleTest is Test {
     function test_voidLifecycle_postponedGameReturnsAllCollateral() public {
         vm.startPrank(alice);
         usdc.approve(address(market), type(uint256).max);
-        market.split(1_000e6);
+        market.split(1000e6);
         // Alice sells her NO to Bob off-pool: positions on both sides,
         // held by different actors, bought at different effective prices.
-        no.transfer(bob, 1_000e6);
+        no.transfer(bob, 1000e6);
         vm.stopPrank();
 
         uint256 marketBalance = usdc.balanceOf(address(market));
-        assertEq(marketBalance, 1_000e6, "collateral escrowed 1:1");
+        assertEq(marketBalance, 1000e6, "collateral escrowed 1:1");
 
         // Game postponed before kickoff — operator voids via the manual
         // override path (B4-004: same code path as the signer).
@@ -269,5 +287,30 @@ contract FullLifecycleTest is Test {
 
         // Every unit returned: the void path cannot strand collateral.
         assertEq(usdc.balanceOf(address(market)), 0, "market fully drained");
+    }
+
+    /// @dev H-013 — the fee the swap actually charged, two ways: the hook's
+    ///      `MarketFeeUpdated` event carries the pip fee it returned to v4,
+    ///      and the pool's fee growth (Alice is the only LP) carries the raw
+    ///      amount v4 took. Both must agree with the pre-trade quote.
+    function _assertLiveFee(PoolKey memory key, uint24 quotedFee, bool zeroForOne, uint256 amountIn) internal {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool seen;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter != address(hook) || logs[i].topics[0] != DynamicMarketHook.MarketFeeUpdated.selector) {
+                continue;
+            }
+            (Calc.Breakdown memory b, uint24 charged) = abi.decode(logs[i].data, (Calc.Breakdown, uint24));
+            assertEq(charged, quotedFee, "the executed fee is the quoted fee");
+            assertEq(charged, F.effectiveFeePips(b.rate, b.probabilityBps), "fee = rate x (1 - p)");
+            seen = true;
+        }
+        assertTrue(seen, "every swap emits its fee decomposition");
+
+        (uint256 growth0, uint256 growth1) = StateLibrary.getFeeGrowthGlobals(manager, key.toId());
+        uint256 collected = FullMath.mulDiv(zeroForOne ? growth0 : growth1, ALICE_LIQUIDITY, 1 << 128);
+        // v4 rounds the fee up once per tick-range step and the growth
+        // accounting floors once; the quote is exact to a few raw units.
+        assertApproxEqAbs(collected, F.feeOnInput(amountIn, quotedFee), 4, "LPs received the formula's fee");
     }
 }

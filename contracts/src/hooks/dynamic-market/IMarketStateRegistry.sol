@@ -46,9 +46,17 @@ interface IMarketStateRegistry {
         ///      (spec §0.1) but storing it means a future non-6dp collateral
         ///      cannot silently break notional maths.
         uint8 outcomeDecimals;
+        /// @dev D-105 season switch. True when the game is a playoff game per
+        ///      the league calendar: the dynamic 0.10%–0.70% fee applies.
+        ///      False is the regular season: every swap is fee-free. Written
+        ///      once at registration by the operator and never again, so
+        ///      nobody can turn fees on or off against traders mid-market.
+        bool playoffs;
     }
 
-    event PoolRegistered(PoolId indexed poolId, uint64 kickoffTimestamp, bool yesIsToken0, uint8 outcomeDecimals);
+    event PoolRegistered(
+        PoolId indexed poolId, uint64 kickoffTimestamp, bool yesIsToken0, uint8 outcomeDecimals, bool playoffs
+    );
     event MarketUpdated(PoolId indexed poolId, uint16 modelProbability, uint16 confidence, EventState eventState);
     event PausedSet(PoolId indexed poolId, bool paused);
     event GlobalPausedSet(bool paused);

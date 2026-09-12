@@ -57,3 +57,61 @@ export function closePositionDetail(row: {
   if (!row.league || !row.providerEventId) return null;
   return { league: row.league, eventId: row.providerEventId, balance: row.balance };
 }
+
+// ─── D-105 fee line (task 049, T-008 / H-012) ───────────────────────────────
+
+/** The `fee` block on the server's trade quote — straight from the hook. */
+export interface FeeQuoteWire {
+  feePips: number;
+  ratePips: number;
+  probabilityBps: number;
+  playoffs: boolean;
+  /** Fee in raw units of the input token. */
+  feeRaw: string;
+  /** The same fee valued in USDC raw units (6dp). */
+  feeUsdcRaw: string;
+}
+
+export interface FeeSummary {
+  /** USDC that actually buys contracts: the input net of the fee (buys). */
+  position: string;
+  /** The fee, in dollars, rounded UP to the cent — never under-quoted. */
+  fee: string;
+  /** What leaves the wallet: the full input (buys). */
+  total: string;
+  /** Effective rate on the input, e.g. "0.35%". */
+  ratePct: string;
+  playoffs: boolean;
+}
+
+/** Raw 6dp → "12.34", rounding to the nearest cent. */
+function usdc2(raw: bigint): string {
+  const cents = (raw + 5_000n) / 10_000n;
+  return `${(cents / 100n).toString()}.${(cents % 100n).toString().padStart(2, "0")}`;
+}
+
+/** Raw 6dp → "0.18", rounding UP to the cent (a non-zero fee never shows as $0.00). */
+export function usdcCeil2(raw: bigint): string {
+  const cents = (raw + 9_999n) / 10_000n;
+  return `${(cents / 100n).toString()}.${(cents % 100n).toString().padStart(2, "0")}`;
+}
+
+/**
+ * Position / Estimated fee / Total for a buy ticket. Uniswap v4 takes the
+ * fee out of the input, so Total is the USDC the wallet sends, Position is
+ * what remains to buy contracts, and the two differ by exactly the fee.
+ * Uses the hook's own quote (`fee.feeUsdcRaw`) — no fee maths is re-derived
+ * here, so the ticket cannot disagree with the execution.
+ */
+export function feeSummary(amountInRaw: bigint | string, fee: FeeQuoteWire): FeeSummary {
+  const amountIn = BigInt(amountInRaw);
+  const feeUsdc = BigInt(fee.feeUsdcRaw);
+  const position = amountIn > feeUsdc ? amountIn - feeUsdc : 0n;
+  return {
+    position: usdc2(position),
+    fee: usdcCeil2(feeUsdc),
+    total: usdc2(amountIn),
+    ratePct: `${(fee.feePips / 10_000).toFixed(fee.feePips % 100 === 0 ? 2 : 3)}%`,
+    playoffs: fee.playoffs,
+  };
+}

@@ -50,6 +50,9 @@ export interface ProviderTeam {
   record?: string;
 }
 
+/** League calendar phase, as the provider reports it (`team_records.season_type`). */
+export type SeasonType = "regular" | "preseason" | "postseason";
+
 /**
  * One game, normalized. This is the shape the `events` table stores and the
  * only shape feature code sees.
@@ -70,6 +73,12 @@ export interface ProviderEvent {
    * the opening pool price (B1-009); absent means fall back to 5000.
    */
   homeWinProbabilityBps?: number;
+  /**
+   * Where the game sits in the league calendar, if the provider says. Drives
+   * the D-105 season switch: a postseason game registers its pool with the
+   * dynamic fee on; anything else (including absent) is fee-free.
+   */
+  seasonType?: SeasonType;
 }
 
 /** A provider's answer, plus how much to trust its freshness. */
@@ -175,7 +184,7 @@ export interface ProviderTeamStanding {
   /** Season label, e.g. "2026". */
   season: string;
   /** Collapsed onto the `team_records.season_type` convention. */
-  seasonType: "regular" | "preseason" | "postseason";
+  seasonType: SeasonType;
   wins: number;
   losses: number;
   ties: number;
