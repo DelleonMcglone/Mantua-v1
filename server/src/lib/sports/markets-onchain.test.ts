@@ -22,6 +22,7 @@ function planned(overrides: Partial<PlannedMarket> = {}): PlannedMarket {
     label: "KC to beat LV",
     kickoffTimestamp: NOW + 3600,
     openingProbability: 0.62,
+    playoffs: false,
     ...overrides,
   };
 }

@@ -68,6 +68,7 @@ import {
   type SportsDataProvider,
   ProviderShapeError,
   teamKey,
+  type SeasonType,
 } from "./provider.ts";
 import { ResilientJson } from "./resilience.ts";
 
@@ -266,7 +267,11 @@ export function parseSportradarTeam(raw: unknown, league: LeagueSlug): ProviderT
  * with `home_points`/`away_points`. Boxscore (nfl-game-boxscore) carries
  * the same identity fields with `points` directly on `home`/`away`.
  */
-export function parseSportradarGame(raw: unknown, league: LeagueSlug): ProviderEvent {
+export function parseSportradarGame(
+  raw: unknown,
+  league: LeagueSlug,
+  seasonType: SeasonType | null = null,
+): ProviderEvent {
   const game = asRecord(raw);
   if (!game) throw new ProviderShapeError("game is not an object");
 
@@ -296,6 +301,7 @@ export function parseSportradarGame(raw: unknown, league: LeagueSlug): ProviderE
     away: parseSportradarTeam(awayRec, league),
     ...(homeScore !== undefined ? { homeScore } : {}),
     ...(awayScore !== undefined ? { awayScore } : {}),
+    ...(seasonType !== null ? { seasonType } : {}),
     // No homeWinProbabilityBps: pre-game odds are Sportradar's separate Odds
     // Comparison API, not NFL v7 — pools seed at 50/50 until a line source
     // is licensed (provider.ts documents the fallback).
@@ -313,6 +319,9 @@ export function parseSportradarSchedule(payload: unknown, league: LeagueSlug): P
   const root = asRecord(payload);
   const weeks = root?.["weeks"];
   if (!Array.isArray(weeks)) throw new ProviderShapeError("payload has no weeks array");
+  // The schedule root names the season phase (PRE | REG | PST) once for every
+  // game it carries — that is the D-105 season switch's source of truth.
+  const seasonType = mapSeasonType(root?.["type"]);
 
   const out: ProviderEvent[] = [];
   for (const weekRaw of weeks) {
@@ -320,7 +329,7 @@ export function parseSportradarSchedule(payload: unknown, league: LeagueSlug): P
     if (!Array.isArray(games)) continue;
     for (const raw of games) {
       try {
-        out.push(parseSportradarGame(raw, league));
+        out.push(parseSportradarGame(raw, league, seasonType));
       } catch {
         // Skip the one bad game; keep the slate.
       }
@@ -555,7 +564,7 @@ export function parseSportradarPlays(payload: unknown, league: LeagueSlug): Prov
 }
 
 /** Season type per the schedule/standings references: PRE | REG | PST. */
-function mapSeasonType(raw: unknown): "regular" | "preseason" | "postseason" | null {
+export function mapSeasonType(raw: unknown): SeasonType | null {
   if (typeof raw !== "string") return null;
   switch (raw.toUpperCase()) {
     case "REG":

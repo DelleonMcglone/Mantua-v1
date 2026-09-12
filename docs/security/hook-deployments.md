@@ -25,7 +25,7 @@ degrades gracefully. Mainnet launch checklist:
 
 - `StableProtectionHook` — [DelleonMcglone/stableprotection-hook@8190d50](https://github.com/DelleonMcglone/stableprotection-hook/commit/8190d5032bea6a1e85fea969156eb708d1cef266)
 - `DynamicFee` — [DelleonMcglone/dynamic-fee@d34af93](https://github.com/DelleonMcglone/dynamic-fee/commit/d34af93025ae998474883eac81596edb7e37c159)
-- `DynamicMarketHook` — [DelleonMcglone/Mantua-Intelligence@07f6f16](https://github.com/DelleonMcglone/Mantua-Intelligence/commit/07f6f169fb79172c01f4a7d1dd68e9850a132ace)
+- `DynamicMarketHook` — [DelleonMcglone/Mantua-Intelligence@07f6f16](https://github.com/DelleonMcglone/Mantua-Intelligence/commit/07f6f169fb79172c01f4a7d1dd68e9850a132ace) — **superseded by the D-105 fee-model build (task 049)**: the mainnet deploy must be made from, and verified against, the commit that carries `MarketFeeFormula.sol` and `RiskPolicy.MAX_RATE = 7000`; re-pin here at deploy.
 
 ## Historical (superseded) deployments
 

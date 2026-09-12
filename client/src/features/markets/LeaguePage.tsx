@@ -13,7 +13,7 @@ import {
 import { getSport, SPORTS, type SportId } from "./sports.ts";
 import { useSlate, type SlateEvent } from "./use-slate.ts";
 import { useMarketTrade } from "./use-market-trade.ts";
-import { isTradableStatus, rawToHuman6 } from "./market-trade-core.ts";
+import { feeSummary, isTradableStatus, rawToHuman6, usdcCeil2 } from "./market-trade-core.ts";
 import { MarketDetail } from "./MarketDetail.tsx";
 import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 
@@ -223,7 +223,9 @@ export function LeaguePage({
             />
           )}
           {!detailEvent && loading && !slate && (
-            <p role="status" className="text-[13px] text-text-dim">Loading games…</p>
+            <p role="status" className="text-[13px] text-text-dim">
+              Loading games…
+            </p>
           )}
           {!detailEvent && !loading && events.length === 0 && (
             <div className="rounded-md border border-border-soft px-5 py-10 text-center">
@@ -465,6 +467,9 @@ function TradeSidebar({
 
   const quote = calldata?.quote ?? null;
   const out = quote ? Number(quote.amountOut) / 1e6 : null;
+  // T-008 — the transparent fee line, from the hook's own quote (D-105).
+  const fee = calldata?.fee ?? null;
+  const feeLine = quote && fee ? feeSummary(quote.amountIn, fee) : null;
   // Server-quoted floor (quote − slippage tolerance); the matching price
   // bound is already inside the calldata the wallet will sign.
   const minOut =
@@ -591,6 +596,26 @@ function TradeSidebar({
             You receive <span className="font-mono text-text">{out.toFixed(2)}</span> USDC
             {minOut !== null && ` · min ${minOut.toFixed(2)} after slippage`}
           </>
+        )}
+        {feeLine && fee && (
+          <div className="mt-1" data-testid="fee-line">
+            {!feeLine.playoffs && <span>Regular season · 0% trading fee</span>}
+            {feeLine.playoffs && direction === "buy" && (
+              <>
+                Position <span className="font-mono text-text">${feeLine.position}</span> ·
+                Estimated fee <span className="font-mono text-text">${feeLine.fee}</span> (
+                {feeLine.ratePct}) · Total{" "}
+                <span className="font-mono text-text">${feeLine.total}</span>
+              </>
+            )}
+            {feeLine.playoffs && direction === "sell" && (
+              <>
+                Estimated fee{" "}
+                <span className="font-mono text-text">${usdcCeil2(BigInt(fee.feeUsdcRaw))}</span> (
+                {feeLine.ratePct} of the YES sold)
+              </>
+            )}
+          </div>
         )}
         {phase.kind === "error" && (
           <span role="alert" className="text-yellow">

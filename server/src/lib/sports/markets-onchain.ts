@@ -297,6 +297,8 @@ async function bootstrapMarketPool(
         BigInt(m.kickoffTimestamp + RESOLUTION_WINDOW_SECONDS),
         plan.yesIsToken0,
         6,
+        // D-105 season switch — once-only, from the league calendar (H-010).
+        m.playoffs,
       ],
     });
     const tx = await wallet.writeContract(request);

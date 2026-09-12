@@ -24,7 +24,7 @@ git submodule update --init --recursive
 
 ## Layout
 
-- `src/` — Mantua-owned hook source (currently empty; vendored hooks live in `hooks/`).
+- `src/` — Mantua-owned source: the Dynamic Market Hook (`src/hooks/dynamic-market/`, fee model per D-105 in `MarketFeeFormula.sol` / `MarketFeeCalculator.sol` / `RiskPolicy.sol`) and the markets layer (`src/markets/`). Vendored hooks live in `hooks/`.
 - `hooks/` — git submodules pinned to specific commits of each external hook repo (see "Hooks" below).
 - `test/` — Foundry tests, fork tests, fuzz harnesses (Phase 5 P5-024).
 - `script/` — deployment + admin scripts. Includes `verify-hooks.ts` (P5-001 deployment verification).
@@ -37,10 +37,10 @@ pair) and Dynamic Fee (any pair). Run `npm run verify:hooks` from the
 repo root to refresh the on-chain verification report at
 `docs/security/hook-deployments.md`.
 
-| Hook | Source | Deployment | Address | Permissions |
-| ---- | ------ | ---------- | ------- | ----------- |
+| Hook              | Source                                                                                                                                     | Deployment                    | Address                              | Permissions                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------- | ------------------------------------ | --------------------------------------- |
 | Stable Protection | [`stableprotection-hook@1282b89`](https://github.com/DelleonMcglone/stableprotection-hook/commit/1282b899b6f68d27e28d65194dc75661f23476af) | Base Mainnet (8453) — pending | env `STABLE_PROTECTION_HOOK_ADDRESS` | beforeInitialize, beforeSwap, afterSwap |
-| Dynamic Fee | [`dynamic-fee@62710d6`](https://github.com/DelleonMcglone/dynamic-fee/commit/62710d6d9b403557b073a702b5546bc10e75c0c6) | Base Mainnet (8453) — pending | env `DYNAMIC_FEE_HOOK_ADDRESS` | beforeSwap, afterSwap |
+| Dynamic Fee       | [`dynamic-fee@62710d6`](https://github.com/DelleonMcglone/dynamic-fee/commit/62710d6d9b403557b073a702b5546bc10e75c0c6)                     | Base Mainnet (8453) — pending | env `DYNAMIC_FEE_HOOK_ADDRESS`       | beforeSwap, afterSwap                   |
 
 **No hook is on Base Mainnet (8453) yet.** Deployment to mainnet, after
 security sign-off, is the launch-gating step — see

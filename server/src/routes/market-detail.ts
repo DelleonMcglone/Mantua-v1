@@ -27,6 +27,9 @@ interface ActivityRow {
   usdc: number;
   tokens: number;
   txHash: string;
+  /** D-105 fee the trade paid, in USDC (H-011); null when not recorded. */
+  feeUsdc: number | null;
+  playoffs: boolean | null;
 }
 
 /**
@@ -127,6 +130,8 @@ marketDetailRouter.get("/api/markets/detail", async (req: Request, res: Response
       usdc: Number(f.usdcRaw) / 1e6,
       tokens: Number(f.tokensRaw) / 1e6,
       txHash: f.txHash,
+      feeUsdc: f.feeUsdcRaw === null ? null : Number(f.feeUsdcRaw) / 1e6,
+      playoffs: f.playoffs,
     }));
 
     // Holders are best-effort — a BaseScan hiccup must not blank the page.

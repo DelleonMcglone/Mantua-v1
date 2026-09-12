@@ -127,3 +127,22 @@ responsibility**, but documenting them here tells reviewers we ran the
 tool against the full transitive set, not just our own files. Same
 ratios for Dynamic Fee (~16 dep mediums) and RWAGate (8 dep mediums).
 Upstream findings are logged in the raw JSON; not transcribed above.
+
+### Task 049 — Dynamic Market Hook fee model (2026-09-12)
+
+Review: [`dynamic-market-fee-review.md`](dynamic-market-fee-review.md)
+(Trail of Bits methodology over the D-105 fee-model change). Slither
+0.11.6 re-run: 27 findings, 0 High, 9 Medium — identical to the P-013
+baseline; no detector fires on the new `MarketFeeFormula.sol`,
+`MarketFeeCalculator.sol`, or `RiskPolicy.sol`.
+
+| ID   | Finding                                                             | Severity | Status                     |
+| ---- | ------------------------------------------------------------------- | -------- | -------------------------- |
+| L-03 | Volatility griefing can lift the rate by ≤ 0.15% while it lasts     | Low      | Open — bounded, self-defeating, decays; accepted for launch pending owner note |
+| L-04 | Sell-side `fee_usdc_raw` telemetry valued at the pre-trade price    | Low      | Accepted — analytics only  |
+| I-03 | Pip rate on the input equals the full rate as `p → 0`               | Info     | Documented                 |
+| I-04 | Rate varies with `p` through the model-deviation driver             | Info     | Documented                 |
+
+The previous fee-band statements in this file and in `sign-off.md`
+(`BASE_FEE` 0.30%, `MAX_FEE` 5.00%) are superseded by D-105
+(`MIN_RATE` 0.10%, `MAX_RATE` 0.70%, `REGULAR_SEASON_FEE` 0%).

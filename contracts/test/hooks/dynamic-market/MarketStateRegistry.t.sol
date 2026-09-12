@@ -30,7 +30,7 @@ contract MarketStateRegistryTest is Test {
 
     function _register(PoolId id) internal {
         vm.prank(operator);
-        registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6);
+        registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6, false);
     }
 
     // ─── Construction ────────────────────────────────────────────────────
@@ -61,6 +61,18 @@ contract MarketStateRegistryTest is Test {
         assertEq(s.lastUpdate, 0, "never written by the keeper yet");
     }
 
+    /// @dev D-105: the season flag is a registration fact, written once.
+    function test_registerStoresTheSeasonFlagAndEmitsIt() public {
+        _register(POOL);
+        assertFalse(registry.marketState(POOL).playoffs, "regular season by default in this suite");
+
+        vm.expectEmit(true, false, false, true);
+        emit I.PoolRegistered(OTHER, kickoff, false, 6, true);
+        vm.prank(operator);
+        registry.registerPool(OTHER, kickoff, kickoff + 4 hours, false, 6, true);
+        assertTrue(registry.marketState(OTHER).playoffs, "playoff pool records the flag");
+    }
+
     function test_unregisteredPoolReadsFalse() public view {
         assertFalse(registry.isRegistered(POOL));
     }
@@ -68,20 +80,20 @@ contract MarketStateRegistryTest is Test {
     function test_onlyOperatorMayRegister() public {
         vm.prank(keeper);
         vm.expectRevert(MarketErrors.NotOperator.selector);
-        registry.registerPool(POOL, kickoff, kickoff + 4 hours, true, 6);
+        registry.registerPool(POOL, kickoff, kickoff + 4 hours, true, 6, false);
     }
 
     function test_cannotRegisterTwice() public {
         _register(POOL);
         vm.prank(operator);
         vm.expectRevert(MarketErrors.PoolAlreadyRegistered.selector);
-        registry.registerPool(POOL, kickoff, kickoff + 4 hours, true, 6);
+        registry.registerPool(POOL, kickoff, kickoff + 4 hours, true, 6, false);
     }
 
     function test_cannotRegisterKickoffInPast() public {
         vm.prank(operator);
         vm.expectRevert(MarketErrors.KickoffInPast.selector);
-        registry.registerPool(POOL, uint64(block.timestamp), kickoff, true, 6);
+        registry.registerPool(POOL, uint64(block.timestamp), kickoff, true, 6, false);
     }
 
     function test_marketStateRevertsForUnregisteredPool() public {

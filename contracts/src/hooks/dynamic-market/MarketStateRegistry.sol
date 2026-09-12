@@ -11,14 +11,15 @@ import {MarketErrors} from "./MarketErrors.sol";
 ///
 /// @dev **Two roles, deliberately.** The `operator` registers pools, pauses, and
 ///      rotates roles. The `keeper` writes exactly three fields (spec §4.1) and
-///      nothing else. A compromised keeper — the key most exposed, since it
-///      writes on every game tick — therefore cannot register a pool, pause,
-///      move a kickoff timestamp, or take the operator role (spec §25).
+///      nothing else, so a compromised keeper — the key most exposed, since it
+///      writes on every game tick — cannot register a pool, pause, move a
+///      kickoff, or take the operator role (spec §25).
 ///
-///      Registration is once-only. There is no kickoff setter at all, because
-///      a mutable kickoff would defeat the §6 time backstop: the backstop
-///      reads that timestamp, so anyone able to push it forward could keep an
-///      abandoned market tradeable past `kickoff + MAX_EVENT_DURATION`.
+///      Registration is once-only. There is no kickoff setter, because a
+///      mutable kickoff would defeat the §6 time backstop (anyone able to push
+///      it forward could keep an abandoned market tradeable), and no season
+///      setter, because a flippable D-105 `playoffs` flag would be an admin
+///      path to turn fees on against traders.
 contract MarketStateRegistry is IMarketStateRegistry {
     /// @inheritdoc IMarketStateRegistry
     address public override operator;
@@ -55,12 +56,15 @@ contract MarketStateRegistry is IMarketStateRegistry {
     /// @param yesIsToken0 Whether YES sorted into token0. Recorded once so the
     ///        hook cannot get the ordering backwards when reading price.
     /// @param outcomeDecimals Outcome-token decimals (spec §9).
+    /// @param playoffs D-105 season switch from the league calendar: true
+    ///        enables the dynamic fee, false keeps the pool fee-free.
     function registerPool(
         PoolId poolId,
         uint64 kickoffTimestamp,
         uint64 resolutionTimestamp,
         bool yesIsToken0,
-        uint8 outcomeDecimals
+        uint8 outcomeDecimals,
+        bool playoffs
     ) external onlyOperator {
         MarketState storage s = _states[poolId];
         if (s.registered) revert MarketErrors.PoolAlreadyRegistered();
@@ -71,18 +75,17 @@ contract MarketStateRegistry is IMarketStateRegistry {
         s.resolutionTimestamp = resolutionTimestamp;
         s.yesIsToken0 = yesIsToken0;
         s.outcomeDecimals = outcomeDecimals;
+        s.playoffs = playoffs;
         s.eventState = EventState.PRE_GAME;
 
-        emit PoolRegistered(poolId, kickoffTimestamp, yesIsToken0, outcomeDecimals);
+        emit PoolRegistered(poolId, kickoffTimestamp, yesIsToken0, outcomeDecimals, playoffs);
     }
 
     // ─── Keeper writes (§4.1, §28.4) ─────────────────────────────────────
 
     /// @notice Write the three keeper-controlled fields. Spec §4.1.
-    /// @dev Bounds are checked before storage (spec §28.4), so an out-of-range
-    ///      value never reaches state and cannot be read by a later fee
-    ///      calculation. `lastUpdate` is stamped here and is what §22 staleness
-    ///      measures from.
+    /// @dev Bounds are checked before storage (§28.4), so an out-of-range value
+    ///      never reaches state; `lastUpdate` is what §22 staleness measures from.
     function updateMarket(PoolId poolId, uint16 modelProbability, uint16 confidence, EventState eventState)
         external
         onlyKeeper
@@ -101,7 +104,6 @@ contract MarketStateRegistry is IMarketStateRegistry {
     }
 
     // ─── Pause (§24) ─────────────────────────────────────────────────────
-
     function setPaused(PoolId poolId, bool paused) external onlyOperator {
         if (!_states[poolId].registered) revert MarketErrors.PoolNotRegistered();
         _states[poolId].paused = paused;
@@ -114,7 +116,6 @@ contract MarketStateRegistry is IMarketStateRegistry {
     }
 
     // ─── Role management (§25, §26) ──────────────────────────────────────
-
     /// @dev Two steps so a mistyped address cannot take the role — it has to
     ///      act to claim it. Re-proposing overwrites a pending typo.
     function proposeOperator(address next) external onlyOperator {
@@ -137,7 +138,6 @@ contract MarketStateRegistry is IMarketStateRegistry {
     }
 
     // ─── Views ───────────────────────────────────────────────────────────
-
     function marketState(PoolId poolId) external view override returns (MarketState memory) {
         MarketState memory s = _states[poolId];
         if (!s.registered) revert MarketErrors.PoolNotRegistered();

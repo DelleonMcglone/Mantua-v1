@@ -34,8 +34,8 @@ From a single natural-language prompt you can:
 
 Mantua runs on a single chain: **Base Mainnet**.
 
-| Network          | Chain id | Gas token | What runs there                                                                                                                  |
-| ---------------- | -------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Network          | Chain id | Gas token | What runs there                                                                                                                                                            |
+| ---------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Base Mainnet** | `8453`   | ETH       | Full stack: sports markets (Dynamic Market hook + factory/resolver, deployment pending), Stable Protection (USDC/EURC, deployment pending), swaps, liquidity, agent wallet |
 
 The wallet, swaps, liquidity, and the Circle agent wallet all target Base Mainnet. Contract
@@ -280,11 +280,11 @@ contract deployed at a mined CREATE2 address. On Base Mainnet they deploy agains
 v4 stack (PoolManager + PositionManager + StateView + V4Quoter); the app routes every pool's
 create / liquidity / swap / read through `getV4StackForHook`.
 
-| Hook                    | Surface           | Purpose                                                                                     | Target                          | Source                                                                           |
-| ----------------------- | ----------------- | ------------------------------------------------------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------------- |
-| **Dynamic Market Hook** | Prediction market | Adapts pricing, fees, liquidity, and risk parameters in real time from game state and flow  | Base Mainnet (deploy pending)   | [`contracts/src/hooks/dynamic-market/`](contracts/src/hooks/dynamic-market)      |
-| **Stable Protection**   | Trading           | Monitors peg deviation across five zones, scaling LP fees to severity and halting past 5%   | Base Mainnet (deploy pending)   | [stableprotection-hook](https://github.com/DelleonMcglone/stableprotection-hook) |
-| **Dynamic Fee**         | Trading           | Nezlobin directional fees across five deviation zones, charging the toxic side of the trade | Base Mainnet (deploy pending)   | [dynamic-fee](https://github.com/DelleonMcglone/dynamic-fee)                     |
+| Hook                    | Surface           | Purpose                                                                                     | Target                        | Source                                                                           |
+| ----------------------- | ----------------- | ------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------- |
+| **Dynamic Market Hook** | Prediction market | Adapts pricing, fees, liquidity, and risk parameters in real time from game state and flow  | Base Mainnet (deploy pending) | [`contracts/src/hooks/dynamic-market/`](contracts/src/hooks/dynamic-market)      |
+| **Stable Protection**   | Trading           | Monitors peg deviation across five zones, scaling LP fees to severity and halting past 5%   | Base Mainnet (deploy pending) | [stableprotection-hook](https://github.com/DelleonMcglone/stableprotection-hook) |
+| **Dynamic Fee**         | Trading           | Nezlobin directional fees across five deviation zones, charging the toxic side of the trade | Base Mainnet (deploy pending) | [dynamic-fee](https://github.com/DelleonMcglone/dynamic-fee)                     |
 
 The Dynamic Market Hook's eight Solidity modules live in this repo under
 [`contracts/src/hooks/dynamic-market/`](contracts/src/hooks/dynamic-market), alongside the
@@ -299,11 +299,17 @@ git clone --recurse-submodules https://github.com/DelleonMcglone/Mantua-Intellig
 ```
 
 > The Dynamic Market Hook shipped against the authoritative spec in
-> [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md): a 0.30%–5% adaptive
-> fee band (five weighted premiums + a directional adjustment), per-risk trade caps, in-play
+> [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md) and the Mantua fee
+> model ([D-105](docs/decisions/v2-open-decisions.md), user page
+> [`docs/fee-model.md`](docs/fee-model.md)): **0% fees in the regular season; in the playoffs a
+> dynamic 0.10%–0.70% rate** (liquidity, volatility, trading activity, market uncertainty — the
+> 0.70% ceiling is an immutable constant) applied as `Fee = C × rate × p × (1 − p)`, so 50/50
+> contracts pay the most and near-certain ones almost nothing. Plus per-risk trade caps, in-play
 > trading that halts on the event's `FINAL` state with a keeper-independent 12-hour backstop
-> that fires even with no keeper write, and fail-closed behaviour on stale keeper state. Security review: 0 HIGH / 0 MEDIUM open
-> ([`docs/security/sign-off.md`](docs/security/sign-off.md), owner-signed).
+> that fires even with no keeper write, and fail-closed behaviour on stale keeper state. Security
+> review: [`docs/security/dynamic-market-fee-review.md`](docs/security/dynamic-market-fee-review.md);
+> the ship gate ([`docs/security/sign-off.md`](docs/security/sign-off.md)) awaits re-signing for
+> the fee model.
 
 > Two further hooks **RWA Gate** (permissioned pools via a ComplianceRegistry) and
 > **Async Limit Order** are built but **deferred** — they join a later deployment wave,

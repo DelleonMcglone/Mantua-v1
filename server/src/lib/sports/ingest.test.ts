@@ -25,6 +25,18 @@ function event(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
   };
 }
 
+void describe("planMarkets season switch (D-105 / H-004)", () => {
+  void it("flags only postseason games for the dynamic fee", () => {
+    for (const m of planMarkets(event({ seasonType: "postseason" }), NOW)) assert.equal(m.playoffs, true);
+    for (const m of planMarkets(event({ seasonType: "regular" }), NOW)) assert.equal(m.playoffs, false);
+    for (const m of planMarkets(event({ seasonType: "preseason" }), NOW)) assert.equal(m.playoffs, false);
+  });
+
+  void it("defaults to the fee-free regular season when the feed says nothing", () => {
+    for (const m of planMarkets(event(), NOW)) assert.equal(m.playoffs, false);
+  });
+});
+
 void describe("planMarkets (B3-006)", () => {
   void it("plans two moneyline markets per scheduled game — one per side", () => {
     const markets = planMarkets(event({ homeWinProbabilityBps: 6200 }), NOW);

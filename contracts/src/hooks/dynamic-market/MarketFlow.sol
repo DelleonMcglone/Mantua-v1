@@ -92,7 +92,8 @@ library MarketFlow {
             eventState: s.eventState,
             stale: RiskPolicy.isStale(s.lastUpdate, uint64(block.timestamp)),
             // Risk-increasing means leaning further onto the already-heavy side.
-            increasesRisk: buysYes == (buy >= sell)
+            increasesRisk: buysYes == (buy >= sell),
+            playoffs: s.playoffs
         });
     }
 

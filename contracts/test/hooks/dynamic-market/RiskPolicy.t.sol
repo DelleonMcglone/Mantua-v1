@@ -1,19 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-// Purpose: tests for RiskPolicy — the immutable bounds every fee and
-// trade-cap clamp resolves against (spec §27, values in §0.3).
+// Purpose: tests for RiskPolicy — the immutable bounds every fee-rate and
+// trade-cap clamp resolves against (spec §27; fee bounds per D-105, H-002).
 
 import {Test} from "forge-std/Test.sol";
 import {RiskPolicy} from "../../../src/hooks/dynamic-market/RiskPolicy.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/src/libraries/LPFeeLibrary.sol";
 
 contract RiskPolicyTest is Test {
-    // ─── Values (spec §0.3) ──────────────────────────────────────────────
+    // ─── Values (D-105) ──────────────────────────────────────────────────
 
-    function test_feeBoundsMatchSpec() public pure {
-        assertEq(RiskPolicy.BASE_FEE, 3000, "BASE_FEE must be 0.30%");
-        assertEq(RiskPolicy.MAX_FEE, 50_000, "MAX_FEE must be 5.00%");
+    function test_feeBoundsMatchTheFeeModel() public pure {
+        assertEq(RiskPolicy.REGULAR_SEASON_FEE, 0, "regular season is fee-free");
+        assertEq(RiskPolicy.MIN_RATE, 1000, "MIN_RATE must be 0.10%");
+        assertEq(RiskPolicy.MAX_RATE, 7000, "MAX_RATE must be 0.70%");
     }
 
     function test_tradeCapBoundsMatchSpec() public pure {
@@ -24,60 +25,56 @@ contract RiskPolicyTest is Test {
     function test_timingsMatchSpec() public pure {
         assertEq(RiskPolicy.STALE_AFTER, 900, "STALE_AFTER must be 15 minutes");
         // D-103 in-play trading: the backstop must equal the market
-        // contract's window, so the hook halts swaps at the same instant the
-        // market's permissionless freeze() unlocks. The cross-contract
-        // equality is asserted in Market.t.sol (test_backstopMatchesTheHook),
-        // where a Market instance exists to read the getter from.
+        // contract's window (cross-contract equality asserted in Market.t.sol).
         assertEq(RiskPolicy.MAX_EVENT_DURATION, 12 hours, "backstop must be 12 hours");
     }
 
     // ─── Internal consistency ────────────────────────────────────────────
 
-    function test_baseFeeIsBelowMaxFee() public pure {
-        assertLt(RiskPolicy.BASE_FEE, RiskPolicy.MAX_FEE);
+    function test_minRateIsBelowMaxRate() public pure {
+        assertLt(RiskPolicy.MIN_RATE, RiskPolicy.MAX_RATE);
+        assertLt(RiskPolicy.REGULAR_SEASON_FEE, RiskPolicy.MIN_RATE);
     }
 
     function test_minTradeCapIsBelowAbsMax() public pure {
         assertLt(RiskPolicy.MIN_TRADE_CAP, RiskPolicy.ABS_MAX_TRADE);
     }
 
-    function test_maxFeeIsAValidV4Fee() public pure {
+    function test_maxRateIsAValidV4Fee() public pure {
         // A fee above MAX_LP_FEE would be rejected by the PoolManager, making
         // every stale-state swap revert instead of paying the ceiling (§22).
-        assertLe(RiskPolicy.MAX_FEE, LPFeeLibrary.MAX_LP_FEE);
+        assertLe(RiskPolicy.MAX_RATE, LPFeeLibrary.MAX_LP_FEE);
     }
 
-    function test_maxFeeLeavesHeadroomForFivePremiums() public pure {
-        // §16 stacks five premiums plus a directional adjustment on top of
-        // BASE_FEE. If the band were tight they would saturate immediately and
-        // the fee would carry no information.
-        assertGe(RiskPolicy.MAX_FEE - RiskPolicy.BASE_FEE, 5 * RiskPolicy.BASE_FEE);
+    function test_headroomIsSharedByFourDrivers() public pure {
+        // 0.60% of headroom split four ways still leaves each driver a share
+        // wider than a pip, so the rate carries information.
+        assertEq(RiskPolicy.MAX_RATE - RiskPolicy.MIN_RATE, 6000);
     }
 
-    // ─── clampFee (§16) ──────────────────────────────────────────────────
+    // ─── clampRate (H-002) ───────────────────────────────────────────────
 
-    function test_clampFeePassesThroughInBandValues() public pure {
-        assertEq(RiskPolicy.clampFee(3000), 3000);
-        assertEq(RiskPolicy.clampFee(20_000), 20_000);
-        assertEq(RiskPolicy.clampFee(50_000), 50_000);
+    function test_clampRatePassesThroughInBandValues() public pure {
+        assertEq(RiskPolicy.clampRate(1000), 1000);
+        assertEq(RiskPolicy.clampRate(4000), 4000);
+        assertEq(RiskPolicy.clampRate(7000), 7000);
     }
 
-    function test_clampFeeRaisesBelowBase() public pure {
-        assertEq(RiskPolicy.clampFee(0), RiskPolicy.BASE_FEE);
-        assertEq(RiskPolicy.clampFee(2999), RiskPolicy.BASE_FEE);
+    function test_clampRateRaisesBelowTheFloor() public pure {
+        assertEq(RiskPolicy.clampRate(0), RiskPolicy.MIN_RATE);
+        assertEq(RiskPolicy.clampRate(999), RiskPolicy.MIN_RATE);
     }
 
-    function test_clampFeeCapsAboveMax() public pure {
-        assertEq(RiskPolicy.clampFee(50_001), RiskPolicy.MAX_FEE);
-        assertEq(RiskPolicy.clampFee(type(uint24).max), RiskPolicy.MAX_FEE);
+    function test_clampRateCapsAboveTheCeiling() public pure {
+        assertEq(RiskPolicy.clampRate(7001), RiskPolicy.MAX_RATE);
+        assertEq(RiskPolicy.clampRate(type(uint24).max), RiskPolicy.MAX_RATE);
     }
 
-    /// @dev §44: a fee below BASE_FEE or above MAX_FEE is a failure condition.
-    ///      This is the property the §34 fuzz suite asserts at scale.
-    function testFuzz_clampFeeAlwaysInBand(uint24 raw) public pure {
-        uint24 fee = RiskPolicy.clampFee(raw);
-        assertGe(fee, RiskPolicy.BASE_FEE);
-        assertLe(fee, RiskPolicy.MAX_FEE);
+    /// @dev H-002: no input can produce a rate above 0.70%.
+    function testFuzz_clampRateAlwaysInBand(uint24 raw) public pure {
+        uint24 rate = RiskPolicy.clampRate(raw);
+        assertGe(rate, RiskPolicy.MIN_RATE);
+        assertLe(rate, RiskPolicy.MAX_RATE);
     }
 
     // ─── clampTradeCap (§21) ─────────────────────────────────────────────
@@ -134,22 +131,16 @@ contract RiskPolicyTest is Test {
     }
 
     function test_backstopSilentDuringTheGame() public pure {
-        // In-play trading: kickoff itself halts nothing, and neither does any
-        // moment inside the event window.
         assertFalse(RiskPolicy.isPastBackstop(1000, 1000));
         assertFalse(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours - 1));
     }
 
     function test_backstopFiresAtExactlyKickoffPlusMaxDuration() public pure {
-        // The same instant Market.freeze() becomes permissionless.
         assertTrue(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours));
         assertTrue(RiskPolicy.isPastBackstop(1000, 1000 + 12 hours + 1));
     }
 
     function test_backstopDoesNotOverflowNearMaxKickoff() public pure {
-        // Subtraction form: a kickoff near uint64 max must halt eventually
-        // rather than revert (which would read as "never frozen" via a
-        // try/catch or brick the swap path outright).
         uint64 k = type(uint64).max - 1;
         assertFalse(RiskPolicy.isPastBackstop(k, type(uint64).max));
     }

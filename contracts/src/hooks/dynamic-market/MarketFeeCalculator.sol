@@ -2,26 +2,30 @@
 pragma solidity ^0.8.26;
 
 import {IMarketStateRegistry as I} from "./IMarketStateRegistry.sol";
-import {MarketMath} from "./MarketMath.sol";
+import {MarketFeeFormula as F} from "./MarketFeeFormula.sol";
 import {RiskPolicy} from "./RiskPolicy.sol";
 
 /// @title MarketFeeCalculator
-/// @notice PURPOSE: turns derived market conditions into a fee and a trade cap.
-///         Five-premium stack, directional adjustment, stale handling, clamping.
-///         Spec §16-§18, §21, §22.
+/// @notice PURPOSE: turns derived market conditions into the dynamic rate,
+///         the season-gated pip fee, and the trade cap. D-105 (H-003, H-004);
+///         spec §16-§18, §21, §22 as superseded by the fee model.
 ///
-/// @dev **Directional adjustment follows the Nezlobin shape used by the
-///      dynamic-fee hook** (spec §18, §31): the side of the trade that adds to
-///      existing risk pays a surcharge, the side that relieves it does not. The
-///      dynamic-fee library keys off an oracle deviation zone; here the analogue
-///      is the pool's own imbalance, since a prediction market has no external
-///      reference price to deviate from. The asymmetry is the reused idea — a
-///      literal import would bring a `DeviationMonitor.Zone` this market cannot
-///      produce.
+/// @dev **Four drivers, one band.** The playoff rate is `MIN_RATE` plus four
+///      premiums — liquidity, volatility, trading activity, market
+///      uncertainty — each a bounded share of the headroom to `MAX_RATE`.
+///      The shares total 100%, so every driver at maximum lands exactly on
+///      the ceiling and a calm, deep, agreed, pre-game market pays exactly
+///      the floor. `clampRate` is the belt to those braces.
 ///
-///      Premiums are scaled fractions of the band above `BASE_FEE`, so their
-///      sum cannot leave the band by construction; `clampFee` is the belt to
-///      that braces (spec §44).
+///      "Activity" keeps the Nezlobin directional shape (spec §18, §31):
+///      the side of the trade that leans onto the already-heavy flow pays a
+///      surcharge, the side that relieves it does not. "Uncertainty" is the
+///      keeper model's disagreement with the pool, gated by its own stated
+///      confidence (§11, §12), plus event-state risk (§17.5).
+///
+///      **The season gate comes first.** A regular-season pool returns
+///      `REGULAR_SEASON_FEE` before any driver is read: no condition, stale
+///      or otherwise, can charge a fee outside the playoffs.
 library MarketFeeCalculator {
     /// @notice Everything the fee depends on. All bps except `liquidity`.
     struct Inputs {
@@ -34,50 +38,48 @@ library MarketFeeCalculator {
         I.EventState eventState;
         bool stale;
         bool increasesRisk;
+        bool playoffs;
     }
 
-    /// @notice Per-premium contributions, for the §29 event.
+    /// @notice Per-driver contributions for the `MarketFeeUpdated` event and
+    ///         the UI's fee panel. Pips throughout except `probabilityBps`.
     struct Breakdown {
-        uint24 baseFee;
-        uint24 volatilityPremium;
-        uint24 imbalancePremium;
+        uint24 minRate;
         uint24 liquidityPremium;
-        uint24 eventRiskPremium;
-        uint24 deviationPremium;
-        uint24 directionalAdjustment;
+        uint24 volatilityPremium;
+        uint24 activityPremium;
+        uint24 uncertaintyPremium;
+        uint24 rate;
+        uint16 probabilityBps;
+        bool playoffs;
+        bool stale;
     }
 
     uint256 private constant BPS = 10_000;
 
-    /// @dev Each premium's share of the headroom between BASE_FEE and MAX_FEE.
-    ///      They total 100%, so all six at maximum reach exactly MAX_FEE.
+    /// @dev Each driver's share of the headroom between MIN_RATE and MAX_RATE.
+    uint256 private constant W_LIQUIDITY = 2500;
     uint256 private constant W_VOLATILITY = 2500;
-    uint256 private constant W_IMBALANCE = 2000;
-    uint256 private constant W_LIQUIDITY = 1500;
-    uint256 private constant W_EVENT = 2000;
-    uint256 private constant W_DEVIATION = 1000;
+    uint256 private constant W_IMBALANCE = 1500;
     uint256 private constant W_DIRECTIONAL = 1000;
+    uint256 private constant W_DEVIATION = 1500;
+    uint256 private constant W_EVENT = 1000;
 
     /// @notice Liquidity at or above this is "deep" and adds no premium.
     uint256 private constant DEEP_LIQUIDITY = 100_000e6;
 
-    function _headroom() private pure returns (uint256) {
-        return RiskPolicy.MAX_FEE - RiskPolicy.BASE_FEE;
-    }
-
     /// @dev A premium worth `ratioBps` of its `weight` share of the headroom.
     function _premium(uint256 ratioBps, uint256 weight) private pure returns (uint24) {
         if (ratioBps > BPS) ratioBps = BPS;
-        return uint24((_headroom() * weight * ratioBps) / (BPS * BPS));
+        uint256 headroom = RiskPolicy.MAX_RATE - RiskPolicy.MIN_RATE;
+        return uint24((headroom * weight * ratioBps) / (BPS * BPS));
     }
 
     /// @notice Event-state risk as a bps ratio. Spec §17.5.
     function _eventRatio(I.EventState s) private pure returns (uint256) {
         if (s == I.EventState.PRE_GAME) return 0;
         if (s == I.EventState.LIVE) return 4000;
-        if (s == I.EventState.CRITICAL) return BPS;
-        // FINAL, RESOLVED, VOID are halted states — the hook reverts before
-        // reaching the calculator, but price them at maximum defensively.
+        // CRITICAL, and the halted states the hook never reaches, price at max.
         return BPS;
     }
 
@@ -92,36 +94,45 @@ library MarketFeeCalculator {
     function _deviationRatio(Inputs memory i) private pure returns (uint256) {
         uint256 gap =
             i.marketProbBps > i.modelProbBps ? i.marketProbBps - i.modelProbBps : i.modelProbBps - i.marketProbBps;
-        // Confidence gates it: an unsure model barely moves the fee (§12).
         return (gap * i.confidenceBps) / BPS;
     }
 
-    /// @notice The five-premium stack plus deviation and direction. Spec §16.
-    /// @dev A stale market skips the whole stack and takes `MAX_FEE` (§22) —
-    ///      fail closed. It does not revert, so an offline keeper cannot brick
-    ///      trading (§44).
-    function calculate(Inputs memory i) internal pure returns (uint24 fee, Breakdown memory b) {
-        b.baseFee = RiskPolicy.BASE_FEE;
-        if (i.stale) return (RiskPolicy.MAX_FEE, b);
-
-        b.volatilityPremium = _premium(i.volatilityBps, W_VOLATILITY);
-        b.imbalancePremium = _premium(i.imbalanceBps, W_IMBALANCE);
+    /// @notice The dynamic rate and its decomposition. A stale market skips
+    ///         the drivers and takes `MAX_RATE` (§22) — fail closed, without
+    ///         reverting, so an offline keeper cannot brick trading (§44).
+    function rate(Inputs memory i) internal pure returns (Breakdown memory b) {
+        b.probabilityBps = uint16(i.marketProbBps > BPS ? BPS : i.marketProbBps);
+        b.playoffs = i.playoffs;
+        b.stale = i.stale;
+        if (!i.playoffs) return b; // regular season: every field stays zero.
+        b.minRate = RiskPolicy.MIN_RATE;
+        if (i.stale) {
+            b.rate = RiskPolicy.MAX_RATE;
+            return b;
+        }
         b.liquidityPremium = _premium(_liquidityRatio(i.liquidity), W_LIQUIDITY);
-        b.eventRiskPremium = _premium(_eventRatio(i.eventState), W_EVENT);
-        b.deviationPremium = _premium(_deviationRatio(i), W_DEVIATION);
-        // Nezlobin: only the risk-increasing side pays the directional share.
-        b.directionalAdjustment = i.increasesRisk ? _premium(i.imbalanceBps, W_DIRECTIONAL) : 0;
+        b.volatilityPremium = _premium(i.volatilityBps, W_VOLATILITY);
+        b.activityPremium =
+            _premium(i.imbalanceBps, W_IMBALANCE) + (i.increasesRisk ? _premium(i.imbalanceBps, W_DIRECTIONAL) : 0);
+        b.uncertaintyPremium = _premium(_deviationRatio(i), W_DEVIATION) + _premium(_eventRatio(i.eventState), W_EVENT);
+        uint256 sum =
+            uint256(b.minRate) + b.liquidityPremium + b.volatilityPremium + b.activityPremium + b.uncertaintyPremium;
+        b.rate = RiskPolicy.clampRate(sum > type(uint24).max ? type(uint24).max : uint24(sum));
+    }
 
-        uint256 sum = uint256(b.baseFee) + b.volatilityPremium + b.imbalancePremium + b.liquidityPremium
-            + b.eventRiskPremium + b.deviationPremium + b.directionalAdjustment;
-        fee = RiskPolicy.clampFee(sum > type(uint24).max ? type(uint24).max : uint24(sum));
+    /// @notice The pip fee to return to v4: `rate × (1 − p)`, which realises
+    ///         `Fee = C × rate × p × (1 − p)` on the swap (D-105, H-001).
+    function calculate(Inputs memory i) internal pure returns (uint24 fee, Breakdown memory b) {
+        b = rate(i);
+        fee = F.effectiveFeePips(b.rate, b.probabilityBps);
     }
 
     /// @notice Per-swap cap for current conditions. Spec §21.
     /// @dev Shrinks from `ABS_MAX_TRADE` toward `MIN_TRADE_CAP` as risk rises,
-    ///      taking the worst of the three risk ratios rather than blending them:
+    ///      taking the worst of the risk ratios rather than blending them:
     ///      any one of thin liquidity, wild volatility, or heavy one-sided flow
-    ///      is reason enough to cut size.
+    ///      is reason enough to cut size. Season-independent — the cap is a
+    ///      risk control, not a fee.
     function tradeCap(Inputs memory i) internal pure returns (uint256) {
         if (i.stale) return RiskPolicy.MIN_TRADE_CAP;
 
