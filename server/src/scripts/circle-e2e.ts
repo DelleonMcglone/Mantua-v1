@@ -29,6 +29,7 @@
  * No secret material is ever printed — key shapes only, matching
  * circle-preflight.ts.
  */
+import { env } from "../env.ts";
 import type { Blockchain } from "@circle-fin/developer-controlled-wallets";
 
 const ok = (m: string) => {
@@ -114,9 +115,8 @@ async function main(): Promise<number> {
   const { getCircleClient, getAgentWalletSetId } = await import("../lib/circle/client.ts");
   const { executeAgentAbiCall, CircleReceiptTimeoutError, CircleTransactionFailedError } =
     await import("../lib/circle/execute.ts");
-  const { isAllowedTarget, registerDynamicTargets } = await import(
-    "../lib/circle/allowed-targets.ts"
-  );
+  const { isAllowedTarget, registerDynamicTargets } =
+    await import("../lib/circle/allowed-targets.ts");
 
   // ── 1. Provision (or fetch) an agent wallet in the set ───────────────────
   console.log("\nAgent wallet");
@@ -135,7 +135,8 @@ async function main(): Promise<number> {
       count: 1,
       walletSetId,
       accountType: "SCA",
-    });
+      scaConfiguration: { scaCore: env.CIRCLE_SCA_CORE },
+    } as Parameters<typeof client.createWallets>[0]);
     wallet = created.data?.wallets.at(0);
     if (!wallet?.id || !wallet.address) {
       bad("Circle createWallets returned no wallet");
@@ -220,7 +221,9 @@ async function main(): Promise<number> {
         .limit(1);
       if (auditRows.length > 0) ok(`mantua_audit_log row present for ${receipt.txHash}`);
       else {
-        bad(`no mantua_audit_log row for ${receipt.txHash} (logAudit swallows insert errors — check server logs)`);
+        bad(
+          `no mantua_audit_log row for ${receipt.txHash} (logAudit swallows insert errors — check server logs)`,
+        );
         return 1;
       }
 
@@ -236,7 +239,9 @@ async function main(): Promise<number> {
         .limit(1);
       const spendRow = spendRows.at(0);
       if (spendRow) {
-        ok(`daily_wallet_spend row present for ${agentAddress} (txCount ${String(spendRow.txCount)})`);
+        ok(
+          `daily_wallet_spend row present for ${agentAddress} (txCount ${String(spendRow.txCount)})`,
+        );
       } else {
         bad(`no daily_wallet_spend row for ${agentAddress} today`);
         return 1;

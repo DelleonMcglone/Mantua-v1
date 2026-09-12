@@ -124,6 +124,18 @@ const schema = z.object({
    *  preflight evidence or fixtures). Never set this in production — the
    *  override redirects ALL Circle traffic. */
   CIRCLE_API_BASE_URL: z.url().optional(),
+  /** Circle SCA version pinned at wallet creation. Circle's platform default
+   *  moves to `circle_6900_singleowner_v4` on 2026-09-14 (new address
+   *  derivation, EntryPoint v0.7). Mantua's gateway spends default to "the
+   *  agent's own address" on the destination chain, which only holds if a
+   *  wallet created later on another chain derives the SAME address — so
+   *  creation pins the version explicitly instead of inheriting the
+   *  platform default. Keep v3 for the existing wallet set; move to v4 only
+   *  with a fresh wallet set. Runbook §11. */
+  CIRCLE_SCA_CORE: z
+    .string()
+    .regex(/^circle_6900_singleowner_v\d+$/, "expected circle_6900_singleowner_vN")
+    .default("circle_6900_singleowner_v3"),
 
   /** Webhook signature key id for Circle transaction notifications. Circle
    *  recommends webhooks over polling for terminal transaction state; absent
