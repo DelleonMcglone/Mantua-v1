@@ -21,7 +21,7 @@ export function UserBubble({ text }: { text: string }) {
   );
 }
 
-/** Inline EVM address — short form, copy button, and a BaseScan link. */
+/** Inline EVM address — short form, copy button, and an explorer link. */
 export function AddressInline({ addr }: { addr: string }) {
   const chainId = BASE_CHAIN_ID;
   const url = getExplorerAddressUrl(chainId, addr);
@@ -46,7 +46,7 @@ export function AddressInline({ addr }: { addr: string }) {
  * Render assistant text as plain prose with clickable links and copyable
  * addresses. The model is told to avoid Markdown, but we defensively unwrap any
  * stray **bold** (showing the inner text, no asterisks), turn full URLs into
- * links, and turn 0x addresses into copy + BaseScan chips.
+ * links, and turn 0x addresses into copy + explorer chips.
  */
 export function RichText({ text }: { text: string }) {
   const nodes: ReactNode[] = [];

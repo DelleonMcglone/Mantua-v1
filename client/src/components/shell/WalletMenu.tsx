@@ -21,7 +21,7 @@ const ITEM_CLASS = "justify-between px-3 py-2 data-[highlighted]:bg-chip";
 
 /**
  * Connected-wallet pill in the header. Click toggles a dropdown with
- * Copy address / View on BaseScan / Refresh balances / Disconnect.
+ * Copy address / View on explorer / Refresh balances / Disconnect.
  * Built on the shared Radix dropdown primitive (menu roles, arrow-key
  * nav, Escape + outside-click dismissal, focus return). Refresh
  * dispatches `mantua:refresh-portfolio` on the window — the portfolio
@@ -61,7 +61,11 @@ export function WalletMenu({
           <span className="font-mono text-[13px]">{shorten(walletAddress)}</span>
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={6} className="min-w-[220px] rounded-sm shadow-lg">
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className="min-w-[220px] rounded-sm shadow-lg"
+      >
         {onOpenProfile && (
           <DropdownMenuItem className={ITEM_CLASS} onSelect={onOpenProfile}>
             Profile &amp; portfolio

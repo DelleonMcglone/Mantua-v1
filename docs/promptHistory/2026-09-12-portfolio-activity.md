@@ -31,3 +31,5 @@ Management + Activity 🔴 P0 · 21 rows · 0 done".)
 - Lane 062 landed (see `docs/tasks/062-activity-spine.md`).
 - Lane 063 landed: `lib/lp-economics.ts`, `settledHistory`, potential payout,
   `GET /api/portfolio/economics` + `/settled` (see `docs/tasks/063-position-economics.md`).
+- Lane 064 landed: `features/activity/` timeline + Activity tab, the
+  chainless-branding sweep and its leak fixes (see `docs/tasks/064-activity-timeline.md`).

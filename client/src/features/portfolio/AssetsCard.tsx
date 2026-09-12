@@ -16,6 +16,7 @@ import { formatFeesEarned } from "@/features/liquidity/position-adapters.ts";
 import { getUserLocalPositions, type LocalPosition } from "@/features/liquidity/local-positions.ts";
 import { localPoolKey } from "@/features/liquidity/local-pools.ts";
 import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
+import { ActivityFeed } from "@/features/activity/ActivityFeed.tsx";
 import { ClaimWinnings } from "@/features/markets/ClaimWinnings.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { AssetIcon, type AssetSymbol } from "./asset-icons.tsx";
@@ -102,7 +103,7 @@ interface AssetsCardProps {
 export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}) {
   const chainId = BASE_CHAIN_ID;
   const [tab, setTab] = useState<
-    "assets" | "cash" | "positions" | "agent" | "unified" | "earnings"
+    "assets" | "cash" | "positions" | "agent" | "unified" | "earnings" | "activity"
   >("assets");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("Descending");
@@ -198,6 +199,8 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
       label: "Earnings",
       count: earningPoolCount(earnings.data),
     },
+    // Phase 9 / PF-019 — the unified timeline; count is shown inside the tab.
+    { k: "activity" as const, label: "Activity", count: null },
   ];
 
   return (
@@ -217,9 +220,11 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
               className="group -mb-px px-3.5 py-2 bg-transparent border-none cursor-pointer text-[13px] font-medium inline-flex items-center gap-1.5 border-b-2 text-text-dim border-transparent data-[state=active]:text-text data-[state=active]:border-accent"
             >
               {t.label}
-              <span className="text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute bg-transparent group-data-[state=active]:bg-chip">
-                {t.count}
-              </span>
+              {t.count !== null && (
+                <span className="text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute bg-transparent group-data-[state=active]:bg-chip">
+                  {t.count}
+                </span>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -444,6 +449,9 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
 
       <TabsContent value="earnings">
         <EarningsTabBody earnings={earnings} walletAddress={portfolio.walletAddress} />
+      </TabsContent>
+      <TabsContent value="activity">
+        <ActivityFeed walletAddress={portfolio.walletAddress} />
       </TabsContent>
     </Tabs>
   );
