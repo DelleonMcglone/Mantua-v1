@@ -44,6 +44,8 @@ export interface UserPolicyRead {
   maxStakePerTradeUsd: number;
   /** Empty = every launch league. */
   allowedLeagues: readonly string[];
+  /** Largest exposure the agent may hold in one market after this trade (D-109). */
+  maxExposureUsd?: number;
 }
 
 export interface SimulationDeps {
@@ -214,6 +216,16 @@ export async function simulateMarketTrade(
         : impliedBps - eff
       : null;
   const exposureUsd = eff === null ? null : (Number(afterRaw) / 1e6) * (eff / 10_000);
+  if (
+    policy?.maxExposureUsd !== undefined &&
+    policyReason === null &&
+    args.direction === "buy" &&
+    exposureUsd !== null &&
+    exposureUsd > policy.maxExposureUsd
+  ) {
+    policyReason = `Exposure limit: this buy would put $${exposureUsd.toFixed(2)} at stake in one market; the policy allows at most $${String(policy.maxExposureUsd)}.`;
+    blockers.push(policyReason);
+  }
 
   return {
     simulationId: deps.id(),

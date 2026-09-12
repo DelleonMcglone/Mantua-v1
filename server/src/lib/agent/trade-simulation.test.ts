@@ -184,6 +184,36 @@ void describe("simulateMarketTrade", () => {
     assert.equal(ok.executable, true);
   });
 
+  void it("blocks a buy that would exceed the policy's per-market exposure ceiling (D-109)", async () => {
+    const sim = await simulateMarketTrade(
+      deps({
+        policy: {
+          status: "active",
+          maxStakePerTradeUsd: 25,
+          allowedLeagues: [],
+          maxExposureUsd: 5,
+        },
+      }),
+      ARGS,
+      8453,
+    );
+    assert.equal(sim.executable, false);
+    assert.match(sim.marketPolicy.reason ?? "", /Exposure limit/);
+    const fine = await simulateMarketTrade(
+      deps({
+        policy: {
+          status: "active",
+          maxStakePerTradeUsd: 25,
+          allowedLeagues: [],
+          maxExposureUsd: 50,
+        },
+      }),
+      ARGS,
+      8453,
+    );
+    assert.equal(fine.executable, true);
+  });
+
   void it("sells spend YES tokens, touch no cap, and reduce the position", async () => {
     const sell: SimulationArgs = { ...ARGS, direction: "sell", amountRaw: 4_000_000n };
     const short = await simulateMarketTrade(

@@ -759,6 +759,25 @@ status`, `/api/markets/fills`). A server-side indexer is the upgrade
    `/api/cron/live-sync` is cheap enough for 5 minutes and exempt from the
    kill switch, so a paused platform still shows live scores.
 
+### Agent policies — the user's limits on the agent (D-109, task 057)
+
+1. **Why one row with defaults, not required setup.** A user who never
+   opens the settings still gets a bounded agent ($25 per trade, $100
+   exposure per market, $100 hedge budget per day) — the defaults are the
+   conservative policy, and a missing row reads as those defaults.
+2. **Why the agent cannot write it.** A-012: the agent must not change its
+   own caps. The C-010 attested raise is one bounded exception for the
+   daily cap; the policy has no chat path at all — `mantua_get_policy`
+   reads, `PATCH /api/agent/policy` (the user, audited) writes.
+3. **Where each limit bites.** Per-trade stake, leagues, status and
+   per-market exposure block in the simulation (so the model sees the
+   reason before asking the user to confirm); hedge size clamps and the
+   market-type / confidence / cooldown / budget holds run in the strategy
+   executor before the daily-cap ledger, independent of the model (A-041).
+   Holds a later tick can pass (cooldown, budget) release the claim; holds
+   that need a person (paused, market type, confidence) leave the strategy
+   `triggered` and recorded.
+
 ### Agent tool architecture — the five layers (A-019, task 056)
 
 The agent is a proposer inside a stack where no layer trusts the one

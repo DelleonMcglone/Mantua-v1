@@ -479,6 +479,7 @@ function AgentTabBody({
       </div>
 
       <AutoRebalanceToggle />
+      <AgentPolicyPanel />
 
       <div className="px-3.5 pt-3 pb-1.5 text-[11px] text-text-mute uppercase tracking-wide">
         Balances
@@ -690,5 +691,230 @@ function AssetRowIcon({ symbol }: { symbol: string }) {
         {initial}
       </text>
     </svg>
+  );
+}
+
+interface AgentPolicyView {
+  status: "active" | "paused";
+  autoTradeEnabled: boolean;
+  maxStakePerTradeUsd: number;
+  riskLevel: "conservative" | "balanced" | "aggressive";
+  allowedLeagues: string[];
+  hedge: {
+    maxSizeUsd: number;
+    maxExposureUsd: number;
+    minConfidenceBps: number;
+    cooldownMinutes: number;
+    dailyBudgetUsd: number;
+    allowedMarketTypes: string[];
+  };
+  persisted: boolean;
+}
+
+const POLICY_LEAGUES: { slug: string; label: string }[] = [
+  { slug: "nfl", label: "NFL" },
+  { slug: "wnba", label: "WNBA" },
+];
+
+/**
+ * Phase 8 / A-003, A-012 (D-109) — the user's policy over the agent. The
+ * only write path for these limits is this panel (PATCH /api/agent/policy);
+ * the agent can read them and never change them. Every control saves on
+ * change with an optimistic update and reverts on failure.
+ */
+function AgentPolicyPanel() {
+  const [policy, setPolicy] = useState<AgentPolicyView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stakeDraft, setStakeDraft] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<AgentPolicyView>("/api/agent/policy")
+      .then((p) => {
+        if (cancelled) return;
+        setPolicy(p);
+        setStakeDraft(String(p.maxStakePerTradeUsd));
+      })
+      .catch(() => {
+        if (!cancelled) setError("Policy unavailable right now.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = (patch: Record<string, unknown>, optimistic: Partial<AgentPolicyView>) => {
+    if (!policy || busy) return;
+    const before = policy;
+    setBusy(true);
+    setError(null);
+    setPolicy({ ...policy, ...optimistic });
+    api
+      .patch<AgentPolicyView>("/api/agent/policy", patch)
+      .then((p) => {
+        setPolicy(p);
+        setStakeDraft(String(p.maxStakePerTradeUsd));
+      })
+      .catch(() => {
+        setPolicy(before);
+        setStakeDraft(String(before.maxStakePerTradeUsd));
+        setError("Could not save — try again.");
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  if (error && !policy) {
+    return <div className="px-4 py-3 text-[11px] text-text-mute">{error}</div>;
+  }
+  if (!policy) return null;
+
+  const paused = policy.status === "paused";
+  const toggle = (on: boolean, onClick: () => void, label: string) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={busy}
+      onClick={onClick}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+        on ? "bg-accent" : "bg-border-soft"
+      } ${busy ? "opacity-50" : "cursor-pointer"}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          on ? "translate-x-4" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+
+  return (
+    <div className="px-4 py-3 border-b border-border-soft flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px] font-medium">Agent policy · your limits on the agent</div>
+          <div className="text-[11px] text-text-mute mt-0.5">
+            Enforced in code before any trade or hedge. The agent can read these, never change them.
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] ${paused ? "text-red" : "text-text-dim"}`}>
+            {paused ? "Paused" : "Active"}
+          </span>
+          {toggle(
+            !paused,
+            () => {
+              save(
+                { status: paused ? "active" : "paused" },
+                { status: paused ? "active" : "paused" },
+              );
+            },
+            "Agent active",
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-text-mute">Max stake per trade (USD)</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            inputMode="decimal"
+            value={stakeDraft}
+            disabled={busy}
+            onChange={(e) => {
+              setStakeDraft(e.target.value);
+            }}
+            onBlur={() => {
+              const n = Number(stakeDraft);
+              if (!Number.isFinite(n) || n <= 0 || n === policy.maxStakePerTradeUsd) {
+                setStakeDraft(String(policy.maxStakePerTradeUsd));
+                return;
+              }
+              save({ maxStakePerTradeUsd: n }, { maxStakePerTradeUsd: n });
+            }}
+            className="h-8 rounded-md border border-border-soft bg-transparent px-2 text-[12px] tabular-nums"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-text-mute">Risk level</span>
+          <select
+            value={policy.riskLevel}
+            disabled={busy}
+            onChange={(e) => {
+              const riskLevel = e.target.value as AgentPolicyView["riskLevel"];
+              save({ riskLevel }, { riskLevel });
+            }}
+            className="h-8 rounded-md border border-border-soft bg-transparent px-2 text-[12px]"
+          >
+            <option value="conservative">Conservative</option>
+            <option value="balanced">Balanced</option>
+            <option value="aggressive">Aggressive</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[11px] text-text-mute">Leagues</span>
+        {POLICY_LEAGUES.map((l) => {
+          const all = policy.allowedLeagues.length === 0;
+          const on = all || policy.allowedLeagues.includes(l.slug);
+          return (
+            <label key={l.slug} className="flex items-center gap-1.5 text-[12px]">
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={busy}
+                onChange={() => {
+                  const current = all ? POLICY_LEAGUES.map((x) => x.slug) : policy.allowedLeagues;
+                  const next = on ? current.filter((s) => s !== l.slug) : [...current, l.slug];
+                  if (next.length === 0) return; // at least one league stays permitted
+                  const allowedLeagues = next.length === POLICY_LEAGUES.length ? [] : next;
+                  save({ allowedLeagues }, { allowedLeagues });
+                }}
+              />
+              {l.label}
+            </label>
+          );
+        })}
+        <span className="text-[11px] text-text-mute">
+          {policy.allowedLeagues.length === 0 ? "(all launch leagues)" : ""}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px]">Allow unprompted trades</div>
+          <div className="text-[11px] text-text-mute mt-0.5">
+            Only takes effect if the platform runs the agent in autonomous mode; in user-testing
+            mode every trade still needs your &quot;confirm&quot;.
+          </div>
+        </div>
+        {toggle(
+          policy.autoTradeEnabled,
+          () => {
+            const autoTradeEnabled = !policy.autoTradeEnabled;
+            save({ autoTradeEnabled }, { autoTradeEnabled });
+          },
+          "Allow unprompted trades",
+        )}
+      </div>
+
+      <div className="text-[11px] text-text-mute">
+        Hedges: max ${policy.hedge.maxSizeUsd} per leg · max ${policy.hedge.maxExposureUsd} exposure
+        per market · ${policy.hedge.dailyBudgetUsd}/day
+        {policy.hedge.cooldownMinutes > 0
+          ? ` · ${String(policy.hedge.cooldownMinutes)} min cooldown`
+          : ""}
+      </div>
+      {error ? <div className="text-[11px] text-red">{error}</div> : null}
+    </div>
   );
 }

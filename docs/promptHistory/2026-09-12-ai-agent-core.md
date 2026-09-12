@@ -56,6 +56,10 @@ Mid-lane directives, in order:
   `mantua_get_position` / `mantua_get_portfolio`, positions computation
   lifted to `lib/sports/market-positions.ts`, A-019 five-layer section;
   ledger 23 ✅ · 16 🟡 · 8 ⬜.
-- Next lanes: 057 policies (D-109); 058
+- Lane 057 landed: `lib/agent/policy.ts` (defaults, clamps, `hedgePolicyGate`),
+  `GET/PATCH /api/agent/policy`, the hedge executor's per-user gate, the
+  simulation's exposure ceiling, `mantua_get_policy`, the Portfolio → Agent
+  policy panel, D-109; ledger 27 ✅ · 12 🟡 · 8 ⬜.
+- Next lanes: 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.

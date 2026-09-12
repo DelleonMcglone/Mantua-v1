@@ -118,7 +118,7 @@ import {
 import { quoteMarketTrade } from "./sports/market-trade-build.ts";
 import { getDailyCap, getDailySpend } from "./spending-cap.ts";
 import { sharedKvClient } from "./shared-cache.ts";
-import { agentPolicies } from "../db/schema/agent.ts";
+import { readPolicy, toUserPolicyRead } from "./agent/policy.ts";
 import { events, leagues, marketPrices, markets } from "../db/schema/markets.ts";
 
 /**
@@ -253,7 +253,7 @@ Supported tokens (case-sensitive symbols): ${TOKEN_SYMBOLS.join(", ")}.
 Conventions:
 - Amounts are decimal strings in human units (e.g. "1.5"), never atomic/wei.
 - Addresses are 0x-prefixed 40-hex EVM addresses.
-- The wallet already exists (auto-provisioned); use get_portfolio for balances and manage_wallet for cap/info.`;
+- The wallet already exists (auto-provisioned); use mantua_get_portfolio for balances and positions, manage_wallet for cap/info, and mantua_get_policy for the limits the user set on you (you can never change them).`;
 
 // 039 — the sports-data tool suite reads the CANONICAL Mantua database
 // through this seam, never the provider per-request.
@@ -395,6 +395,12 @@ const RAW_TOOLS: Anthropic.Tool[] = [
         marketId: { type: "string" },
       },
     },
+  },
+  {
+    name: "mantua_get_policy",
+    description:
+      "The user's policy over you (read-only, D-109): status (active/paused), whether unprompted trading is allowed, the per-trade stake ceiling, risk level, permitted leagues, and the hedge limits (max size, max exposure per market, min confidence, cooldown, daily hedge budget, permitted market types). You cannot change any of it — the user edits it under Portfolio → Agent. Cite it when a simulation is blocked by policy.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "mantua_get_portfolio",
@@ -1222,19 +1228,7 @@ function buildSimulationDeps(privyUserId: string, chainId: SupportedChainId): Si
     },
     policy: async () => {
       const user = await resolveUserId(privyUserId);
-      if (!user) return null;
-      const row = (
-        await db.select().from(agentPolicies).where(eq(agentPolicies.userId, user)).limit(1)
-      ).at(0);
-      if (!row) return null;
-      const leaguesAllowed = Array.isArray(row.allowedLeagues)
-        ? (row.allowedLeagues as unknown[]).filter((l): l is string => typeof l === "string")
-        : [];
-      return {
-        status: row.status === "paused" ? "paused" : "active",
-        maxStakePerTradeUsd: Number(row.maxStakePerTradeUsd),
-        allowedLeagues: leaguesAllowed,
-      };
+      return user ? toUserPolicyRead(await readPolicy(db, user)) : null;
     },
     league: async (providerEventId) => {
       const row = (
@@ -1733,6 +1727,14 @@ async function executeTool(
           }
         : summary;
     }
+    case "mantua_get_policy": {
+      const user = await resolveUserId(privyUserId);
+      if (!user) throw new Error("No user record for this session.");
+      return {
+        ...(await readPolicy(db, user)),
+        note: "Read-only for the agent: limits are the user's and change only through Portfolio → Agent (PATCH /api/agent/policy).",
+      };
+    }
     case "mantua_get_portfolio": {
       const p = await getAgentPortfolio(privyUserId, 20, chainId);
       const markets = summarizeMarketPositions(
@@ -2186,18 +2188,12 @@ export async function* runAgentChat(params: {
     yield { type: "error", message: "The agent is disabled." };
     return;
   }
-  const policyRow = (
-    await db
-      .select({ auto: agentPolicies.autoTradeEnabled, status: agentPolicies.status })
-      .from(agentPolicies)
-      .where(eq(agentPolicies.userId, userDbId))
-      .limit(1)
-  ).at(0);
+  const policy = await readPolicy(db, userDbId);
   const turn = await buildTurnContext(confirmationStore, {
     mode,
     sessionId,
     message,
-    autoTradeEnabled: Boolean(policyRow?.auto) && policyRow?.status !== "paused",
+    autoTradeEnabled: policy.autoTradeEnabled && policy.status !== "paused",
   });
 
   const history = await loadHistory(sessionId);

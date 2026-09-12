@@ -31,6 +31,7 @@
 | D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                               | High (process)                                              | Owner decision after 2026-09-17                                       |
 | D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
 | D-111 | Gasless user transactions (C-005/C-006)                                                                                    | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                                                                                                                                                                 | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                       |
+| D-109 | Agent policies — the user's limits on the agent (A-003/A-012/A-038)                                                        | ✅ CLOSED 2026-09-12 — one `agent_policies` row per user (defaults when absent): status, unprompted-trade permission, per-trade stake, risk level, leagues, and a hedge block (max size, max exposure, min confidence, cooldown, daily budget, market types); written only by the user through `PATCH /api/agent/policy`, read by the simulation, the turn context and the hedge executor — the agent has a read tool and no write tool     | High (shipped, task 057)                                    | None                                                                  |
 | D-114 | Agent execution protocol — modes, preview → confirm → server-minted id; x402 data is the agent's own spend (A-025 … A-035) | ✅ CLOSED 2026-09-12 — `AGENT_MODE` (disabled / simulation / user_testing default / autonomous); money-moving tools need a preview the user saw plus a single-use confirmation id the server mints from the user's own explicit "confirm"; market trades are re-simulated at execution and refused on material drift; `call_paid_service` (x402 data) is exempt — the agent has direct marketplace access under its own per-call/daily caps | High (shipped, task 055)                                    | None                                                                  |
 | D-113 | Live-sports reliability transport & status (R-001/R-004/R-005)                                                             | ✅ CLOSED 2026-09-12 — SSE (not WebSocket) for the live market stream on the single-function API; one public `/api/status` computed from the enforcement points' own inputs and pushed on the stream; trades enter a persisted per-wallet pending register at hash time and leave only on a chain-verified terminal state; game-time ingest every 5 min from GitHub Actions                                                                 | High (shipped, task 051)                                    | None                                                                  |
 
@@ -754,6 +755,37 @@ B9-005 execution engine, B10 E2Es, design-debt follow-ups). Nothing merged
 before 2026-09-17 may hard-commit the chain beyond existing config.
 
 ---
+
+## D-109 — Agent policies: the user's limits on the agent ✅ CLOSED 2026-09-12
+
+**Decision.** The user's control over their agent is one policy row
+(`agent_policies`, unique per user; defaults when absent), with every
+value clamped by schema and written only by the authenticated user via
+`PATCH /api/agent/policy` (task 057):
+
+1. **Trading policy.** `status` (active / paused), `autoTradeEnabled`
+   (honored only under `AGENT_MODE=autonomous`, D-114),
+   `maxStakePerTradeUsd`, `riskLevel` (prompt preset), `allowedLeagues`
+   (empty = all launch leagues).
+2. **Hedge policy** (`config.hedge`): `maxSizeUsd` (clamps a hedge leg),
+   `maxExposureUsd` (per-market ceiling after a buy), `minConfidenceBps`,
+   `cooldownMinutes` (between executed hedges), `dailyBudgetUsd` (today's
+   executed hedges counted at their strategy caps), `allowedMarketTypes`.
+3. **Enforcement is code.** The trade simulation blocks on status, stake,
+   league and exposure; the turn context reads the autonomous flag; the
+   hedge executor (`hedgePolicyGate`) holds or clamps before the daily-cap
+   ledger. The agent reads its policy (`mantua_get_policy`) and has no
+   tool to change it — a prompt cannot widen the limits.
+
+**Rejected.** A chat tool that edits the policy (A-012 forbids the agent
+changing its own caps; the C-010 attestation pattern is for one bounded
+raise, not policy). Budget from receipts (exact but a join per tick; the
+cap-bound is honest and deterministic). Columns instead of the typed
+`config.hedge` block (no migration needed; zod is the contract).
+
+**Consequence.** `agent_policies` is live. The Portfolio → Agent tab hosts
+the only editor. A paused policy stops unprompted hedges and every agent
+trade; the kill switch remains the platform-wide stop above it.
 
 ## D-114 — Agent execution protocol: modes, confirmation, and the x402 exemption ✅ CLOSED 2026-09-12
 
