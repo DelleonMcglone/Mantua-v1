@@ -333,3 +333,14 @@ already refuses every write; `AGENT_MODE` is the finer lever.
 Confirmations live in Upstash under `mantua:agent:` (5 min TTL; previews
 10 min). Deleting `mantua:agent:confirmation:<id>` voids one; deleting
 `mantua:agent:preview:<sessionId>` clears a pending preview.
+
+**Alert `agent_refusal_rate`** (task 061): more than half of gated
+executions refused. Read the refusal codes in the alert detail:
+`CONFIRMATION_REQUIRED` means the model is calling money tools without
+the user's confirm (a prompt regression — compare the prompt's
+confirmation protocol against the last deploy); `SIMULATION_DRIFT`
+means previews are going stale before users confirm (check pool
+activity and the 5-minute confirmation TTL); `CONFIRMATION_EXPIRED` /
+`CONFIRMATION_INVALID` in volume suggests a client that re-sends or an
+injection attempt (see the untrusted-data envelope's `suspiciousCount`
+in the tool cards). No money moved in any refused case.

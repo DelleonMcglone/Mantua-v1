@@ -106,6 +106,13 @@ export type AuditAction =
   | "agent_market_trade"
   | "agent_gateway"
   | "agent_x402"
+  // B9 hedge engine (task 061 folds the store's string literals into the union)
+  | "strategy_arm"
+  | "strategy_disarm"
+  | "strategy_auto_disarm"
+  | "strategy_trigger"
+  | "strategy_execute"
+  | "strategy_close"
   | "command_parse"
   | "market_redeem"
   | "market_resolution"

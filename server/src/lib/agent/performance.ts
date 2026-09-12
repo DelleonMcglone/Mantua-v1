@@ -1,6 +1,7 @@
 import { desc, eq, inArray } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { marketFills, markets, resolutions } from "../../db/schema/markets.ts";
+import { mantuaAuditLog } from "../../db/schema/safety.ts";
 
 /**
  * Phase 8 / A-016 — the agent's performance: realized P&L and win rate
@@ -25,6 +26,17 @@ export interface FillRow {
   tokensRaw: string;
   usdcRaw: string;
   createdAt: Date;
+  txHash?: string;
+}
+
+/** A-039 — who moved the money: the chat agent, the hedge engine, or the user's own ticket. */
+export type FillSource = "agent_chat" | "hedge_strategy" | "user";
+
+/** Map an audit action recorded against a fill's tx hash to its source. */
+export function sourceOfAction(action: string | undefined): FillSource {
+  if (action === "agent_market_trade") return "agent_chat";
+  if (action === "strategy_execute" || action === "strategy_close") return "hedge_strategy";
+  return "user";
 }
 
 export interface MarketRow {
@@ -44,6 +56,8 @@ export interface MarketPerformance {
   marketId: string;
   outcomeIndex: number;
   status: "resolved_win" | "resolved_loss" | "voided" | "open";
+  /** Distinct sources of this market's fills (A-039 attribution). */
+  attribution: FillSource[];
   costUsd: number;
   proceedsUsd: number;
   payoutUsd: number;
@@ -71,6 +85,8 @@ export interface AgentPerformance {
     trades: number;
     /** Realized P&L / cost of resolved markets; null when no cost. */
     returnOnResolvedCost: number | null;
+    /** Trades by source (A-039). */
+    bySource: Record<FillSource, number>;
   };
 }
 
@@ -88,7 +104,10 @@ export function computePerformance(
   fills: readonly FillRow[],
   marketRows: readonly MarketRow[],
   resolutionRows: readonly ResolutionRow[],
+  /** txHash → audit action, for attribution; absent = user ticket. */
+  actionsByTx: ReadonlyMap<string, string> = new Map(),
 ): AgentPerformance {
+  const bySource: Record<FillSource, number> = { agent_chat: 0, hedge_strategy: 0, user: 0 };
   const byMarket = new Map<string, FillRow[]>();
   for (const f of fills) {
     const list = byMarket.get(f.marketId) ?? [];
@@ -108,7 +127,11 @@ export function computePerformance(
     let sold = 0n;
     let first = list[0].createdAt;
     let last = first;
+    const sources = new Set<FillSource>();
     for (const f of list) {
+      const src = sourceOfAction(f.txHash ? actionsByTx.get(f.txHash.toLowerCase()) : undefined);
+      sources.add(src);
+      bySource[src] += 1;
       const tokens = BigInt(f.tokensRaw);
       const usdc = BigInt(f.usdcRaw);
       if (f.direction === "buy") {
@@ -142,6 +165,7 @@ export function computePerformance(
       marketId,
       outcomeIndex,
       status,
+      attribution: [...sources],
       costUsd: round2(usd(cost)),
       proceedsUsd: round2(usd(proceeds)),
       payoutUsd: round2(usd(payout)),
@@ -191,6 +215,7 @@ export function computePerformance(
       trades,
       returnOnResolvedCost:
         resolvedCost === 0 ? null : Number((realizedPnl / resolvedCost).toFixed(4)),
+      bySource,
     },
   };
 }
@@ -204,12 +229,14 @@ export async function readAgentPerformance(db: DB, address: string): Promise<Age
       tokensRaw: marketFills.tokensRaw,
       usdcRaw: marketFills.usdcRaw,
       createdAt: marketFills.createdAt,
+      txHash: marketFills.txHash,
     })
     .from(marketFills)
     .where(eq(marketFills.address, address.toLowerCase()));
   const ids = [...new Set(fills.map((f) => f.marketId))];
   if (ids.length === 0) return computePerformance(address, [], [], []);
-  const [marketRows, resolutionRows] = await Promise.all([
+  const txHashes = fills.map((f) => f.txHash.toLowerCase());
+  const [marketRows, resolutionRows, auditRows] = await Promise.all([
     db
       .select({
         marketId: markets.marketId,
@@ -229,6 +256,12 @@ export async function readAgentPerformance(db: DB, address: string): Promise<Age
       .from(resolutions)
       .where(inArray(resolutions.marketId, ids))
       .orderBy(desc(resolutions.createdAt)),
+    db
+      .select({ txHash: mantuaAuditLog.txHash, action: mantuaAuditLog.action })
+      .from(mantuaAuditLog)
+      .where(inArray(mantuaAuditLog.txHash, txHashes)),
   ]);
-  return computePerformance(address, fills, marketRows, resolutionRows);
+  const actionsByTx = new Map<string, string>();
+  for (const r of auditRows) if (r.txHash) actionsByTx.set(r.txHash.toLowerCase(), r.action);
+  return computePerformance(address, fills, marketRows, resolutionRows, actionsByTx);
 }

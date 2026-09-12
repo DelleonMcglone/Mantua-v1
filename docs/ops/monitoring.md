@@ -90,6 +90,17 @@ scenario the security review's M-01 requires monitoring for. The strict
 on-chain form (reading the hook's event state per frozen market) is a
 follow-up; this catches what the service itself can see.
 
+### Agent gate (Phase 8, task 061)
+
+| Alert                | Severity | Rule                                                                                              | Runbook                            |
+| -------------------- | -------- | ------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| `agent_refusal_rate` | warn     | ≥ 10 gated executions this instance and > 50 % refused (`agent.funnel.refused.*` vs `execute_ok`) | `docs/ops/incident-runbook.md` §12 |
+
+The funnel counters (`agent.funnel.turn`, `.analyze`, `.simulate`,
+`.preview`, `.confirm_minted`, `.execute_ok`, `.refused.<code>`) are the
+user-testing baseline (A-044); read them from `/api/ops/metrics` before
+and after each owner user test.
+
 ## Dashboards and the log drain (owner-gated)
 
 The API emits everything as structured pino JSON to stdout, which Vercel

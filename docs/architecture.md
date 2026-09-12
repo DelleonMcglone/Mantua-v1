@@ -795,6 +795,21 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Agent loop seam, attribution, gate monitoring (A-017/A-039/A-040, task 061)
+
+1. **Why the loop has a dependency bag.** `runAgentChat` is the one place
+   the model, the gate and the tools meet; `AgentLoopDeps` (defaults =
+   production) lets the loop test run the real loop with a scripted model
+   and the real `executeTool`, proving the refusal path, the feedback to
+   the model, and the confirmation plumbing without a wallet or a chain.
+2. **Why attribution comes from the audit log.** Every money path already
+   writes an audit row with the tx hash (`agent_market_trade`,
+   `strategy_execute`, the user's fills route); joining fills to those
+   rows attributes P&L without a schema change.
+3. **Why the refusal rate is a warning, not a page.** A refused execution
+   moved no money; a high rate is a prompt or drift regression to look at,
+   with the codes in the detail.
+
 ### Agent chat cards, brief, performance, funnel (A-002/A-014/A-016/A-043/A-044, task 060)
 
 1. **Why the Confirm button sends "confirm".** One consent channel: the

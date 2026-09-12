@@ -49,6 +49,10 @@ export const TRADE_MIN_SAMPLES = 10;
 export const TRADE_FAILURE_RATE_CRITICAL = 0.1;
 /** How long a FROZEN-but-not-final divergence may persist before paging (M-01). */
 export const FROZEN_NOT_FINAL_GRACE_MS = 5 * 60_000;
+/** Minimum gated agent executions (ok + refused) before the refusal rate is trusted. */
+export const AGENT_GATE_MIN_SAMPLES = 10;
+/** Share of gated executions refused that warns (A-040 — the funnel is breaking). */
+export const AGENT_REFUSAL_RATE_WARN = 0.5;
 
 export function evaluateAlerts(input: AlertInput): Alert[] {
   const alerts: Alert[] = [];
@@ -148,6 +152,29 @@ export function evaluateAlerts(input: AlertInput): Alert[] {
       title: `Trade success rate ${String(Math.round((fillsOk / fills) * 100))}%`,
       detail: `${String(fillsFailed)} of ${String(fills)} reported fills failed verification (reverted, wrong target, or unreadable receipt).`,
       runbook: "docs/ops/monitoring.md §Trades",
+    });
+  }
+
+  // A-040 — the agent's execution gate: many refusals per execution means
+  // the model is calling money tools without the user's confirm (a prompt
+  // regression) or previews are drifting; both are worth a look, not a page.
+  const executed = input.counters["agent.funnel.execute_ok"] ?? 0;
+  let refused = 0;
+  const byCode: string[] = [];
+  for (const [k, v] of Object.entries(input.counters)) {
+    if (k.startsWith("agent.funnel.refused.")) {
+      refused += v;
+      byCode.push(`${k.slice("agent.funnel.refused.".length)} ${String(v)}`);
+    }
+  }
+  const gated = executed + refused;
+  if (gated >= AGENT_GATE_MIN_SAMPLES && refused / gated > AGENT_REFUSAL_RATE_WARN) {
+    alerts.push({
+      id: "agent_refusal_rate",
+      severity: "warn",
+      title: `Agent gate refused ${String(Math.round((refused / gated) * 100))}% of executions`,
+      detail: `${String(refused)} refused vs ${String(executed)} executed this instance (${byCode.join(", ")}). Check the prompt's confirm protocol and simulation drift.`,
+      runbook: "docs/ops/incident-runbook.md §12",
     });
   }
 

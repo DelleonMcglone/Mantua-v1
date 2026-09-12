@@ -68,9 +68,32 @@ void describe("computePerformance", () => {
       openMarkets: 1,
       trades: 6,
       returnOnResolvedCost: Number((3.5 / 18).toFixed(4)),
+      bySource: { agent_chat: 0, hedge_strategy: 0, user: 6 },
     });
     // Newest activity first.
     assert.equal(perf.markets[0].marketId, "0xopen");
+  });
+
+  void it("attributes fills to the chat agent, the hedge engine, or the user by audit action", () => {
+    const withTx = (f: FillRow, txHash: string): FillRow => ({ ...f, txHash });
+    const perf = computePerformance(
+      "0xabc",
+      [
+        withTx(fill("0xm", "buy", 5, 3, 1), "0xAAA"),
+        withTx(fill("0xm", "sell", 2, 1.5, 2), "0xbbb"),
+        withTx(fill("0xn", "buy", 1, 0.5, 3), "0xccc"),
+      ],
+      [],
+      [],
+      new Map([
+        ["0xaaa", "agent_market_trade"],
+        ["0xbbb", "strategy_execute"],
+      ]),
+    );
+    const by = Object.fromEntries(perf.markets.map((m) => [m.marketId, m]));
+    assert.deepEqual([...by["0xm"].attribution].sort(), ["agent_chat", "hedge_strategy"]);
+    assert.deepEqual(by["0xn"].attribution, ["user"]);
+    assert.deepEqual(perf.totals.bySource, { agent_chat: 1, hedge_strategy: 1, user: 1 });
   });
 
   void it("is empty and null-rated before any trade", () => {

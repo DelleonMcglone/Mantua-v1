@@ -97,4 +97,4 @@ listed as open.
 - ~~058~~ (landed) — prompt-injection sanitisation at the x402 / explorer / DefiLlama boundaries + adversarial tests (A-034, A-036).
 - ~~059~~ (landed) — `sports_intelligence` / `mantua_analyze_market` (A-004, A-005, A-013, A-022), skills reset (A-001).
 - ~~060~~ (landed) — preview + confirm cards, Daily Brief card, performance and funnel metrics (A-002, A-014, A-016, A-043, A-044).
-- 061 — agent loop test through `runAgentChat` with the gate (A-017), audit action cleanup, the ledger's owner rows (A-045, A-046).
+- ~~061~~ (landed) — agent loop test through `runAgentChat` with the gate (A-017), audit action cleanup, the ledger's owner rows (A-045, A-046).

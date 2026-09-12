@@ -122,7 +122,7 @@ import {
 import { quoteMarketTrade } from "./sports/market-trade-build.ts";
 import { getDailyCap, getDailySpend } from "./spending-cap.ts";
 import { sharedKvClient } from "./shared-cache.ts";
-import { readPolicy, toUserPolicyRead } from "./agent/policy.ts";
+import { readPolicy, toUserPolicyRead, type AgentPolicyView } from "./agent/policy.ts";
 import { events, leagues, marketPrices, markets } from "../db/schema/markets.ts";
 
 /**
@@ -2230,46 +2230,99 @@ async function resolveUserId(privyUserId: string): Promise<string | null> {
  * Run one conversational turn, streaming events. Persists the user message and
  * the final assistant message (with a compact tool trace in `parsedIntent`).
  */
-export async function* runAgentChat(params: {
-  privyUserId: string;
-  walletAddress?: string | undefined;
-  sessionId?: string | undefined;
-  message: string;
-  /** The user's selected chain (from the app's chain selector). */
-  chainId?: SupportedChainId | undefined;
-}): AsyncGenerator<AgentChatEvent> {
+/** Resolve the caller's session (must exist) or create one for this turn. */
+async function ensureSession(
+  requested: string | undefined,
+  userDbId: string,
+  message: string,
+): Promise<string> {
+  if (requested) {
+    const owned = await db
+      .select({ id: chatSessions.id })
+      .from(chatSessions)
+      .where(eq(chatSessions.id, requested))
+      .limit(1);
+    if (owned.at(0)?.id === requested) return requested;
+  }
+  const created = await db
+    .insert(chatSessions)
+    .values({ userId: userDbId, mode: "agent", title: message.slice(0, 80) })
+    .returning({ id: chatSessions.id });
+  return created[0].id;
+}
+
+async function persistMessage(row: {
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  parsedIntent?: unknown;
+}): Promise<void> {
+  await db.insert(chatMessages).values({
+    sessionId: row.sessionId,
+    role: row.role,
+    content: row.content,
+    parsedIntent: row.parsedIntent === undefined ? null : row.parsedIntent,
+  });
+}
+
+/**
+ * Task 061 / A-017 — the loop's seams, injectable for the loop test.
+ * Every default is the production reader/writer; nothing changes for the
+ * route, which passes no deps.
+ */
+export interface AgentLoopDeps {
+  client?: () => Pick<Anthropic, "messages">;
+  ensureWallet?: typeof getOrCreateAgentWallet;
+  resolveUser?: (privyUserId: string) => Promise<string | null>;
+  ensureSession?: typeof ensureSession;
+  loadHistory?: typeof loadHistory;
+  persist?: typeof persistMessage;
+  readPolicy?: (userDbId: string) => Promise<AgentPolicyView>;
+  execute?: typeof executeTool;
+  audit?: typeof auditChatToolCall;
+  store?: ConfirmationStore;
+}
+
+export async function* runAgentChat(
+  params: {
+    privyUserId: string;
+    walletAddress?: string | undefined;
+    sessionId?: string | undefined;
+    message: string;
+    /** The user's selected chain (from the app's chain selector). */
+    chainId?: SupportedChainId | undefined;
+  },
+  deps: AgentLoopDeps = {},
+): AsyncGenerator<AgentChatEvent> {
   const { privyUserId, walletAddress, message } = params;
   const chainId = params.chainId ?? BASE_CHAIN_ID;
-  const client = getAnthropic();
+  const client = (deps.client ?? getAnthropic)();
+  const execute = deps.execute ?? executeTool;
+  const audit = deps.audit ?? auditChatToolCall;
+  const persist = deps.persist ?? persistMessage;
+  const store = deps.store ?? confirmationStore;
 
   // Ensure the agent wallet exists ON THE ACTIVE CHAIN so swap/send have
   // something to act on (the wallet is provisioned on first use). Kept for
   // the audit rows below — chat-driven actions are logged against it.
-  const agentWallet = await getOrCreateAgentWallet(privyUserId, walletAddress, chainId);
+  const agentWallet = await (deps.ensureWallet ?? getOrCreateAgentWallet)(
+    privyUserId,
+    walletAddress,
+    chainId,
+  );
 
-  const userDbId = await resolveUserId(privyUserId);
+  const userDbId = await (deps.resolveUser ?? resolveUserId)(privyUserId);
   if (!userDbId) {
     yield { type: "error", message: "User record not found." };
     return;
   }
 
   // Resolve or create the conversation session.
-  let sessionId = params.sessionId;
-  if (sessionId) {
-    const owned = await db
-      .select({ id: chatSessions.id })
-      .from(chatSessions)
-      .where(eq(chatSessions.id, sessionId))
-      .limit(1);
-    if (owned.at(0)?.id !== sessionId) sessionId = undefined;
-  }
-  if (!sessionId) {
-    const created = await db
-      .insert(chatSessions)
-      .values({ userId: userDbId, mode: "agent", title: message.slice(0, 80) })
-      .returning({ id: chatSessions.id });
-    sessionId = created[0].id;
-  }
+  const sessionId = await (deps.ensureSession ?? ensureSession)(
+    params.sessionId,
+    userDbId,
+    message,
+  );
   yield { type: "session", sessionId };
 
   // Phase 8 — mode + this turn's confirmation state, computed BEFORE the
@@ -2280,8 +2333,8 @@ export async function* runAgentChat(params: {
     yield { type: "error", message: "The agent is disabled." };
     return;
   }
-  const policy = await readPolicy(db, userDbId);
-  const turn = await buildTurnContext(confirmationStore, {
+  const policy = await (deps.readPolicy ?? ((u: string) => readPolicy(db, u)))(userDbId);
+  const turn = await buildTurnContext(store, {
     mode,
     sessionId,
     message,
@@ -2292,8 +2345,8 @@ export async function* runAgentChat(params: {
   counters.inc("agent.funnel.turn");
   if (turn.confirmation) counters.inc("agent.funnel.confirm_minted");
 
-  const history = await loadHistory(sessionId);
-  await db.insert(chatMessages).values({ sessionId, role: "user", content: message });
+  const history = await (deps.loadHistory ?? loadHistory)(sessionId);
+  await persist({ sessionId, role: "user", content: message });
 
   const messages: Anthropic.MessageParam[] = [...history, { role: "user", content: message }];
   const steps: ToolStep[] = [];
@@ -2335,7 +2388,7 @@ export async function* runAgentChat(params: {
       const args = (tu.input ?? {}) as Record<string, unknown>;
       yield { type: "tool_start", id: tu.id, tool: tu.name, args };
       try {
-        const data = await executeTool(
+        const data = await execute(
           privyUserId,
           walletAddress,
           tu.name,
@@ -2345,7 +2398,7 @@ export async function* runAgentChat(params: {
           turn,
         );
         deferBackground(
-          auditChatToolCall({
+          audit({
             walletAddress: agentWallet.address,
             chainId,
             tool: tu.name,
@@ -2369,7 +2422,7 @@ export async function* runAgentChat(params: {
         const errMsg = err instanceof Error ? err.message : String(err);
         if (err instanceof ExecutionRefusedError) counters.inc(`agent.funnel.refused.${err.code}`);
         deferBackground(
-          auditChatToolCall({
+          audit({
             walletAddress: agentWallet.address,
             chainId,
             tool: tu.name,
@@ -2392,11 +2445,11 @@ export async function* runAgentChat(params: {
     messages.push({ role: "user", content: toolResults });
   }
 
-  await db.insert(chatMessages).values({
+  await persist({
     sessionId,
     role: "assistant",
     content: assistantText,
-    parsedIntent: steps.length > 0 ? { steps } : null,
+    ...(steps.length > 0 ? { parsedIntent: { steps } } : {}),
   });
 
   yield { type: "done" };

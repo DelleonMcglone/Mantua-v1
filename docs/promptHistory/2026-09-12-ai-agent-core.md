@@ -69,6 +69,10 @@ Mid-lane directives, in order:
   analysis, Daily Brief, performance, portfolio, markets), Add Liquidity chip,
   `mantua_daily_brief`, `computePerformance` + `/api/agent/performance`, funnel
   counters; ledger 40 ✅ · 5 🟡 · 2 ⬜.
-- Next lanes: 058
+- Lane 061 landed: the loop seam + A-017 loop test, fill attribution
+  (A-039), the `agent_refusal_rate` alert (A-040), typed strategy audit
+  actions, the owner user-test script (A-045/A-046); ledger 43 ✅ ·
+  2 🟡 · 2 ⬜.
+- Remaining (owner): 058
   prompt-injection hardening; 059 `sports_intelligence`; 060 client cards
   - metrics; 061 loop test + cleanup.
