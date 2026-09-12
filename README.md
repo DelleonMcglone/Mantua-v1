@@ -151,9 +151,12 @@ Programmable money buying programmable intelligence, then acting on it in one au
 
 ## Agent capabilities (your Circle Agent)
 
-An autonomous financial analyst trader and liquidity provider running a tool-using Claude
-loop over a server-custodied Circle wallet on Base Mainnet (ETH gas; a daily USD spending
-cap):
+A financial analyst, trader and liquidity provider running a tool-using Claude loop over a
+server-custodied Circle wallet on Base Mainnet (ETH gas; a daily USD spending cap). Reads run
+as the conversation goes; anything that moves money is previewed in the chat and executed
+only after you reply "confirm" — the server mints a single-use confirmation id from your own
+message and re-simulates a market trade right before it runs (`AGENT_MODE`, D-114). x402 paid
+data is the agent's own pre-capped spend and needs no confirmation.
 
 - **Wallet** auto-provisioned; view/manage, set the daily cap, and fund it by transferring
   USDC from your own wallet.

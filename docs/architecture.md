@@ -361,7 +361,7 @@ that path are advisory UX, not controls.
 
 | Rail                                                 | Verdict                       | Why                                                                                                                                                                                                                                                                                                  | Effort |
 | ---------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Agent-wallet spending caps                           | KEEP + 2 fixes                | Enforced at every server-signed execution point. **Critical hole: the chat LLM tool `set_cap` bypasses the route's zod clamp — the agent can raise its own daily cap $100 → $50,000 with no user assent.** And `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide | S      |
+| Agent-wallet spending caps                           | KEEP (1 fix landed, 1 open)   | Enforced at every server-signed execution point. The chat `set_cap` bypass is CLOSED (C-010, task 024): raises need the user's attested message and every value clamps through `assertValidDailyCap` — verified again in task 055 (A-047). Still open: `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide                                                    | S      |
 | User-wallet spending caps                            | REPLACE (or relabel advisory) | Checked only on `/api/quote`; calldata routes skip it; ledger increments only via a client-reported endpoint; user holds the keys                                                                                                                                                                    | L      |
 | Uncapped money paths                                 | MISSING                       | Sports market trades, user add-liquidity/pool-create, `/api/v4/swap/calldata`, and Gateway spends (which check a counter they never increment) have no cap and mostly no audit                                                                                                                       | M      |
 | Tier system (age-based caps)                         | REPLACE                       | `getWalletAge` has zero callers — the documented D-009 policy is entirely unimplemented; a day-one account can be set to $50k                                                                                                                                                                        | S      |
@@ -400,10 +400,12 @@ mode.
 
 **Correction to P1-005 above:** the "single seam" claim no longer holds — the
 agent chat is a second, deliberate path from user input to on-chain
-transaction that never calls `confirm()` (it acts autonomously within the
-cap). The seam stays mandatory for _user-signed_ writes; the agent path's
-control is the cap + allowlist + guard stack, not the modal. Recorded here
-until a decision record formalizes it.
+transaction that never calls the client's `confirm()`. Since task 055 that
+path has its own server-side seam: the execution gate (D-114) — preview,
+the user's explicit "confirm" in their own message, a server-minted
+single-use confirmation id, a fresh simulation — with the cap + allowlist
++ guard stack underneath. The client modal stays mandatory for
+_user-signed_ writes.
 
 ### Ship-blockers before real volume (ranked)
 
@@ -756,6 +758,34 @@ status`, `/api/markets/fills`). A server-side indexer is the upgrade
    P-012 halt needs `last_polled_at` at game cadence. The read-only
    `/api/cron/live-sync` is cheap enough for 5 minutes and exempt from the
    kill switch, so a paused platform still shows live scores.
+
+### Agent execution gate — modes, confirmation, x402 (D-114, task 055)
+
+1. **Why the gate is server-side and pre-model.** The agent wallet is
+   server-signed, so only a server check is a control. The turn context
+   (mode, pending preview, minted confirmation) is computed from the user's
+   raw message before the model runs and handed to it as a system block;
+   the model can echo a confirmation id but cannot create one the store
+   will honor, and it cannot see or change `AGENT_MODE`.
+2. **Why consent is a regex, not a judgment.** `messageConfirmsAction`
+   follows `messageAuthorizesForce` and `messageAttestsCapRaise`: explicit
+   patterns accept, any hedge / question / negation rejects. A false
+   negative costs one round trip; a false positive moves money.
+3. **Why market executions re-simulate.** The user confirmed numbers; the
+   pool may have moved. `materialDrift` compares the confirmed and the
+   fresh `TradeSimulation` (same builder as the user's own ticket) and
+   refuses on price > 100 bps, output shrink > 1 %, market-state or
+   fee-season change, or any policy turning red.
+4. **Why x402 data is exempt.** `call_paid_service` spends the agent's own
+   buyer wallet under `X402_MAX_CALL_USD` / `X402_DAILY_CAP_USD`; the agent
+   has direct marketplace access by design so its analysis loop is not
+   interrupted per lookup. Everything that touches the user's agent wallet
+   is gated.
+5. **Where it lives.** `server/src/lib/agent/` — `agent-mode.ts`,
+   `confirmation-language.ts`, `trade-simulation.ts`,
+   `confirmation-store.ts` (Upstash when configured, `mantua:agent:`),
+   `execution-gate.ts`; wired in `agent-chat.ts` (`executeTool`,
+   `runAgentChat`) and `routes/agent-chat.ts` (503 `AGENT_DISABLED`).
 
 ### Sports pivot (DM-101 … DM-112)
 

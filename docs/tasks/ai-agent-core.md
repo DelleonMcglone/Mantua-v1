@@ -1,0 +1,77 @@
+# Phase 8 — AI Agent Core (Circle Agent)
+
+> Owner directive 2026-09-12 ("Now you have the complete task list, continue
+> starting with phase 8"; mid-lane: "agent has direct access to x402
+> marketplace to buy data"). Forty-seven rows, A-001 … A-047. Decision
+> record: **D-114** in `docs/decisions/v2-open-decisions.md` (modes,
+> confirmation protocol, x402 exemption); D-109 (agent policies) stays the
+> record for A-003/A-012/A-038.
+>
+> Snapshot: 2026-09-12 (post-055) · **18 ✅ · 20 🟡 · 9 ⬜**. Lanes: 055
+> landed; 056 – 061 planned (see the last section of
+> `docs/tasks/055-agent-execution-gate.md`).
+
+## Rows
+
+| Row   | Requirement (condensed)                                                                                                       | Status | Where / what remains                                                                                                                       |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| A-001 | Reset agent skills from the Circle Agent docs (remove obsolete, add Mantua skills)                                            | ⬜     | Lane 059                                                                                                                                   |
+| A-002 | Agent cards (chat-mode action surface: Create/Manage Agent, Daily Brief, Trade, Swap, Add Liquidity, Send)                    | 🟡     | Chips exist in `client/src/features/agent/CircleAgentChat.tsx`; Trade/Add Liquidity/confirm cards — lane 060                               |
+| A-003 | Agent wallet lifecycle: create (C-003), fund, user policies + limits + authorization + portfolio access (D-109)               | 🟡     | Wallet + cap shipped; `agent_policies` is read by the simulation (055) but has no write path/UI — lane 057                                 |
+| A-004 | `sports_intelligence` built-in skill                                                                                          | ⬜     | Lane 059                                                                                                                                   |
+| A-005 | Intelligence stack composition (sports + market + on-chain + reasoning → trade/hedge/hold)                                    | 🟡     | Prompt's analyst method + sports data tools; the composed skill — lane 059                                                                 |
+| A-006 | Agent can buy or sell at any time                                                                                             | ✅     | D-103 in-play trading; `agentMarketTrade` both directions via `mantua_execute_trade` / `mantua_sell_position`                              |
+| A-007 | Profit-lock / loss-cut                                                                                                        | 🟡     | B9 strategy engine triggers; agent-position variant — lane 057                                                                             |
+| A-008 | Continuous monitoring loop                                                                                                    | 🟡     | `cron-strategies` cadence; agent positions on the loop — lane 057                                                                          |
+| A-009 | Pre-trade check (spread, depth, impact) via simulate                                                                          | ✅     | `simulateMarketTrade` (055): impact vs implied probability, fee, minimum received, blockers                                                |
+| A-010 | Agent trades through the same market contracts + hook path as humans                                                          | ✅     | `market-agent-trade.ts` → `buildMarketTrade` (the user ticket's builder); allowlist via `registerDynamicTargets`                           |
+| A-011 | Agent-controlled positions ledger (attributable, logged, visible)                                                             | 🟡     | `mantua_audit_log` rows per money tool; positions visibility — lane 056                                                                    |
+| A-012 | Policy enforcement (cannot exceed budget, change own caps, disable rails; kill switch halts agent writes)                     | 🟡     | Cap + C-010 attested raises + kill switch (`app.ts`) + policy read in simulation (055); policy write path — lane 057                       |
+| A-013 | Chat analysis ("Should I buy the Falcons YES?") with zero user data                                                           | 🟡     | Prompt + sports tools; `mantua_analyze_market` — lane 059                                                                                  |
+| A-014 | Daily Brief card                                                                                                              | 🟡     | Daily Brief chip sends the workflow; card — lane 060                                                                                       |
+| A-015 | Swap / Add Liquidity / Send actions                                                                                           | 🟡     | Tools exist and are gated (055); Add Liquidity chip — lane 060                                                                             |
+| A-016 | Performance tracking (P&L, win rate)                                                                                          | ⬜     | Lane 060                                                                                                                                   |
+| A-017 | Agent loop test                                                                                                               | 🟡     | Gate/simulation/store unit tests (055); a loop test through `runAgentChat` with a stubbed model — lane 061                                 |
+| A-018 | E2E                                                                                                                           | ✅     | `server/src/lib/agent-e2e.test.ts`                                                                                                         |
+| A-019 | Strict separation doc (skill / tools / wallet auth / contract enforcement / user permission)                                  | 🟡     | `docs/architecture.md` "Agent execution gate" (055); the full layered doc — lane 056                                                       |
+| A-020 | `mantua_search_markets`                                                                                                       | 🟡     | `get_sports_slate`; named tool — lane 056                                                                                                  |
+| A-021 | `mantua_get_market`                                                                                                           | 🟡     | `get_market_price` / `_liquidity` / `_history` / `_volume`; composed tool — lane 056                                                       |
+| A-022 | `mantua_analyze_market`                                                                                                       | ⬜     | Lane 059                                                                                                                                   |
+| A-023 | `mantua_get_position`                                                                                                         | ⬜     | Lane 056                                                                                                                                   |
+| A-024 | `mantua_get_portfolio`                                                                                                        | 🟡     | `get_portfolio` without market positions — lane 056                                                                                        |
+| A-025 | `mantua_simulate_trade` (mandatory; executable, estimate, size, impact, fees, min received, exposure, wallet + market policy) | ✅     | 055                                                                                                                                        |
+| A-026 | `mantua_execute_trade` with explicit confirmation artifact + independent server validation                                    | ✅     | 055 — server-minted single-use id, args match, fresh simulation                                                                            |
+| A-027 | `mantua_sell_position`                                                                                                        | ✅     | 055 — same gate, policy, market-state and execution controls                                                                               |
+| A-028 | Modes DISABLED / SIMULATION / USER_TESTING / AUTONOMOUS via server config                                                     | ✅     | `AGENT_MODE` (055); route 503 when disabled                                                                                                |
+| A-029 | Explicit confirmation for every trade in user testing                                                                         | ✅     | 055                                                                                                                                        |
+| A-030 | Fresh simulation immediately before execution; reject on material change                                                      | ✅     | `materialDrift` (055)                                                                                                                      |
+| A-031 | Unique confirmation id required at execution                                                                                  | ✅     | `ConfirmationStore` (055), Upstash-backed                                                                                                  |
+| A-032 | Ambiguous language never authorizes                                                                                           | ✅     | `messageConfirmsAction` (055)                                                                                                              |
+| A-033 | Never switch wallets/chains, split txs, or alter limits                                                                       | ✅     | Chain fixed per turn; wallet fixed per user+chain; args-hash bound; each execution needs its own confirmation; cap raises attested (C-010) |
+| A-034 | Prompt-injection defenses for external feeds / news / user content                                                            | 🟡     | `sanitizeProviderString` + prompt rule; x402 / explorer / DefiLlama boundaries — lane 058                                                  |
+| A-035 | LLM → tool call → app validation → wallet policy → tx construction → contract validation → chain                              | ✅     | Gate runs before every money-moving tool body (055); allowlist + guard stack underneath                                                    |
+| A-036 | Security tests vs malicious instructions                                                                                      | ⬜     | Lane 058                                                                                                                                   |
+| A-037 | Hedging capability                                                                                                            | ✅     | B9 engine (`strategy-*.ts`)                                                                                                                |
+| A-038 | Hedge policies (max size, permitted markets, max exposure, min confidence, cooldowns, daily budget)                           | 🟡     | Engine caps/cooldowns; per-user policy row — lane 057                                                                                      |
+| A-039 | Hedge attribution                                                                                                             | 🟡     | Audit actions; strategy id on fills — lane 057                                                                                             |
+| A-040 | Hedge monitoring                                                                                                              | 🟡     | Alerts policy (053) covers trade success; strategy-level — lane 057                                                                        |
+| A-041 | Kill switch + policy enforcement independent of the LLM                                                                       | ✅     | `MANTUA_KILL_SWITCH` / runtime flag + `STRATEGIES_KILL_SWITCH`; gate is code                                                               |
+| A-042 | Hedging E2E                                                                                                                   | ✅     | `server/src/lib/sports/hedging-e2e.test.ts`                                                                                                |
+| A-043 | Minimum flow: find NFL market → analyze → request $10 YES → preview → confirm → execute → result                              | 🟡     | Server flow complete (055); preview/confirm cards — lane 060                                                                               |
+| A-044 | UX metrics instrumentation                                                                                                    | ⬜     | Lane 060                                                                                                                                   |
+| A-045 | Owner user test 1                                                                                                             | ⬜     | Owner-gated                                                                                                                                |
+| A-046 | Owner user test 2                                                                                                             | ⬜     | Owner-gated                                                                                                                                |
+| A-047 | Close the inherited `set_cap` bypass                                                                                          | ✅     | Closed in task 024 (C-010); stale architecture rows corrected in 055                                                                       |
+
+## Design in one paragraph
+
+The LLM proposes; the server decides. `AGENT_MODE` is a deployment setting.
+A money-moving tool call is refused unless this turn's context carries a
+confirmation id the server minted from the user's own explicit "confirm"
+against a preview the agent showed (a full `TradeSimulation` for market
+trades, a tool + canonical argument hash otherwise). The id is single-use
+and expires; the execution's tool and arguments must match; market trades
+are re-simulated at execution and refused on material drift. Underneath
+sit the daily cap, the user's policy row, the kill switch and the contract
+allowlist — all code. The one deliberate exemption is x402 paid data: the
+agent has direct marketplace access from its own pre-capped buyer wallet.

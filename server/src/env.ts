@@ -165,6 +165,12 @@ const schema = z.object({
   /** B9-007 — strategies-only global kill: every armed hedging strategy
    *  disarms on the next engine tick and nothing new fires. Narrower than
    *  MANTUA_KILL_SWITCH (which blocks all writes app-wide). */
+  /** Phase 8 / A-028 — the agent's trading mode, a server setting the model
+   *  cannot move: disabled | simulation | user_testing (default, "Always
+   *  Ask") | autonomous (future; also needs the user's policy). */
+  AGENT_MODE: z
+    .enum(["disabled", "simulation", "user_testing", "autonomous"])
+    .default("user_testing"),
   STRATEGIES_KILL_SWITCH: z
     .union([z.literal("0"), z.literal("1")])
     .default("0")
