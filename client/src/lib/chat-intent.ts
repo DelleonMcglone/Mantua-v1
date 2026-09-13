@@ -16,6 +16,8 @@ import type { TokenSymbol } from "./tokens.ts";
 import type { FeeTier } from "../features/liquidity/fee-tiers.ts";
 import type { HookName } from "../features/liquidity/use-create-pool.ts";
 import { matchBridgeDestination } from "../features/bridge/bridge-chains.ts";
+import type { DiscoverFilters } from "../features/markets/discovery.ts";
+import { parseDiscoverQuery } from "../features/markets/discovery-query.ts";
 
 export type AnalyzeTopic =
   | "eth-price"
@@ -59,9 +61,14 @@ export type Intent =
   /** B8-003 — league nav: "nfl markets", "show wnba games", bare "nfl". */
   | { kind: "market"; sport: SportLeague }
   /** B8-003 — position verbs: open / close / hedge a sports position.
-   *  Execution is gated until markets deploy; the route lands on the
-   *  league's market page, which states what's open honestly. */
-  | { kind: "position"; action: "open" | "close" | "hedge"; sport?: SportLeague }
+   *  The route lands on the league's market page; a `team` hint (task
+   *  050, T-017: "bet on the Chiefs") preselects that team's game. */
+  | { kind: "position"; action: "open" | "close" | "hedge"; sport?: SportLeague; team?: string }
+  /** Task 050 (T-019) — natural-language market discovery: "Show me
+   *  today's NFL markets", "Find the most liquid NFL markets", "What can I
+   *  trade right now?". The filters are the same object the Discover page
+   *  and its chips produce (`features/markets/discovery.ts`). */
+  | { kind: "discover"; filters: DiscoverFilters }
   | {
       kind: "analyze";
       topic?: AnalyzeTopic;
@@ -79,6 +86,43 @@ export type Intent =
 export type SportLeague = "nba" | "wnba" | "nfl" | "mlb" | "nhl" | "soccer";
 
 const LEAGUE_WORDS: readonly SportLeague[] = ["nba", "wnba", "nfl", "mlb", "nhl", "soccer"];
+
+/** Research phrasing — never discovery, never league nav. */
+const RESEARCH_RE = /\b(analy[sz]e|research|explain|why|how|compare|should)\b/;
+
+/**
+ * Discovery needs more than a league name: a time window, a sort, a
+ * status, a team, or the literal "what can I trade" — otherwise a bare
+ * "nfl markets" keeps meaning the league page.
+ */
+function detectDiscover(text: string): DiscoverFilters | null {
+  const t = text.toLowerCase();
+  if (RESEARCH_RE.test(t)) return null;
+  const filters = parseDiscoverQuery(text);
+  if (!filters) return null;
+  const strong = /\bwhat can i trade\b/.test(t);
+  const qualified = Boolean(filters.startsWithin ?? filters.sort ?? filters.status ?? filters.team);
+  return strong || (qualified && /\bmarkets?\b|\bgames?\b/.test(t)) ? filters : null;
+}
+
+/**
+ * The team named after "on / for / against" in a position command, e.g.
+ * "bet on the Chiefs" → "chiefs". League words and empty captures are
+ * rejected; the league page resolves the hint against the live slate.
+ */
+export function extractTeamHint(text: string): string | null {
+  const t = text.toLowerCase();
+  const m =
+    /\b(?:on|for|against)\s+(?:the\s+)?([a-z][a-z .'-]*?)(?=\s+(?:to|at|vs|versus|game|matchup|position|bet|market|tonight|today)\b|[?.!,]|$)/.exec(
+      t,
+    );
+  if (!m) return null;
+  const candidate = m[1].trim();
+  if (candidate.length === 0) return null;
+  if (LEAGUE_WORDS.some((l) => new RegExp(`\\b${l}\\b`).test(candidate))) return null;
+  if (/^(my|a|an|this|that|it|them)$/.test(candidate)) return null;
+  return candidate;
+}
 
 /** First league named in the text, if any. WNBA is checked before NBA so
  *  the substring overlap can't misroute ("wnba" contains "nba"). */
@@ -243,24 +287,31 @@ export function detectIntent(text: string): Intent | null {
   }
 
   // ── Sports (B8-003) ────────────────────────────────────────────────────
+  // Discovery (task 050, T-019) runs before the position verbs and the
+  // swap branch: "what can I trade right now?" is browsing, not a swap.
+  const discover = detectDiscover(text);
+  if (discover) return { kind: "discover", filters: discover };
+
   // Position verbs first: "bet on the Chiefs", "open a position on KC",
   // "close my position", "hedge my NFL exposure". Matched before league nav
   // so "close my wnba position" is a position command, not league browsing.
   const positionNoun = /\b(position|bet|wager|exposure|stake)\b/.test(t);
+  const teamHint = extractTeamHint(text);
+  const team = teamHint ? { team: teamHint } : {};
   if (positionNoun && /\b(close|exit|sell|unwind)\b/.test(t)) {
     const sport = extractLeague(text);
-    return { kind: "position", action: "close", ...(sport ? { sport } : {}) };
+    return { kind: "position", action: "close", ...(sport ? { sport } : {}), ...team };
   }
   if (positionNoun && /\bhedge\b/.test(t)) {
     const sport = extractLeague(text);
-    return { kind: "position", action: "hedge", ...(sport ? { sport } : {}) };
+    return { kind: "position", action: "hedge", ...(sport ? { sport } : {}), ...team };
   }
   if (
     (positionNoun && /\b(open|take|place|buy|put)\b/.test(t)) ||
     /\bbet\s+(on|against)\b/.test(t)
   ) {
     const sport = extractLeague(text);
-    return { kind: "position", action: "open", ...(sport ? { sport } : {}) };
+    return { kind: "position", action: "open", ...(sport ? { sport } : {}), ...team };
   }
 
   // League nav: a league name plus a browsing cue — or the bare league name —

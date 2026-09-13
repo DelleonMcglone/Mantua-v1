@@ -17,6 +17,7 @@ import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
 import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
+import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
 import {
   analysisCard,
   dailyBriefCard,
@@ -341,6 +342,8 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
           {msg.streaming && <Caret />}
         </div>
       )}
+      {/* T-022: the agent's read is an estimate, never a certainty. */}
+      {!msg.streaming && msg.text && <PredictionNote className="max-w-[92%]" />}
 
       {msg.failed && (
         <Banner tone="error" icon="⊘" title="Something went wrong">

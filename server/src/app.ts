@@ -19,6 +19,7 @@ import { marketTradeRouter } from "./routes/market-trade.ts";
 import { marketPositionsRouter } from "./routes/market-positions.ts";
 import { marketFillsRouter } from "./routes/market-fills.ts";
 import { marketDetailRouter } from "./routes/market-detail.ts";
+import { marketDiscoverRouter } from "./routes/market-discover.ts";
 import { marketRedeemRouter } from "./routes/market-redeem.ts";
 import { activityRouter } from "./routes/activity.ts";
 import { portfolioEconomicsRouter } from "./routes/portfolio-economics.ts";
@@ -127,6 +128,8 @@ app.use(marketTradeRouter);
 app.use(marketPositionsRouter);
 app.use(marketFillsRouter);
 app.use(marketDetailRouter);
+// Task 050 — id-free discover read (slate + liquidity + popularity).
+app.use(marketDiscoverRouter);
 app.use(marketRedeemRouter);
 app.use(activityRouter);
 app.use(portfolioEconomicsRouter);

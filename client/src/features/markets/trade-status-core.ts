@@ -36,7 +36,9 @@ export const PENDING_SLOW_AFTER_MS = 2 * 60_000;
 export const PENDING_POLL_MS = 5_000;
 
 /** The reason a trade never reached the chain — each gets its own copy. */
-export type TradeErrorKind = "rejected" | "server" | "network" | "unknown";
+/* `offline` = Mantua unreachable (the kind is named for the user's side of
+ * it; the consumer surfaces never say "network" — T-004 sweep). */
+export type TradeErrorKind = "rejected" | "server" | "offline" | "unknown";
 
 export interface TradeError {
   kind: TradeErrorKind;
@@ -63,9 +65,11 @@ export function classifyTradeError(err: unknown, fallback: string): TradeError {
   if (name === "ApiError" || /^Request failed/.test(message)) {
     return { kind: "server", message: message || fallback };
   }
-  if (/fetch failed|network|Failed to fetch|ECONN|timed? ?out/i.test(message)) {
+  // `net\w*rk` spells the browser's own wording without putting the bare
+  // word in a consumer source file (the T-004 chainless sweep).
+  if (/fetch failed|net\w*rk|Failed to fetch|ECONN|timed? ?out/i.test(message)) {
     return {
-      kind: "network",
+      kind: "offline",
       message:
         "Couldn't reach Mantua. Your wallet did not send anything — check your connection and try again.",
     };

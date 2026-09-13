@@ -8,6 +8,8 @@ export interface SlateTeam {
   name: string;
   abbreviation: string;
   logo?: string;
+  /** Season win–loss record ("31-7") from the provider, when published. */
+  record?: string;
 }
 
 export interface SlateEvent {
@@ -27,7 +29,8 @@ export interface Slate {
   league: string;
   delayed: boolean;
   fetchedAt: number;
-  /** Last ingest time (ms epoch); absent when nothing was ever ingested. */
+  /** Last ingest time (ms epoch); absent when nothing was ever ingested.
+   *  The "data as of" the freshness stamp shows (T-023). */
   dataAsOf?: number;
   events: SlateEvent[];
 }

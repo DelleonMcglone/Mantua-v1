@@ -9,7 +9,7 @@ const PROMPTS: { id: HomePromptId; title: string; icon: typeof Droplet }[] = [
     title: "Analyze today's games, matchups, and markets",
     icon: BarChart3,
   },
-  { id: "swap", title: "Swap stablecoins or bridge USDC to another network", icon: ArrowUpDown },
+  { id: "swap", title: "Swap stablecoins or move USDC between accounts", icon: ArrowUpDown },
   { id: "pool", title: "Create / Add Liquidity with Stable protection", icon: Droplet },
 ];
 

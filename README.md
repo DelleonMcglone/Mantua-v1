@@ -121,11 +121,16 @@ Programmable money buying programmable intelligence, then acting on it in one au
   mode, it never locks it. Hookless actions and agent commands go to the Circle Agent; naming a
   hook (Stable Protection / Dynamic Fee) opens the manual Uniswap-v4 panel; research questions
   open Analyze.
-- **Sports markets.** Full-screen per-league pages (Polymarket-style): date-grouped games with
-  moneyline prices in cents fed by the **live pool price**, and a trade sidebar — pick a side,
-  set an amount, get a live quote, sign with your wallet. Browsing and matchup details are open
-  to everyone; anonymous visitors also get **three free analyst questions a day** (enforced
-  server-side), after which chat and every transaction require login.
+- **Sports markets.** A cross-league **Discover** page (filter by league, team, game, status,
+  start time, liquidity, popularity — or just type "What can I trade right now?") and
+  full-screen per-league pages: date-grouped games with contract prices fed by the **live pool
+  price**, each labelled with its source (market price vs. projection), and a **trade ticket**
+  — price tap, amount tap, Confirm: three taps to a trade, two to close. The ticket shows the
+  hook's exact fee (Position / Fee / Fee rate / Total, 0% in the regular season), ends in an
+  explicit **Trade executed** card, offers **Add funds** inline (bank or USDC) when the balance
+  is short, and never mentions gas, a network, or an address. Browsing and matchup details are
+  open to everyone; anonymous visitors also get **three free analyst questions a day**
+  (enforced server-side), after which chat and every transaction require login.
 - **Automated hedging strategies.** Describe one in plain language ("take profit at 80% on the
   Chiefs"), confirm the structured preview, and it arms: evaluated on price and game-state
   ticks, sized under its own USDC cap, armed straight through the game and auto-disarmed when

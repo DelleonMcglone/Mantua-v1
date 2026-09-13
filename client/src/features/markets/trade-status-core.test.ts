@@ -51,7 +51,8 @@ void describe("classifyTradeError", () => {
       message: "Daily cap $100 would be exceeded",
     });
     const net = classifyTradeError(new TypeError("Failed to fetch"), "x");
-    assert.equal(net.kind, "network");
+    assert.equal(net.kind, "offline");
+    assert.equal(classifyTradeError(new Error("Network Error"), "x").kind, "offline");
     assert.match(net.message, /did not send anything/);
   });
 

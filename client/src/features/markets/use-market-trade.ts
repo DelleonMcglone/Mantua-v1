@@ -17,6 +17,10 @@ const ERC20 = parseAbi([
  *  block is ~2 s; a minute of silence is an RPC problem, not a slow chain. */
 export const RECEIPT_WAIT_MS = 60_000;
 
+/** A hash the chain never mined (R-004 `dropped`) — nothing was traded. */
+const DROPPED_MESSAGE =
+  "This trade was never placed — it was dropped before it could go through. Nothing was traded.";
+
 /**
  * The pre-trade quote (`POST /api/markets/trade/quote`, task 050): what the
  * ticket renders while the user is still choosing an amount. Carries no
@@ -79,7 +83,9 @@ export type TradePhase =
   | { kind: "pending"; txHash: `0x${string}`; calldata: TradeCalldata }
   | { kind: "done"; txHash: `0x${string}`; calldata: TradeCalldata; recorded: boolean }
   | { kind: "failed"; txHash: `0x${string}`; calldata: TradeCalldata }
-  | { kind: "error"; message: string; errorKind: TradeErrorKind };
+  /** `error` is the thrown value itself so the ticket can map its code to
+   *  owner-readable copy (T-012); `errorKind` is the coarse class (R-004). */
+  | { kind: "error"; message: string; errorKind: TradeErrorKind; error: unknown };
 
 interface Args {
   eventId: string;
@@ -138,7 +144,7 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
         })
         .catch((err: unknown) => {
           const e = classifyTradeError(err, "Quote failed");
-          setPhase({ kind: "error", message: e.message, errorKind: e.kind });
+          setPhase({ kind: "error", message: e.message, errorKind: e.kind, error: err });
         });
     }, 400);
     return () => {
@@ -163,8 +169,8 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
           : {
               kind: "error",
               errorKind: "unknown",
-              message:
-                "The network never saw this transaction — it was dropped before mining. Nothing was traded.",
+              message: DROPPED_MESSAGE,
+              error: new Error(DROPPED_MESSAGE),
             },
     );
     register.dismiss(phase.txHash);
@@ -280,7 +286,7 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
       window.dispatchEvent(new Event("mantua:refresh-portfolio"));
     } catch (err) {
       const e = classifyTradeError(err, "Trade failed");
-      setPhase({ kind: "error", message: e.message, errorKind: e.kind });
+      setPhase({ kind: "error", message: e.message, errorKind: e.kind, error: err });
     }
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, mentionsHook, type Intent } from "./lib/chat-intent.ts";
@@ -11,8 +11,12 @@ import { MarketIntegrityPage } from "./components/legal/MarketIntegrityPage.tsx"
 import type { LegalDoc } from "./components/legal/LegalPage.tsx";
 import { DocsPage } from "./components/docs/DocsPage.tsx";
 import { LeaguePage } from "./features/markets/LeaguePage.tsx";
+import { DiscoverPage } from "./features/markets/discover/DiscoverPage.tsx";
+import type { DiscoverFilters } from "./features/markets/discovery.ts";
 import { isSportId, type SportId } from "./features/markets/sports.ts";
 import { rawToHuman6 } from "./features/markets/market-trade-core.ts";
+import { QuickActions } from "./components/shell/QuickActions.tsx";
+import { quickActionsFor, type QuickActionContext } from "./lib/quick-actions.ts";
 import { AppShell } from "./components/shell/AppShell.tsx";
 import { Card } from "./components/shell/Card.tsx";
 import { HomePromptRow, type HomePromptId } from "./components/shell/HomeMenu.tsx";
@@ -66,11 +70,18 @@ type Route =
       kind: "market";
       sport: SportId;
       selectEventId?: string;
+      /** Side to put in the ticket with `selectEventId` (a Discover price tap). */
+      selectSide?: 0 | 1;
+      /** Team hint from a position command ("bet on the Chiefs") — the
+       *  league page resolves it against the slate (T-017). */
+      selectTeam?: string;
       direction?: "buy" | "sell";
-      /** Pre-filled sidebar amount (human units) — one-click Close sends
+      /** Pre-filled ticket amount (human units) — one-click Close sends
        *  the full held balance. */
       amount?: string;
     }
+  /** Task 050 — cross-league market discovery with filters (T-001/T-018). */
+  | { kind: "discover"; filters?: DiscoverFilters }
   | { kind: "profile" }
   | { kind: "trading" }
   | { kind: "pools" }
@@ -111,6 +122,7 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "home",
   "swap",
   "market",
+  "discover",
   "profile",
   "trading",
   "pools",
@@ -154,6 +166,12 @@ export default function App() {
   const { ready, authenticated, logout, user } = usePrivy();
   const [route, setRoute] = useState<Route>(() => loadStoredRoute() ?? { kind: "landing" });
   const [showLogin, setShowLogin] = useState(false);
+  // The game in view on a league page, for the dock's contextual quick
+  // actions (T-016). Reported by LeaguePage; cleared when it unmounts.
+  const [focusedGame, setFocusedGame] = useState<{ away: string; home: string } | null>(null);
+  const onFocusGame = useCallback((game: { away: string; home: string } | null) => {
+    setFocusedGame(game);
+  }, []);
 
   // Any surface can request the login modal without prop-drilling —
   // league-page and dock gate buttons dispatch this event.
@@ -300,7 +318,10 @@ export default function App() {
     // actionable command (trade, agent, liquidity…) demands login here.
     if (!authenticated) {
       const guest = detectIntent(text);
-      if (!guest || guest.kind === "analyze") {
+      // Browsing is free (B5-007): research, discovery, and league pages
+      // open logged-out; anything that moves money asks for login.
+      const browsing = new Set<Intent["kind"]>(["analyze", "discover", "market", "home"]);
+      if (!guest || browsing.has(guest.kind)) {
         setRoute(guest ? intentToRoute(guest) : { kind: "analyze", question: text });
         return;
       }
@@ -360,16 +381,23 @@ export default function App() {
         onQuickAction={(id) => {
           setRoute(promptToRoute(id));
         }}
-        full={fullPage(route, setRoute)}
+        full={fullPage(route, setRoute, onFocusGame)}
         dock={
-          <InputBar
-            onSubmit={handleCommand}
-            placeholder={
-              authenticated
-                ? undefined
-                : "Ask the analyst — 3 free questions. Log in to trade and do more"
-            }
-          />
+          <>
+            {/* T-015/T-016: the bar stays primary; chips feed the same handler. */}
+            <QuickActions
+              actions={quickActionsFor(quickActionContext(route, focusedGame))}
+              onPick={handleCommand}
+            />
+            <InputBar
+              onSubmit={handleCommand}
+              placeholder={
+                authenticated
+                  ? undefined
+                  : "Ask the analyst — 3 free questions. Log in to trade and do more"
+              }
+            />
+          </>
         }
         left={<LeftColumn route={route} setRoute={setRoute} />}
         right={<RightColumn route={route} setRoute={setRoute} />}
@@ -446,6 +474,7 @@ function RouteContent({ route, setRoute }: { route: Route; setRoute: (r: Route) 
     case "add-liquidity":
     case "analyze":
     case "market":
+    case "discover":
     case "trading":
       return null;
     case "profile":
@@ -494,7 +523,11 @@ function RouteContent({ route, setRoute }: { route: Route; setRoute: (r: Route) 
  * pools, add-liquidity). Everything else keeps the two-column board +
  * panel shell. Returning undefined selects the split layout.
  */
-function fullPage(route: Route, setRoute: (r: Route) => void): React.ReactNode | undefined {
+function fullPage(
+  route: Route,
+  setRoute: (r: Route) => void,
+  onFocusGame: (game: { away: string; home: string } | null) => void,
+): React.ReactNode | undefined {
   const home = () => {
     setRoute({ kind: "home" });
   };
@@ -504,9 +537,11 @@ function fullPage(route: Route, setRoute: (r: Route) => void): React.ReactNode |
     case "market":
       return (
         <LeaguePage
-          key={`${route.sport}-${route.selectEventId ?? ""}`}
+          key={`${route.sport}-${route.selectEventId ?? ""}-${route.selectTeam ?? ""}`}
           sport={route.sport}
           initialEventId={route.selectEventId}
+          initialSide={route.selectSide}
+          initialTeam={route.selectTeam}
           initialDirection={route.direction}
           initialAmount={route.amount}
           onSelectSport={(sport) => {
@@ -516,6 +551,28 @@ function fullPage(route: Route, setRoute: (r: Route) => void): React.ReactNode |
           onAgent={(message) => {
             setRoute({ kind: "agent", message });
           }}
+          onViewPositions={() => {
+            setRoute({ kind: "profile" });
+          }}
+          onFocusGame={onFocusGame}
+        />
+      );
+    case "discover":
+      return (
+        <DiscoverPage
+          filters={route.filters ?? {}}
+          onChangeFilters={(filters) => {
+            setRoute({ kind: "discover", filters });
+          }}
+          onOpenGame={(sport, eventId, side) => {
+            setRoute({
+              kind: "market",
+              sport,
+              selectEventId: eventId,
+              ...(side !== null ? { selectSide: side } : {}),
+            });
+          }}
+          onBack={home}
         />
       );
     case "trading":
@@ -649,6 +706,9 @@ function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
           }}
           onTrade={(sport, eventId) => {
             setRoute({ kind: "market", sport: sport.id, selectEventId: eventId });
+          }}
+          onDiscover={() => {
+            setRoute({ kind: "discover", filters: { status: "open" } });
           }}
         />
       </div>
@@ -812,10 +872,17 @@ function intentToRoute(intent: Intent): Route {
     case "market":
       return { kind: "market", sport: intent.sport };
     case "position":
-      // B8-004/B8-005 — position execution is gated until the market
-      // contracts deploy. Land on the league's market page (NFL when no
-      // league was named), which says honestly what's open.
-      return { kind: "market", sport: intent.sport ?? "nfl" };
+      // Land on the league's market page (NFL when no league was named);
+      // a team hint preselects that game and side (T-017), and a close
+      // opens the ticket on Sell.
+      return {
+        kind: "market",
+        sport: intent.sport ?? "nfl",
+        ...(intent.team ? { selectTeam: intent.team } : {}),
+        ...(intent.action === "close" ? { direction: "sell" as const } : {}),
+      };
+    case "discover":
+      return { kind: "discover", filters: intent.filters };
     case "analyze":
       return {
         kind: "analyze",
@@ -833,5 +900,26 @@ function intentToRoute(intent: Intent): Route {
         ...(intent.destination ? { bridgeDestination: intent.destination } : {}),
         nonce: nextSwapNonce(),
       };
+  }
+}
+
+/** The dock's quick-action context for the current surface (T-016). */
+function quickActionContext(
+  route: Route,
+  focusedGame: { away: string; home: string } | null,
+): QuickActionContext {
+  switch (route.kind) {
+    case "market":
+      return { kind: "market", sport: route.sport, ...(focusedGame ? { game: focusedGame } : {}) };
+    case "home":
+    case "discover":
+    case "analyze":
+    case "swap":
+    case "pools":
+    case "profile":
+    case "agent":
+      return { kind: route.kind };
+    default:
+      return { kind: "other" };
   }
 }

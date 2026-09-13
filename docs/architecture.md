@@ -593,6 +593,57 @@ Gas is the one non-USDC residue (user-signed trades pay it natively;
 agent-side operations are already sponsored) and is being removed by the
 gasless task, after which the model above is exact.
 
+## Consumer trading layer (Phase 6, task 050)
+
+The consumer layer sits on the market stack without touching the
+mechanism, the fee model, or the execution path. Its rule: every product
+principle is a pure module with a test, and the components only render
+what those modules return.
+
+- **Discovery** (`client/src/features/markets/discovery.ts`,
+  `discover/DiscoverPage.tsx`, `server/src/routes/market-discover.ts`).
+  One `DiscoverFilters` object — sport, league, team, game, status, start
+  window, liquidity floor, sort — produced by the filter chips, by the
+  natural-language path (`discovery-query.ts`, behind `chat-intent.ts`'s
+  `discover` intent), and by the dock's Trade chip. The server read joins
+  the public slate (with live pool odds) to the latest pool tick's
+  liquidity (`2·L·√p`, the value of a full-range position) and 24 h fill
+  volume/count; it is keyed by league + provider event id and never
+  carries a market id or address (T-020). Adding a sport is a `SPORTS`
+  row plus the server allowlist entry — no navigation layer.
+- **The ticket** (`features/markets/ticket/`). `trade-ticket-core.ts` is
+  the tap machine: price → preset → Confirm is three taps for a buy,
+  Close → Confirm two for an exit, asserted in tests (T-002/T-011).
+  `use-trade-ticket.ts` composes it with `useMarketTrade`, the shared live
+  balance, and `trade-errors.ts`; the review block renders `feeLines` from
+  the hook's quote in every season, and `feeExceedsCeiling` refuses a
+  quote above 0.70% instead of rendering it (T-008). Execution ends in
+  `TicketExecuted` (T-006). A short balance opens `TicketFunding` inline:
+  bank via the shipped Plaid rail (`PlaidLinkLauncher`, shared with the
+  Cash tab) or a USDC transfer, with Skip for USDC-native users (T-013).
+- **Chainless surface.** `chainless-copy.test.ts` sweeps every user-facing
+  string in the market surfaces and the shell chips for gas / ETH /
+  network / chain / explorer words and raw addresses (T-004/T-005). The
+  wallet's own prompts are the only place "your wallet" appears.
+- **Provenance and freshness.** `probability-source.ts` labels every
+  probability as market price, projection, or agent estimate (T-021);
+  `PredictionNote` sits under agent and analysis output (T-022);
+  `freshness.ts` + `Freshness` stamp every live-data surface from the
+  slate's `fetchedAt` / `dataAsOf` / `delayed` (T-023).
+- **Conversation first.** The dock `InputBar` stays the primary surface
+  on every page (T-015). `lib/quick-actions.ts` maps the current route and
+  the game in view to Analyze / Trade / Swap / Add Liquidity / Portfolio /
+  Agent chips whose commands go through the same `handleCommand` and are
+  proven to re-detect to their intent (T-016/T-017). Position commands
+  carry a team hint that `team-select.ts` resolves against the slate.
+- **Live updates.** `use-live-balance.ts` is a module-level store — one
+  poll, refreshed on `mantua:refresh-portfolio` — read by the ticket and
+  the portfolio; positions lists refresh on the same event plus a slow
+  poll (T-007).
+- **E2E.** `consumer-loop.e2e.test.ts` composes Discover → Analyze →
+  Trade → Monitor → Exit/Settle through these modules against the
+  server's wire shapes. The live on-chain run waits on the D-112 deploy.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.
