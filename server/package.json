@@ -17,6 +17,7 @@
     "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
     "fiat:e2e": "tsx --env-file-if-exists=.env src/scripts/fiat-e2e.ts",
     "load:spike": "tsx --env-file-if-exists=.env src/scripts/load-test.ts",
+    "drill:kill-switch": "tsx --env-file-if-exists=.env src/scripts/kill-switch-drill.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -38,7 +39,7 @@
     "@x402/fetch": "^2.17.0",
     "drizzle-orm": "0.45.2",
     "express": "5.2.1",
-    "express-rate-limit": "8.4.1",
+    "express-rate-limit": "8.7.0",
     "pg": "8.20.0",
     "pino": "10.3.1",
     "pino-http": "11.0.0",

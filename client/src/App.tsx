@@ -12,6 +12,7 @@ import type { LegalDoc } from "./components/legal/LegalPage.tsx";
 import { DocsPage } from "./components/docs/DocsPage.tsx";
 import { LeaguePage } from "./features/markets/LeaguePage.tsx";
 import { DiscoverPage } from "./features/markets/discover/DiscoverPage.tsx";
+import { HistoryPage } from "./features/markets/history/HistoryPage.tsx";
 import type { DiscoverFilters } from "./features/markets/discovery.ts";
 import { isSportId, type SportId } from "./features/markets/sports.ts";
 import { rawToHuman6 } from "./features/markets/market-trade-core.ts";
@@ -82,6 +83,7 @@ type Route =
     }
   /** Task 050 — cross-league market discovery with filters (T-001/T-018). */
   | { kind: "discover"; filters?: DiscoverFilters }
+  | { kind: "history"; league?: SportId }
   | { kind: "profile" }
   | { kind: "trading" }
   | { kind: "pools" }
@@ -125,6 +127,7 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "discover",
   "profile",
   "trading",
+  "history",
   "pools",
   "pool",
   "add-liquidity",
@@ -212,6 +215,21 @@ export default function App() {
     window.addEventListener("mantua:close-position", handler);
     return () => {
       window.removeEventListener("mantua:close-position", handler);
+    };
+  }, []);
+
+  // The ticket's Terms gate (task 067) opens the legal page without
+  // prop-drilling, like the login modal.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const doc = (e as CustomEvent<string>).detail;
+      if (doc === "terms" || doc === "privacy" || doc === "integrity") {
+        setRoute({ kind: "legal", doc });
+      }
+    };
+    window.addEventListener("mantua:open-legal", handler);
+    return () => {
+      window.removeEventListener("mantua:open-legal", handler);
     };
   }, []);
 
@@ -554,7 +572,20 @@ function fullPage(
           onViewPositions={() => {
             setRoute({ kind: "profile" });
           }}
+          onBrowseHistory={() => {
+            setRoute({ kind: "history", league: route.sport });
+          }}
           onFocusGame={onFocusGame}
+        />
+      );
+    case "history":
+      return (
+        <HistoryPage
+          league={route.league ?? null}
+          onChangeLeague={(league) => {
+            setRoute({ kind: "history", ...(league ? { league } : {}) });
+          }}
+          onBack={home}
         />
       );
     case "discover":
@@ -573,6 +604,9 @@ function fullPage(
             });
           }}
           onBack={home}
+          onBrowseHistory={() => {
+            setRoute({ kind: "history" });
+          }}
         />
       );
     case "trading":

@@ -99,3 +99,7 @@ REPLIT_SYNC.*
 api/_server.mjs
 api/_dcw.mjs
 api/_ubk.mjs
+
+# Playwright (client/e2e) — task 067
+client/test-results/
+client/playwright-report/

@@ -344,3 +344,53 @@ activity and the 5-minute confirmation TTL); `CONFIRMATION_EXPIRED` /
 `CONFIRMATION_INVALID` in volume suggests a client that re-sends or an
 injection attempt (see the untrusted-data envelope's `suspiciousCount`
 in the tool cards). No money moved in any refused case.
+
+## 13. Launch-gate rehearsal — the kill-switch drill (task 067, G-016)
+
+Run this on staging before the first dogfood day and once per quarter
+after launch. It takes about ten minutes and leaves a log. Two people:
+the operator (runs the levers) and the observer (times and records).
+
+**Runner.** `npm run drill:kill-switch -w @mantua/server -- --target https://<host> --operator <name> --observer <name> --commit <sha>`
+does steps 0, 2, 3, 5, 7 and the timing itself (`CRON_SECRET` in the
+server `.env` enables step 5), prompts for the lever flips and the two
+client observations, and prints the log below filled in. Exit code 0 is
+PASS. The table is the manual fallback and the definition of each step.
+
+**Preconditions.** Staging deployed from `main`; the observer has the
+app open, signed in, with a ticket ready to confirm; the operator has
+the Upstash console and `curl` against `https://<staging-host>`.
+
+| Step | Operator                                                                                                                                                                   | Observer records                                                                                                           |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| 0    | `curl -s https://<host>/api/status` — confirm `"killSwitch": false`, `"trading": "open"`                                                                                   | T0, the status body                                                                                                        |
+| 1    | Upstash: set `mantua:kill-switch` = `1`                                                                                                                                    | T1 (lever engaged)                                                                                                         |
+| 2    | Every 5 s: `curl -s -o /dev/null -w '%{http_code}\n' -X POST https://<host>/api/markets/trade/calldata -H 'content-type: application/json' -d '{}'` until it returns `503` | T2 = first 503, and T2 − T1 (target ≤ 20 s: the 15 s per-instance cache plus one request)                                  |
+| 3    | `curl -s https://<host>/api/status` — expect `"killSwitch": true`, `"trading": "paused"`                                                                                   | T3; the status body                                                                                                        |
+| 4    | —                                                                                                                                                                          | In the app: the ticket's Confirm reads "Trading paused" and is disabled without a reload (T4 ≤ T3 + 30 s, the status poll) |
+| 5    | `curl -i https://<host>/api/cron/rebalance -H "authorization: Bearer <CRON_SECRET>"`                                                                                       | `503 {"code":"KILL_SWITCH_ACTIVE"}` before any sweep                                                                       |
+| 6    | Upstash: set `mantua:kill-switch` = `0`                                                                                                                                    | T6 (lever released)                                                                                                        |
+| 7    | Repeat step 2 until the calldata call stops returning 503 (it will return 400 on the empty body — that is the write path open again)                                       | T7, and T7 − T6                                                                                                            |
+| 8    | —                                                                                                                                                                          | In the app: Confirm returns to "Confirm buy" without a reload                                                              |
+
+**Pass** when every row's expectation held and T2 − T1 and T7 − T6 are
+both under 20 s. Any other outcome is a finding: file it in
+`docs/security/findings.md` with the step number and the observed body.
+
+**Log template** (commit under `docs/ops/drills/YYYY-MM-DD-kill-switch.md`):
+
+```
+Date / host / commit:
+Operator / observer:
+T0 status:            T1 engaged:   T2 first 503:   (T2−T1 = __ s)
+T3 status paused:     T4 client paused (no reload): yes/no
+Step 5 cron 503:      yes/no
+T6 released:          T7 write path open: (T7−T6 = __ s)
+Step 8 client resumed (no reload): yes/no
+Result: PASS / FAIL — findings filed: (ids)
+```
+
+The same table works for the deploy-time lever (`MANTUA_KILL_SWITCH=1`
+
+- redeploy) with the deploy time in place of T1; expect T2 − T1 to be the
+  deploy duration, and remember that lever cannot be lifted at runtime.

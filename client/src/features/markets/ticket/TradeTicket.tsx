@@ -1,5 +1,4 @@
 import { usePrivy } from "@privy-io/react-auth";
-import { Button } from "@/components/ui/button.tsx";
 import { usdcRawToDollars } from "@/features/portfolio/live-balance-core.ts";
 import type { Side } from "../trade-ticket-core.ts";
 import type { SlateEvent } from "../use-slate.ts";
@@ -9,6 +8,8 @@ import { TicketFunding } from "./TicketFunding.tsx";
 import { TicketReview } from "./TicketReview.tsx";
 import { TicketSides } from "./TicketSides.tsx";
 import { TicketStatus } from "./TicketStatus.tsx";
+import { TicketAction } from "./TicketAction.tsx";
+import { useLegalAcceptance } from "@/features/legal/use-legal-acceptance.ts";
 import { useTradeTicket } from "./use-trade-ticket.ts";
 
 /**
@@ -34,6 +35,7 @@ export function TradeTicket({
 }) {
   const { user } = usePrivy();
   const t = useTradeTicket({ event, outcomeIndex, initialDirection, initialAmount });
+  const legal = useLegalAcceptance();
   const chosen = outcomeIndex === 0 ? event.home : event.away;
   const login = () => {
     window.dispatchEvent(new Event("mantua:open-login"));
@@ -111,37 +113,21 @@ export function TradeTicket({
             onFund={t.confirm}
             onLogin={login}
           />
-          {t.readiness === "login" ? (
-            <Button variant="primary" size="lg" className="mt-3 w-full" onClick={login}>
-              Log in to trade
-            </Button>
-          ) : (
-            <Button
-              variant="primary"
-              size="lg"
-              className="mt-3 w-full"
-              data-testid="confirm"
-              aria-live="polite"
-              aria-atomic="true"
-              disabled={t.busy || t.readiness === "waiting" || t.readiness === "paused"}
-              onClick={t.confirm}
-            >
-              {t.busy
-                ? "Working…"
-                : t.readiness === "paused"
-                  ? "Trading paused"
-                  : t.readiness === "fund"
-                    ? "Add funds"
-                    : `Confirm ${t.ticket.direction === "sell" ? "sell" : "buy"}`}
-            </Button>
-          )}
+          <TicketAction
+            readiness={t.readiness}
+            busy={t.busy}
+            direction={t.ticket.direction}
+            legal={legal}
+            onLogin={login}
+            onConfirm={t.confirm}
+          />
         </>
       )}
 
       <p className="mt-3 text-[10.5px] leading-relaxed text-text-mute">
         Trade before or during the game — trading closes when the game goes final. A winning
-        contract pays $1; postponed or tied games settle both sides at 50¢. By trading you agree to
-        the Terms of Use.
+        contract pays $1; postponed or tied games settle both sides at 50¢. Trades are governed by
+        the Terms of Use you accepted.
       </p>
     </div>
   );

@@ -12,11 +12,32 @@ import path from "node:path";
  *
  * Staging / prod must serve over real TLS (Vercel handles the frontend).
  */
+/**
+ * Task 067 (G-001): under `VITE_E2E_AUTH=shim` the authentication SDK is
+ * replaced by the browser suite's shim (client/e2e/privy-shim.tsx). The
+ * flag is read at config time from the process env, so a production build
+ * (no flag) never resolves the shim.
+ */
+const e2eAuthShim = process.env.VITE_E2E_AUTH === "shim";
+const alias = [
+  { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
+  ...(e2eAuthShim
+    ? [
+        {
+          find: /^@privy-io\/react-auth\/smart-wallets$/,
+          replacement: path.resolve(import.meta.dirname, "e2e/privy-smart-wallets-shim.ts"),
+        },
+        {
+          find: /^@privy-io\/react-auth$/,
+          replacement: path.resolve(import.meta.dirname, "e2e/privy-shim.tsx"),
+        },
+      ]
+    : []),
+];
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: {
-    alias: { "@": path.resolve(import.meta.dirname, "src") },
-  },
+  resolve: { alias },
   build: {
     rollupOptions: {
       output: {

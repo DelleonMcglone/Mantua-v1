@@ -789,6 +789,41 @@ cap-bound is honest and deterministic). Columns instead of the typed
 the only editor. A paused policy stops unprompted hedges and every agent
 trade; the kill switch remains the platform-wide stop above it.
 
+## D-117 — Launch gate definition and what closes it ✅ CLOSED 2026-09-13
+
+**Decision.** The launch gate is one ledger (`docs/tasks/launch-gate.md`,
+rows G-001 … G-018) sourced from the roadmap's Phase 9 table, its "Launch
+gate" / "Public launch gate" lists, B10-010, TD-005, and the open items in
+the security sign-off. Three rules govern it (task 067):
+
+1. **Proof at the layer that was missing.** The browser suite
+   (`client/e2e/`, Playwright) drives the real client in Chromium against
+   the shipped API wire shapes. Authentication is a shim aliased in only
+   under `VITE_E2E_AUTH=shim`; the chain is a scripted JSON-RPC mock. It
+   proves the UI and its contracts, not the chain — the chain is proven by
+   the Foundry fork suite in CI and by the deployment-gated live run.
+2. **Guards are asserted, not reviewed.** Security headers, the
+   mutating-route guard audit, and the repository secret scan are tests
+   that run on every PR; a new route or file that breaks the rule fails
+   CI rather than waiting for a reviewer to notice.
+3. **Owner-gated rows stay visible.** Counsel review, the dogfood window,
+   the mainnet deploy and its funded E2E, the M-01 written acceptance,
+   and the kill-switch rehearsal are listed 🟡 with the artifact prepared
+   for each; none is marked done by the code.
+
+**Rejected.** A Playwright run against a live backend and chain in CI
+(needs funded wallets and a database per run; the fork suite already
+covers the chain). A content-security policy on the SPA in this task
+(the auth iframe and RPC hosts need an allowlist decided with the
+provider; recorded as a follow-up in the review). Bumping the
+authentication SDK to clear a transitive `ws` advisory (a major behaviour
+change for one moderate-impact dependency; recorded, not taken).
+
+**Consequence.** `npm run e2e` at the root runs the browser suite;
+`.github/workflows/e2e.yml` runs it on every PR; the Terms carry a
+version, and a user's acceptance of that version is recorded server-side
+before the first trade.
+
 ## D-116 — Portfolio valuation sources ✅ CLOSED 2026-09-12
 
 **Decision.** Nothing in a portfolio total is hardcoded (task 066):

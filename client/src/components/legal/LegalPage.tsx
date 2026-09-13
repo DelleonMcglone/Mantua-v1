@@ -7,7 +7,7 @@ export type LegalDoc = "privacy" | "terms" | "integrity";
 
 /** Shown at the top of each policy. Bump when the text changes
  *  materially. */
-export const EFFECTIVE_DATE = "August 15, 2026";
+export const EFFECTIVE_DATE = "September 13, 2026";
 
 /** One channel handles privacy requests, terms questions, and market
  *  integrity reports while the support inbox is not yet set up. */

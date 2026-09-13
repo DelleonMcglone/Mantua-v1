@@ -19,7 +19,8 @@
     "verify:hooks": "tsx contracts/script/verify-hooks.ts --write",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "e2e": "npm run e2e -w @mantua/client"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

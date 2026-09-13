@@ -1,6 +1,9 @@
 import { useMemo } from "react";
-import { ProbabilityTag } from "../ProbabilityTag.tsx";
 import type { SlateEvent } from "../use-slate.ts";
+import { placeAnnotations } from "./chart-annotations.ts";
+import { AnnotationLines, ChartAnnotations } from "./ChartAnnotations.tsx";
+import { ChartLegend } from "./ChartLegend.tsx";
+import type { ChartAnnotation } from "./depth-types.ts";
 import type { DetailResponse, PricePoint } from "./detail-types.ts";
 
 const CHART_W = 640;
@@ -17,15 +20,21 @@ function polyline(points: PricePoint[], t0: number, t1: number): string {
     .join(" ");
 }
 
-/** The recorded price series for both sides, anchored to the live price. */
+/**
+ * The recorded price series for both sides, anchored to the live price,
+ * with Phase 12's market-event annotations (D-005) drawn as guide lines
+ * and a label strip.
+ */
 export function PriceChart({
   event,
   detail,
   failed,
+  annotations = [],
 }: {
   event: SlateEvent;
   detail: DetailResponse | null;
   failed: boolean;
+  annotations?: readonly ChartAnnotation[];
 }) {
   const { home, away } = useMemo(() => {
     const prices = detail?.prices ?? [];
@@ -66,28 +75,11 @@ export function PriceChart({
   const latest = (pts: PricePoint[]) => pts.at(-1)?.priceBps;
   const homePct = latest(home);
   const awayPct = latest(away);
+  const placed = placeAnnotations(annotations, t0, t1, CHART_W);
 
   return (
     <div className="rounded-md border border-border-soft bg-panel-solid p-4">
-      <div className="mb-2 flex items-center gap-4 text-[12px]">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-accent" />
-          {event.home.abbreviation}
-          {typeof homePct === "number" && (
-            <span className="font-mono font-semibold text-text">{(homePct / 100).toFixed(0)}%</span>
-          )}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-green" />
-          {event.away.abbreviation}
-          {typeof awayPct === "number" && (
-            <span className="font-mono font-semibold text-text">{(awayPct / 100).toFixed(0)}%</span>
-          )}
-        </span>
-        <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-text-mute">
-          implied win probability <ProbabilityTag liveOdds={event.liveOdds} />
-        </span>
-      </div>
+      <ChartLegend event={event} homePct={homePct} awayPct={awayPct} />
       <svg
         viewBox={`0 0 ${String(CHART_W)} ${String(CHART_H)}`}
         className="h-[180px] w-full"
@@ -121,7 +113,9 @@ export function PriceChart({
             strokeWidth={2}
           />
         )}
+        <AnnotationLines placed={placed} height={CHART_H} />
       </svg>
+      <ChartAnnotations placed={placed} width={CHART_W} />
       <div className="mt-1 flex justify-between text-[10px] text-text-mute">
         <span>
           {new Date(t0 * 1000).toLocaleString(undefined, {

@@ -45,4 +45,4 @@
 - [x] B10-007 — Security sign-off — zero HIGH findings open, MEDIUM accepted in writing (`docs/security/sign-off.md`)
 - [x] B10-008 — Jurisdictional posture verified end to end (DM-108): no extra jurisdictional notice in the UI
 - [x] B10-009 — Incident runbook: kill-switch activation, mis-resolution recovery, provider failover, user comms
-- [ ] B10-010 — Ship: production live end to end ⏸
+- [ ] B10-010 — Ship: production live end to end ⏸ — gated by the Phase 10 ledger (`docs/tasks/launch-gate.md`): G-004/G-005 hosting + CI/CD, G-011 deploy, G-017 staging drill and funded run

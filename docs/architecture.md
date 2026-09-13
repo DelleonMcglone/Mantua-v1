@@ -359,21 +359,21 @@ The load-bearing distinction: agent wallets are server-signed, so server
 checks are real rails; user wallets are self-custodied, so server checks on
 that path are advisory UX, not controls.
 
-| Rail                                                 | Verdict                       | Why                                                                                                                                                                                                                                                                                                  | Effort |
-| ---------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Agent-wallet spending caps                           | KEEP (1 fix landed, 1 open)   | Enforced at every server-signed execution point. The chat `set_cap` bypass is CLOSED (C-010, task 024): raises need the user's attested message and every value clamps through `assertValidDailyCap` — verified again in task 055 (A-047). Still open: `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide                                                    | S      |
-| User-wallet spending caps                            | REPLACE (or relabel advisory) | Checked only on `/api/quote`; calldata routes skip it; ledger increments only via a client-reported endpoint; user holds the keys                                                                                                                                                                    | L      |
-| Uncapped money paths                                 | MISSING                       | Sports market trades, user add-liquidity/pool-create, `/api/v4/swap/calldata`, and Gateway spends (which check a counter they never increment) have no cap and mostly no audit                                                                                                                       | M      |
-| Tier system (age-based caps)                         | REPLACE                       | `getWalletAge` has zero callers — the documented D-009 policy is entirely unimplemented; a day-one account can be set to $50k                                                                                                                                                                        | S      |
-| x402 caps                                            | KEEP                          | Server-keyed, per-call + daily, conservative defaults                                                                                                                                                                                                                                                | —      |
-| `MANTUA_KILL_SWITCH`                                 | REFACTOR                      | Gates only POST/PUT/PATCH/DELETE — **all seven GET cron money-loops (rebalance, intents, strategies, resolution, sweeps) keep running with the switch on.** Flipping requires a full redeploy. Move to a per-request DB/Edge-Config read, cover GET, and check it inside `executeAgentCalldata`      | M      |
-| `STRATEGIES_KILL_SWITCH`                             | KEEP                          | Correctly scoped, actively disarms, audited                                                                                                                                                                                                                                                          | —      |
-| Rate limiting                                        | REFACTOR                      | Right layering, wrong store: in-memory counters are per-lambda on Vercel and reset on cold start; needs Redis/Upstash                                                                                                                                                                                | M      |
-| Cron/admin auth                                      | REFACTOR                      | One shared secret unlocks settlement, sweeps, and admin ops; non-constant-time compare; `MANTUA_FEE_ADMIN_KEY` is declared/documented but read by zero code (MISSING)                                                                                                                                | S      |
-| `/api/rpc` proxy                                     | REFACTOR                      | Method allowlist is good, but open CORS + allowlisted `eth_sendRawTransaction` = free public tx relay                                                                                                                                                                                                | S      |
-| Audit log                                            | REFACTOR                      | Right schema and ~30 call sites, but inserts fail silently, `rejected_kill_switch`/`rejected_chain` outcomes are never emitted, market trades write no rows, no user-id/request-id correlation, no integrity/retention controls                                                                      | M      |
-| Slippage enforcement                                 | REPLACE                       | `MAX_SLIPPAGE_BPS` unapplied on the v4 path (accepts 100%); min-out is display-only, absent from calldata on both user and agent paths — land it with the UniversalRouter migration                                                                                                                  | M      |
-| Allowed-targets, hook-pair gating, peg/impact guards | KEEP                          | Server-side, default-deny, enforced in code not prompt; the attested-`force`-override pattern is the model to reuse for cap raises                                                                                                                                                                   | —      |
+| Rail                                                 | Verdict                       | Why                                                                                                                                                                                                                                                                                                                                          | Effort |
+| ---------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Agent-wallet spending caps                           | KEEP (1 fix landed, 1 open)   | Enforced at every server-signed execution point. The chat `set_cap` bypass is CLOSED (C-010, task 024): raises need the user's attested message and every value clamps through `assertValidDailyCap` — verified again in task 055 (A-047). Still open: `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide | S      |
+| User-wallet spending caps                            | REPLACE (or relabel advisory) | Checked only on `/api/quote`; calldata routes skip it; ledger increments only via a client-reported endpoint; user holds the keys                                                                                                                                                                                                            | L      |
+| Uncapped money paths                                 | MISSING                       | Sports market trades, user add-liquidity/pool-create, `/api/v4/swap/calldata`, and Gateway spends (which check a counter they never increment) have no cap and mostly no audit                                                                                                                                                               | M      |
+| Tier system (age-based caps)                         | REPLACE                       | `getWalletAge` has zero callers — the documented D-009 policy is entirely unimplemented; a day-one account can be set to $50k                                                                                                                                                                                                                | S      |
+| x402 caps                                            | KEEP                          | Server-keyed, per-call + daily, conservative defaults                                                                                                                                                                                                                                                                                        | —      |
+| `MANTUA_KILL_SWITCH`                                 | REFACTOR                      | Gates only POST/PUT/PATCH/DELETE — **all seven GET cron money-loops (rebalance, intents, strategies, resolution, sweeps) keep running with the switch on.** Flipping requires a full redeploy. Move to a per-request DB/Edge-Config read, cover GET, and check it inside `executeAgentCalldata`                                              | M      |
+| `STRATEGIES_KILL_SWITCH`                             | KEEP                          | Correctly scoped, actively disarms, audited                                                                                                                                                                                                                                                                                                  | —      |
+| Rate limiting                                        | REFACTOR                      | Right layering, wrong store: in-memory counters are per-lambda on Vercel and reset on cold start; needs Redis/Upstash                                                                                                                                                                                                                        | M      |
+| Cron/admin auth                                      | REFACTOR                      | One shared secret unlocks settlement, sweeps, and admin ops; non-constant-time compare; `MANTUA_FEE_ADMIN_KEY` is declared/documented but read by zero code (MISSING)                                                                                                                                                                        | S      |
+| `/api/rpc` proxy                                     | REFACTOR                      | Method allowlist is good, but open CORS + allowlisted `eth_sendRawTransaction` = free public tx relay                                                                                                                                                                                                                                        | S      |
+| Audit log                                            | REFACTOR                      | Right schema and ~30 call sites, but inserts fail silently, `rejected_kill_switch`/`rejected_chain` outcomes are never emitted, market trades write no rows, no user-id/request-id correlation, no integrity/retention controls                                                                                                              | M      |
+| Slippage enforcement                                 | REPLACE                       | `MAX_SLIPPAGE_BPS` unapplied on the v4 path (accepts 100%); min-out is display-only, absent from calldata on both user and agent paths — land it with the UniversalRouter migration                                                                                                                                                          | M      |
+| Allowed-targets, hook-pair gating, peg/impact guards | KEEP                          | Server-side, default-deny, enforced in code not prompt; the attested-`force`-override pattern is the model to reuse for cap raises                                                                                                                                                                                                           | —      |
 
 ### Design system
 
@@ -404,8 +404,9 @@ transaction that never calls the client's `confirm()`. Since task 055 that
 path has its own server-side seam: the execution gate (D-114) — preview,
 the user's explicit "confirm" in their own message, a server-minted
 single-use confirmation id, a fresh simulation — with the cap + allowlist
-+ guard stack underneath. The client modal stays mandatory for
-_user-signed_ writes.
+
+- guard stack underneath. The client modal stays mandatory for
+  _user-signed_ writes.
 
 ### Ship-blockers before real volume (ranked)
 
@@ -644,6 +645,102 @@ what those modules return.
   Trade → Monitor → Exit/Settle through these modules against the
   server's wire shapes. The live on-chain run waits on the D-112 deploy.
 
+## Launch gate (Phase 10, task 067, D-117)
+
+The gate is a ledger (`docs/tasks/launch-gate.md`), not a checklist in
+prose: every row is either closed by an artifact a reader can run or
+marked as the owner's with the artifact that would close it.
+
+- **Browser E2E** (`client/e2e/`, `npm run e2e`, `.github/workflows/e2e.yml`).
+  The real client runs in Chromium under Vite with one substitution: when
+  `VITE_E2E_AUTH=shim`, `vite.config.ts` aliases `@privy-io/react-auth`
+  (and its `smart-wallets` entry) to `e2e/privy-shim.tsx`, a store-backed
+  fake of the six exports the client uses plus an EIP-1193 provider that
+  signs with a fixed address. The API is answered by Playwright routes in
+  `e2e/harness.ts` from `e2e/fixtures.ts`, in the shipped wire shapes, and the chain by
+  `e2e/rpc-mock.ts` behind `VITE_BASE_RPC_URL=/__e2e/rpc`. Nothing else
+  is mocked, so a spec that passes has exercised the same components,
+  hooks, and transports a user does. Decision D-117: a live backend in CI
+  was rejected (secrets, a database, and a chain for every PR) in favour
+  of scripted boundaries plus one funded run on staging (G-017).
+- **Guards as tests.** Security headers (`server/src/middleware/security-headers.ts`),
+  the route-guard audit (`routes/route-guards.test.ts`, a static parse of
+  every mutating registration with an allowlist that names its reason),
+  and the secret scan (`lib/security/secret-scan.ts`) run with the unit
+  suite so the properties cannot regress silently. CSP is deferred to a
+  report-only rollout because the auth iframe, Plaid Link, and the RPC
+  hosts need a per-host allowlist first.
+- **Legal acceptance** (`legal_acceptances`, `routes/legal.ts`,
+  `client/src/features/legal/`). Versions are string constants
+  (`server/src/lib/legal.ts`, `client/src/lib/legal-version.ts`); the
+  ticket swaps its Confirm for a one-tap gate when the current Terms
+  version has no acceptance row for the user, and a version bump re-asks
+  once. The pages and the counsel drafts are kept in step by hand and
+  asserted by `client/e2e/legal.spec.ts`.
+- **CSP, report-only first.** `server/src/lib/security/csp.ts` is the
+  per-host allowlist (each origin with its reason) and the builder for the
+  `Content-Security-Policy-Report-Only` header `vercel.json` ships; a test
+  pins the two together. `POST /api/csp-report` receives browser reports
+  and reduces each to one log line. A clean report window on staging is
+  the evidence for flipping to enforcement — the vendor host lists are
+  documented, not fetched, so the browser is the oracle.
+- **The drill is code.** `server/src/lib/ops/drill-core.ts` holds the
+  kill-switch drill's rules (only `KILL_SWITCH_ACTIVE` counts as engaged,
+  20 s limits, the log format) with tests; `scripts/kill-switch-drill.ts`
+  drives a deployment through them and prints the runbook §13 log.
+- **Lockfile portability.** The lockfile now carries the Linux native
+  bindings beside the macOS ones so `npm ci` installs a working Vite on
+  Linux runners; the Vercel build should move from `npm install
+--no-package-lock` to `npm ci` (review §6).
+
+## Market depth & research layer (Phase 12, task 068)
+
+The market page grows downward, never sideways: every deeper data point
+is a section on the same page, and the rules for what shows are pure
+modules with tests.
+
+- **One read for depth** (`server/src/lib/sports/market-depth-read.ts`,
+  `GET /api/markets/depth?providerEventId=`). Keyed by event, never a
+  market id (T-020). It joins the metrics module (price, 24 h move,
+  volume, trades, open interest, pool liquidity), the depth curve, the
+  live game state, and the chart annotations, over a `DepthDb` seam so the
+  assembly is tested without Postgres (`market-depth-db.ts` binds it).
+- **Depth is the cost to move the price** (`market-depth.ts`). A
+  constant-product pool has no order book; the ladder quotes, for ±1, 2,
+  5, 10, 20¢, the USDC and contracts that reach that price through the
+  active-range liquidity L: buy `L·(√p′ − √p)` in, sell `L·(1/√p′ − 1/√p)`
+  contracts in. Clamped to 1–99¢, deduplicated at the edges, labelled on
+  the page as a curve, not a book.
+- **Live game** (`LiveGamePanel.tsx`, `live-game-core.ts`). Score from the
+  event; period, clock, possession, and the last play from the latest
+  ingested play (`game_plays`), stamped with that play's time. Nothing is
+  invented: a game with no plays shows the score and says why.
+- **Research** (`GET /api/markets/analysis`, `ResearchSection.tsx`,
+  `research-core.ts`). The same `mantua_analyze_market` the agent runs —
+  a deterministic read over the canonical database, no model call —
+  cached a minute per side, rendered with the agent-estimate tag (T-021)
+  and the prediction note (T-022); the market price is quoted beside it,
+  never replaced by it.
+- **Layered disclosure** (`disclosure-core.ts`, `MarketDepthSections.tsx`).
+  Four sections — Depth & liquidity, Fees & execution, Research, Past
+  markets — start closed; each toggles independently; "Open all" opens
+  the available ones; an unavailable section says what it waits for.
+- **Annotations** (`market-depth-annotations.ts`, `chart-annotations.ts`).
+  Kickoff, the first ingested play of each period, the freeze, the
+  resolution, and up to six injury reports for the two teams; placed on
+  the chart's time axis in two lanes so labels never overlap. Halftime is
+  the start of period 3 where a play was ingested; no timestamp is
+  estimated.
+- **History** (`GET /api/markets/history`, `history/`). Resolved moneyline
+  markets with the final score, the latest resolution's outcome, the
+  home-side settlement price ($1, $0, or 50¢ voided), and a sampled price
+  path; a page filterable by league, reached from the market page's Past
+  markets section and from Discover.
+- **Proof** (`client/e2e/market.spec.ts`, `market-depth.e2e.test.ts`). The
+  browser spec asserts each data point with the page heading still
+  visible; the node test composes the shared wire fixtures through every
+  pure module.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.
@@ -834,13 +931,13 @@ status`, `/api/markets/fills`). A server-side indexer is the upgrade
 The agent is a proposer inside a stack where no layer trusts the one
 above it:
 
-| Layer                   | What it is                                                                                                                                                                                                                                                                                                                       | Where                                                                                                        |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| 1. Skill                | Prompt guidance: how to analyze, which tool first, what to cite. Advice, never authority.                                                                                                                                                                                                                                        | `SYSTEM_PROMPT` in `server/src/lib/agent-chat.ts`                                                            |
-| 2. Tools                | Typed reads (`mantua_search_markets`, `mantua_get_market`, `mantua_get_position`, `mantua_get_portfolio`, the sports detail tools) and typed writes (`mantua_simulate_trade` → `mantua_execute_trade` / `mantua_sell_position`, swap, send, …). Inputs are zod-validated; outputs say `unavailable` / `null` rather than guess. | `TOOLS` + `executeTool`; `lib/sports/agent-sports-tools.ts`; `lib/agent/read-tools.ts`                       |
-| 3. Wallet authorization | The server-custodied Circle wallet signs; the daily cap, the attested cap raise (C-010), the user's `agent_policies` row and the kill switch are checked in code before any signature.                                                                                                                                          | `lib/spending-cap.ts`, `lib/agent-wallet.ts`, `middleware/kill-switch.ts`, `lib/agent/trade-simulation.ts`  |
-| 4. Contract enforcement | Only allowlisted targets (`registerDynamicTargets`), the same market contracts and hook path the user's ticket uses, market state and fee decided on-chain.                                                                                                                                                                      | `lib/sports/market-agent-trade.ts`, `lib/sports/market-trade-build.ts`, the hook                             |
-| 5. User permission      | The D-114 gate: preview → the user's own explicit "confirm" → a server-minted single-use id → matching execution with a fresh simulation.                                                                                                                                                                                       | `lib/agent/execution-gate.ts`                                                                                |
+| Layer                   | What it is                                                                                                                                                                                                                                                                                                                      | Where                                                                                                      |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| 1. Skill                | Prompt guidance: how to analyze, which tool first, what to cite. Advice, never authority.                                                                                                                                                                                                                                       | `SYSTEM_PROMPT` in `server/src/lib/agent-chat.ts`                                                          |
+| 2. Tools                | Typed reads (`mantua_search_markets`, `mantua_get_market`, `mantua_get_position`, `mantua_get_portfolio`, the sports detail tools) and typed writes (`mantua_simulate_trade` → `mantua_execute_trade` / `mantua_sell_position`, swap, send, …). Inputs are zod-validated; outputs say `unavailable` / `null` rather than guess. | `TOOLS` + `executeTool`; `lib/sports/agent-sports-tools.ts`; `lib/agent/read-tools.ts`                     |
+| 3. Wallet authorization | The server-custodied Circle wallet signs; the daily cap, the attested cap raise (C-010), the user's `agent_policies` row and the kill switch are checked in code before any signature.                                                                                                                                          | `lib/spending-cap.ts`, `lib/agent-wallet.ts`, `middleware/kill-switch.ts`, `lib/agent/trade-simulation.ts` |
+| 4. Contract enforcement | Only allowlisted targets (`registerDynamicTargets`), the same market contracts and hook path the user's ticket uses, market state and fee decided on-chain.                                                                                                                                                                     | `lib/sports/market-agent-trade.ts`, `lib/sports/market-trade-build.ts`, the hook                           |
+| 5. User permission      | The D-114 gate: preview → the user's own explicit "confirm" → a server-minted single-use id → matching execution with a fresh simulation.                                                                                                                                                                                       | `lib/agent/execution-gate.ts`                                                                              |
 
 Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model

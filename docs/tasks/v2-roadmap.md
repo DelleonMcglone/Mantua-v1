@@ -95,21 +95,21 @@ Completed:   0
 [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 ```
 
-| Phase                                                | Tasks | Done | Progress                                                                                  |
-| ---------------------------------------------------- | ----- | ---- | ----------------------------------------------------------------------------------------- |
-| 🧱 Phase 0: Project Bootstrap                        | 8     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 🎨 Phase D: Design System & UI Shell                 | 8     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 🛡️ Phase 1: Mainnet Safety                           | 8     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 🔌 Phase 2: Skill, MCP & Wallet Provider Integration | 16    | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 💱 Phase 3: Swap (Core)                              | 8     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 💧 Phase 4: Liquidity (Add & Remove)                 | 10    | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 🪝 Phase 5: Hook Integration + AI Security Analysis  | 26    | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 🤖 Phase 6: Agent (Chat + Autonomous)                | 13    | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 📊 Phase 7: DefiLlama Analytics                      | 6     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 💼 Phase 8: Portfolio Page                           | 7     | 0    | `░░░░░░░░░░` 0%                                                                           |
-| 💰 Phase F: LP & Mantua Fee                          | 10    | 3    | `███░░░░░░░` 30% (+1 🟡, +6 ⬜ deferred per D-015)                                        |
-| 🗣️ Phase N: Natural Language Command Bar             | 11    | 7    | `███████░░░` 64% (+4 🟡 — clarify multi-turn / param passthrough / OpenAI fallback / E2E) |
-| ✅ Phase 9: E2E Testing & Launch                     | 13    | 0    | `░░░░░░░░░░` 0%                                                                           |
+| Phase                                                | Tasks | Done | Progress                                                                                                        |
+| ---------------------------------------------------- | ----- | ---- | --------------------------------------------------------------------------------------------------------------- |
+| 🧱 Phase 0: Project Bootstrap                        | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🎨 Phase D: Design System & UI Shell                 | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🛡️ Phase 1: Mainnet Safety                           | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🔌 Phase 2: Skill, MCP & Wallet Provider Integration | 16    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💱 Phase 3: Swap (Core)                              | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💧 Phase 4: Liquidity (Add & Remove)                 | 10    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🪝 Phase 5: Hook Integration + AI Security Analysis  | 26    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🤖 Phase 6: Agent (Chat + Autonomous)                | 13    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 📊 Phase 7: DefiLlama Analytics                      | 6     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💼 Phase 8: Portfolio Page                           | 7     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💰 Phase F: LP & Mantua Fee                          | 10    | 3    | `███░░░░░░░` 30% (+1 🟡, +6 ⬜ deferred per D-015)                                                              |
+| 🗣️ Phase N: Natural Language Command Bar             | 11    | 7    | `███████░░░` 64% (+4 🟡 — clarify multi-turn / param passthrough / OpenAI fallback / E2E)                       |
+| ✅ Phase 9: E2E Testing & Launch                     | 13    | 3    | `██░░░░░░░░` 23% (+2 🟡 — browser E2E + fork suites in CI; counsel review owner-gated; ledger `launch-gate.md`) |
 
 ---
 
@@ -780,21 +780,21 @@ Real user funds are in play from day one, so the Phase 1 safety rails,
 the security sign-off, and the hook redeployment/verification below are
 all launch-gating.
 
-| ID     | Task                                                                                                         | Status |
-| ------ | ------------------------------------------------------------------------------------------------------------ | ------ |
-| P9-001 | Full E2E test suite in Playwright — all flows Phase 3–8 against Base Mainnet (Anvil fork for writes)         | ⬜     |
-| P9-002 | Base Mainnet fork test environment (Anvil) for CI                                                            | ⬜     |
-| P9-003 | Confirm AI-assisted security analysis sign-off for the hook deployments (P5-026); residuals logged           | ✅     |
-| P9-004 | Provision hosting per D-004: Vercel (frontend) + Railway or Fly.io (backend) + Neon (Postgres)               | ⬜     |
-| P9-005 | Configure CI/CD: GitHub Actions → Vercel + Railway/Fly deploy; staging branch auto-deploys                   | ⬜     |
-| P9-006 | Production build: frontend + backend + DB migrations                                                         | ⬜     |
-| P9-007 | Deploy to staging, dogfood internally with team wallets (small real balances) for at least 2 weeks           | ⬜     |
-| P9-008 | Mainnet E2E: 10+ funded transactions across swap, LP, agent, all 4 hooks                                     | ⬜     |
-| P9-009 | Terms of Service + Privacy Policy drafted and reviewed                                                       | ⬜     |
-| P9-010 | Incident runbook: kill-switch activation, rollback, user comms                                               | ⬜     |
-| P9-011 | Soft launch: limited organic announcement, monitor for issues                                                | ⬜     |
-| P9-012 | Public launch announcement (open to all)                                                                     | ⬜     |
-| P9-013 | Deploy + verify all four hooks on Base Mainnet (`npm run verify:hooks`; `docs/security/hook-deployments.md`) | ⬜     |
+| ID     | Task                                                                                                                                                                                                                                                 | Status |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| P9-001 | Full E2E test suite in Playwright — all flows Phase 3–8 against Base Mainnet (Anvil fork for writes). **Browser suite shipped** (task 067, G-001/G-002: `client/e2e`, in CI on every PR, chain scripted); the fork-backed write path waits on P9-002 | 🟡     |
+| P9-002 | Base Mainnet fork test environment for CI — `contracts.yml` runs the gating fork suites on a Base Mainnet fork with a public-RPC fallback, green on `main` (ledger G-003)                                                                            | ✅     |
+| P9-003 | Confirm AI-assisted security analysis sign-off for the hook deployments (P5-026); residuals logged                                                                                                                                                   | ✅     |
+| P9-004 | Provision hosting per D-004: Vercel (frontend) + Railway or Fly.io (backend) + Neon (Postgres)                                                                                                                                                       | ⬜     |
+| P9-005 | Configure CI/CD: GitHub Actions → Vercel + Railway/Fly deploy; staging branch auto-deploys                                                                                                                                                           | ⬜     |
+| P9-006 | Production build: frontend + backend + DB migrations                                                                                                                                                                                                 | ⬜     |
+| P9-007 | Deploy to staging, dogfood internally with team wallets (small real balances) for at least 2 weeks                                                                                                                                                   | ⬜     |
+| P9-008 | Mainnet E2E: 10+ funded transactions across swap, LP, agent, all 4 hooks                                                                                                                                                                             | ⬜     |
+| P9-009 | Terms of Service + Privacy Policy drafted and reviewed — **drafted and live in the app with recorded acceptance** (task 067, G-012 … G-014); counsel review is the owner's (G-015)                                                                   | 🟡     |
+| P9-010 | Incident runbook: kill-switch activation, rollback, user comms — `docs/ops/incident-runbook.md` §1–§13 including the timed rehearsal script (G-016); the staging rehearsal itself is G-017                                                           | ✅     |
+| P9-011 | Soft launch: limited organic announcement, monitor for issues                                                                                                                                                                                        | ⬜     |
+| P9-012 | Public launch announcement (open to all)                                                                                                                                                                                                             | ⬜     |
+| P9-013 | Deploy + verify all four hooks on Base Mainnet (`npm run verify:hooks`; `docs/security/hook-deployments.md`)                                                                                                                                         | ⬜     |
 
 ### Launch gate
 
@@ -804,6 +804,48 @@ all launch-gating.
 - Internal dogfood ≥ 2 weeks with zero critical incidents (P9-007): required
 - Hook deployment + verification on Base Mainnet (P9-013): required before hook-gated pools open
 - **Not required for the initial (zero-fee) beta:** PF-005 → PF-010 (fee admin) and fee-collection code paths in production; they gate the fee turn-on per D-015, along with Risk 1 (EOA hardware-wallet hygiene) and Risk 2 (full crypto-counsel review).
+
+## 🚦 PHASE 10: Launch Gate — E2E, Security, Legal (task 067, D-117)
+
+The three lists above (this table, "Launch gate", "Public launch gate")
+plus B10-010, TD-005, and the open sign-off items are reconciled into one
+ledger, **`docs/tasks/launch-gate.md`** (G-001 … G-018). Twelve rows are
+closed inside the repository with a test, a CI job, or a document; six
+are the owner's and name the artifact that flips them.
+
+| ID          | Gate                                                                                                  | Status |
+| ----------- | ----------------------------------------------------------------------------------------------------- | ------ |
+| G-001/G-002 | Browser E2E (real client, Chromium, chain scripted) — in CI on every PR                               | ✅     |
+| G-006–G-010 | Security headers, route-guard audit, secret scan, dependency triage, rails review + sign-off addendum | ✅     |
+| G-012–G-014 | Terms / Privacy describe the shipped product; versioned acceptance recorded before the first trade    | ✅     |
+| G-016       | Runbook rehearsal script                                                                              | ✅     |
+| G-003       | Fork suites run in CI on a Base Mainnet fork (`contracts.yml`)                                        | ✅     |
+| G-004/G-005 | Hosting, CI/CD — owner                                                                                | 🟡     |
+| G-011       | Mainnet deploy + verify (P9-013, D-112) — owner                                                       | 🟡     |
+| G-015       | Counsel review — owner                                                                                | 🟡     |
+| G-017/G-018 | Staging drill + dogfood + funded run; M-01 / L-03 / fork suites / human audit — owner                 | 🟡     |
+
+## ⏸ PHASE 11 — deferred
+
+Skipped for now on the owner's instruction (2026-09-13); no scope recorded
+in the repository yet. To be supplied with its row table.
+
+## 🔍 PHASE 12: Market Depth & Research Layer (task 068)
+
+Progressively deeper information per market — users never leave the
+market page to understand what they're trading. Ledger and evidence:
+`docs/tasks/068-market-depth.md`.
+
+| ID    | Task                                                                                                                  | Status |
+| ----- | --------------------------------------------------------------------------------------------------------------------- | ------ |
+| D-001 | Market page deep data: price/implied probability, history, volume, liquidity/depth, movement, open interest, activity | ✅     |
+| D-002 | Live game panel: score, clock, situation from the sports data layer                                                   | ✅     |
+| D-003 | AI research section per market (`sports_intelligence`), labelled as an agent estimate                                 | ✅     |
+| D-004 | Layered disclosure: simple surface, sections closed by default, fees and execution in the deeper view                 | ✅     |
+| D-005 | Price chart annotations: kickoff, period starts, freeze, resolution, injury reports                                   | ✅     |
+| D-006 | Depth ladder for the pro layer (an AMM has no order book; the cost to move the price is shown instead)                | ✅     |
+| D-007 | Historical market browser: resolved markets with outcomes, settlement, and price paths                                | ✅     |
+| D-008 | E2E: every listed data point reachable from a market page without leaving it (`client/e2e/market.spec.ts`)            | ✅     |
 
 ---
 
@@ -834,15 +876,15 @@ all launch-gating.
 - [ ] Phase 7 complete (DefiLlama)
 - [ ] Phase 8 complete (Portfolio)
 - [ ] Phase 9 items 001–008 complete
-- [ ] Kill-switch tested in staging
-- [ ] Team has dogfooded for ≥ 2 weeks with zero critical incidents
+- [ ] Kill-switch tested in staging (script: `docs/ops/incident-runbook.md` §13; ledger G-017)
+- [ ] Team has dogfooded for ≥ 2 weeks with zero critical incidents (G-017)
 
 ### Public launch gate
 
 - [ ] All above +
 - [ ] AI-assisted security analysis sign-off complete (`docs/security/sign-off.md`); HIGH severity findings all resolved
-- [ ] Terms of Service + Privacy Policy live
-- [ ] Incident runbook rehearsed, on-call rotation established
+- [ ] Terms of Service + Privacy Policy live (in the app with recorded acceptance — G-012 … G-014 ✅; counsel-reviewed — G-015 🟡)
+- [ ] Incident runbook rehearsed, on-call rotation established (runbook + script ✅ G-016; rehearsal G-017 🟡)
 - [ ] EOA fee recipient configured with hardware wallet, seed phrase backed up offline (Risk 1 mitigation tracked)
 - [ ] Public documentation published
 
@@ -865,7 +907,9 @@ all launch-gating.
 | Phase 8: Portfolio                                | 7       |
 | Phase N: Natural Language Command Bar             | 11      |
 | Phase 9: E2E & Launch                             | 13      |
-| **Grand Total**                                   | **144** |
+| Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
+| Phase 12: Market Depth & Research Layer           | 8       |
+| **Grand Total**                                   | **170** |
 
 ### Future phases
 

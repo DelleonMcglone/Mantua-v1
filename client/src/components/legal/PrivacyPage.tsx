@@ -1,4 +1,6 @@
-import { LegalPage, Section, List, DiscordLink } from "./LegalPage.tsx";
+import { LegalPage, Section, DiscordLink } from "./LegalPage.tsx";
+import { CollectionSections } from "./PrivacyCollectionSections.tsx";
+import { SharingAndRetentionSections } from "./PrivacySharingSections.tsx";
 
 interface Props {
   onBack: () => void;
@@ -13,7 +15,8 @@ interface Props {
  * two were merged on 2026-08-16; keep them in step — a change here needs
  * the matching edit there.
  *
- * Draft — not reviewed by counsel.
+ * Sections live in `PrivacyCollectionSections.tsx` and
+ * `PrivacySharingSections.tsx`. Draft — not reviewed by counsel.
  */
 export function PrivacyPage({ onBack, onLaunch }: Props) {
   return (
@@ -31,145 +34,9 @@ export function PrivacyPage({ onBack, onLaunch }: Props) {
         </p>
       }
     >
-      <Section title="Information we collect">
-        <p>We collect three kinds of information.</p>
-        <p>
-          <strong className="text-text">Information you give us.</strong> When you create an account
-          or sign in, our authentication provider processes an identifier you choose — typically an
-          email address, a social login, or a passkey — and returns a wallet address to us. If you
-          contact support or sign up for updates, we receive whatever you include in that message.
-        </p>
-        <p>
-          <strong className="text-text">Blockchain and activity information.</strong> We record the
-          public wallet addresses you connect and the on-chain activity associated with them in our
-          interface: positions taken, swaps, liquidity provided, transaction hashes, and agent
-          instructions you issue. Much of this originates on public networks and is not private
-          information — see the section on public blockchains below.
-        </p>
-        <p>
-          <strong className="text-text">Technical information.</strong> Like most web services, our
-          servers automatically receive your IP address, browser and device type, pages requested,
-          timestamps, and referring page. We use this to operate the service, debug failures, and
-          detect abuse.
-        </p>
-        <p>
-          <strong className="text-text">What we do not collect.</strong> We never hold your private
-          keys. We do not collect your real-world identity — there is no KYC — the contents of your
-          other wallets, or your location for any purpose beyond rate limiting and fraud detection.
-        </p>
-      </Section>
+      <CollectionSections />
 
-      <Section title="How we use information">
-        <List>
-          <li>To authenticate you and keep you signed in.</li>
-          <li>
-            To provide the product: display your portfolio and positions, route and execute the
-            actions you request, and run the agent workflows you configure.
-          </li>
-          <li>To diagnose problems, monitor reliability, and improve the product.</li>
-          <li>
-            To protect the service and its users — detecting fraud, abuse, manipulation, and
-            activity that threatens market integrity.
-          </li>
-          <li>To respond to you when you contact us.</li>
-          <li>To meet legal and regulatory obligations that apply to us.</li>
-        </List>
-      </Section>
-
-      <Section title="Public blockchains">
-        <p>
-          Transactions you make through the app are written to a public blockchain. That data is
-          permanent, worldwide, and readable by anyone — we cannot delete, alter, or restrict it,
-          and neither can you. Anyone can analyze on-chain records and may be able to associate a
-          wallet address with a person, particularly if that address has interacted with a regulated
-          exchange or a service that collects identity information. Please consider this before
-          transacting.
-        </p>
-      </Section>
-
-      <Section title="Market-integrity monitoring">
-        <p>
-          We analyse on-chain and interface activity for patterns consistent with manipulation —
-          clustered wallets, self-matching, timing anomalies around news and resolution, and
-          coordinated flow. This uses the records described above together with public chain data;
-          it is not a separate collection of information about you. The Market Integrity policy
-          explains what the analysis is for and what happens when something is found.
-        </p>
-      </Section>
-
-      <Section title="How we share information">
-        <p>
-          We do not sell your personal information, and we never share it with advertisers. We share
-          it only as follows.
-        </p>
-        <List>
-          <li>
-            <strong className="text-text">Service providers</strong> who run parts of the product on
-            our behalf — authentication, hosting, infrastructure, blockchain data, payments, and
-            analytics — and only to the extent they need it to perform that work.
-          </li>
-          <li>
-            <strong className="text-text">Legal and safety.</strong> When we reasonably believe
-            disclosure is required by law, legal process, or a government request, or is necessary
-            to protect the rights, property, or safety of our users, the public, or us.
-          </li>
-          <li>
-            <strong className="text-text">Business transfers.</strong> If we are involved in a
-            merger, acquisition, financing, or sale of assets, information may be transferred as
-            part of that transaction.
-          </li>
-          <li>
-            <strong className="text-text">With your direction.</strong> When you ask us to share it,
-            or connect a third-party service yourself.
-          </li>
-        </List>
-        <p>
-          Sports data flows inbound only. We fetch public schedules, scores, and team marks, and
-          those requests carry no identifier for you — a data provider cannot learn from our traffic
-          who holds a position.
-        </p>
-      </Section>
-
-      <Section title="Cookies and similar technologies">
-        <p>
-          We use session cookies to keep you signed in and local browser storage to remember
-          preferences such as your theme and to keep recently-touched pools and positions visible
-          while server reads warm up. Local storage never leaves your browser.
-        </p>
-        <p>
-          We use no third-party advertising cookies, no analytics pixels, and no session-replay
-          tools. You can block or delete cookies in your browser settings; parts of the app will not
-          work correctly without the ones needed for sign-in.
-        </p>
-      </Section>
-
-      <Section title="Data retention">
-        <p>We keep each category only as long as it is useful for the purpose it serves.</p>
-        <List>
-          <li>
-            <strong className="text-text">Wallet address, account, and preferences</strong> — until
-            you delete your account, or two years of inactivity, whichever comes first.
-          </li>
-          <li>
-            <strong className="text-text">Transaction and market position records</strong> — while
-            the position is open or the market unsettled, then archived for two years.
-          </li>
-          <li>
-            <strong className="text-text">Hedging strategies</strong> — until you disarm them, then
-            archived for one year.
-          </li>
-          <li>
-            <strong className="text-text">Server logs</strong> — 30 days.
-          </li>
-          <li>
-            <strong className="text-text">Audit log</strong> — one year.
-          </li>
-        </List>
-        <p>
-          Aggregated or de-identified data that can no longer be linked to you may be kept longer.
-          On-chain data, as noted above, cannot be deleted by anyone.
-        </p>
-      </Section>
+      <SharingAndRetentionSections />
 
       <Section title="Security">
         <p>
