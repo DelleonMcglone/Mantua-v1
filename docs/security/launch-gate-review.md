@@ -51,11 +51,21 @@ when the request arrived over TLS, and `Cache-Control: no-store` on any
 response to an authenticated request. `vercel.json` mirrors the static
 subset on the hosted SPA.
 
-**Content-Security-Policy is deferred** (D-117). The SPA loads the Privy
-auth iframe, Plaid Link, and the Circle and RPC endpoints; a policy tight
-enough to matter needs a per-host allowlist and a nonce path through the
-Vite build, and a wrong one breaks login. It is the first item of the
-post-launch security follow-up, to be added in report-only mode first.
+**Content-Security-Policy ships in report-only mode.**
+`server/src/lib/security/csp.ts` lists every third-party origin the SPA
+loads (Privy and its Turnstile challenge, the WalletConnect relay, verify
+and secure frames, Plaid Link, Google Fonts, the two public Base RPC
+hosts), each with its reason, and renders the
+`Content-Security-Policy-Report-Only` value that `vercel.json` carries; a
+test keeps the two identical and forbids `'unsafe-eval'`, inline scripts,
+and plugins. Violations post to `POST /api/csp-report`
+(`routes/csp-report.ts`): no credentials by design, IP-limited, body
+capped at 16 kB, reduced to one log line per violation, always 204. The
+vendor host lists could not be re-fetched from this environment (egress
+blocked), which is exactly why the policy is report-only: a clean report
+window on staging (G-017) is the evidence to flip the header to
+`Content-Security-Policy`. Until then a missing host costs a log line,
+not a broken login.
 
 ## 4. Dependency audit (G-009)
 
@@ -101,14 +111,17 @@ adding the Linux bindings for the same package versions (including the
 two nested esbuild copies) without re-resolving anything else; `npm ci`
 on Linux is now clean and the browser suite runs on it. The Vercel build
 sidestepped this with `npm install --no-package-lock`, which means
-production builds were not pinned to the lockfile — G-004 should switch
-the build to `npm ci` now that it works.
+production builds were not pinned to the lockfile. `vercel.json` now
+installs with `npm ci` (peer resolution comes from `.npmrc`), so the
+first deploy after this change is the proof that the pin holds on
+Vercel's Linux builders (G-004).
 
 ## 7. Residual risk and follow-ups
 
-- CSP in report-only mode (§3).
+- Flip CSP from report-only to enforcing after a clean report window on
+  staging (§3).
 - The SDK bump task: `@privy-io/react-auth` 3.42, the CDP SDK, `vite` 8.3.
-- The fork suites and the human audit before the mainnet deploy (ledger
-  G-018).
+- The human audit and second-model review before the mainnet deploy
+  (ledger G-018); the fork suites already run in CI (G-003).
 - The browser suite scripts the chain; a funded run on staging (G-017) is
   the only proof of the wallet path end to end.

@@ -677,6 +677,17 @@ marked as the owner's with the artifact that would close it.
   version has no acceptance row for the user, and a version bump re-asks
   once. The pages and the counsel drafts are kept in step by hand and
   asserted by `client/e2e/legal.spec.ts`.
+- **CSP, report-only first.** `server/src/lib/security/csp.ts` is the
+  per-host allowlist (each origin with its reason) and the builder for the
+  `Content-Security-Policy-Report-Only` header `vercel.json` ships; a test
+  pins the two together. `POST /api/csp-report` receives browser reports
+  and reduces each to one log line. A clean report window on staging is
+  the evidence for flipping to enforcement — the vendor host lists are
+  documented, not fetched, so the browser is the oracle.
+- **The drill is code.** `server/src/lib/ops/drill-core.ts` holds the
+  kill-switch drill's rules (only `KILL_SWITCH_ACTIVE` counts as engaged,
+  20 s limits, the log format) with tests; `scripts/kill-switch-drill.ts`
+  drives a deployment through them and prints the runbook §13 log.
 - **Lockfile portability.** The lockfile now carries the Linux native
   bindings beside the macOS ones so `npm ci` installs a working Vite on
   Linux runners; the Vercel build should move from `npm install

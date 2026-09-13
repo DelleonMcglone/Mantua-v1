@@ -87,3 +87,21 @@ product as shipped with recorded acceptance.
 - Ledger: 11 rows ✅, 7 rows 🟡 owner-gated (`docs/tasks/launch-gate.md`).
 - Found and fixed on the way: the lockfile carried only macOS native
   bindings, so no Linux `npm ci` could start Vite (review §6).
+
+## Slice 2 (2026-09-13, same day) — closing what the first pass left open
+
+- [x] G-003 corrected: `contracts.yml` already runs the gating fork suites
+      on a Base Mainnet fork on every contracts PR and on `main` (run #8
+      green, 2026-09-12); the ledger, roadmap P9-002, and sign-off B4 now
+      say so. Ledger: 12 ✅ / 6 🟡.
+- [x] CSP in report-only mode: `server/src/lib/security/csp.ts` (per-host
+      allowlist with reasons, builder) + test that pins `vercel.json`'s
+      header to the builder and forbids eval / inline scripts / plugins;
+      `POST /api/csp-report` (`routes/csp-report.ts`, both browser content
+      types, 16 kB cap, one log line per violation, always 204) + tests;
+      route-guard allowlist entry with reason.
+- [x] Vercel installs from the lockfile (`npm ci`) now that the Linux
+      bindings are present.
+- [x] Kill-switch drill runner: `lib/ops/drill-core.ts` (classify, judge,
+      render — tested) + `scripts/kill-switch-drill.ts`
+      (`npm run drill:kill-switch`); runbook §13 names it.

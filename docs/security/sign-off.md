@@ -230,6 +230,10 @@ the `ws` and `axios` entries is a separate task.
 ## B4. What this addendum does not do
 
 It does not re-sign the ship gate. Still outstanding and unchanged: M-01
-written acceptance, the L-03 note, the fork suites on a funded RPC, the
-human audit and second-model review before the mainnet deploy, and CSP.
-The ledger in `docs/tasks/launch-gate.md` carries each as a 🟡 row.
+written acceptance, the L-03 note, and the human audit and second-model
+review before the mainnet deploy. Two items A7 left open have moved: the
+fork suites run green in CI on a Base Mainnet fork (`contracts.yml`, ledger
+G-003), and a Content-Security-Policy now ships in report-only mode with a
+report endpoint (`launch-gate-review.md` §3) — enforcement waits on a clean
+report window. The ledger in `docs/tasks/launch-gate.md` carries the rest
+as 🟡 rows.

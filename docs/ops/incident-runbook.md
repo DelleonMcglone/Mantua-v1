@@ -351,6 +351,12 @@ Run this on staging before the first dogfood day and once per quarter
 after launch. It takes about ten minutes and leaves a log. Two people:
 the operator (runs the levers) and the observer (times and records).
 
+**Runner.** `npm run drill:kill-switch -w @mantua/server -- --target https://<host> --operator <name> --observer <name> --commit <sha>`
+does steps 0, 2, 3, 5, 7 and the timing itself (`CRON_SECRET` in the
+server `.env` enables step 5), prompts for the lever flips and the two
+client observations, and prints the log below filled in. Exit code 0 is
+PASS. The table is the manual fallback and the definition of each step.
+
 **Preconditions.** Staging deployed from `main`; the observer has the
 app open, signed in, with a ticket ready to confirm; the operator has
 the Upstash console and `curl` against `https://<staging-host>`.

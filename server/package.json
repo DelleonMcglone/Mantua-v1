@@ -17,6 +17,7 @@
     "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
     "fiat:e2e": "tsx --env-file-if-exists=.env src/scripts/fiat-e2e.ts",
     "load:spike": "tsx --env-file-if-exists=.env src/scripts/load-test.ts",
+    "drill:kill-switch": "tsx --env-file-if-exists=.env src/scripts/kill-switch-drill.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"

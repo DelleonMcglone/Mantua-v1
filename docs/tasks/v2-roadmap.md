@@ -95,21 +95,21 @@ Completed:   0
 [░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] 0%
 ```
 
-| Phase                                                | Tasks | Done | Progress                                                                                                       |
-| ---------------------------------------------------- | ----- | ---- | -------------------------------------------------------------------------------------------------------------- |
-| 🧱 Phase 0: Project Bootstrap                        | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 🎨 Phase D: Design System & UI Shell                 | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 🛡️ Phase 1: Mainnet Safety                           | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 🔌 Phase 2: Skill, MCP & Wallet Provider Integration | 16    | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 💱 Phase 3: Swap (Core)                              | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 💧 Phase 4: Liquidity (Add & Remove)                 | 10    | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 🪝 Phase 5: Hook Integration + AI Security Analysis  | 26    | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 🤖 Phase 6: Agent (Chat + Autonomous)                | 13    | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 📊 Phase 7: DefiLlama Analytics                      | 6     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 💼 Phase 8: Portfolio Page                           | 7     | 0    | `░░░░░░░░░░` 0%                                                                                                |
-| 💰 Phase F: LP & Mantua Fee                          | 10    | 3    | `███░░░░░░░` 30% (+1 🟡, +6 ⬜ deferred per D-015)                                                             |
-| 🗣️ Phase N: Natural Language Command Bar             | 11    | 7    | `███████░░░` 64% (+4 🟡 — clarify multi-turn / param passthrough / OpenAI fallback / E2E)                      |
-| ✅ Phase 9: E2E Testing & Launch                     | 13    | 2    | `██░░░░░░░░` 15% (+3 🟡 — browser E2E shipped, fork env / counsel review owner-gated; ledger `launch-gate.md`) |
+| Phase                                                | Tasks | Done | Progress                                                                                                        |
+| ---------------------------------------------------- | ----- | ---- | --------------------------------------------------------------------------------------------------------------- |
+| 🧱 Phase 0: Project Bootstrap                        | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🎨 Phase D: Design System & UI Shell                 | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🛡️ Phase 1: Mainnet Safety                           | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🔌 Phase 2: Skill, MCP & Wallet Provider Integration | 16    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💱 Phase 3: Swap (Core)                              | 8     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💧 Phase 4: Liquidity (Add & Remove)                 | 10    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🪝 Phase 5: Hook Integration + AI Security Analysis  | 26    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 🤖 Phase 6: Agent (Chat + Autonomous)                | 13    | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 📊 Phase 7: DefiLlama Analytics                      | 6     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💼 Phase 8: Portfolio Page                           | 7     | 0    | `░░░░░░░░░░` 0%                                                                                                 |
+| 💰 Phase F: LP & Mantua Fee                          | 10    | 3    | `███░░░░░░░` 30% (+1 🟡, +6 ⬜ deferred per D-015)                                                              |
+| 🗣️ Phase N: Natural Language Command Bar             | 11    | 7    | `███████░░░` 64% (+4 🟡 — clarify multi-turn / param passthrough / OpenAI fallback / E2E)                       |
+| ✅ Phase 9: E2E Testing & Launch                     | 13    | 3    | `██░░░░░░░░` 23% (+2 🟡 — browser E2E + fork suites in CI; counsel review owner-gated; ledger `launch-gate.md`) |
 
 ---
 
@@ -783,7 +783,7 @@ all launch-gating.
 | ID     | Task                                                                                                                                                                                                                                                 | Status |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
 | P9-001 | Full E2E test suite in Playwright — all flows Phase 3–8 against Base Mainnet (Anvil fork for writes). **Browser suite shipped** (task 067, G-001/G-002: `client/e2e`, in CI on every PR, chain scripted); the fork-backed write path waits on P9-002 | 🟡     |
-| P9-002 | Base Mainnet fork test environment (Anvil) for CI — owner: an RPC egress secret for Actions (ledger G-003)                                                                                                                                           | 🟡     |
+| P9-002 | Base Mainnet fork test environment for CI — `contracts.yml` runs the gating fork suites on a Base Mainnet fork with a public-RPC fallback, green on `main` (ledger G-003)                                                                            | ✅     |
 | P9-003 | Confirm AI-assisted security analysis sign-off for the hook deployments (P5-026); residuals logged                                                                                                                                                   | ✅     |
 | P9-004 | Provision hosting per D-004: Vercel (frontend) + Railway or Fly.io (backend) + Neon (Postgres)                                                                                                                                                       | ⬜     |
 | P9-005 | Configure CI/CD: GitHub Actions → Vercel + Railway/Fly deploy; staging branch auto-deploys                                                                                                                                                           | ⬜     |
@@ -809,8 +809,8 @@ all launch-gating.
 
 The three lists above (this table, "Launch gate", "Public launch gate")
 plus B10-010, TD-005, and the open sign-off items are reconciled into one
-ledger, **`docs/tasks/launch-gate.md`** (G-001 … G-018). Eleven rows are
-closed inside the repository with a test, a CI job, or a document; seven
+ledger, **`docs/tasks/launch-gate.md`** (G-001 … G-018). Twelve rows are
+closed inside the repository with a test, a CI job, or a document; six
 are the owner's and name the artifact that flips them.
 
 | ID          | Gate                                                                                                  | Status |
@@ -819,7 +819,8 @@ are the owner's and name the artifact that flips them.
 | G-006–G-010 | Security headers, route-guard audit, secret scan, dependency triage, rails review + sign-off addendum | ✅     |
 | G-012–G-014 | Terms / Privacy describe the shipped product; versioned acceptance recorded before the first trade    | ✅     |
 | G-016       | Runbook rehearsal script                                                                              | ✅     |
-| G-003–G-005 | Fork env for CI, hosting, CI/CD — owner                                                               | 🟡     |
+| G-003       | Fork suites run in CI on a Base Mainnet fork (`contracts.yml`)                                        | ✅     |
+| G-004/G-005 | Hosting, CI/CD — owner                                                                                | 🟡     |
 | G-011       | Mainnet deploy + verify (P9-013, D-112) — owner                                                       | 🟡     |
 | G-015       | Counsel review — owner                                                                                | 🟡     |
 | G-017/G-018 | Staging drill + dogfood + funded run; M-01 / L-03 / fork suites / human audit — owner                 | 🟡     |

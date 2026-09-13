@@ -6,6 +6,7 @@ import { killSwitch } from "./middleware/kill-switch.ts";
 import { securityHeaders } from "./middleware/security-headers.ts";
 import { ipRateLimiter } from "./middleware/rate-limit.ts";
 import { agentChatRouter } from "./routes/agent-chat.ts";
+import { cspReportRouter } from "./routes/csp-report.ts";
 import { agentInstructionRouter } from "./routes/agent-instruction.ts";
 import { agentLiquidityRouter } from "./routes/agent-liquidity.ts";
 import { agentPortfolioRouter } from "./routes/agent-portfolio.ts";
@@ -136,6 +137,7 @@ app.use(marketDetailRouter);
 app.use(marketDiscoverRouter);
 // Task 067 (G-014) — recorded Terms acceptance.
 app.use(legalRouter);
+app.use(cspReportRouter);
 app.use(marketRedeemRouter);
 app.use(activityRouter);
 app.use(portfolioEconomicsRouter);

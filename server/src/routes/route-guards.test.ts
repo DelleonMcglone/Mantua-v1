@@ -30,6 +30,12 @@ const ALLOWLIST: { file: string; path: string; reason: string }[] = [
     reason: "read-only JSON-RPC proxy with a method allowlist; IP rate-limited; no state",
   },
   {
+    file: "csp-report.ts",
+    path: "/api/csp-report",
+    reason:
+      "browser-originated CSP violation reports carry no credentials by design; IP rate-limited; body capped at 16 kB and reduced to a log line; no state",
+  },
+  {
     file: "circle-webhook.ts",
     path: "/api/circle/webhook",
     reason: "signature verified inside the handler against Circle's public key",
