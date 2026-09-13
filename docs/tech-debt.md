@@ -404,3 +404,35 @@ tracks the fallback half.
 **Owner:** Phase N owner (TBD). Blocks: PN-001 cannot flip to ✅;
 beta dogfood may experience hard parse failures during Anthropic
 outages where the fallback would have kept the command bar working.
+
+---
+
+## TD-007 — Dedicated RPC provider not yet provisioned (R-006)
+
+**Slice:** Phase 7 R-006 (task 052) — no public rate-limited RPC endpoint
+in production.
+
+**Gap:** The code side is done: `env.ts` fails the production boot when
+`BASE_RPC_URL` is a public host, `BASE_RPC_FALLBACK_URLS` lists dedicated
+fallbacks, the public backstop is off in production, and per-host health
+feeds `/api/status`. What does not exist is the provider account: no
+Alchemy / QuickNode / Infura / paid-dRPC key is set in Vercel, so the next
+production deploy will refuse to boot until one is.
+
+**Why accepted:** Provisioning is an account the owner opens and a secret
+only the owner should hold; a code lane cannot do it. The boot failure is
+deliberate — the inherited lesson (`rpc-client.ts` header, task 045
+§"Flakiness caveat", `contracts.yml`) is that a public default silently
+survives every warning.
+
+**Closure condition:**
+
+1. Open a Base Mainnet endpoint at a dedicated provider (free tiers are
+   fine to start; the load test in task 054 sizes the paid tier).
+2. Set `BASE_RPC_URL` to it in Vercel (production + preview) and, ideally,
+   a second provider in `BASE_RPC_FALLBACK_URLS`.
+3. Deploy; confirm `GET /api/status` reports `rpc.healthy: true` and the
+   boot log carries no `BASE_RPC_URL` issue.
+4. Set the same URL as the repo secret `BASE_RPC_URL` for `contracts.yml`.
+
+**Owner:** operator (owner). Blocks: the production deploy of task 052.

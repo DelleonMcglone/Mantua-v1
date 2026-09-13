@@ -1,5 +1,6 @@
 import { getAccessToken } from "@privy-io/react-auth";
 import { API_BASE } from "@/lib/api.ts";
+import { readSseBody, sseJson } from "@/lib/sse-core.ts";
 import { type AgentChatEvent } from "@/features/agent/agent-stream.ts";
 
 /**
@@ -56,26 +57,10 @@ export async function streamAnalyzeChat(
     );
   }
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const frames = buffer.split("\n\n");
-    buffer = frames.pop() ?? "";
-    for (const frame of frames) {
-      const dataLine = frame.split("\n").find((l) => l.startsWith("data:"));
-      if (!dataLine) continue;
-      const json = dataLine.slice("data:".length).trim();
-      if (!json) continue;
-      try {
-        onEvent(JSON.parse(json) as AgentChatEvent);
-      } catch {
-        // Ignore a malformed frame rather than killing the stream.
-      }
-    }
-  }
+  // Phase 7 — one SSE parser for every stream (lib/sse-core.ts); a
+  // malformed frame yields null and is skipped rather than killing the stream.
+  await readSseBody(res.body, (ev) => {
+    const parsed = sseJson(ev);
+    if (parsed !== null) onEvent(parsed as AgentChatEvent);
+  });
 }

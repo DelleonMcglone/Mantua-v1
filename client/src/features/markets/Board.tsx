@@ -35,9 +35,10 @@ function todayRange(): string {
  * transactions, not this view (B5-007).
  */
 export function Board({ onAnalyze, onOpenLeague, onTrade }: BoardProps) {
-  const wnba = useSlate(todayRange(), "wnba");
-  const nfl = useSlate(todayRange(), "nfl");
-  const states: Partial<Record<string, SlateState>> = { wnba, nfl };
+  // Phase 7 / R-001 — one live stream (one connection) carries every
+  // launch league; each card reads its league out of the shared state.
+  const today = useSlate(todayRange());
+  const states: Partial<Record<string, SlateState>> = { wnba: today, nfl: today };
   const launchSports = SPORTS.filter((s) => s.coverage === "launch");
 
   const handleAnalyze = (event: SlateEvent, sport: Sport) => {

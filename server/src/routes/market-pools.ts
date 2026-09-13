@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { eq, isNotNull } from "drizzle-orm";
 import { db } from "../db/client.ts";
+import { sharedCache } from "../lib/shared-cache.ts";
 import { events, leagues, markets, sports } from "../db/schema/index.ts";
 import { DEFAULT_CHAIN_ID } from "../lib/chains.ts";
 import { logger } from "../lib/logger.ts";
@@ -26,26 +27,30 @@ export const marketPoolsRouter = Router();
 marketPoolsRouter.get("/api/markets/pools", async (_req: Request, res: Response) => {
   const marketsDeployed = MARKETS_BY_CHAIN[DEFAULT_CHAIN_ID] !== undefined;
   try {
-    const rows = await db
-      .select({
-        marketId: markets.marketId,
-        poolId: markets.poolId,
-        state: markets.state,
-        outcomeIndex: markets.outcomeIndex,
-        chainId: markets.chainId,
-        providerEventId: events.providerEventId,
-        homeTeam: events.homeTeam,
-        awayTeam: events.awayTeam,
-        startsAt: events.startsAt,
-        league: leagues.slug,
-        sport: sports.slug,
-      })
-      .from(markets)
-      .innerJoin(events, eq(markets.eventId, events.id))
-      .innerJoin(leagues, eq(events.leagueId, leagues.id))
-      .innerJoin(sports, eq(leagues.sportId, sports.id))
-      .where(isNotNull(markets.poolId))
-      .limit(500);
+    // Phase 7 / R-007 — the pool list changes at ingest cadence; one read
+    // per window across instances.
+    const rows = await sharedCache.getOrCompute("market-pools", 15_000, () =>
+      db
+        .select({
+          marketId: markets.marketId,
+          poolId: markets.poolId,
+          state: markets.state,
+          outcomeIndex: markets.outcomeIndex,
+          chainId: markets.chainId,
+          providerEventId: events.providerEventId,
+          homeTeam: events.homeTeam,
+          awayTeam: events.awayTeam,
+          startsAt: events.startsAt,
+          league: leagues.slug,
+          sport: sports.slug,
+        })
+        .from(markets)
+        .innerJoin(events, eq(markets.eventId, events.id))
+        .innerJoin(leagues, eq(events.leagueId, leagues.id))
+        .innerJoin(sports, eq(leagues.sportId, sports.id))
+        .where(isNotNull(markets.poolId))
+        .limit(500),
+    );
     res.setHeader("Cache-Control", "public, max-age=15, stale-while-revalidate=30");
     res.json({
       marketsDeployed,

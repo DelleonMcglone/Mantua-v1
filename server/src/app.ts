@@ -53,6 +53,11 @@ import { tokenPricesRouter } from "./routes/token-prices.ts";
 import { pairPriceChartRouter } from "./routes/pair-price-chart.ts";
 import { v4SwapRouter } from "./routes/v4-swap.ts";
 import { fiatRailsRouter } from "./routes/fiat-rails.ts";
+import { platformStatusRouter } from "./routes/platform-status.ts";
+import { liveStreamRouter } from "./routes/live-stream.ts";
+import { cronLiveSyncRouter } from "./routes/cron-live-sync.ts";
+import { opsMetricsRouter } from "./routes/ops-metrics.ts";
+import { latencyMiddleware } from "./lib/metrics.ts";
 
 /**
  * Express app factory, shared by the standalone server (`index.ts`,
@@ -63,6 +68,8 @@ import { fiatRailsRouter } from "./routes/fiat-rails.ts";
 export const app = express();
 app.set("trust proxy", 1);
 app.use(pinoHttp({ logger }));
+// Phase 7 / R-003 — time the budgeted routes from the edge of Express.
+app.use(latencyMiddleware);
 // C-015 — Circle webhook finalizer. Mounted BEFORE express.json() so the
 // ECDSA signature is verified over the raw body bytes Circle signed.
 app.use(circleWebhookRouter);
@@ -74,6 +81,9 @@ app.use(killSwitch);
 app.use(attachAuth);
 
 app.use(healthRouter);
+// Phase 7 — the platform status (R-005) and the live market stream (R-001).
+app.use(platformStatusRouter);
+app.use(liveStreamRouter);
 app.use(rpcProxyRouter);
 app.use(poolsRouter);
 app.use(poolCreateRouter);
@@ -103,6 +113,7 @@ app.use(agentUnifiedBalanceRouter);
 app.use(cronRebalanceRouter);
 app.use(cronPegSyncRouter);
 app.use(cronSportsSyncRouter);
+app.use(cronLiveSyncRouter);
 app.use(adminSpPoolRouter);
 app.use(sportsSlateRouter);
 app.use(strategiesRouter);
@@ -114,6 +125,8 @@ app.use(marketRedeemRouter);
 app.use(cronStrategiesRouter);
 app.use(cronResolutionRouter);
 app.use(resolutionOpsRouter);
+// Phase 7 / R-010 — operator metrics + alerts (cron-secret guarded).
+app.use(opsMetricsRouter);
 app.use(cronIntentsRouter);
 app.use(x402ServiceRouter);
 app.use(agentChatRouter);

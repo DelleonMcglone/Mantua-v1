@@ -4,23 +4,65 @@ import { type SupportedChainId } from "./chains.ts";
 import { env } from "../env.ts";
 
 /**
- * Base Mainnet public client. Public RPC hosts rate-limit once the app's
- * polling + quoting traffic concentrates on one, which surfaced as failed
- * swap quotes and missing balances. Spread the load and degrade gracefully:
+ * Base Mainnet public client.
  *
- *  - `fallback()` rotates to the next host when one errors or rate-limits.
+ * Phase 7 / R-006 — the inherited lesson (this file's original header, task
+ * 045 §"Flakiness caveat", `contracts.yml`): public RPC hosts rate-limit
+ * once the app's polling + quoting traffic concentrates on one, which
+ * surfaced as failed swap quotes, missing balances, and Cloudflare 502s
+ * under fan-out. So:
+ *
+ *  - **Production refuses a public primary.** `env.ts` fails the boot when
+ *    `BASE_RPC_URL` is a known public host in production (`rpcProviderIssues`).
+ *  - **Public hosts are a dev convenience, never a production backstop.**
+ *    They are appended only when `BASE_RPC_PUBLIC_FALLBACK` allows it —
+ *    default on outside production, off in production (a rate-limited
+ *    fallback does not add availability under the load that took the
+ *    primary down; it adds 10 s timeouts).
+ *  - `BASE_RPC_FALLBACK_URLS` lists additional dedicated endpoints; viem's
+ *    `fallback()` rotates to the next host when one errors or rate-limits.
  *  - `http(..., { batch: true })` coalesces concurrent JSON-RPC calls into a
- *    single HTTP request (rate limits count requests, not calls).
- *  - `batch: { multicall: true }` aggregates concurrent `readContract`s into
- *    one Multicall3 `aggregate3` eth_call (deployed on Base at the canonical
- *    address; declared in viem's base chain def).
+ *    single HTTP request (rate limits count requests, not calls);
+ *    `batch: { multicall }` aggregates concurrent `readContract`s into one
+ *    Multicall3 `aggregate3` eth_call.
+ *  - **Every response is scored per host** (`fallback`'s `onResponse`), so
+ *    `rpcHealthSnapshot()` can tell `/api/status` whether blockchain reads
+ *    are degraded — the R-005 banner's RPC rung.
  *
- * A custom `BASE_RPC_URL` (e.g. a private Alchemy/QuickNode endpoint) goes
- * first in the list.
+ * `RPC_UPSTREAMS` is the one list; the wallet-side proxy (`routes/rpc-proxy.ts`)
+ * reads it too, so the two never diverge again.
  */
-const PUBLIC_BASE_RPC_URLS = ["https://mainnet.base.org", "https://base-rpc.publicnode.com"] as const;
 
-const rpcUrls = [env.BASE_RPC_URL, ...PUBLIC_BASE_RPC_URLS.filter((u) => u !== env.BASE_RPC_URL)];
+import { RpcHealthRegistry, resolveRpcUrls, type RpcHealth } from "./rpc-config.ts";
+
+export {
+  PUBLIC_BASE_RPC_HOSTS,
+  PUBLIC_BASE_RPC_URLS,
+  RPC_HOST_FAILURE_THRESHOLD,
+  RpcHealthRegistry,
+  isPublicRpcUrl,
+  parseUrlList,
+  resolveRpcUrls,
+  rpcProviderIssues,
+  type RpcEnv,
+  type RpcHealth,
+  type RpcHostHealth,
+} from "./rpc-config.ts";
+
+/** The one upstream list — the viem client and the wallet proxy share it. */
+export const RPC_UPSTREAMS: readonly string[] = resolveRpcUrls(env);
+
+const registry = new RpcHealthRegistry(RPC_UPSTREAMS);
+
+/** Per-host health for `/api/status` (R-005) and operators. */
+export function rpcHealthSnapshot(): RpcHealth {
+  return registry.snapshot();
+}
+
+/** Score an outcome for the host at `index` (the proxy reports through this). */
+export function recordRpcOutcome(index: number, ok: boolean, error?: unknown): void {
+  registry.record(index, ok, error);
+}
 
 // Types are inferred (not annotated `: PublicClient`): viem's generic
 // PublicClient default params don't unify with createPublicClient's
@@ -30,8 +72,26 @@ const baseClient = createPublicClient({
   chain: base,
   batch: { multicall: { wait: 16 } },
   transport: fallback(
-    rpcUrls.map((url) => http(url, { batch: true, retryCount: 1, retryDelay: 300 })),
+    RPC_UPSTREAMS.map((url, i) =>
+      http(url, {
+        key: `rpc-${String(i)}`,
+        batch: true,
+        retryCount: 1,
+        retryDelay: 300,
+        // A dedicated endpoint answers in well under a second; a host that
+        // needs longer is the problem, and the next host should get the call.
+        timeout: 8_000,
+      }),
+    ),
   ),
+});
+
+// Score every response per host — the fallback transport exposes the hook
+// on its value, not its config.
+baseClient.transport.onResponse(({ status, transport, error }) => {
+  const key = transport.config.key;
+  const index = Number(key.startsWith("rpc-") ? key.slice(4) : NaN);
+  if (Number.isInteger(index)) registry.record(index, status === "success", error);
 });
 
 /** Legacy single-chain alias. Use `getRpcClient(chainId)` in new code. */

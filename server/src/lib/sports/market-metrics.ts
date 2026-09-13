@@ -35,10 +35,14 @@ import {
 import { getTokenHolders } from "../basescan.ts";
 import { isSupportedChainId } from "../chains.ts";
 import { logger } from "../logger.ts";
-import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN, STATE_VIEW_ABI } from "../markets-contracts.ts";
+import {
+  MARKETS_BY_CHAIN,
+  MARKETS_PERIPHERY_BY_CHAIN,
+  STATE_VIEW_ABI,
+} from "../markets-contracts.ts";
 import { sqrtPriceX96ToRawProbability } from "../probability.ts";
 import { getRpcClient } from "../rpc-client.ts";
-import { TtlCache } from "../ttl-cache.ts";
+import { sharedCache } from "../shared-cache.ts";
 
 const USDC_SCALE = 1e6;
 const DAY_SECONDS = 86_400;
@@ -457,7 +461,6 @@ async function computeMarketMetrics(
 /** Short-TTL snapshot cache — the route is authless and rate-limit-light,
  *  so bursts of identical reads must collapse into one computation. */
 const METRICS_TTL_MS = 15_000;
-const metricsCache = new TtlCache<MarketMetrics | null>();
 
 /**
  * Metrics snapshot for one market. Null when the market id is unknown to
@@ -467,10 +470,10 @@ export async function getMarketMetrics(
   marketId: string,
   db: DB = defaultDb,
 ): Promise<MarketMetrics | null> {
-  return metricsCache.get(
-    marketId.toLowerCase(),
-    () => computeMarketMetrics(db, marketId, Math.floor(Date.now() / 1000)),
-    METRICS_TTL_MS,
+  // Phase 7 / R-007 — shared across instances (the metrics read fans out to
+  // BaseScan + two RPC reads per market; one computation per window, total).
+  return sharedCache.getOrCompute(`metrics:${marketId.toLowerCase()}`, METRICS_TTL_MS, () =>
+    computeMarketMetrics(db, marketId, Math.floor(Date.now() / 1000)),
   );
 }
 
@@ -563,7 +566,8 @@ export async function snapshotMarketPoolPrices(
     .groupBy(marketPrices.marketId);
   const latestByMarket = new Map<string, number>();
   for (const l of latest) {
-    const t = l.capturedAt instanceof Date ? l.capturedAt.getTime() : Date.parse(String(l.capturedAt));
+    const t =
+      l.capturedAt instanceof Date ? l.capturedAt.getTime() : Date.parse(String(l.capturedAt));
     if (Number.isFinite(t)) latestByMarket.set(l.marketId, t);
   }
 

@@ -388,17 +388,19 @@ docs/        Architecture, specs, decision memos, task lists, legal drafts
 
 ## Documentation
 
-| Document                                                                                             | What it covers                                                |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| [`docs/architecture.md`](docs/architecture.md)                                                       | Living architecture notes and the decision log                |
-| [`docs/tasks/sports-pivot.md`](docs/tasks/sports-pivot.md)                                           | The build plan phases, priorities, and what is done           |
-| [`docs/decisions/sports-pivot-decisions.md`](docs/decisions/sports-pivot-decisions.md)               | Each decision, its reasoning, and what it rules out           |
-| [`docs/specs/market-lifecycle.md`](docs/specs/market-lifecycle.md)                                   | Market states, transitions, failure modes                     |
-| [`docs/specs/market-id.md`](docs/specs/market-id.md)                                                 | Deterministic market ids                                      |
-| [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md)                             | The authoritative hook spec (§1–§46) + implementation record  |
-| [`docs/security/sign-off.md`](docs/security/sign-off.md)                                             | Ship-gate security sign-off — findings, rails, E2E proofs     |
-| [`docs/ops/incident-runbook.md`](docs/ops/incident-runbook.md)                                       | Kill switches, mis-resolution, provider failover, comms       |
-| [`docs/tasks/sports-pivot-scope-reconciliation.md`](docs/tasks/sports-pivot-scope-reconciliation.md) | What survives the pivot, what is superseded, what is deferred |
+| Document                                                                                             | What it covers                                                     |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| [`docs/architecture.md`](docs/architecture.md)                                                       | Living architecture notes and the decision log                     |
+| [`docs/tasks/sports-pivot.md`](docs/tasks/sports-pivot.md)                                           | The build plan phases, priorities, and what is done                |
+| [`docs/decisions/sports-pivot-decisions.md`](docs/decisions/sports-pivot-decisions.md)               | Each decision, its reasoning, and what it rules out                |
+| [`docs/specs/market-lifecycle.md`](docs/specs/market-lifecycle.md)                                   | Market states, transitions, failure modes                          |
+| [`docs/specs/market-id.md`](docs/specs/market-id.md)                                                 | Deterministic market ids                                           |
+| [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md)                             | The authoritative hook spec (§1–§46) + implementation record       |
+| [`docs/security/sign-off.md`](docs/security/sign-off.md)                                             | Ship-gate security sign-off — findings, rails, E2E proofs          |
+| [`docs/ops/incident-runbook.md`](docs/ops/incident-runbook.md)                                       | Kill switches, mis-resolution, provider failover, comms            |
+| [`docs/tasks/sports-pivot-scope-reconciliation.md`](docs/tasks/sports-pivot-scope-reconciliation.md) | What survives the pivot, what is superseded, what is deferred      |
+| [`docs/tasks/live-sports-reliability.md`](docs/tasks/live-sports-reliability.md)                     | Phase 7 — real-time stream, status ladder, trade state, load/chaos |
+| [`docs/ops/monitoring.md`](docs/ops/monitoring.md)                                                   | Latency budgets, metrics reads, the alert/paging policy            |
 
 An in-app documentation site covering the same ground for users is reachable from the landing
 footer.
@@ -418,8 +420,8 @@ Requires Postgres + a `.env` (see `server/.env.example`, `client/.env.example`).
 ```bash
 npm run typecheck            # all workspaces
 npm run lint                 # eslint, zero warnings tolerated
-npm test -w @mantua/server   # 223 tests
-npm test -w @mantua/client   # 84 tests
+npm test -w @mantua/server   # 785 tests
+npm test -w @mantua/client   # 163 tests
 ```
 
 ### Contracts
