@@ -693,6 +693,54 @@ marked as the owner's with the artifact that would close it.
   Linux runners; the Vercel build should move from `npm install
 --no-package-lock` to `npm ci` (review §6).
 
+## Market depth & research layer (Phase 12, task 068)
+
+The market page grows downward, never sideways: every deeper data point
+is a section on the same page, and the rules for what shows are pure
+modules with tests.
+
+- **One read for depth** (`server/src/lib/sports/market-depth-read.ts`,
+  `GET /api/markets/depth?providerEventId=`). Keyed by event, never a
+  market id (T-020). It joins the metrics module (price, 24 h move,
+  volume, trades, open interest, pool liquidity), the depth curve, the
+  live game state, and the chart annotations, over a `DepthDb` seam so the
+  assembly is tested without Postgres (`market-depth-db.ts` binds it).
+- **Depth is the cost to move the price** (`market-depth.ts`). A
+  constant-product pool has no order book; the ladder quotes, for ±1, 2,
+  5, 10, 20¢, the USDC and contracts that reach that price through the
+  active-range liquidity L: buy `L·(√p′ − √p)` in, sell `L·(1/√p′ − 1/√p)`
+  contracts in. Clamped to 1–99¢, deduplicated at the edges, labelled on
+  the page as a curve, not a book.
+- **Live game** (`LiveGamePanel.tsx`, `live-game-core.ts`). Score from the
+  event; period, clock, possession, and the last play from the latest
+  ingested play (`game_plays`), stamped with that play's time. Nothing is
+  invented: a game with no plays shows the score and says why.
+- **Research** (`GET /api/markets/analysis`, `ResearchSection.tsx`,
+  `research-core.ts`). The same `mantua_analyze_market` the agent runs —
+  a deterministic read over the canonical database, no model call —
+  cached a minute per side, rendered with the agent-estimate tag (T-021)
+  and the prediction note (T-022); the market price is quoted beside it,
+  never replaced by it.
+- **Layered disclosure** (`disclosure-core.ts`, `MarketDepthSections.tsx`).
+  Four sections — Depth & liquidity, Fees & execution, Research, Past
+  markets — start closed; each toggles independently; "Open all" opens
+  the available ones; an unavailable section says what it waits for.
+- **Annotations** (`market-depth-annotations.ts`, `chart-annotations.ts`).
+  Kickoff, the first ingested play of each period, the freeze, the
+  resolution, and up to six injury reports for the two teams; placed on
+  the chart's time axis in two lanes so labels never overlap. Halftime is
+  the start of period 3 where a play was ingested; no timestamp is
+  estimated.
+- **History** (`GET /api/markets/history`, `history/`). Resolved moneyline
+  markets with the final score, the latest resolution's outcome, the
+  home-side settlement price ($1, $0, or 50¢ voided), and a sampled price
+  path; a page filterable by league, reached from the market page's Past
+  markets section and from Discover.
+- **Proof** (`client/e2e/market.spec.ts`, `market-depth.e2e.test.ts`). The
+  browser spec asserts each data point with the page heading still
+  visible; the node test composes the shared wire fixtures through every
+  pure module.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.

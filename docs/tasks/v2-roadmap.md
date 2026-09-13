@@ -825,6 +825,28 @@ are the owner's and name the artifact that flips them.
 | G-015       | Counsel review — owner                                                                                | 🟡     |
 | G-017/G-018 | Staging drill + dogfood + funded run; M-01 / L-03 / fork suites / human audit — owner                 | 🟡     |
 
+## ⏸ PHASE 11 — deferred
+
+Skipped for now on the owner's instruction (2026-09-13); no scope recorded
+in the repository yet. To be supplied with its row table.
+
+## 🔍 PHASE 12: Market Depth & Research Layer (task 068)
+
+Progressively deeper information per market — users never leave the
+market page to understand what they're trading. Ledger and evidence:
+`docs/tasks/068-market-depth.md`.
+
+| ID    | Task                                                                                                                  | Status |
+| ----- | --------------------------------------------------------------------------------------------------------------------- | ------ |
+| D-001 | Market page deep data: price/implied probability, history, volume, liquidity/depth, movement, open interest, activity | ✅     |
+| D-002 | Live game panel: score, clock, situation from the sports data layer                                                   | ✅     |
+| D-003 | AI research section per market (`sports_intelligence`), labelled as an agent estimate                                 | ✅     |
+| D-004 | Layered disclosure: simple surface, sections closed by default, fees and execution in the deeper view                 | ✅     |
+| D-005 | Price chart annotations: kickoff, period starts, freeze, resolution, injury reports                                   | ✅     |
+| D-006 | Depth ladder for the pro layer (an AMM has no order book; the cost to move the price is shown instead)                | ✅     |
+| D-007 | Historical market browser: resolved markets with outcomes, settlement, and price paths                                | ✅     |
+| D-008 | E2E: every listed data point reachable from a market page without leaving it (`client/e2e/market.spec.ts`)            | ✅     |
+
 ---
 
 ## ⚠️ Critical Implementation Rules
@@ -886,7 +908,8 @@ are the owner's and name the artifact that flips them.
 | Phase N: Natural Language Command Bar             | 11      |
 | Phase 9: E2E & Launch                             | 13      |
 | Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
-| **Grand Total**                                   | **162** |
+| Phase 12: Market Depth & Research Layer           | 8       |
+| **Grand Total**                                   | **170** |
 
 ### Future phases
 

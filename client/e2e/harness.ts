@@ -1,5 +1,11 @@
 import type { Page, Route } from "@playwright/test";
-import { TERMS_VERSION, calldata, discover, portfolio, quote, slate, status } from "./fixtures.ts";
+import { TERMS_VERSION, discover, livePrices, portfolio, slate, status } from "./fixtures.ts";
+import { calldata, quote } from "./fixtures-trade.ts";
+import {
+  analysisRead,
+  depthRead,
+  historyRows,
+} from "../src/features/markets/detail/depth-fixtures.ts";
 import { respond } from "./rpc-mock.ts";
 
 /**
@@ -15,6 +21,8 @@ export interface MockOptions {
   paused?: boolean;
   /** The user already accepted the current Terms. */
   termsAccepted?: boolean;
+  /** The Chiefs game is in progress: live score, plays, in-game prices. */
+  liveGame?: boolean;
 }
 
 interface TradeBody {
@@ -44,13 +52,26 @@ export async function mockApi(
   );
   await page.route("**/api/status", (route) => json(route, status(opts.paused)));
   await page.route("**/api/stream/live**", (route) => route.abort());
-  await page.route("**/api/sports/slate**", (route) => json(route, slate()));
+  await page.route("**/api/sports/slate**", (route) => json(route, slate(opts.liveGame)));
   await page.route("**/api/markets/discover**", (route) => json(route, discover()));
   await page.route("**/api/markets/positions**", (route) => json(route, { positions: [] }));
   await page.route("**/api/markets/detail**", (route) =>
-    json(route, { hasMarkets: true, prices: [], activity: [], holders: [] }),
+    json(route, {
+      hasMarkets: true,
+      prices: opts.liveGame ? livePrices() : [],
+      activity: [],
+      holders: [],
+    }),
   );
   await page.route("**/api/markets/comments**", (route) => json(route, { comments: [] }));
+  await page.route("**/api/markets/depth**", (route) =>
+    json(route, depthRead({ live: Boolean(opts.liveGame) })),
+  );
+  await page.route("**/api/markets/analysis**", (route) => {
+    const side = new URL(route.request().url()).searchParams.get("outcomeIndex") === "1" ? 1 : 0;
+    return json(route, analysisRead(side));
+  });
+  await page.route("**/api/markets/history**", (route) => json(route, historyRows()));
   await page.route("**/api/portfolio**", (route) => json(route, portfolio()));
   await page.route("**/api/legal/acceptance", (route) => {
     if (route.request().method() === "POST") {

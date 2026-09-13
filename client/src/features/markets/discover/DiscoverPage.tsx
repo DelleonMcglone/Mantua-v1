@@ -14,6 +14,8 @@ interface Props {
   /** A game (and optionally a side) → the league page with the ticket set. */
   onOpenGame: (sport: SportId, eventId: string, side: 0 | 1 | null) => void;
   onBack: () => void;
+  /** Phase 12 — the historical market browser. */
+  onBrowseHistory?: (() => void) | undefined;
 }
 
 /**
@@ -21,7 +23,13 @@ interface Props {
  * one filter object, no market ids: a new sport is a `SPORTS` row plus the
  * server's league allowlist, never a new navigation layer.
  */
-export function DiscoverPage({ filters, onChangeFilters, onOpenGame, onBack }: Props) {
+export function DiscoverPage({
+  filters,
+  onChangeFilters,
+  onOpenGame,
+  onBack,
+  onBrowseHistory,
+}: Props) {
   const data = useDiscover();
   const rows = useMemo(() => applyDiscoverFilters(data.markets, filters), [data.markets, filters]);
   return (
@@ -51,8 +59,18 @@ export function DiscoverPage({ filters, onChangeFilters, onOpenGame, onBack }: P
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 flex flex-wrap items-start justify-between gap-3">
         <DiscoverFilterBar filters={filters} onChange={onChangeFilters} />
+        {onBrowseHistory && (
+          <button
+            type="button"
+            data-testid="browse-history-discover"
+            onClick={onBrowseHistory}
+            className="text-[12.5px] font-medium text-accent hover:underline cursor-pointer"
+          >
+            Past markets →
+          </button>
+        )}
       </div>
 
       <div className="mt-5 flex flex-col gap-2.5">

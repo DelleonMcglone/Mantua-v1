@@ -21,6 +21,9 @@ import { marketTradeRouter } from "./routes/market-trade.ts";
 import { marketPositionsRouter } from "./routes/market-positions.ts";
 import { marketFillsRouter } from "./routes/market-fills.ts";
 import { marketDetailRouter } from "./routes/market-detail.ts";
+import { marketAnalysisRouter } from "./routes/market-analysis.ts";
+import { marketDepthRouter } from "./routes/market-depth.ts";
+import { marketHistoryRouter } from "./routes/market-history.ts";
 import { marketDiscoverRouter } from "./routes/market-discover.ts";
 import { legalRouter } from "./routes/legal.ts";
 import { marketRedeemRouter } from "./routes/market-redeem.ts";
@@ -135,6 +138,9 @@ app.use(marketFillsRouter);
 app.use(marketDetailRouter);
 // Task 050 — id-free discover read (slate + liquidity + popularity).
 app.use(marketDiscoverRouter);
+app.use(marketDepthRouter);
+app.use(marketAnalysisRouter);
+app.use(marketHistoryRouter);
 // Task 067 (G-014) — recorded Terms acceptance.
 app.use(legalRouter);
 app.use(cspReportRouter);

@@ -29,7 +29,29 @@ const QUIET_GAME = {
   homeWinProbabilityBps: 6000,
 };
 
-export function slate() {
+/** The Chiefs game an hour into play, when a spec asks for a live board. */
+export const CHIEFS_LIVE = {
+  ...CHIEFS_GAME,
+  startsAt: NOW - 3600,
+  status: "in_progress",
+  homeScore: 10,
+  awayScore: 14,
+};
+
+/** In-game price ticks for the live variant (home side first, mirrored). */
+export function livePrices() {
+  const home = [
+    { t: NOW - 3600, priceBps: 5200 },
+    { t: NOW - 1800, priceBps: 4800 },
+    { t: NOW - 600, priceBps: 5000 },
+  ];
+  return home.flatMap((p) => [
+    { ...p, outcomeIndex: 0 },
+    { t: p.t, outcomeIndex: 1, priceBps: 10_000 - p.priceBps },
+  ]);
+}
+
+export function slate(live = false) {
   return {
     leagues: {
       nfl: {
@@ -37,7 +59,7 @@ export function slate() {
         provider: "canonical",
         delayed: false,
         fetchedAt: Date.now(),
-        events: [CHIEFS_GAME, QUIET_GAME],
+        events: [live ? CHIEFS_LIVE : CHIEFS_GAME, QUIET_GAME],
       },
       wnba: {
         league: "wnba",
@@ -106,45 +128,5 @@ export function portfolio() {
       },
     ],
     transactions: [],
-  };
-}
-
-/** A 50¢ market in the playoffs at the 0.70% ceiling: fee = 0.35% of the input. */
-export function quote(amountRaw: string, direction: "buy" | "sell") {
-  const amountIn = BigInt(amountRaw);
-  const amountOut = direction === "buy" ? amountIn * 2n : amountIn / 2n;
-  const feeRaw = (amountIn * 35n) / 10_000n;
-  return {
-    marketAddress: "0x00000000000000000000000000000000000000ee",
-    marketId: `0x${"12".repeat(32)}`,
-    yesToken: "0x00000000000000000000000000000000000000dd",
-    quote: {
-      amountIn: amountIn.toString(),
-      amountOut: amountOut.toString(),
-      amountOutMinimum: ((amountOut * 995n) / 1000n).toString(),
-      effectivePriceBps: 5000,
-    },
-    fee: {
-      feePips: 3500,
-      ratePips: 7000,
-      probabilityBps: 5000,
-      playoffs: true,
-      stale: false,
-      feeRaw: feeRaw.toString(),
-      feeUsdcRaw: feeRaw.toString(),
-      breakdown: {},
-    },
-  };
-}
-
-export function calldata(amountRaw: string, direction: "buy" | "sell") {
-  return {
-    ...quote(amountRaw, direction),
-    to: "0x00000000000000000000000000000000000000ee",
-    data: "0x1234",
-    value: "0",
-    approvalTarget: null,
-    inputToken: "0x00000000000000000000000000000000000000cc",
-    sqrtPriceLimitX96: "0",
   };
 }

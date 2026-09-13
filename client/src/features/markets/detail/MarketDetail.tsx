@@ -1,48 +1,39 @@
 import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { ArrowLeft, ChevronDown } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
+import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api.ts";
 import { ClaimWinnings } from "../ClaimWinnings.tsx";
+import type { SportId } from "../sports.ts";
 import type { Slate, SlateEvent } from "../use-slate.ts";
-import { ActivityTab } from "./ActivityTab.tsx";
-import { AgentTab } from "./AgentTab.tsx";
-import { CommentsTab } from "./CommentsTab.tsx";
 import type { DetailResponse } from "./detail-types.ts";
-import { HoldersTab } from "./HoldersTab.tsx";
+import { LiveGamePanel } from "./LiveGamePanel.tsx";
+import { MarketDepthSections } from "./MarketDepthSections.tsx";
 import { MarketSummary } from "./MarketSummary.tsx";
-import { PositionsTab } from "./PositionsTab.tsx";
+import { MarketTabs } from "./MarketTabs.tsx";
 import { PriceChart } from "./PriceChart.tsx";
-
-type Tab = "positions" | "comments" | "activity" | "holders" | "agent";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "positions", label: "Your positions" },
-  { id: "comments", label: "Comments" },
-  { id: "activity", label: "Activity" },
-  { id: "holders", label: "Top holders" },
-  { id: "agent", label: "Agent" },
-];
+import { useMarketDepth } from "./use-market-depth.ts";
 
 interface Props {
   event: SlateEvent;
   slate: Slate;
+  league: SportId;
   onBack: () => void;
   onAgent: (message: string) => void;
+  /** Phase 12 — the full historical browser, from the Past markets section. */
+  onBrowseHistory: () => void;
 }
 
 /**
- * The market page. Simple layer first (T-010): summary, claim, chart.
- * Everything deeper — positions, comments, activity, holders, agent — sits
- * behind one "More" toggle. Renders in place of the games list; the ticket
- * stays alongside.
+ * The market page. Simple layer first (T-010): summary, the live game when
+ * there is one, claim, chart. Then Phase 12's deeper layer — depth, fees
+ * and execution, research, past markets — each section closed until
+ * opened (D-004), and the "More" tabs below. Nothing here leaves the page.
  */
-export function MarketDetail({ event, slate, onBack, onAgent }: Props) {
+export function MarketDetail({ event, slate, league, onBack, onAgent, onBrowseHistory }: Props) {
   const { user } = usePrivy();
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [failed, setFailed] = useState(false);
-  const [more, setMore] = useState(false);
-  const [tab, setTab] = useState<Tab>("positions");
+  const depth = useMarketDepth(event.providerEventId, event.status === "in_progress");
 
   useEffect(() => {
     let cancelled = false;
@@ -77,60 +68,28 @@ export function MarketDetail({ event, slate, onBack, onAgent }: Props) {
 
       <MarketSummary event={event} slate={slate} detail={detail} />
       <div className="mt-4">
+        <LiveGamePanel league={league} event={event} game={depth.read?.game ?? null} />
+      </div>
+      <div className="mt-4">
         <ClaimWinnings address={user?.wallet?.address} providerEventId={event.providerEventId} />
       </div>
       <div className="mt-4">
-        <PriceChart event={event} detail={detail} failed={failed} />
+        <PriceChart
+          event={event}
+          detail={detail}
+          failed={failed}
+          annotations={depth.read?.annotations ?? []}
+        />
       </div>
 
-      <button
-        type="button"
-        aria-expanded={more}
-        data-testid="market-more"
-        onClick={() => {
-          setMore((m) => !m);
-        }}
-        className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-text-dim hover:text-text cursor-pointer"
-      >
-        More about this market
-        <ChevronDown className={`h-4 w-4 transition-transform ${more ? "rotate-180" : ""}`} />
-      </button>
+      <MarketDepthSections
+        event={event}
+        league={league}
+        depth={depth.read}
+        onBrowseHistory={onBrowseHistory}
+      />
 
-      {more && (
-        <Tabs
-          value={tab}
-          onValueChange={(v) => {
-            setTab(v as Tab);
-          }}
-        >
-          <TabsList className="mt-3 flex gap-4 border-b border-border-soft text-[13px]">
-            {TABS.map((t) => (
-              <TabsTrigger
-                key={t.id}
-                value={t.id}
-                className="pb-2 cursor-pointer text-text-dim hover:text-text data-[state=active]:border-b-2 data-[state=active]:border-text data-[state=active]:font-semibold data-[state=active]:text-text"
-              >
-                {t.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          <TabsContent value="positions" className="mt-4">
-            <PositionsTab event={event} />
-          </TabsContent>
-          <TabsContent value="comments" className="mt-4">
-            <CommentsTab providerEventId={event.providerEventId} />
-          </TabsContent>
-          <TabsContent value="activity" className="mt-4">
-            <ActivityTab event={event} detail={detail} />
-          </TabsContent>
-          <TabsContent value="holders" className="mt-4">
-            <HoldersTab event={event} detail={detail} />
-          </TabsContent>
-          <TabsContent value="agent" className="mt-4">
-            <AgentTab event={event} onAgent={onAgent} />
-          </TabsContent>
-        </Tabs>
-      )}
+      <MarketTabs event={event} detail={detail} onAgent={onAgent} />
     </div>
   );
 }
