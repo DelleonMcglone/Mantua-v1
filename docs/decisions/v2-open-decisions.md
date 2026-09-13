@@ -8,29 +8,34 @@
 
 ## Summary table
 
-| ID    | Decision                                    | Recommendation                                                                                                                                                                                                                                                                                         | Confidence                                                  | Needs external input?                                                 |
-| ----- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- | --------------------------------------------------------------------- |
-| D-002 | Promote DynamicFee / RWAGate / ALO hooks    | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                                                                                                                                                                                          | High                                                        | Audit firm (D-003) for DynamicFee                                     |
-| D-003 | External security audit                     | YES — mandatory                                                                                                                                                                                                                                                                                        | Very high                                                   | Audit firm engagement                                                 |
-| D-004 | Hosting target                              | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                                                                                                                                                                                          | High                                                        | None                                                                  |
-| D-005 | Privy login methods                         | email + Google + Apple + passkey + external wallet (skip SMS)                                                                                                                                                                                                                                          | High                                                        | None                                                                  |
-| D-006 | Embedded wallet auto-create                 | `users-without-wallets`                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
-| D-007 | WalletConnect                               | YES — enable                                                                                                                                                                                                                                                                                           | High                                                        | None                                                                  |
-| D-008 | Privy wallet vs separate CDP agent wallet   | Separate CDP wallet                                                                                                                                                                                                                                                                                    | High                                                        | None                                                                  |
-| D-009 | Per-wallet daily spending cap               | YES — keep, $500 default, tiered raise                                                                                                                                                                                                                                                                 | High                                                        | None                                                                  |
-| D-010 | Mantua fee rate                             | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                                                                                                                                                                                        | Medium                                                      | None (legal weighs on D-012)                                          |
-| D-011 | Fee recipient                               | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                                                                                                                                                                                        | Very high                                                   | Choose signers                                                        |
-| D-012 | Legal review before fee collection          | YES — non-negotiable                                                                                                                                                                                                                                                                                   | Very high                                                   | Crypto-native counsel                                                 |
-| D-013 | LLM provider (intent parser)                | Anthropic primary, OpenAI fallback                                                                                                                                                                                                                                                                     | Medium                                                      | None                                                                  |
-| D-014 | Intent parser confidence threshold          | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                                                                                                                                                                        | Medium                                                      | Tune in beta                                                          |
-| D-102 | Licensed sports data provider (S-001/S-002) | Sportradar NFL API v7 primary behind the existing provider abstraction; SportsDataIO held as the negotiation alternative; ESPN stays prototyping-only fallback                                                                                                                                         | High (architecture); contract unsigned                      | Operator signs the Sportradar commercial agreement                    |
-| D-103 | Market mechanism (P-001)                    | ✅ CLOSED 2026-09-06 — full-collateral YES/NO vs USDC, single YES/USDC dynamic-fee v4 pool, price = implied probability; **in-play trading: buy/sell any time before or during the event** (owner call, supersedes the kickoff-freeze deferral); trading closes on final, permissionless time backstop | Very high (mechanism shipped); in-play is a contract change | None — owner decided 2026-09-06                                       |
-| D-104 | Resolution engine & authority (P-005)       | ✅ CLOSED 2026-09-06 — Sportradar finals via the canonical data layer through the S-022…S-026 integrity gates; mandatory dispute window before on-chain submit; audited manual-override path; signer = service key, operator = owner (closes DM-103)                                                   | High                                                        | None (window length tunable in ops)                                   |
-| D-105 | Dynamic Market Hook fee model (H-001…H-017) | ✅ CLOSED 2026-09-11 — regular season 0%; playoffs dynamic 0.10%–0.70% (immutable ceiling); `Fee = C × r × p × (1 − p)` realised as v4 pip fee `r × (1 − p)` on the gross input; season flag per pool at registration from the league calendar; one on-chain `quoteFee` feeds the UI quote             | Very high (owner spec); deployment pending                  | None — owner spec 2026-09-11; deploy waits on D-112 + funded keystore |
-| D-106 | x402 payments — scope, non-goals, gate      | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                                                                                                                                                                      | High (facts); open questions undecided                      | Counsel (open question: D-012 posture for seller revenue)             |
-| D-112 | Launch chain: Base vs Arc mainnet           | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                          | High (process)                                              | Owner decision after 2026-09-17                                       |
-| D-110 | Wallet-stack reconciliation                 | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                           | High                                                        | None                                                                  |
-| D-111 | Gasless user transactions (C-005/C-006)     | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                            | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                       |
+| ID    | Decision                                                                                                                   | Recommendation                                                                                                                                                                                                                                                                                                                                                                                                                              | Confidence                                                  | Needs external input?                                                 |
+| ----- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------- |
+| D-002 | Promote DynamicFee / RWAGate / ALO hooks                                                                                   | Stable Protection only at v2 launch; DynamicFee in v2.1; RWAGate/ALO deferred                                                                                                                                                                                                                                                                                                                                                               | High                                                        | Audit firm (D-003) for DynamicFee                                     |
+| D-003 | External security audit                                                                                                    | YES — mandatory                                                                                                                                                                                                                                                                                                                                                                                                                             | Very high                                                   | Audit firm engagement                                                 |
+| D-004 | Hosting target                                                                                                             | Vercel (FE) + Railway/Fly.io (BE) + Neon (DB)                                                                                                                                                                                                                                                                                                                                                                                               | High                                                        | None                                                                  |
+| D-005 | Privy login methods                                                                                                        | email + Google + Apple + passkey + external wallet (skip SMS)                                                                                                                                                                                                                                                                                                                                                                               | High                                                        | None                                                                  |
+| D-006 | Embedded wallet auto-create                                                                                                | `users-without-wallets`                                                                                                                                                                                                                                                                                                                                                                                                                     | High                                                        | None                                                                  |
+| D-007 | WalletConnect                                                                                                              | YES — enable                                                                                                                                                                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
+| D-008 | Privy wallet vs separate CDP agent wallet                                                                                  | Separate CDP wallet                                                                                                                                                                                                                                                                                                                                                                                                                         | High                                                        | None                                                                  |
+| D-009 | Per-wallet daily spending cap                                                                                              | YES — keep, $500 default, tiered raise                                                                                                                                                                                                                                                                                                                                                                                                      | High                                                        | None                                                                  |
+| D-010 | Mantua fee rate                                                                                                            | Flat 10 bps; tighten `MAX_FEE_BPS` from 50 → 25                                                                                                                                                                                                                                                                                                                                                                                             | Medium                                                      | None (legal weighs on D-012)                                          |
+| D-011 | Fee recipient                                                                                                              | Safe multisig, 2-of-3 minimum, 3-of-5 preferred                                                                                                                                                                                                                                                                                                                                                                                             | Very high                                                   | Choose signers                                                        |
+| D-012 | Legal review before fee collection                                                                                         | YES — non-negotiable                                                                                                                                                                                                                                                                                                                                                                                                                        | Very high                                                   | Crypto-native counsel                                                 |
+| D-013 | LLM provider (intent parser)                                                                                               | Anthropic primary, OpenAI fallback                                                                                                                                                                                                                                                                                                                                                                                                          | Medium                                                      | None                                                                  |
+| D-014 | Intent parser confidence threshold                                                                                         | 0.85 execute / 0.65–0.85 clarify / <0.65 reject                                                                                                                                                                                                                                                                                                                                                                                             | Medium                                                      | Tune in beta                                                          |
+| D-102 | Licensed sports data provider (S-001/S-002)                                                                                | Sportradar NFL API v7 primary behind the existing provider abstraction; SportsDataIO held as the negotiation alternative; ESPN stays prototyping-only fallback                                                                                                                                                                                                                                                                              | High (architecture); contract unsigned                      | Operator signs the Sportradar commercial agreement                    |
+| D-103 | Market mechanism (P-001)                                                                                                   | ✅ CLOSED 2026-09-06 — full-collateral YES/NO vs USDC, single YES/USDC dynamic-fee v4 pool, price = implied probability; **in-play trading: buy/sell any time before or during the event** (owner call, supersedes the kickoff-freeze deferral); trading closes on final, permissionless time backstop                                                                                                                                      | Very high (mechanism shipped); in-play is a contract change | None — owner decided 2026-09-06                                       |
+| D-104 | Resolution engine & authority (P-005)                                                                                      | ✅ CLOSED 2026-09-06 — Sportradar finals via the canonical data layer through the S-022…S-026 integrity gates; mandatory dispute window before on-chain submit; audited manual-override path; signer = service key, operator = owner (closes DM-103)                                                                                                                                                                                        | High                                                        | None (window length tunable in ops)                                   |
+| D-105 | Dynamic Market Hook fee model (H-001…H-017)                                                                                | ✅ CLOSED 2026-09-11 — regular season 0%; playoffs dynamic 0.10%–0.70% (immutable ceiling); `Fee = C × r × p × (1 − p)` realised as v4 pip fee `r × (1 − p)` on the gross input; season flag per pool at registration from the league calendar; one on-chain `quoteFee` feeds the UI quote                                                                                                                                                  | Very high (owner spec); deployment pending                  | None — owner spec 2026-09-11; deploy waits on D-112 + funded keystore |
+| D-106 | x402 payments — scope, non-goals, gate                                                                                     | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                                                                                                                                                                                                                                                                                                           | High (facts); open questions undecided                      | Counsel (open question: D-012 posture for seller revenue)             |
+| D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                               | High (process)                                              | Owner decision after 2026-09-17                                       |
+| D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
+| D-111 | Gasless user transactions (C-005/C-006)                                                                                    | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                                                                                                                                                                 | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                       |
+| D-109 | Agent policies — the user's limits on the agent (A-003/A-012/A-038)                                                        | ✅ CLOSED 2026-09-12 — one `agent_policies` row per user (defaults when absent): status, unprompted-trade permission, per-trade stake, risk level, leagues, and a hedge block (max size, max exposure, min confidence, cooldown, daily budget, market types); written only by the user through `PATCH /api/agent/policy`, read by the simulation, the turn context and the hedge executor — the agent has a read tool and no write tool     | High (shipped, task 057)                                    | None                                                                  |
+| D-116 | Portfolio valuation sources (PF-011)                                                                                       | ✅ CLOSED 2026-09-12 — market positions marked at the live pool price; assets priced Pyth-first with the DefiLlama fallback until Phase 13's CoinGecko migration (AN-001, owner-gated); the lenient `$0` fallback is observable (`pricing.fallback_zero` counter, `pricing_zero` alert) and enforcement keeps the strict fail-closed helpers                                                                                                | High (shipped, task 066)                                    | None                                                                  |
+| D-115 | Unified Activity model — one timeline table, typed kinds, one-way status, added beside the ledgers (PF-014 … PF-017)       | ✅ CLOSED 2026-09-12 — the dormant `activity` table becomes the user-facing timeline: eighteen typed kinds with categories, `actor` user/agent/system, `pending → completed \| failed` exactly once, `(tx_hash, kind)` unique; written best-effort beside `portfolio_transactions` and the audit log at every money write site, read by `GET /api/activity`                                                                                 | High (shipped, task 062)                                    | None                                                                  |
+| D-114 | Agent execution protocol — modes, preview → confirm → server-minted id; x402 data is the agent's own spend (A-025 … A-035) | ✅ CLOSED 2026-09-12 — `AGENT_MODE` (disabled / simulation / user_testing default / autonomous); money-moving tools need a preview the user saw plus a single-use confirmation id the server mints from the user's own explicit "confirm"; market trades are re-simulated at execution and refused on material drift; `call_paid_service` (x402 data) is exempt — the agent has direct marketplace access under its own per-call/daily caps | High (shipped, task 055)                                    | None                                                                  |
+| D-113 | Live-sports reliability transport & status (R-001/R-004/R-005)                                                             | ✅ CLOSED 2026-09-12 — SSE (not WebSocket) for the live market stream on the single-function API; one public `/api/status` computed from the enforcement points' own inputs and pushed on the stream; trades enter a persisted per-wallet pending register at hash time and leave only on a chain-verified terminal state; game-time ingest every 5 min from GitHub Actions                                                                 | High (shipped, task 051)                                    | None                                                                  |
 
 ---
 
@@ -753,6 +758,187 @@ before 2026-09-17 may hard-commit the chain beyond existing config.
 
 ---
 
+## D-109 — Agent policies: the user's limits on the agent ✅ CLOSED 2026-09-12
+
+**Decision.** The user's control over their agent is one policy row
+(`agent_policies`, unique per user; defaults when absent), with every
+value clamped by schema and written only by the authenticated user via
+`PATCH /api/agent/policy` (task 057):
+
+1. **Trading policy.** `status` (active / paused), `autoTradeEnabled`
+   (honored only under `AGENT_MODE=autonomous`, D-114),
+   `maxStakePerTradeUsd`, `riskLevel` (prompt preset), `allowedLeagues`
+   (empty = all launch leagues).
+2. **Hedge policy** (`config.hedge`): `maxSizeUsd` (clamps a hedge leg),
+   `maxExposureUsd` (per-market ceiling after a buy), `minConfidenceBps`,
+   `cooldownMinutes` (between executed hedges), `dailyBudgetUsd` (today's
+   executed hedges counted at their strategy caps), `allowedMarketTypes`.
+3. **Enforcement is code.** The trade simulation blocks on status, stake,
+   league and exposure; the turn context reads the autonomous flag; the
+   hedge executor (`hedgePolicyGate`) holds or clamps before the daily-cap
+   ledger. The agent reads its policy (`mantua_get_policy`) and has no
+   tool to change it — a prompt cannot widen the limits.
+
+**Rejected.** A chat tool that edits the policy (A-012 forbids the agent
+changing its own caps; the C-010 attestation pattern is for one bounded
+raise, not policy). Budget from receipts (exact but a join per tick; the
+cap-bound is honest and deterministic). Columns instead of the typed
+`config.hedge` block (no migration needed; zod is the contract).
+
+**Consequence.** `agent_policies` is live. The Portfolio → Agent tab hosts
+the only editor. A paused policy stops unprompted hedges and every agent
+trade; the kill switch remains the platform-wide stop above it.
+
+## D-116 — Portfolio valuation sources ✅ CLOSED 2026-09-12
+
+**Decision.** Nothing in a portfolio total is hardcoded (task 066):
+
+1. **Market positions** are marked at the live pool price (`readMarketPositions`)
+   and settled at par on resolution (`settleResolvedPositions`).
+2. **Assets** are priced by `usd-pricing.ts`: Pyth first, the DefiLlama
+   Coins feed as fallback, then the last cached value. Phase 13 (AN-001,
+   owner-gated paid plan) migrates the fallback to CoinGecko; the
+   portfolio-history chart moves with it.
+3. **A $0 valuation is never silent.** The lenient contract still returns
+   0 when every source fails — blanking the portfolio would be worse — but
+   it counts `pricing.fallback_zero`, logs the symbol, and the alert policy
+   raises `pricing_zero` (warn). Cap enforcement is unaffected: it uses the
+   strict helpers that fail closed (C-019).
+
+**Rejected.** Failing reads closed (a dead feed would hide the whole
+portfolio). Client-side pricing (every USD figure comes from a server
+read). Switching feeds now (a Phase 13 owner decision).
+
+## D-115 — Unified Activity model ✅ CLOSED 2026-09-12
+
+**Decision.** The user-facing timeline is one table, `activity`, with a
+typed vocabulary and one status machine (task 062):
+
+1. **Kinds and categories.** market_buy, market_sell, redeem,
+   settlement, swap, liquidity_add, liquidity_remove, send, bridge,
+   deposit, withdraw, gateway_deposit, gateway_spend, hedge,
+   agent_research, agent_simulation, agent_recommendation, resolution —
+   grouped as trade / liquidity / transfer / agent / settlement for the
+   card's icon. Agent activity is therefore self-describing (PF-020).
+2. **Fields.** tx hash, chain, market / pool / related position, asset,
+   raw amount, USD value, actor (user | agent | system), status, a
+   one-line summary and structured data (PF-016).
+3. **Status.** `pending → completed | failed`, exactly once, guarded in
+   SQL; terminal rows never move (PF-017). Circle sends enter pending
+   keyed by the Circle tx id and gain the hash on completion.
+4. **Beside, not instead.** Every write site keeps its ledger row
+   (`portfolio_transactions`, `market_fills`, `market_positions`,
+   `fiat_transfers`, the audit log) and adds a best-effort activity
+   entry; `(tx_hash, kind)` uniqueness absorbs replays and the webhook /
+   poll race.
+
+**Rejected.** A read-time union of the ledgers (no pending state, no
+attribution, seven vocabularies). Replacing `portfolio_transactions`
+now (it backs `/api/portfolio`; retire it after the portfolio reads
+activity). Deriving the timeline from the audit log (attempts and
+refusals are not history).
+
+**Consequence.** `GET /api/activity` serves one feed across the user's
+id, their wallet and their agent wallet. The timeline UI (lane 064)
+renders `txHash` through the neutral tx row only — no chain branding
+(PF-018).
+
+## D-114 — Agent execution protocol: modes, confirmation, and the x402 exemption ✅ CLOSED 2026-09-12
+
+**Decision.** The chat agent's money-moving tools pass one execution gate
+(`server/src/lib/agent/execution-gate.ts`, task 055). The LLM proposes; the
+gate decides:
+
+1. **A server-side mode the model cannot move.** `AGENT_MODE` is
+   `disabled` (503), `simulation` (previews only; every execution refused),
+   `user_testing` (default — "Always Ask") or `autonomous` (unprompted
+   execution only when the user's own policy row also says
+   `auto_trade_enabled`; a fresh executable simulation is still the entry
+   ticket).
+2. **Preview → the user's words → a server-minted id → a matching call.**
+   In `user_testing` a market trade must first be simulated
+   (`mantua_simulate_trade`: executable status, estimate, impact, fees,
+   resulting position, wallet-policy and market-policy results) and any
+   other money action previewed (`mantua_preview_action`). The turn context
+   is computed BEFORE the model runs: if the user's own message explicitly
+   confirms (`messageConfirmsAction` — hedges, questions and negations never
+   do) while a preview is pending, the server mints a single-use, 5-minute
+   confirmation id and tells the model. Execution must present that id with
+   the preview's tool and arguments (hash-compared); market executions are
+   re-simulated immediately before running and refused on material drift
+   (price > 100 bps, output shrink > 1 %, market state, fee season, any
+   policy going red). One id, one execution, whatever the outcome.
+3. **x402 paid data is the agent's own operating spend.** `call_paid_service`
+   is NOT gated: the agent has direct marketplace access by design (owner
+   directive 2026-09-12) — a "confirm" per $0.01 stats lookup would defeat
+   the analyst loop. Its bounds are code: `X402_MAX_CALL_USD` per call,
+   `X402_DAILY_CAP_USD` per day, from the buyer wallet, audited per call.
+
+**Rejected.** Model-declared consent (the model deciding the user agreed —
+the same reason `messageAuthorizesForce` and `messageAttestsCapRaise` are
+code). Client-side confirm modals as the control (the agent path is
+server-signed; the seam must be server-side — the modal is UX, lane 060).
+Per-tool confirmation flags in the prompt (the prompt is advice; the gate
+is the rule). Gating x402 purchases (see 3).
+
+**Consequence.** The "acts autonomously within the cap" posture is retired
+from the prompt, the route, the client copy and `docs/architecture.md`.
+`trade_market` is replaced by `mantua_simulate_trade` /
+`mantua_execute_trade` / `mantua_sell_position`. The user-testing minimum
+flow (A-043) exists server-side; the client renders the preview and the
+confirmation as chat text until lane 060 gives it a card.
+
+## D-113 — Live-sports reliability: transport, status, trade state ✅ CLOSED 2026-09-12
+
+**Decision.** Phase 7's user-visible reliability rests on three shapes,
+chosen for the platform as deployed (one Express function on Vercel,
+Hobby-plan daily crons, a client that already speaks `text/event-stream`):
+
+1. **Server-Sent Events, not a WebSocket, for the live market stream**
+   (`GET /api/stream/live`, task 051). One connection per page carries the
+   slate, live pool prices and the platform status — a snapshot on connect,
+   deltas on change, 5 s ticks while a game is in play, heartbeats, `id:`
+   on every frame with `Last-Event-ID`, and a deliberate `end` under the
+   function's 300 s ceiling. The architecture doc's WebSocket grammar
+   (subscribe by id, event_type-discriminated frames, snapshot-then-deltas,
+   PING/PONG) is honored over SSE. Backpressure is a per-instance
+   connection cap that sheds the next client to polling with 503 +
+   `Retry-After`; hidden tabs disconnect.
+2. **One status, computed once, from the enforcement points' own inputs.**
+   `GET /api/status` (public, 5 s cache) derives `mode` / `reads` /
+   `trading` and a banner message from per-league feed freshness, games in
+   play, the kill switch (deploy-time OR runtime flag, one shared reader)
+   and the provider breakers, using the same thresholds the trade gate
+   (P-012) and the slate label use — so the banner and the refusal never
+   disagree. The client renders it globally, plus "unreachable" and
+   "offline" from its own connectivity; a live platform shows nothing.
+3. **Trade state is chain-verified and persisted.** A signed trade enters a
+   per-wallet pending register the moment its hash exists and leaves only
+   when `GET /api/markets/trade/status` (receipt-derived: confirmed /
+   failed / pending / unknown) says so. "Pending" is a state with an
+   explorer link, never an error; "error" is reserved for pre-chain
+   failures, with wallet rejection classified as benign.
+
+**Also decided:** the game-time ingest cadence is a 5-minute GitHub
+Actions schedule hitting the read-only `/api/cron/live-sync`, and
+`IN_PLAY_FEED_MAX_AGE_MS` is 15 minutes (two missed ticks with drift).
+
+**Rejected.** A WebSocket server (no long-lived process or pub/sub on the
+current deployment; revisit if the API leaves the single function). A
+server-side event bus (no shared process; per-instance ticks through a
+short cache are the honest shape). Provider fetches on page load to keep
+the feed fresh (the 041 rule; Sportradar trial is 1 QPS). Client-trusted
+trade outcomes (the server reads the chain; the client's claim is never
+believed for status or for fills).
+
+**Consequence.** The board and league pages hold one stream each and poll
+only when it is not open; positions/balances join the stream after R-007
+makes their reads cheap. `/api/status` is the contract the load and chaos
+drills (054) assert against. The runbook's §3 "no action usually required"
+now has a user-visible banner behind it.
+
+---
+
 ## What needs external input before any decision is final
 
 | Decision | External input required                                                    |
@@ -776,4 +962,4 @@ Recommendation: Option 2, but only if any of those constraints actually exist. O
 
 ---
 
-_Last updated: 2026-09-04_
+_Last updated: 2026-09-12_

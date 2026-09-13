@@ -146,3 +146,30 @@ quick actions, and the discovery filters.
 - **House review steps.** The external o3 / Gemini reviews are not reachable
   from this environment; the review that ran is this checklist plus the
   suites (client, server, lint, typecheck).
+
+## Integration with Phases 7–9 (merge, 2026-09-13)
+
+This lane was built beside Phases 7–9 (PRs #53–#55) and merged after them.
+Six client files conflicted; the resolution keeps the consumer layer's
+structure and folds the later phases' behaviour into it:
+
+- **Trade hook (`use-market-trade.ts`).** Phase 7's states win (quote route,
+  `building`, `confirming` → `pending` / `done` / `failed`, the pending-trade
+  register, `classifyTradeError`); the `error` phase additionally carries the
+  thrown value so `describeTradeError` (T-012) keeps mapping codes to copy.
+  The dropped-trade message is chainless.
+- **Trade ticket.** `use-trade-ticket` renders the previous quote while
+  re-quoting (R-003), treats `pending` as still executing and `failed` as
+  the reverted copy (R-004), lists trades from earlier sessions with a
+  neutral "View transaction" link (PF-018), and shows "Trading paused" on
+  an operator pause (R-005) via a new `paused` readiness. The executed card
+  notes when the position is still being recorded.
+- **League page** keeps this lane's split (`GamesList`, `TradeTicket`,
+  `detail/`). **Board** takes Phase 7's single live stream plus the
+  Discover entry and the freshness stamp.
+- **Positions** use Phase 9's grouped-by-game section with this lane's
+  copy ("contracts", dollar values, "Lock in profit") and the 30 s poll
+  (T-007) moved into `use-market-positions`.
+- **Chainless sweep.** Phase 7's `TradeErrorKind` value `network` is now
+  `offline` so `trade-status-core.ts` passes the T-004 sweep; the detection
+  regex is unchanged in effect.

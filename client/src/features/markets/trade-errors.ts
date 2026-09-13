@@ -59,18 +59,21 @@ export function describeTradeError(err: unknown): TradeErrorCopy {
       action: RETRY,
     };
   }
-  if (/revert/.test(raw)) {
-    return {
-      kind: "reverted",
-      title: "The trade didn't go through",
-      body: "The market rejected it — usually because the price moved. Nothing was charged. Re-check and try again.",
-      action: RETRY,
-    };
-  }
+  if (/revert/.test(raw)) return revertedTradeError();
   return {
     kind: "unknown",
     title: "Couldn't place the trade",
     body: "Something went wrong on our side. Nothing was placed. Try again in a moment.",
+    action: RETRY,
+  };
+}
+
+/** The trade was mined and reverted (Phase 7 `failed`): nothing traded, nothing charged. */
+export function revertedTradeError(): TradeErrorCopy {
+  return {
+    kind: "reverted",
+    title: "The trade didn't go through",
+    body: "The market rejected it — usually because the price moved. Nothing was charged. Re-check and try again.",
     action: RETRY,
   };
 }

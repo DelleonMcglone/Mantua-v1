@@ -38,8 +38,7 @@ export function TradeTicket({
   const login = () => {
     window.dispatchEvent(new Event("mantua:open-login"));
   };
-  const executed =
-    t.ticket.step === "executed" && t.phase.kind === "done" ? t.phase.calldata : null;
+  const executed = t.ticket.step === "executed" && t.phase.kind === "done" ? t.phase : null;
 
   return (
     <div data-testid="trade-ticket" className="rounded-md border border-border bg-panel-solid p-4">
@@ -69,7 +68,8 @@ export function TradeTicket({
 
       {executed ? (
         <TicketExecuted
-          calldata={executed}
+          calldata={executed.calldata}
+          recorded={executed.recorded}
           direction={t.ticket.direction}
           teamName={chosen.name}
           onViewPositions={onViewPositions}
@@ -104,6 +104,7 @@ export function TradeTicket({
           <TicketStatus
             phase={t.phase}
             error={t.error}
+            earlier={t.earlier}
             onRetry={() => {
               t.tap({ kind: "reset" });
             }}
@@ -122,14 +123,16 @@ export function TradeTicket({
               data-testid="confirm"
               aria-live="polite"
               aria-atomic="true"
-              disabled={t.busy || t.readiness === "waiting"}
+              disabled={t.busy || t.readiness === "waiting" || t.readiness === "paused"}
               onClick={t.confirm}
             >
               {t.busy
                 ? "Working…"
-                : t.readiness === "fund"
-                  ? "Add funds"
-                  : `Confirm ${t.ticket.direction === "sell" ? "sell" : "buy"}`}
+                : t.readiness === "paused"
+                  ? "Trading paused"
+                  : t.readiness === "fund"
+                    ? "Add funds"
+                    : `Confirm ${t.ticket.direction === "sell" ? "sell" : "buy"}`}
             </Button>
           )}
         </>

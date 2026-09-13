@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rpcProviderIssues } from "./lib/rpc-config.ts";
 
 const schema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -44,10 +45,28 @@ const schema = z.object({
    *  the `testnet` option is retained for the shared IS_MAINNET guard. */
   MANTUA_NETWORK: z.enum(["mainnet", "testnet"]).default("mainnet"),
 
-  /** Base Mainnet RPC URL — used by all server-side viem reads
-   *  (StateView.getSlot0, portfolio balances, etc.). Override with a
-   *  private endpoint (Alchemy/QuickNode) in production for headroom. */
+  /** Base Mainnet RPC URL — used by all server-side viem reads and the
+   *  wallet-side proxy. Phase 7 / R-006: production MUST point this at a
+   *  dedicated endpoint (Alchemy / QuickNode / paid dRPC …); a public,
+   *  rate-limited host fails the production boot (`rpcProviderIssues` in
+   *  lib/rpc-client.ts). The default is a dev convenience only. */
   BASE_RPC_URL: z.url().default("https://mainnet.base.org"),
+  /** Additional DEDICATED endpoints, comma-separated, tried in order after
+   *  the primary (viem `fallback`). Public hosts here are a config error. */
+  BASE_RPC_FALLBACK_URLS: z.string().min(1).optional(),
+  /** Append the public hosts as a last-resort backstop. Unset → on outside
+   *  production, off in production. `1` in production fails the boot. */
+  BASE_RPC_PUBLIC_FALLBACK: z.union([z.literal("0"), z.literal("1")]).optional(),
+
+  // ── Postgres pool (Phase 7 / R-002) — per lambda instance ────────────
+  /** Connections per instance. Small on purpose: the real ceiling is this
+   *  × live instances against the pooler. */
+  DATABASE_POOL_MAX: z.coerce.number().int().min(1).max(50).default(5),
+  /** Max wait for a pool slot before failing the query (ms). */
+  DATABASE_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(100).default(5_000),
+  /** Max runtime for one statement (ms) — a runaway query fails, never
+   *  holds the lambda to its 300 s ceiling. */
+  DATABASE_QUERY_TIMEOUT_MS: z.coerce.number().int().min(100).default(15_000),
 
   /** The Graph decentralized-network API key. Required for /api/positions
    *  to surface pre-Mantua v4 positions; absence degrades gracefully (only
@@ -105,6 +124,18 @@ const schema = z.object({
    *  preflight evidence or fixtures). Never set this in production — the
    *  override redirects ALL Circle traffic. */
   CIRCLE_API_BASE_URL: z.url().optional(),
+  /** Circle SCA version pinned at wallet creation. Circle's platform default
+   *  moves to `circle_6900_singleowner_v4` on 2026-09-14 (new address
+   *  derivation, EntryPoint v0.7). Mantua's gateway spends default to "the
+   *  agent's own address" on the destination chain, which only holds if a
+   *  wallet created later on another chain derives the SAME address — so
+   *  creation pins the version explicitly instead of inheriting the
+   *  platform default. Keep v3 for the existing wallet set; move to v4 only
+   *  with a fresh wallet set. Runbook §11. */
+  CIRCLE_SCA_CORE: z
+    .string()
+    .regex(/^circle_6900_singleowner_v\d+$/, "expected circle_6900_singleowner_vN")
+    .default("circle_6900_singleowner_v3"),
 
   /** Webhook signature key id for Circle transaction notifications. Circle
    *  recommends webhooks over polling for terminal transaction state; absent
@@ -134,6 +165,12 @@ const schema = z.object({
   /** B9-007 — strategies-only global kill: every armed hedging strategy
    *  disarms on the next engine tick and nothing new fires. Narrower than
    *  MANTUA_KILL_SWITCH (which blocks all writes app-wide). */
+  /** Phase 8 / A-028 — the agent's trading mode, a server setting the model
+   *  cannot move: disabled | simulation | user_testing (default, "Always
+   *  Ask") | autonomous (future; also needs the user's policy). */
+  AGENT_MODE: z
+    .enum(["disabled", "simulation", "user_testing", "autonomous"])
+    .default("user_testing"),
   STRATEGIES_KILL_SWITCH: z
     .union([z.literal("0"), z.literal("1")])
     .default("0")
@@ -149,6 +186,10 @@ const schema = z.object({
    *  it as `Authorization: Bearer <CRON_SECRET>`; an external scheduler can use
    *  the same header. Absent → the endpoint is disabled (503). */
   CRON_SECRET: z.string().min(1).optional(),
+  /** Phase 7 / R-008 — requests carrying `x-mantua-load-test: <this>` skip
+   *  the per-IP limiters so a load test from one machine can drive
+   *  game-time traffic. Unset → no bypass exists. Rotate after each run. */
+  LOAD_TEST_SECRET: z.string().min(16).optional(),
 
   // ── Shared rate-limit store (C-021) ─────────────────────────────────
   // Upstash Redis REST credentials. With both set, every express-rate-limit
@@ -361,6 +402,7 @@ export function loadEnv(): Env {
     ...circleCredentialIssues(parsed.data),
     ...rateLimitStoreIssues(parsed.data),
     ...resolutionDisputeWindowIssues(parsed.data),
+    ...rpcProviderIssues(parsed.data),
   ];
   if (issues.length > 0) {
     const fatal = parsed.data.NODE_ENV === "production";

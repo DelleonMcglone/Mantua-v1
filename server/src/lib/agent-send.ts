@@ -1,3 +1,5 @@
+import { db } from "../db/client.ts";
+import { transitionActivity } from "./activity.ts";
 import { type Address, parseUnits } from "viem";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
 import { BASE_CHAIN_ID, getChainInfo, getExplorerTxUrl, type SupportedChainId } from "./chains.ts";
@@ -143,6 +145,10 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
         network: agentNetworkName(chainId),
       },
       usdValue,
+    });
+    // Task 062 / PF-017 — the pending timeline entry becomes completed with the hash.
+    await transitionActivity(db, { refId: created.id, kind: "send" }, "completed", {
+      txHash: receipt.txHash,
     });
   }
 

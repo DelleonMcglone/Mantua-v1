@@ -1,3 +1,5 @@
+import { counters } from "./metrics.ts";
+import { logger } from "./logger.ts";
 import { getTokenPrices } from "./defillama.ts";
 import { getPythPrice } from "./pyth-prices.ts";
 import { TOKENS, type TokenSymbol, type Token } from "./tokens.ts";
@@ -51,6 +53,14 @@ async function getUsdPriceForToken(token: Token | undefined): Promise<number> {
     usd = fresh[key]?.price ?? cached?.usd ?? 0;
   }
 
+  // Phase 9 / PF-011 (D-116) — the lenient contract may return 0, but never
+  // silently: a priced token valued at zero is counted and logged so the
+  // alert policy can surface a dead feed instead of a quietly shrunken
+  // portfolio.
+  if (usd === 0) {
+    counters.inc("pricing.fallback_zero");
+    logger.warn({ symbol: token.symbol }, "usd-pricing: no live or cached price — valuing at 0");
+  }
   cache.set(cacheKey, { usd, fetchedAt: Date.now() });
   return usd;
 }

@@ -18,7 +18,8 @@ export interface PortfolioHistory {
 
 /**
  * Build a portfolio-value time series over `range` by:
- *   1. Fetching CoinGecko price history per held token.
+ *   1. Fetching price history per held token (`price-history.ts` — the
+ *      DefiLlama chart today; CoinGecko when Phase 13 lands, D-116).
  *   2. Aligning to the densest token's timestamps (typically ETH).
  *   3. Multiplying each timestamp's price by the user's *current*
  *      balance for that token, then summing across tokens.

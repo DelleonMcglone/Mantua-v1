@@ -9,12 +9,15 @@ import type { TradeCalldata } from "../use-market-trade.ts";
  */
 export function TicketExecuted({
   calldata,
+  recorded,
   direction,
   teamName,
   onViewPositions,
   onTradeAgain,
 }: {
   calldata: TradeCalldata;
+  /** False while the position is still being written to your history (R-004). */
+  recorded: boolean;
   direction: "buy" | "sell";
   teamName: string;
   onViewPositions: () => void;
@@ -38,7 +41,7 @@ export function TicketExecuted({
         You {direction === "buy" ? "bought" : "sold"}{" "}
         <span className="font-mono">{contracts.toFixed(2)}</span> {teamName} contracts for{" "}
         <span className="font-mono">${dollars.toFixed(2)}</span>
-        {price !== null && ` at ${String(price)}¢ each`}.
+        {price !== null && ` at ${String(price)}¢ each`}.{!recorded && " Recording your position…"}
       </p>
       {direction === "buy" && (
         <p className="mt-1 text-[12px] text-text-dim">

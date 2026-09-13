@@ -1,3 +1,5 @@
+import { activityUserId, recordActivity } from "../lib/activity.ts";
+import { resolveUserId } from "../lib/sports/strategy-store.ts";
 import { Router, type Request, type Response } from "express";
 import { asc, desc, eq, inArray, isNotNull, isNull, and } from "drizzle-orm";
 import { parseAbi } from "viem";
@@ -378,6 +380,17 @@ marketRedeemRouter.post(
         txHash: txHash.toLowerCase(),
         chainId,
         params: { marketId },
+      });
+      // Task 062 / PF-015 — the timeline entry (best-effort).
+      await recordActivity(db, {
+        kind: "redeem",
+        actor: "user",
+        userId: await activityUserId(db, resolveUserId, req.privyUserId),
+        walletAddress,
+        txHash: txHash.toLowerCase(),
+        chainId,
+        marketId,
+        data: { marketId },
       });
       res.status(201).json({ ok: true });
     } catch (err) {

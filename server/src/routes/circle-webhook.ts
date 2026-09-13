@@ -1,3 +1,5 @@
+import { db } from "../db/client.ts";
+import { transitionActivity } from "../lib/activity.ts";
 import express, { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { env } from "../env.ts";
@@ -172,6 +174,15 @@ circleWebhookRouter.post(
     }
     try {
       await applyFinalization(plan);
+      // Task 062 / PF-017 — the pending timeline entry moves exactly once.
+      if (execution.kind === "agent_send") {
+        await transitionActivity(
+          db,
+          { refId: circleTxId, kind: "send" },
+          plan.outcome === "confirmed" ? "completed" : "failed",
+          tx?.txHash ? { txHash: tx.txHash } : {},
+        );
+      }
       logger.info(
         { circleTxId, notificationId, outcome: plan.outcome, effects: plan.effects.length },
         "circle webhook: execution finalized",

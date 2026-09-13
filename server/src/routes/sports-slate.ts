@@ -4,6 +4,7 @@ import { logger } from "../lib/logger.ts";
 import { type PublicSlate } from "../lib/sports/public-slate.ts";
 import { readCanonicalPublicSlate } from "../lib/sports/store.ts";
 import { withLiveOdds } from "../lib/sports/live-odds.ts";
+import { sharedCache } from "../lib/shared-cache.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 
 export const sportsSlateRouter = Router();
@@ -15,6 +16,10 @@ export const sportsSlateRouter = Router();
 // last ingest time and `delayed` flips when it is stale, so old data renders
 // labeled as old instead of masquerading as live (or blanking the board).
 const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+
+/** Shorter than the ingest cadence by an order of magnitude; the stream's
+ *  own 2 s L1 sits in front of this for connected clients. */
+const SLATE_CACHE_MS = 5_000;
 
 function isLeague(value: unknown): value is LeagueSlug {
   return typeof value === "string" && (LEAGUES as readonly string[]).includes(value);
@@ -87,7 +92,13 @@ sportsSlateRouter.get("/api/sports/slate", async (req: Request, res: Response) =
   await Promise.all(
     leagues.map(async (league) => {
       try {
-        const slate = await readCanonicalPublicSlate(db, league, range);
+        // Phase 7 / R-007 — one canonical read per league per window across
+        // every instance (the CDN's 15 s covers one edge; this covers the fan-out).
+        const slate = await sharedCache.getOrCompute(
+          `slate:${league}:${range ? `${String(range.fromMs)}-${String(range.toMs)}` : "default"}`,
+          SLATE_CACHE_MS,
+          () => readCanonicalPublicSlate(db, league, range),
+        );
         if (slate.events.length === 0 && slate.dataAsOf === undefined) {
           // Nothing was EVER ingested for this league — that is an outage
           // (or a fresh deployment), not an off-day; keep the error contract.

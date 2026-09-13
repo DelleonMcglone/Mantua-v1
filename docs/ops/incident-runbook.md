@@ -123,16 +123,18 @@ while data is unconfirmed.
 
 ## 5. Escalation quick reference
 
-| Situation                       | First move                                                                                    |
-| ------------------------------- | --------------------------------------------------------------------------------------------- |
-| Strategy misbehaving            | that strategy's Disarm button / endpoint                                                      |
-| All strategies suspect          | `STRATEGIES_KILL_SWITCH=1`                                                                    |
-| Bad data suspected              | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                           |
-| Rate limit blocking legit users | §7 — delete the `mantua:rl:*` key in Upstash                                                  |
-| Signer key leaked               | `setSigner` rotation + pull env key                                                           |
-| Operator key leaked             | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise |
-| Raw agent/ key (C-018)          | §6 — sweep + retire; the key is burned in git history                                         |
-| App-wide emergency              | runtime: `SET mantua:kill-switch 1` in Upstash (§1); or `MANTUA_KILL_SWITCH=1` + redeploy     |
+| Situation                                 | First move                                                                                              |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Strategy misbehaving                      | that strategy's Disarm button / endpoint                                                                |
+| All strategies suspect                    | `STRATEGIES_KILL_SWITCH=1`                                                                              |
+| Chat agent misbehaving                    | `AGENT_MODE=simulation` (previews only) or `AGENT_MODE=disabled` (503) + redeploy — §12                 |
+| Bad data suspected                        | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                                     |
+| Rate limit blocking legit users           | §7 — delete the `mantua:rl:*` key in Upstash                                                            |
+| Signer key leaked                         | `setSigner` rotation + pull env key                                                                     |
+| Operator key leaked                       | `proposeOperator`/`acceptOperator` two-step to a fresh key; rotate registry operator likewise           |
+| Raw agent/ key (C-018)                    | §6 — sweep + retire; the key is burned in git history                                                   |
+| App-wide emergency                        | runtime: `SET mantua:kill-switch 1` in Upstash (§1); or `MANTUA_KILL_SWITCH=1` + redeploy               |
+| Users see "trading paused" / stale scores | §8 — `GET /api/status` says which rung of the ladder and why; live scores need the 5-min live-sync loop |
 
 ## 6. Raw agent/ key — MANDATORY revocation (C-018)
 
@@ -212,3 +214,133 @@ needed. Keys untouched inside one window expire by themselves.
 (15 min worst case). The free Upstash tier handles this write load;
 there is nothing to tune unless request volume grows by orders of
 magnitude.
+
+## 8. Platform status and the live stream (Phase 7, task 051)
+
+**What users see.** A banner at the top of every app page whenever the
+platform is not `live`: paused (kill switch), degraded (stale feed during a
+game → new buys paused, sells open; stale data off-game; a provider
+breaker open; RPC degraded), unreachable (the client could not reach the
+API for ~50 s), or offline. Nothing is shown while live.
+
+**Where it comes from.** `GET /api/status` (public, no auth, 5 s cache):
+
+```bash
+curl -s https://test-mantua.vercel.app/api/status | jq '{mode, reads, trading, killSwitch, message, feeds}'
+```
+
+`feeds.<league>.ageMs` is how old the last ingest is; `buysHalted` flips
+when a league has a game in play and the feed is older than 15 minutes
+(`IN_PLAY_FEED_MAX_AGE_MS`) — the same rule the trade route refuses under.
+
+**Keeping the feed fresh.** Live scores are ingested by
+`.github/workflows/live-sync.yml` every 5 minutes (`/api/cron/live-sync`,
+cron-secret guarded, read-only for money — it keeps running under the
+kill switch). If `feeds.*.ageMs` climbs during a game with the provider
+healthy, check the Actions run first: a missing/mismatched `CRON_SECRET`
+fails it with 401. `workflow_dispatch` runs it by hand.
+
+**The stream.** `GET /api/stream/live` is the SSE feed the board holds
+open. A 503 `STREAM_BUSY` means an instance is at its per-instance cap
+(200) and clients are polling instead — expected under a spike, not an
+incident by itself. Streams end themselves at 240 s and clients reconnect.
+
+**Trades in doubt.** `GET /api/markets/trade/status?txHash=…` (auth)
+returns the chain's verdict — confirmed / failed / pending / unknown — and
+whether the fill is on record. The client asks this itself for anything it
+signed and did not see confirm, across reloads.
+
+## 9. RPC health, the shared cache, and the database pool (Phase 7, task 052)
+
+**RPC.** `GET /api/status` → `rpc.healthy` / `rpc.detail`. `"primary … failing — on fallback"` means
+the dedicated primary is rate-limited or down and reads are riding a
+fallback: check the provider dashboard, then `BASE_RPC_FALLBACK_URLS`.
+`"all N RPC hosts failing"` is a full outage of blockchain reads —
+trades still settle on-chain, but balances, prices and the fill verifier
+cannot read; the banner says so. **Production refuses a public host**
+(`mainnet.base.org` etc.) in `BASE_RPC_URL`: the boot log prints the fix.
+Never "fix" an RPC incident by pointing production at a public host —
+that is the failure mode this rule exists for (TD-007).
+
+**Shared cache.** Hot reads (slate, live odds, pools, metrics, positions)
+are cached in the same Upstash database as the rate limiters under the
+prefix `mantua:cache:`. A Redis outage degrades to per-instance caching —
+reads keep working, look for `shared-cache:` warnings in the logs. To
+force a refresh of one key: `DEL mantua:cache:<key>` (e.g.
+`mantua:cache:positions:0x…` after a manual on-chain correction).
+
+**Database pool.** Per instance: `DATABASE_POOL_MAX` (5) connections,
+5 s to obtain one, 15 s per statement. Symptoms of exhaustion are
+`connectionTimeoutMillis`-style errors in a burst: lower the per-instance
+max before raising it (the ceiling is max × instances against Neon's
+pooler), and check for a runaway query hitting the 15 s statement cap.
+
+## 10. Metrics and alerts (Phase 7, task 053)
+
+`GET /api/ops/alerts` (Bearer `CRON_SECRET`) is the on-call's first
+`curl`: every condition worth a human, with severity and the runbook
+section. `GET /api/ops/metrics` adds the numbers behind it. The alert
+policy, the latency budgets and the log-drain recipe are in
+`docs/ops/monitoring.md`; each live-sync tick also logs firing alerts as
+structured `alert` events.
+
+## 11. Circle SCA version pin (platform default changes 2026-09-14)
+
+Circle's default smart-contract-account version for new Developer-Controlled
+Wallets becomes `circle_6900_singleowner_v4` on 2026-09-14 (EntryPoint v0.7,
+new address derivation). Existing wallets are untouched. Mantua **does**
+depend on matching addresses across chains: a Gateway spend to another chain
+defaults its recipient to the agent's own address (`unified-balance.ts`,
+`recipientAddress ?? wallet.address`), so a wallet created later on that
+chain must derive the same address or the funds land where no agent wallet
+exists.
+
+**What is pinned.** `getOrCreateAgentWallet` passes
+`scaConfiguration.scaCore = CIRCLE_SCA_CORE` (default
+`circle_6900_singleowner_v3`, matching the existing wallet set) on every
+create. Do not change it for the current wallet set. To adopt v4, create a
+NEW wallet set (`CIRCLE_WALLET_SET_ID`) and set `CIRCLE_SCA_CORE=…_v4`
+together — never one without the other.
+
+**Reproducing one existing address on a new chain** (e.g. Arc after D-112):
+use Circle's Derive Wallet API (`client.deriveWallet`) against the existing
+wallet id rather than Create Wallets; it reproduces the address regardless
+of the platform default.
+
+**If a spend already landed at an address with no wallet:** derive the
+wallet for that chain from the Base wallet id — the funds are recoverable as
+long as the derivation matches (v3). Check the Circle console for the
+wallet's `scaCore` before deriving.
+
+## 12. Agent execution modes (Phase 8, task 055, D-114)
+
+`AGENT_MODE` is a server setting the model cannot read or change:
+
+| Mode                     | Endpoint | Money-moving tools                                                                                                     |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `disabled`               | 503      | —                                                                                                                      |
+| `simulation`             | 200      | Preview and simulate only; every execution is refused `SIMULATION_MODE`                                                |
+| `user_testing` (default) | 200      | Preview → the user's own explicit "confirm" → server-minted single-use id → matching execution                         |
+| `autonomous`             | 200      | As `user_testing` unless the user's policy has `auto_trade_enabled` — then a fresh executable simulation is the ticket |
+
+In every mode the daily cap, the user's policy, the kill switch and the
+contract allowlist are enforced in code underneath the gate. x402 paid
+data (`call_paid_service`) is the agent's own pre-capped spend
+(`X402_MAX_CALL_USD`, `X402_DAILY_CAP_USD`) and is not gated. To stop
+the agent moving money without a redeploy, the runtime kill switch (§1)
+already refuses every write; `AGENT_MODE` is the finer lever.
+
+Confirmations live in Upstash under `mantua:agent:` (5 min TTL; previews
+10 min). Deleting `mantua:agent:confirmation:<id>` voids one; deleting
+`mantua:agent:preview:<sessionId>` clears a pending preview.
+
+**Alert `agent_refusal_rate`** (task 061): more than half of gated
+executions refused. Read the refusal codes in the alert detail:
+`CONFIRMATION_REQUIRED` means the model is calling money tools without
+the user's confirm (a prompt regression — compare the prompt's
+confirmation protocol against the last deploy); `SIMULATION_DRIFT`
+means previews are going stale before users confirm (check pool
+activity and the 5-minute confirmation TTL); `CONFIRMATION_EXPIRED` /
+`CONFIRMATION_INVALID` in volume suggests a client that re-sends or an
+injection attempt (see the untrusted-data envelope's `suspiciousCount`
+in the tool cards). No money moved in any refused case.

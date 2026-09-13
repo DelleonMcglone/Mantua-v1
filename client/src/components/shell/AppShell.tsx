@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { StatusBanner } from "@/features/status/PlatformStatusProvider.tsx";
 import { Header } from "./Header.tsx";
 import type { NavDestination } from "./MarketNav.tsx";
 import type { HomePromptId } from "./HomeMenu.tsx";
@@ -61,6 +62,9 @@ export function AppShell({
         onNavigate={onNavigate}
         onQuickAction={onQuickAction}
       />
+      {/* Phase 7 / R-005 — the platform status banner: rendered only while
+          degraded, paused, unreachable or offline. */}
+      <StatusBanner className="px-4 pt-3 md:px-8" />
       {full ? (
         <main className="flex-1 min-h-0 overflow-auto">{full}</main>
       ) : (

@@ -2,6 +2,19 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import { closeLegUsd, executeTriggeredClose, type ExecuteCloseDeps } from "./strategy-execute.ts";
+import { DEFAULT_POLICY } from "../agent/policy.ts";
+
+/** Task 057 — the default (permissive-enough) policy context; tests that
+ *  exercise the policy gate override it. */
+const OPEN_POLICY: NonNullable<ExecuteCloseDeps["hedgeContext"]> = () =>
+  Promise.resolve({
+    view: {
+      ...DEFAULT_POLICY,
+      hedge: { ...DEFAULT_POLICY.hedge, maxSizeUsd: 10_000, dailyBudgetUsd: 10_000 },
+    },
+    lastHedgeAtMs: null,
+    spentTodayUsd: 0,
+  });
 import type { HedgeStrategy } from "../../db/schema/markets.ts";
 import type { StrategyDecision } from "./strategies.ts";
 import { SafetyError } from "../errors.ts";
@@ -57,6 +70,7 @@ function makeDeps(overrides: {
   const calls: string[] = [];
   const deps: ExecuteCloseDeps = {
     balanceOf: () => Promise.resolve(BALANCE),
+    hedgeContext: OPEN_POLICY,
     checkSpendingCap:
       overrides.checkSpendingCap ??
       (() => {
@@ -193,5 +207,63 @@ describe("executeTriggeredClose (C-019 cron daily cap)", () => {
       executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, deps),
       /ledger connection refused/,
     );
+  });
+});
+
+void describe("task 057 — the user's hedge policy (D-109) gates and clamps the close", () => {
+  const BASE_VIEW = {
+    status: "active" as const,
+    autoTradeEnabled: false,
+    maxStakePerTradeUsd: 25,
+    riskLevel: "conservative" as const,
+    allowedLeagues: [],
+    hedge: {
+      maxSizeUsd: 1,
+      maxExposureUsd: 100,
+      minConfidenceBps: 0,
+      cooldownMinutes: 0,
+      dailyBudgetUsd: 100,
+      allowedMarketTypes: [],
+    },
+    updatedAt: null,
+    persisted: true,
+  };
+
+  void it("a paused policy holds non-retryably before the cap ledger is touched", async () => {
+    let capChecked = false;
+    const out = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, {
+      balanceOf: () => Promise.resolve(BALANCE),
+      checkSpendingCap: () => {
+        capChecked = true;
+        return Promise.resolve();
+      },
+      agentMarketTrade: () => Promise.reject(new Error("must not execute")),
+      hedgeContext: () =>
+        Promise.resolve({
+          view: { ...BASE_VIEW, status: "paused" as const },
+          lastHedgeAtMs: null,
+          spentTodayUsd: 0,
+        }),
+    });
+    assert.equal(out.kind, "held");
+    assert.equal(out.retryable, false);
+    assert.match(out.reason, /policy: the agent's policy is paused/);
+    assert.equal(capChecked, false);
+  });
+
+  void it("the policy's max size clamps the leg below the strategy cap and the balance", async () => {
+    let traded: bigint | null = null;
+    const out = await executeTriggeredClose(fakeDb(MARKET, WALLET), STRATEGY, DECISION, {
+      balanceOf: () => Promise.resolve(BALANCE),
+      checkSpendingCap: () => Promise.resolve(),
+      agentMarketTrade: (args) => {
+        traded = args.amountRaw;
+        return Promise.reject(new Error("stop here"));
+      },
+      hedgeContext: () =>
+        Promise.resolve({ view: BASE_VIEW, lastHedgeAtMs: null, spentTodayUsd: 0 }),
+    });
+    assert.notEqual(out.kind, "executed");
+    assert.equal(traded, 1_000_000n, "2 YES held, $500 strategy cap, $1 policy max → 1 YES");
   });
 });

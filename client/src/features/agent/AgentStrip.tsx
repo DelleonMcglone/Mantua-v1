@@ -5,7 +5,7 @@ interface AgentStripProps {
   /** Top line — "Agent wallet" / "From agent wallet" / "Sending to" / etc. */
   label: string;
   /** Bottom line — truncated address or context string. Pass a ReactNode
-   *  if you need an BaseScan link inside it. */
+   *  if you need an explorer link inside it. */
   addr: ReactNode;
   /** Right-side cap pill. Tone shifts the colors:
    *  - default → chip background, dim text ("$32 / $100 today")

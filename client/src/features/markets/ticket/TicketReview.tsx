@@ -1,12 +1,13 @@
 import { FeeExplainer } from "../FeeExplainer.tsx";
 import type { FeeLine } from "../fee-lines.ts";
 import type { FeeSummary } from "../market-trade-core.ts";
-import type { TradeCalldata } from "../use-market-trade.ts";
+import type { TradeQuote } from "../use-market-trade.ts";
 
 /**
  * T-008 — the review block: what you get, then Position / Fee / Fee rate /
  * Total straight from the hook's quote, in every season. The fee
- * explainer (T-009) is one tap below it.
+ * explainer (T-009) is one tap below it. A re-quote keeps the last numbers
+ * on screen, dimmed, until the new ones land (Phase 7 / R-003).
  */
 export function TicketReview({
   quote,
@@ -16,7 +17,7 @@ export function TicketReview({
   teamName,
   quoting,
 }: {
-  quote: TradeCalldata["quote"] | null;
+  quote: TradeQuote["quote"] | null;
   summary: FeeSummary | null;
   lines: FeeLine[];
   direction: "buy" | "sell";
@@ -25,8 +26,13 @@ export function TicketReview({
 }) {
   const out = quote ? Number(quote.amountOut) / 1e6 : null;
   return (
-    <div className="mt-3 min-h-[38px] text-[12px] leading-relaxed text-text-dim">
-      {quoting && <span role="status">Pricing…</span>}
+    <div
+      className={`mt-3 min-h-[38px] text-[12px] leading-relaxed text-text-dim transition-opacity ${
+        quoting && quote ? "opacity-60" : ""
+      }`}
+      aria-busy={quoting}
+    >
+      {quoting && !quote && <span role="status">Pricing…</span>}
       {quote && out !== null && (
         <p data-testid="you-get">
           {direction === "buy" ? (

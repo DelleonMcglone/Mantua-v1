@@ -16,6 +16,14 @@ import { formatFeesEarned } from "@/features/liquidity/position-adapters.ts";
 import { getUserLocalPositions, type LocalPosition } from "@/features/liquidity/local-positions.ts";
 import { localPoolKey } from "@/features/liquidity/local-pools.ts";
 import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
+import { ActivityFeed } from "@/features/activity/ActivityFeed.tsx";
+import { useActivity } from "@/features/activity/use-activity.ts";
+import { AgentStatusStrip } from "./AgentStatusStrip.tsx";
+import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
+import { aggregateHoldings, sumMarketValueUsd, sumUsd } from "./portfolio-core.ts";
+import { useMarketPositions } from "./use-market-positions.ts";
+import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
+import { usd as fmtUsd } from "@/lib/format.ts";
 import { ClaimWinnings } from "@/features/markets/ClaimWinnings.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { AssetIcon, type AssetSymbol } from "./asset-icons.tsx";
@@ -102,7 +110,7 @@ interface AssetsCardProps {
 export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}) {
   const chainId = BASE_CHAIN_ID;
   const [tab, setTab] = useState<
-    "assets" | "cash" | "positions" | "agent" | "unified" | "earnings"
+    "assets" | "cash" | "positions" | "agent" | "unified" | "earnings" | "activity"
   >("assets");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("Descending");
@@ -122,6 +130,43 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
   // Authoritative on-chain positions. While this loads (or if it errors)
   // we fall back to the localStorage breadcrumb so the tab is never blank.
   const onchainPositions = useOnchainPositions(portfolio.walletAddress);
+  // Phase 9 — the money views (LP economics, settled history) and both
+  // wallets' market positions feed the holdings aggregate and the tabs.
+  const economics = usePortfolioEconomics(portfolio.walletAddress);
+  const userMarkets = useMarketPositions(portfolio.walletAddress);
+  const agentMarkets = useMarketPositions(agent.agentAddress);
+  const holdings = useMemo(
+    () =>
+      aggregateHoldings({
+        userWalletUsd: portfolio.walletAddress ? sumUsd(portfolio.balances) : null,
+        agentWalletUsd: agent.agentAddress
+          ? sumUsd(agent.balances)
+          : agent.notProvisioned
+            ? 0
+            : null,
+        unifiedBalanceUsd:
+          unifiedBalance.data?.totalUsdc === undefined
+            ? null
+            : Number(unifiedBalance.data.totalUsdc),
+        marketPositionsUsd:
+          userMarkets.rows === null && agentMarkets.rows === null
+            ? null
+            : sumMarketValueUsd(userMarkets.rows ?? []) +
+              sumMarketValueUsd(agentMarkets.rows ?? []),
+        lpPositionsUsd: economics.economics ? economics.economics.lpTotals.currentValueUsd : null,
+      }),
+    [
+      portfolio.walletAddress,
+      portfolio.balances,
+      agent.agentAddress,
+      agent.balances,
+      agent.notProvisioned,
+      unifiedBalance.data,
+      userMarkets.rows,
+      agentMarkets.rows,
+      economics.economics,
+    ],
+  );
   const assets = useMemo<DisplayAsset[]>(() => {
     if (!portfolio.walletAddress) return [];
     return toDisplayAssets(portfolio.balances, chainId);
@@ -198,6 +243,8 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
       label: "Earnings",
       count: earningPoolCount(earnings.data),
     },
+    // Phase 9 / PF-019 — the unified timeline; count is shown inside the tab.
+    { k: "activity" as const, label: "Activity", count: null },
   ];
 
   return (
@@ -217,15 +264,37 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
               className="group -mb-px px-3.5 py-2 bg-transparent border-none cursor-pointer text-[13px] font-medium inline-flex items-center gap-1.5 border-b-2 text-text-dim border-transparent data-[state=active]:text-text data-[state=active]:border-accent"
             >
               {t.label}
-              <span className="text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute bg-transparent group-data-[state=active]:bg-chip">
-                {t.count}
-              </span>
+              {t.count !== null && (
+                <span className="text-[10px] px-1.5 py-px rounded-full font-mono border border-border-soft text-text-mute bg-transparent group-data-[state=active]:bg-chip">
+                  {t.count}
+                </span>
+              )}
             </TabsTrigger>
           ))}
         </TabsList>
       </div>
 
       <TabsContent value="assets">
+        {portfolio.walletAddress && (
+          <div className="px-4 py-3 border-b border-border-soft">
+            <div className="text-[11px] uppercase tracking-wide text-text-mute">
+              Everything you hold
+            </div>
+            <div className="mt-0.5 font-mono text-[18px] font-medium">
+              {fmtUsd(holdings.totalUsd)}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-text-dim">
+              {holdings.parts.map((p) => (
+                <span key={p.key}>
+                  {p.label} <span className="font-mono text-text">{fmtUsd(p.usd)}</span>
+                </span>
+              ))}
+              {holdings.missing.length > 0 && (
+                <span className="text-text-mute">not counted: {holdings.missing.join(", ")}</span>
+              )}
+            </div>
+          </div>
+        )}
         <div className="px-4 py-3.5 border-b border-border-soft flex items-center gap-2.5">
           <Search className="h-4 w-4 text-text-dim" />
           <div className="flex-1">
@@ -347,6 +416,8 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
           {portfolio.walletAddress && (
             <div className="px-3.5 pb-3">
               <MarketPositionsSection />
+              <SettledPositionsSection econ={economics} />
+              <LpEconomicsSection econ={economics} />
             </div>
           )}
           {!portfolio.walletAddress && (
@@ -445,6 +516,9 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
       <TabsContent value="earnings">
         <EarningsTabBody earnings={earnings} walletAddress={portfolio.walletAddress} />
       </TabsContent>
+      <TabsContent value="activity">
+        <ActivityFeed walletAddress={portfolio.walletAddress} />
+      </TabsContent>
     </Tabs>
   );
 }
@@ -478,7 +552,13 @@ function AgentTabBody({
         <div className="font-mono text-[12px] mt-0.5">{shortenAddress(agent.agentAddress)}</div>
       </div>
 
+      <AgentStatusStrip />
       <AutoRebalanceToggle />
+      <AgentPolicyPanel />
+      <div className="px-3.5 pb-3">
+        <MarketPositionsSection address={agent.agentAddress} title="Agent sports positions" />
+      </div>
+      <AgentRecentActions walletAddress={agent.agentAddress} />
 
       <div className="px-3.5 pt-3 pb-1.5 text-[11px] text-text-mute uppercase tracking-wide">
         Balances
@@ -690,5 +770,259 @@ function AssetRowIcon({ symbol }: { symbol: string }) {
         {initial}
       </text>
     </svg>
+  );
+}
+
+interface AgentPolicyView {
+  status: "active" | "paused";
+  autoTradeEnabled: boolean;
+  maxStakePerTradeUsd: number;
+  riskLevel: "conservative" | "balanced" | "aggressive";
+  allowedLeagues: string[];
+  hedge: {
+    maxSizeUsd: number;
+    maxExposureUsd: number;
+    minConfidenceBps: number;
+    cooldownMinutes: number;
+    dailyBudgetUsd: number;
+    allowedMarketTypes: string[];
+  };
+  persisted: boolean;
+}
+
+const POLICY_LEAGUES: { slug: string; label: string }[] = [
+  { slug: "nfl", label: "NFL" },
+  { slug: "wnba", label: "WNBA" },
+];
+
+/**
+ * Phase 8 / A-003, A-012 (D-109) — the user's policy over the agent. The
+ * only write path for these limits is this panel (PATCH /api/agent/policy);
+ * the agent can read them and never change them. Every control saves on
+ * change with an optimistic update and reverts on failure.
+ */
+function AgentPolicyPanel() {
+  const [policy, setPolicy] = useState<AgentPolicyView | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [stakeDraft, setStakeDraft] = useState<string>("");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<AgentPolicyView>("/api/agent/policy")
+      .then((p) => {
+        if (cancelled) return;
+        setPolicy(p);
+        setStakeDraft(String(p.maxStakePerTradeUsd));
+      })
+      .catch(() => {
+        if (!cancelled) setError("Policy unavailable right now.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const save = (patch: Record<string, unknown>, optimistic: Partial<AgentPolicyView>) => {
+    if (!policy || busy) return;
+    const before = policy;
+    setBusy(true);
+    setError(null);
+    setPolicy({ ...policy, ...optimistic });
+    api
+      .patch<AgentPolicyView>("/api/agent/policy", patch)
+      .then((p) => {
+        setPolicy(p);
+        setStakeDraft(String(p.maxStakePerTradeUsd));
+      })
+      .catch(() => {
+        setPolicy(before);
+        setStakeDraft(String(before.maxStakePerTradeUsd));
+        setError("Could not save — try again.");
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
+  if (error && !policy) {
+    return <div className="px-4 py-3 text-[11px] text-text-mute">{error}</div>;
+  }
+  if (!policy) return null;
+
+  const paused = policy.status === "paused";
+  const toggle = (on: boolean, onClick: () => void, label: string) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={busy}
+      onClick={onClick}
+      className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+        on ? "bg-accent" : "bg-border-soft"
+      } ${busy ? "opacity-50" : "cursor-pointer"}`}
+    >
+      <span
+        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+          on ? "translate-x-4" : "translate-x-0.5"
+        }`}
+      />
+    </button>
+  );
+
+  return (
+    <div className="px-4 py-3 border-b border-border-soft flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px] font-medium">Agent policy · your limits on the agent</div>
+          <div className="text-[11px] text-text-mute mt-0.5">
+            Enforced in code before any trade or hedge. The agent can read these, never change them.
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] ${paused ? "text-red" : "text-text-dim"}`}>
+            {paused ? "Paused" : "Active"}
+          </span>
+          {toggle(
+            !paused,
+            () => {
+              save(
+                { status: paused ? "active" : "paused" },
+                { status: paused ? "active" : "paused" },
+              );
+            },
+            "Agent active",
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-text-mute">Max stake per trade (USD)</span>
+          <input
+            type="number"
+            min={1}
+            step={1}
+            inputMode="decimal"
+            value={stakeDraft}
+            disabled={busy}
+            onChange={(e) => {
+              setStakeDraft(e.target.value);
+            }}
+            onBlur={() => {
+              const n = Number(stakeDraft);
+              if (!Number.isFinite(n) || n <= 0 || n === policy.maxStakePerTradeUsd) {
+                setStakeDraft(String(policy.maxStakePerTradeUsd));
+                return;
+              }
+              save({ maxStakePerTradeUsd: n }, { maxStakePerTradeUsd: n });
+            }}
+            className="h-8 rounded-md border border-border-soft bg-transparent px-2 text-[12px] tabular-nums"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-text-mute">Risk level</span>
+          <select
+            value={policy.riskLevel}
+            disabled={busy}
+            onChange={(e) => {
+              const riskLevel = e.target.value as AgentPolicyView["riskLevel"];
+              save({ riskLevel }, { riskLevel });
+            }}
+            className="h-8 rounded-md border border-border-soft bg-transparent px-2 text-[12px]"
+          >
+            <option value="conservative">Conservative</option>
+            <option value="balanced">Balanced</option>
+            <option value="aggressive">Aggressive</option>
+          </select>
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[11px] text-text-mute">Leagues</span>
+        {POLICY_LEAGUES.map((l) => {
+          const all = policy.allowedLeagues.length === 0;
+          const on = all || policy.allowedLeagues.includes(l.slug);
+          return (
+            <label key={l.slug} className="flex items-center gap-1.5 text-[12px]">
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={busy}
+                onChange={() => {
+                  const current = all ? POLICY_LEAGUES.map((x) => x.slug) : policy.allowedLeagues;
+                  const next = on ? current.filter((s) => s !== l.slug) : [...current, l.slug];
+                  if (next.length === 0) return; // at least one league stays permitted
+                  const allowedLeagues = next.length === POLICY_LEAGUES.length ? [] : next;
+                  save({ allowedLeagues }, { allowedLeagues });
+                }}
+              />
+              {l.label}
+            </label>
+          );
+        })}
+        <span className="text-[11px] text-text-mute">
+          {policy.allowedLeagues.length === 0 ? "(all launch leagues)" : ""}
+        </span>
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[12px]">Allow unprompted trades</div>
+          <div className="text-[11px] text-text-mute mt-0.5">
+            Only takes effect if the platform runs the agent in autonomous mode; in user-testing
+            mode every trade still needs your &quot;confirm&quot;.
+          </div>
+        </div>
+        {toggle(
+          policy.autoTradeEnabled,
+          () => {
+            const autoTradeEnabled = !policy.autoTradeEnabled;
+            save({ autoTradeEnabled }, { autoTradeEnabled });
+          },
+          "Allow unprompted trades",
+        )}
+      </div>
+
+      <div className="text-[11px] text-text-mute">
+        Hedges: max ${policy.hedge.maxSizeUsd} per leg · max ${policy.hedge.maxExposureUsd} exposure
+        per market · ${policy.hedge.dailyBudgetUsd}/day
+        {policy.hedge.cooldownMinutes > 0
+          ? ` · ${String(policy.hedge.cooldownMinutes)} min cooldown`
+          : ""}
+      </div>
+      {error ? <div className="text-[11px] text-red">{error}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * Phase 9 / PF-004 — the agent's last few actions (research, simulations,
+ * recommendations, trades, hedges, transfers) from the unified timeline.
+ */
+function AgentRecentActions({ walletAddress }: { walletAddress: string | null }) {
+  const feed = useActivity(walletAddress, "all", { actor: "agent", limit: 6 });
+  return (
+    <>
+      <div className="px-3.5 pt-3 pb-1.5 text-[11px] text-text-mute uppercase tracking-wide">
+        Recent actions
+      </div>
+      {feed.items.length === 0 ? (
+        <EmptyState className="py-4">
+          {feed.loading ? "Loading…" : "No agent actions yet."}
+        </EmptyState>
+      ) : (
+        <ul className="px-4 pb-3 flex flex-col gap-1 list-none m-0">
+          {feed.items.map((i) => (
+            <li key={i.id} className="flex items-center justify-between gap-2 text-[12px]">
+              <span className="min-w-0 flex-1 truncate">{i.summary}</span>
+              <span className="text-[10px] text-text-mute">{i.status}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

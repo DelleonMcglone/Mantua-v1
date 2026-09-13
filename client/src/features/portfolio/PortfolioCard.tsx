@@ -138,4 +138,3 @@ export function PortfolioCard() {
 function flatSeries(value: number): number[] {
   return Array<number>(FALLBACK_POINTS).fill(value);
 }
-

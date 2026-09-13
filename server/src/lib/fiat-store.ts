@@ -1,3 +1,4 @@
+import { recordActivity } from "./activity.ts";
 import { randomUUID } from "node:crypto";
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "../db/client.ts";
@@ -244,7 +245,28 @@ export const dbFiatStore: FiatStore = {
       .where(and(eq(fiatTransfers.id, id), inArray(fiatTransfers.status, [...priors])))
       .returning();
     const row = rows.at(0);
-    return row ? toRecord(row) : null;
+    if (!row) return null;
+    const record = toRecord(row);
+    // Task 062 / PF-015 — a terminal fiat transfer lands on the timeline
+    // (best-effort; the transfer row is the ledger).
+    if (to === "complete" || to === "failed" || to === "canceled") {
+      await recordActivity(db, {
+        kind: record.kind === "deposit" ? "deposit" : "withdraw",
+        actor: "user",
+        status: to === "complete" ? "completed" : "failed",
+        userId: record.userId,
+        refId: record.id,
+        asset: "USD",
+        valueUsd: Number(record.amountUsd),
+        data: {
+          provider: record.provider,
+          providerStatus: record.providerStatus,
+          failureReason: record.failureReason,
+          finalStatus: to,
+        },
+      });
+    }
+    return record;
   },
 
   async completeStaleSandboxPendings(userId, olderThanMs) {

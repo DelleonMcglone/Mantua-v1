@@ -104,15 +104,18 @@ export function needsFunding(
   return BigInt(balanceRaw) < BigInt(totalRaw);
 }
 
-export type TicketReadiness = "login" | "fund" | "ready" | "waiting";
+export type TicketReadiness = "login" | "paused" | "fund" | "ready" | "waiting";
 
 /** Which single primary button the ticket shows. */
 export function ticketReadiness(input: {
   authenticated: boolean;
   quoted: boolean;
   funding: boolean;
+  /** Phase 7 / R-005 — the platform is pausing this direction of trade. */
+  paused?: boolean;
 }): TicketReadiness {
   if (!input.authenticated) return "login";
+  if (input.paused) return "paused";
   if (!input.quoted) return "waiting";
   return input.funding ? "fund" : "ready";
 }

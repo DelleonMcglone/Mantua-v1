@@ -17,6 +17,18 @@ const ONE_MIN_MS = 60 * 1000;
 const skipInDev = () => env.NODE_ENV === "development";
 
 /**
+ * Phase 7 / R-008 — the load test drives hundreds of virtual users from one
+ * IP, which the per-IP limiters would (correctly) refuse. Requests carrying
+ * the configured secret skip them. No secret configured → no bypass.
+ */
+export const LOAD_TEST_HEADER = "x-mantua-load-test";
+function loadTestBypass(req: Request): boolean {
+  const secret = env.LOAD_TEST_SECRET;
+  return typeof secret === "string" && req.get(LOAD_TEST_HEADER) === secret;
+}
+const skipLimiter = (req: Request): boolean => skipInDev() || loadTestBypass(req);
+
+/**
  * C-021 — the shared counter store. Every limiter below used to count in
  * process memory, so each Vercel lambda instance kept its own windows and a
  * recycle reset them. With Upstash's REST credentials configured, all four
@@ -84,7 +96,7 @@ export const ipRateLimiter: RequestHandler = rateLimit(
     limit: 1000,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: skipInDev,
+    skip: skipLimiter,
     message: { error: "Too many requests from this IP.", code: "RATE_LIMITED" },
   }),
 );
@@ -100,7 +112,7 @@ export const writeRateLimiter: RequestHandler = rateLimit(
     limit: 20,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: skipInDev,
+    skip: skipLimiter,
     message: { error: "Too many write requests.", code: "RATE_LIMITED" },
   }),
 );
@@ -116,7 +128,7 @@ export const walletRateLimiter: RequestHandler = rateLimit(
     limit: 30,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: skipInDev,
+    skip: skipLimiter,
     keyGenerator: (req: Request) => {
       const wallet = (req as Request & { walletAddress?: string }).walletAddress;
       if (wallet) return `wallet:${wallet.toLowerCase()}`;

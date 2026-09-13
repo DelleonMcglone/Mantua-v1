@@ -1,3 +1,4 @@
+import { recordActivity } from "./activity.ts";
 import { and, eq } from "drizzle-orm";
 import { type Address, encodeFunctionData, parseAbi, parseUnits } from "viem";
 import { db } from "../db/client.ts";
@@ -338,6 +339,26 @@ export async function addLiquidityFromAgentWallet(
       outcome: "success",
       usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
     });
+    // Task 062 / PF-015 — the agent's timeline entry (best-effort).
+    await recordActivity(db, {
+      kind: "liquidity_add",
+      actor: "agent",
+      userId: user.id,
+      walletAddress: wallet.address,
+      txHash,
+      chainId,
+      poolId: calldata.poolKeyHash,
+      asset: `${tokenA}/${tokenB}`,
+      valueUsd: usdValue > 0 ? usdValue : null,
+      data: {
+        tokenA,
+        tokenB,
+        fee,
+        hook,
+        amountARaw: amountARaw.toString(),
+        amountBRaw: amountBRaw.toString(),
+      },
+    });
 
     const poolRows = await db
       .select({ id: pools.id })
@@ -488,6 +509,17 @@ export async function removeLiquidityFromAgentWallet(
       agent: true,
     },
     outcome: "success",
+  });
+  // Task 062 / PF-015 — the agent's timeline entry (best-effort).
+  await recordActivity(db, {
+    kind: "liquidity_remove",
+    actor: "agent",
+    userId: user.id,
+    walletAddress: wallet.address,
+    txHash,
+    chainId,
+    positionRef: positionId,
+    data: { positionId, liquidityRemoved: liquidityToRemove.toString(), isFullExit },
   });
 
   if (isFullExit) {

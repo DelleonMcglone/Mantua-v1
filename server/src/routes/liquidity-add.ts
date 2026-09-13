@@ -1,3 +1,4 @@
+import { recordActivity } from "../lib/activity.ts";
 import { Router, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import { db } from "../db/client.ts";
@@ -318,6 +319,23 @@ async function handleMarketAddRecord(req: Request, res: Response): Promise<void>
     params,
     outcome: v.outcome,
     usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
+  });
+  // Task 062 / PF-015 — the timeline entry (best-effort).
+  await recordActivity(db, {
+    kind: "liquidity_add",
+    actor: "user",
+    status: v.outcome === "success" ? "completed" : "failed",
+    userId: user.id,
+    walletAddress: ctx.walletAddress,
+    txHash: v.txHash,
+    chainId: v.chainId,
+    poolId: v.poolKeyHash,
+    marketId: v.marketId,
+    positionRef: v.tokenId ?? null,
+    asset: "YES/USDC",
+    amountRaw: v.amountUsdcRaw,
+    valueUsd: usdValue > 0 ? usdValue : null,
+    data: params,
   });
   await logAudit({
     ...ctx,

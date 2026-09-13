@@ -171,4 +171,3 @@ function formatQty(value: number, decimals: number): string {
   const dp = decimals === 6 ? 2 : decimals === 8 ? 6 : 4;
   return value.toLocaleString(undefined, { maximumFractionDigits: dp });
 }
-

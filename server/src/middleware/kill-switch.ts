@@ -135,7 +135,22 @@ export function createKillSwitchGate({
   };
 }
 
+/** The one runtime flag reader for this instance — the gate and the status
+ *  snapshot share its 15 s cache, so they never disagree within a window. */
+const runtimeFlag = runtimeFlagFromEnv();
+
+/**
+ * Phase 7 / R-005 — is the switch engaged right now (deploy-time OR runtime)?
+ * The same answer the gate gives, for `/api/status` and the live stream, so
+ * a paused platform is announced to every client rather than discovered one
+ * refused POST at a time.
+ */
+export async function killSwitchEngaged(): Promise<boolean> {
+  if (env.MANTUA_KILL_SWITCH) return true;
+  return runtimeFlag ? runtimeFlag.read() : false;
+}
+
 export const killSwitch: RequestHandler = createKillSwitchGate({
   envEngaged: env.MANTUA_KILL_SWITCH,
-  runtime: runtimeFlagFromEnv(),
+  runtime: runtimeFlag,
 });

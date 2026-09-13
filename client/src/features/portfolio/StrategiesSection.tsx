@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { api } from "@/lib/api.ts";
 import { Button } from "@/components/ui/button.tsx";
+import { useActivity } from "@/features/activity/use-activity.ts";
+import { usePrivy } from "@privy-io/react-auth";
 
 interface StrategyRow {
   id: string;
@@ -41,6 +43,11 @@ export function StrategiesSection() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Phase 9 / PF-010 — each executed hedge's timeline entry (value, market),
+  // keyed by the strategy it belongs to.
+  const { user } = usePrivy();
+  const hedges = useActivity(user?.wallet?.address ?? null, "all", { kinds: "hedge", limit: 50 });
+  const hedgeByStrategy = new Map(hedges.items.map((h) => [h.positionRef, h]));
 
   const reload = useCallback(() => {
     api
@@ -131,6 +138,16 @@ export function StrategiesSection() {
               <span className="min-w-0 flex-1 truncate text-[12px]">
                 {row.strategyType.replaceAll("_", " ")} · cap ${row.capUsd}
                 {row.disarmedReason ? ` · ${row.disarmedReason}` : ""}
+                {(() => {
+                  const h = hedgeByStrategy.get(row.id);
+                  if (!h) return null;
+                  return (
+                    <span className="ml-2 text-text">
+                      hedged{h.valueUsd !== null ? ` $${h.valueUsd.toFixed(2)}` : ""}
+                      {h.marketId ? ` on ${h.marketId.slice(0, 10)}…` : ""}
+                    </span>
+                  );
+                })()}
               </span>
               {row.status === "armed" && (
                 <Button

@@ -22,7 +22,7 @@ interface Props {
  * token's balance + USD value at top, then a filtered list of recent
  * portfolio transactions involving this token (swaps where it's the
  * in/out leg, pool creates / liquidity adds where it's one of the pair,
- * sends where it's the token moved). Each row links to BaseScan.
+ * sends where it's the token moved). Each row links to the explorer.
  */
 export function AssetDetailPanel({ symbol, onClose }: Props) {
   const chainId = BASE_CHAIN_ID;
