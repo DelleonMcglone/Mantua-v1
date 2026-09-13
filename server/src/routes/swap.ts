@@ -1,3 +1,4 @@
+import { recordActivity } from "../lib/activity.ts";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "../db/client.ts";
@@ -155,6 +156,20 @@ swapRouter.post(
       params,
       outcome,
       usdValue: usdValue > 0 ? usdValue.toFixed(2) : null,
+    });
+    // Task 062 / PF-015 — the timeline entry (best-effort, next to the ledger row).
+    await recordActivity(db, {
+      kind: "swap",
+      actor: "user",
+      status: outcome === "success" ? "completed" : "failed",
+      userId: user.id,
+      walletAddress: wallet,
+      txHash,
+      chainId: ACTIVE_CHAIN_ID,
+      asset: `${tokenIn} → ${tokenOut}`,
+      amountRaw: amountInRaw,
+      valueUsd: usdValue > 0 ? usdValue : null,
+      data: params,
     });
 
     // C-019 — the intent was already recorded at issuance; a failed trade

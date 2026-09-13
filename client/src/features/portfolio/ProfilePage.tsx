@@ -2,6 +2,8 @@ import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, Bot, Droplet, LogOut } from "lucide-react";
 import { StrategiesSection } from "./StrategiesSection.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
+import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
+import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
 import { DepositCard } from "./DepositCard.tsx";
 import { WithdrawModal } from "./WithdrawModal.tsx";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
@@ -38,6 +40,8 @@ export function ProfilePage({
   // wallet they act on. "Send from my wallet" on the deposit surface's
   // agent tab hands the agent address across as the withdraw recipient.
   const [modal, setModal] = useState<"deposit" | "withdraw" | null>(null);
+  // Phase 9 / PF-009, PF-012 — the per-pool LP view and settled history.
+  const economics = usePortfolioEconomics(walletAddress ?? null);
   const [withdrawRecipient, setWithdrawRecipient] = useState<string | undefined>(undefined);
 
   return (
@@ -107,6 +111,8 @@ export function ProfilePage({
         )}
 
         <MarketPositionsSection />
+        <SettledPositionsSection econ={economics} />
+        <LpEconomicsSection econ={economics} />
 
         <section className="mt-3 rounded-md border border-border-soft px-4 py-3.5">
           <h3 className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-text-mute">

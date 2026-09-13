@@ -1,3 +1,4 @@
+import { recordActivity } from "../lib/activity.ts";
 import { Router, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.ts";
@@ -299,6 +300,23 @@ liquidityRemoveRouter.post(
         isFullExit: v.isFullExit,
       },
       outcome: v.outcome,
+    });
+    // Task 062 / PF-015 — the timeline entry (best-effort).
+    await recordActivity(db, {
+      kind: "liquidity_remove",
+      actor: "user",
+      status: v.outcome === "success" ? "completed" : "failed",
+      userId: user.id,
+      walletAddress: ctx.walletAddress,
+      txHash: v.txHash,
+      chainId: ACTIVE_CHAIN_ID,
+      positionRef: v.positionId ?? v.tokenId ?? null,
+      data: {
+        ...(v.positionId ? { positionId: v.positionId } : {}),
+        ...(v.tokenId ? { tokenId: v.tokenId } : {}),
+        liquidityRemoved: v.liquidityRemoved,
+        isFullExit: v.isFullExit,
+      },
     });
 
     // Only touch the positions table when we have a DB row to update —

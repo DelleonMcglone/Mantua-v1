@@ -221,7 +221,7 @@ export function computePerformance(
 }
 
 /** Production reader: this wallet's fills, their markets, and the latest resolutions. */
-export async function readAgentPerformance(db: DB, address: string): Promise<AgentPerformance> {
+export async function readWalletPerformance(db: DB, address: string): Promise<AgentPerformance> {
   const fills = await db
     .select({
       marketId: marketFills.marketId,
@@ -264,4 +264,52 @@ export async function readAgentPerformance(db: DB, address: string): Promise<Age
   const actionsByTx = new Map<string, string>();
   for (const r of auditRows) if (r.txHash) actionsByTx.set(r.txHash.toLowerCase(), r.action);
   return computePerformance(address, fills, marketRows, resolutionRows, actionsByTx);
+}
+
+/** The agent's wallet is a wallet: same computation (kept for the agent tools). */
+export const readAgentPerformance = readWalletPerformance;
+
+// ─── Phase 9 / PF-012 — settled-position history for any wallet ─────────────
+
+export interface MarketLabel {
+  marketId: string;
+  label: string;
+  league: string | null;
+  providerEventId: string | null;
+  state: string;
+  resolvedAt: string | null;
+}
+
+export interface SettledPositionRow extends MarketPerformance {
+  label: string;
+  league: string | null;
+  providerEventId: string | null;
+  state: string;
+  resolvedAt: string | null;
+  /** Winning-side tokens still unclaimed (redeem pending) vs claimed. */
+  redeemed: boolean;
+}
+
+/** Pure: join the per-market ledger to its labels; resolved markets only, newest first. */
+export function settledHistory(
+  perf: AgentPerformance,
+  labels: ReadonlyMap<string, MarketLabel>,
+  redeemedMarketIds: ReadonlySet<string>,
+): { rows: SettledPositionRow[]; totals: AgentPerformance["totals"] } {
+  const rows: SettledPositionRow[] = [];
+  for (const m of perf.markets) {
+    if (m.status === "open") continue;
+    const l = labels.get(m.marketId.toLowerCase());
+    rows.push({
+      ...m,
+      label: l?.label ?? m.marketId,
+      league: l?.league ?? null,
+      providerEventId: l?.providerEventId ?? null,
+      state: l?.state ?? "RESOLVED",
+      resolvedAt: l?.resolvedAt ?? null,
+      redeemed: redeemedMarketIds.has(m.marketId.toLowerCase()),
+    });
+  }
+  rows.sort((a, b) => (b.resolvedAt ?? b.lastTradeAt).localeCompare(a.resolvedAt ?? a.lastTradeAt));
+  return { rows, totals: perf.totals };
 }

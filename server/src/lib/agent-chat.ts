@@ -44,6 +44,7 @@ import { readMarketPositions } from "./sports/market-positions.ts";
 import { searchMarkets, summarizeMarketPositions } from "./agent/read-tools.ts";
 import { boundaryForTool } from "./agent/untrusted.ts";
 import { readAgentPerformance } from "./agent/performance.ts";
+import { recordActivity } from "./activity.ts";
 import { counters } from "./metrics.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
@@ -1383,6 +1384,20 @@ async function executeTool(
         args,
         chainId,
       );
+      await recordActivity(db, {
+        kind: "agent_simulation",
+        actor: "agent",
+        userId: await resolveUserId(privyUserId),
+        marketId: sim.market.marketId,
+        asset: `${args.direction} ${args.direction === "buy" ? "USDC of" : "YES on"} game ${args.providerEventId}`,
+        amountRaw: args.amountRaw.toString(),
+        valueUsd: args.direction === "buy" ? Number(args.amountRaw) / 1e6 : null,
+        data: {
+          executable: sim.executable,
+          blockers: sim.blockers,
+          simulationId: sim.simulationId,
+        },
+      });
       await confirmationStore.savePreview({
         sessionId: turn.sessionId,
         kind: "market_trade",
@@ -1448,6 +1463,26 @@ async function executeTool(
       });
       if (direction === "buy") await recordSpending(wallet.address, amountNum);
       counters.inc("agent.funnel.execute_ok");
+      // Task 062 / PF-015 — the agent's trade on the timeline (best-effort).
+      await recordActivity(db, {
+        kind: direction === "buy" ? "market_buy" : "market_sell",
+        actor: "agent",
+        userId: await resolveUserId(privyUserId),
+        walletAddress: wallet.address,
+        txHash: result.txHash,
+        chainId,
+        marketId: result.marketId,
+        asset: "YES",
+        amountRaw: direction === "buy" ? result.quote.amountOut : args.amountRaw.toString(),
+        valueUsd: direction === "buy" ? amountNum : Number(result.quote.amountOut) / 1e6,
+        data: {
+          direction,
+          providerEventId: args.providerEventId,
+          outcomeIndex: args.outcomeIndex,
+          confirmationId:
+            typeof input["confirmationId"] === "string" ? input["confirmationId"] : null,
+        },
+      });
       return {
         txHash: result.txHash,
         marketId: result.marketId,
@@ -1623,11 +1658,25 @@ async function executeTool(
       if (typeof amount !== "string" || !(Number(amount) > 0)) {
         throw new Error("amount (positive decimal string) is required for deposit and spend.");
       }
-      if (action === "deposit") {
-        return await depositToUnifiedBalance(privyUserId, userWalletAddress, amount);
-      }
-      if (action === "deposit_base") {
-        return await depositToUnifiedBalanceFromBase(privyUserId, amount);
+      if (action === "deposit" || action === "deposit_base") {
+        const deposited =
+          action === "deposit"
+            ? await depositToUnifiedBalance(privyUserId, userWalletAddress, amount)
+            : await depositToUnifiedBalanceFromBase(privyUserId, amount);
+        // Task 062 / PF-015 — the unified-balance move on the timeline.
+        const dep = deposited as unknown as Record<string, unknown>;
+        await recordActivity(db, {
+          kind: "gateway_deposit",
+          actor: "agent",
+          userId: await resolveUserId(privyUserId),
+          txHash: typeof dep["txHash"] === "string" ? dep["txHash"] : null,
+          chainId,
+          asset: "USDC",
+          amountRaw: String(Math.round(Number(amount) * 1e6)),
+          valueUsd: Number(amount),
+          data: { action, ...dep },
+        });
+        return deposited;
       }
       if (action === "spend") {
         const destIn = input["destinationChain"];
@@ -1644,13 +1693,27 @@ async function executeTool(
         if (typeof recipient === "string" && recipient.length > 0 && !isAddress(recipient)) {
           throw new Error("recipientAddress must be a valid 0x EVM address.");
         }
-        return await spendUnifiedBalance(privyUserId, {
+        const spent = await spendUnifiedBalance(privyUserId, {
           amount,
           destinationChain,
           ...(typeof recipient === "string" && recipient.length > 0
             ? { recipientAddress: recipient }
             : {}),
         });
+        // Task 062 / PF-015 — the unified-balance spend on the timeline.
+        const sp = spent as unknown as Record<string, unknown>;
+        await recordActivity(db, {
+          kind: "gateway_spend",
+          actor: "agent",
+          userId: await resolveUserId(privyUserId),
+          txHash: typeof sp["txHash"] === "string" ? sp["txHash"] : null,
+          chainId,
+          asset: "USDC",
+          amountRaw: String(Math.round(Number(amount) * 1e6)),
+          valueUsd: Number(amount),
+          data: { action, ...sp },
+        });
+        return spent;
       }
       throw new Error("action must be balance, deposit, or spend.");
     }
@@ -1767,9 +1830,43 @@ async function executeTool(
           }
         : summary;
     }
-    case "mantua_analyze_market":
+    case "mantua_analyze_market": {
       counters.inc("agent.funnel.analyze");
-      return await analyzeMarket(sportsToolsDb, input);
+      const analysis = await analyzeMarket(sportsToolsDb, input);
+      // Task 062 / PF-020 — research and recommendations are activity too.
+      if (analysis["status"] === "ok") {
+        const user = await resolveUserId(privyUserId);
+        const a = analysis["analysis"] as {
+          suggestedAction: { kind: string };
+          probabilityBps: number;
+        };
+        const market = analysis["market"] as { marketId?: string } | null;
+        const label = `${String(analysis["team"])} vs ${String(analysis["opponent"])}`;
+        const marketId = market && typeof market.marketId === "string" ? market.marketId : null;
+        await recordActivity(db, {
+          kind: "agent_research",
+          actor: "agent",
+          userId: user,
+          marketId,
+          asset: label,
+          data: { probabilityBps: a.probabilityBps, suggestedAction: a.suggestedAction.kind },
+        });
+        if (
+          a.suggestedAction.kind === "consider_buy_yes" ||
+          a.suggestedAction.kind === "consider_fade"
+        ) {
+          await recordActivity(db, {
+            kind: "agent_recommendation",
+            actor: "agent",
+            userId: user,
+            marketId,
+            asset: `${a.suggestedAction.kind === "consider_buy_yes" ? "buy" : "fade"} ${label}`,
+            data: { suggestedAction: a.suggestedAction.kind, probabilityBps: a.probabilityBps },
+          });
+        }
+      }
+      return analysis;
+    }
     case "mantua_get_performance": {
       const wallet = await getAgentWallet(privyUserId, chainId);
       if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
@@ -2023,6 +2120,21 @@ async function executeTool(
       }
       await requireAgentBalance(privyUserId, "USDC", amount);
       const r = await bridgeFromAgentWallet({ privyUserId, amount, destinationChain, recipient });
+      // Task 062 / PF-015 — the bridge on the timeline.
+      {
+        const br = r as unknown as Record<string, unknown>;
+        await recordActivity(db, {
+          kind: "bridge",
+          actor: "agent",
+          userId: await resolveUserId(privyUserId),
+          txHash: typeof br["txHash"] === "string" ? br["txHash"] : null,
+          chainId,
+          asset: "USDC",
+          amountRaw: String(Math.round(Number(amount) * 1e6)),
+          valueUsd: Number(amount),
+          data: { destinationChain, recipient },
+        });
+      }
       return r;
     }
     case "create_pool": {

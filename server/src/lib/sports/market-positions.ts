@@ -53,6 +53,8 @@ export interface MarketPositionRow {
   entryPriceBps: number | null;
   /** Unrealized P&L in USDC raw units: mark value − avg-cost basis. */
   pnlRaw: string | null;
+  /** PF-003 — what this side pays at par if it wins (balance × 1 USDC), raw 6dp. */
+  potentialPayoutRaw: string;
 }
 
 type Deployment = (typeof MARKETS_BY_CHAIN)[typeof BASE_CHAIN_ID];
@@ -195,6 +197,7 @@ export async function computeMarketPositions(
           providerEventId: row.providerEventId,
           entryPriceBps,
           pnlRaw,
+          potentialPayoutRaw: bal.toString(),
         });
       }
     }),

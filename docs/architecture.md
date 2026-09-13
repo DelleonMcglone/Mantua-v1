@@ -795,6 +795,33 @@ Reads (layers 1–2) run freely and use no user data beyond the agent's
 own wallet address. Writes must pass 3, 4 and 5 in that order; the model
 can neither see nor change `AGENT_MODE`.
 
+### Portfolio valuation (D-116, task 066)
+
+1. **Why Pyth-first with a fallback, and why $0 stays possible.** The
+   read path must degrade, not blank; an outage on both feeds values the
+   token at 0 — visibly (`pricing.fallback_zero`, the `pricing_zero`
+   alert) — while the write path (caps) keeps the strict helpers that
+   refuse to trade on a missing price.
+2. **Why market marks are the pool.** A prediction position's price is
+   the pool's implied probability, read on-chain; no external feed exists
+   for it and none is wanted.
+
+### Unified Activity (D-115, task 062)
+
+1. **Why a dedicated table.** The ledgers each answer one question
+   (fills for price ticks, positions for marks, fiat transfers for rails,
+   the audit log for compliance). "What happened to my money, in order"
+   needs one row shape with a status and an actor; `activity` is that,
+   written beside the ledgers, never instead.
+2. **Why best-effort.** A timeline gap is recoverable; a trade record
+   that fails because the timeline insert failed is not. `recordActivity`
+   logs and returns null; nothing upstream awaits its success.
+3. **Why pending is keyed by the Circle tx id.** A sponsored send has no
+   hash until it is mined; the entry exists from acceptance so the user
+   sees "pending", and the hash arrives with the terminal transition.
+4. **Where it lives.** `server/src/lib/activity.ts`, `routes/activity.ts`,
+   `db/schema/activity.ts`, migration `0020_activity_spine`.
+
 ### Agent loop seam, attribution, gate monitoring (A-017/A-039/A-040, task 061)
 
 1. **Why the loop has a dependency bag.** `runAgentChat` is the one place

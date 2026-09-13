@@ -139,6 +139,7 @@ void describe("summarizeMarketPositions", () => {
       providerEventId: "401",
       entryPriceBps: 6250,
       pnlRaw: "560000",
+      potentialPayoutRaw: "16000000",
     },
     {
       marketId: "0xbbb",
@@ -154,6 +155,7 @@ void describe("summarizeMarketPositions", () => {
       providerEventId: "402",
       entryPriceBps: null,
       pnlRaw: null,
+      potentialPayoutRaw: "5000000",
     },
   ];
 

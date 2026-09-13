@@ -10,7 +10,7 @@ import {
 import { ArrowLeft, Bot, Check, ExternalLink, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { Banner } from "@/components/ui/banner.tsx";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { useAgentPortfolio } from "./use-agent-portfolio.ts";
 import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
@@ -709,7 +709,10 @@ function renderResult(step: ToolStep): ReactNode {
             from the minted amount.
           </Banner>
           {d.burnTxHash && (
-            <TxRow hash={d.burnTxHash} explorerUrl={`https://basescan.org/tx/${d.burnTxHash}`} />
+            <TxRow
+              hash={d.burnTxHash}
+              explorerUrl={getExplorerTxUrl(BASE_CHAIN_ID, d.burnTxHash)}
+            />
           )}
         </div>
       );

@@ -10,6 +10,7 @@
  * burning gas, matching `executeResolution`'s isolation contract.
  */
 
+import { recordActivity } from "../activity.ts";
 import { createWalletClient, encodePacked, http, keccak256, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
@@ -887,11 +888,7 @@ export function planPositionSettlement(
   const candidateKeys = new Set<string>();
   for (const row of rows) {
     if (row.side !== "yes" && row.side !== "no") continue;
-    const price = settlementPriceFor(
-      row.side,
-      row.state,
-      winnerByMarket.get(row.marketId) ?? null,
-    );
+    const price = settlementPriceFor(row.side, row.state, winnerByMarket.get(row.marketId) ?? null);
     if (price === null) {
       plan.heldUnknownWinner += 1;
       continue;
@@ -969,6 +966,8 @@ export async function settleResolvedPositions(
       marketId: marketPositions.marketId,
       walletAddress: marketPositions.walletAddress,
       side: marketPositions.side,
+      userId: marketPositions.userId,
+      size: marketPositions.size,
       redeemedAt: marketPositions.redeemedAt,
       state: marketsSchema.state,
       yesToken: marketsSchema.yesToken,
@@ -1012,12 +1011,35 @@ export async function settleResolvedPositions(
   summary.heldUnknownWinner = plan.heldUnknownWinner;
 
   const now = new Date();
+  const rowById = new Map(rows.map((r) => [r.id, r]));
   for (const mark of plan.marks) {
-    await db
+    const marked = await db
       .update(marketPositions)
       .set({ settledAt: now, settlementPrice: mark.settlementPrice, updatedAt: now })
-      .where(and(eq(marketPositions.id, mark.id), isNull(marketPositions.settledAt)));
+      .where(and(eq(marketPositions.id, mark.id), isNull(marketPositions.settledAt)))
+      .returning({ id: marketPositions.id });
     summary.positionsSettled += 1;
+    // Task 062 / PF-015, PF-021 — "settle market → settlement appears":
+    // one timeline entry per position the mark closed (idempotent via the
+    // guarded update above — a re-run marks nothing and writes nothing).
+    const row = rowById.get(mark.id);
+    if (marked.length > 0 && row) {
+      const price = Number(mark.settlementPrice);
+      const tokens = Number(row.size) / 1e6;
+      await recordActivity(db, {
+        kind: "settlement",
+        actor: "system",
+        userId: row.userId,
+        walletAddress: row.walletAddress,
+        chainId,
+        marketId: row.marketId,
+        positionRef: row.id,
+        asset: `${row.side.toUpperCase()} side`,
+        amountRaw: row.size,
+        valueUsd: Number.isFinite(price) ? Number((tokens * price).toFixed(2)) : null,
+        data: { settlementPrice: mark.settlementPrice, side: row.side },
+      });
+    }
   }
 
   if (plan.redeemCandidates.length === 0) return summary;
