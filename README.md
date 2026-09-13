@@ -428,9 +428,15 @@ Requires Postgres + a `.env` (see `server/.env.example`, `client/.env.example`).
 ```bash
 npm run typecheck            # all workspaces
 npm run lint                 # eslint, zero warnings tolerated
-npm test -w @mantua/server   # 785 tests
-npm test -w @mantua/client   # 163 tests
+npm test -w @mantua/server   # 937 tests
+npm test -w @mantua/client   # 240 tests
+npm run e2e                  # browser suite: the real client in Chromium, auth shimmed, API + chain scripted
 ```
+
+The browser suite (`client/e2e/`, task 067) needs no Privy app id,
+database, or chain: it starts Vite with `VITE_E2E_AUTH=shim` and answers
+the API and the RPC from Playwright routes. Set
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a preinstalled Chromium.
 
 ### Contracts
 

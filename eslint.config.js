@@ -44,7 +44,11 @@ export default tseslint.config(
       ecmaVersion: 2023,
       globals: globals.browser,
       parserOptions: {
-        project: ["./client/tsconfig.app.json", "./client/tsconfig.node.json"],
+        project: [
+          "./client/tsconfig.app.json",
+          "./client/tsconfig.node.json",
+          "./client/tsconfig.e2e.json",
+        ],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -55,6 +59,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+    },
+  },
+  // The browser-suite shims (client/e2e) stand in for a whole SDK module,
+  // so one file exports a provider component beside hooks by design. They
+  // are never hot-reloaded.
+  {
+    files: ["client/e2e/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
   {

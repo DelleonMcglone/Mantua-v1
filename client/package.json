@@ -9,7 +9,8 @@
     "preview": "vite preview --port 4173",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint . --max-warnings 0",
-    "test": "find src -name '*.test.ts' | xargs tsx --test"
+    "test": "find src -name '*.test.ts' | xargs tsx --test",
+    "e2e": "playwright test"
   },
   "dependencies": {
     "@circle-fin/adapter-viem-v2": "1.12.1",
@@ -35,6 +36,7 @@
     "viem": "2.48.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.2.4",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

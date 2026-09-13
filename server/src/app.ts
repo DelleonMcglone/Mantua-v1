@@ -3,6 +3,7 @@ import pinoHttp from "pino-http";
 import { logger } from "./lib/logger.ts";
 import { attachAuth } from "./middleware/auth.ts";
 import { killSwitch } from "./middleware/kill-switch.ts";
+import { securityHeaders } from "./middleware/security-headers.ts";
 import { ipRateLimiter } from "./middleware/rate-limit.ts";
 import { agentChatRouter } from "./routes/agent-chat.ts";
 import { agentInstructionRouter } from "./routes/agent-instruction.ts";
@@ -20,6 +21,7 @@ import { marketPositionsRouter } from "./routes/market-positions.ts";
 import { marketFillsRouter } from "./routes/market-fills.ts";
 import { marketDetailRouter } from "./routes/market-detail.ts";
 import { marketDiscoverRouter } from "./routes/market-discover.ts";
+import { legalRouter } from "./routes/legal.ts";
 import { marketRedeemRouter } from "./routes/market-redeem.ts";
 import { activityRouter } from "./routes/activity.ts";
 import { portfolioEconomicsRouter } from "./routes/portfolio-economics.ts";
@@ -72,6 +74,8 @@ import { latencyMiddleware } from "./lib/metrics.ts";
  */
 export const app = express();
 app.set("trust proxy", 1);
+// Task 067 (G-006) — security headers before anything else answers.
+app.use(securityHeaders);
 app.use(pinoHttp({ logger }));
 // Phase 7 / R-003 — time the budgeted routes from the edge of Express.
 app.use(latencyMiddleware);
@@ -130,6 +134,8 @@ app.use(marketFillsRouter);
 app.use(marketDetailRouter);
 // Task 050 — id-free discover read (slate + liquidity + popularity).
 app.use(marketDiscoverRouter);
+// Task 067 (G-014) — recorded Terms acceptance.
+app.use(legalRouter);
 app.use(marketRedeemRouter);
 app.use(activityRouter);
 app.use(portfolioEconomicsRouter);

@@ -1,0 +1,51 @@
+name: Browser E2E
+
+# Task 067 (G-002) — the Playwright suite in client/e2e: the real client in
+# Chromium with the auth SDK shimmed and the API + chain scripted. Runs on
+# every PR and on pushes to main, beside the unit CI.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  playwright:
+    name: browser e2e (chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx --workspace=@mantua/client playwright install --with-deps chromium
+
+      - name: Run the browser suite
+        env:
+          CI: "1"
+        run: npm run e2e
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: client/test-results
+          if-no-files-found: ignore
+          retention-days: 7

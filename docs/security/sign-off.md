@@ -80,16 +80,16 @@ semantics change made after that signing**, and the review run against it.
 ## A1. What changed
 
 Owner decision **D-103** (2026-09-06) replaced kickoff-freeze with **in-play
-trading**: buy/sell runs before *and during* the event. Implemented in task
+trading**: buy/sell runs before _and during_ the event. Implemented in task
 045 (`docs/tasks/045-inplay-trading-security-e2e.md`).
 
-| Layer                | Signed design (2026-08-18)                          | After D-103                                                                                     |
-| -------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `Market.freeze()`    | Permissionless at `startsAt`                        | Resolver-only from `startsAt`; **permissionless from `startsAt + MAX_EVENT_DURATION` (12 h)**    |
-| `Resolver.freeze()`  | Permissionless forward                              | `onlyAuthorized` (signer/operator) — see M-01 note below                                        |
-| Hook swap gate       | `RiskPolicy.isFrozen` — pure time at kickoff        | Market-state-driven (`FINAL`) + `RiskPolicy.isPastBackstop` time backstop                       |
-| `split` / `merge`    | Closed at kickoff                                   | Open while trading is open; still close at freeze                                               |
-| Registry kickoff     | Immutable, no setter                                | **Unchanged** — still immutable, now anchoring the backstop and fee dynamics                     |
+| Layer               | Signed design (2026-08-18)                   | After D-103                                                                                   |
+| ------------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `Market.freeze()`   | Permissionless at `startsAt`                 | Resolver-only from `startsAt`; **permissionless from `startsAt + MAX_EVENT_DURATION` (12 h)** |
+| `Resolver.freeze()` | Permissionless forward                       | `onlyAuthorized` (signer/operator) — see M-01 note below                                      |
+| Hook swap gate      | `RiskPolicy.isFrozen` — pure time at kickoff | Market-state-driven (`FINAL`) + `RiskPolicy.isPastBackstop` time backstop                     |
+| `split` / `merge`   | Closed at kickoff                            | Open while trading is open; still close at freeze                                             |
+| Registry kickoff    | Immutable, no setter                         | **Unchanged** — still immutable, now anchoring the backstop and fee dynamics                  |
 
 Preserved unchanged and re-verified: once-only pool registration, no kickoff
 setter, dynamic-fee-only pools, `onlyPoolManager` callbacks, no
@@ -103,8 +103,8 @@ hook timestamp check, service sweep — and strategies disarm on the same
 clock") describes the **pre-D-103** design and no longer matches the code.
 As of this addendum the rail reads:
 
-| Rail             | Enforcement point                                                                                                                                                        | Evidence                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Rail             | Enforcement point                                                                                                                                                                       | Evidence                                                                                             |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Freeze integrity | Resolver freeze on final (contract) + hook halt on `eventState = FINAL` + **shared 12 h time backstop** on both layers (`Market.MAX_EVENT_DURATION` == `RiskPolicy.MAX_EVENT_DURATION`) | `Market.t.sol` freeze-window tests, `test_backstopMatchesTheHook`, `FullLifecycle.t.sol` in-game leg |
 
 The service-side strategy disarm (B9-007) moved with the contract in task
@@ -123,12 +123,12 @@ Trail of Bits methodology, covering `contracts/src/markets/` plus the hook
 files changed for D-103, with the new freeze/backstop surface reviewed
 explicitly (early-freeze griefing, backstop bypass, state-machine holes).
 
-| Severity      | Open  | Notes                                                                                                    |
-| ------------- | ----- | ---------------------------------------------------------------------------------------------------------- |
-| HIGH          | **0** | Ship criterion "zero HIGH open" still met                                                                |
+| Severity      | Open  | Notes                                                                                                                              |
+| ------------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| HIGH          | **0** | Ship criterion "zero HIGH open" still met                                                                                          |
 | MEDIUM        | 1     | M-01 — halt/freeze are keeper/resolver-coupled; bounded by the stale clamp + backstop. **Ops requirement, needs owner acceptance** |
-| LOW           | 2     | L-01 `redeemInvalid` odd-unit dust; L-02 permissionless `createMarket` (pre-existing, now also anchors the trading window) |
-| Informational | 2     | I-01 losing-side tokens survive redemption; I-02 resolver authority concentration (carries B10-007 I-01)  |
+| LOW           | 2     | L-01 `redeemInvalid` odd-unit dust; L-02 permissionless `createMarket` (pre-existing, now also anchors the trading window)         |
+| Informational | 2     | I-01 losing-side tokens survive redemption; I-02 resolver authority concentration (carries B10-007 I-01)                           |
 
 One finding was fixed during review rather than reported: the permissionless
 `Resolver.freeze()` forward would have handed the resolver-only early-freeze
@@ -197,3 +197,39 @@ run before deploy.
 **This addendum does not re-sign the ship gate.** M-01 remains unaccepted,
 L-03 needs the owner's written note, the fork suites need a run, and the
 human audit and second-model review remain outstanding as before.
+
+# Addendum — 2026-09-13: launch gate (task 067, D-117)
+
+Scope: the surfaces shipped after A1–A7 (consumer trading layer,
+reliability spine, agent core, portfolio, and the legal acceptance
+record). Full review: [`launch-gate-review.md`](./launch-gate-review.md).
+
+## B1. Rails re-verified
+
+Every rail in §2 is traced to its enforcement point on the new surfaces
+and to a test (`launch-gate-review.md` §2). No rail regressed. The only
+new write, Terms acceptance, sits behind `requireAuth`,
+`writeRateLimiter`, and the kill switch like every other write.
+
+## B2. Guards that are now tests
+
+- Security headers on every response (`security-headers.test.ts`).
+- Every mutating route carries a guard, with three allowlisted exceptions
+  that name their reason (`route-guards.test.ts`).
+- No secret in any tracked file (`secret-scan.test.ts`).
+- The real client in a real browser: Discover → Trade → Executed, the
+  error copy, the pause, the legal pages (`client/e2e`, in CI).
+
+## B3. Dependency posture
+
+`express-rate-limit` bumped to 8.7.0. Seventeen high advisories remain,
+each triaged in `launch-gate-review.md` §4; none reaches a production
+request path with attacker-controlled input. The SDK bump that clears
+the `ws` and `axios` entries is a separate task.
+
+## B4. What this addendum does not do
+
+It does not re-sign the ship gate. Still outstanding and unchanged: M-01
+written acceptance, the L-03 note, the fork suites on a funded RPC, the
+human audit and second-model review before the mainnet deploy, and CSP.
+The ledger in `docs/tasks/launch-gate.md` carries each as a 🟡 row.

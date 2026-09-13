@@ -215,6 +215,21 @@ export default function App() {
     };
   }, []);
 
+  // The ticket's Terms gate (task 067) opens the legal page without
+  // prop-drilling, like the login modal.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const doc = (e as CustomEvent<string>).detail;
+      if (doc === "terms" || doc === "privacy" || doc === "integrity") {
+        setRoute({ kind: "legal", doc });
+      }
+    };
+    window.addEventListener("mantua:open-legal", handler);
+    return () => {
+      window.removeEventListener("mantua:open-legal", handler);
+    };
+  }, []);
+
   // Keep the stored route in sync so a refresh restores the current view.
   useEffect(() => {
     try {

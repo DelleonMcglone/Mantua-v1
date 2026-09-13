@@ -1,178 +1,133 @@
-# Mantua — Terms of Service (DRAFT, NOT REVIEWED)
+# Mantua — Terms of Use (DRAFT, NOT REVIEWED)
 
-> **Status: DRAFT** · This document is a developer-authored starting
-> point for crypto-counsel review per Phase 9 / P9-009. It is **not**
-> legal advice and **must not** be published before counsel sign-off.
-> Specific risk areas flagged inline as `[REVIEW: …]`.
+> **Status: DRAFT** · Developer-authored counsel copy for the published
+> page `client/src/components/legal/TermsPage.tsx` (+ `TermsProductSections.tsx`).
+> The page is what users accept; this file carries the same text in
+> plain form with the counsel-review markers `[REVIEW: …]`. It is **not**
+> legal advice. Version **2026-09-13** (task 067, G-012) — the version
+> users accept is recorded per `docs/tasks/launch-gate.md` G-014.
 
-**Effective date:** TBD (set on counsel-approval merge)
+**Effective date:** September 13, 2026 (the page's `EFFECTIVE_DATE`).
 
-## 1. About these Terms
+## 1. Agreement and eligibility
 
-These Terms of Service ("Terms") govern your access to and use of
-Mantua (the "Service"), an interface for interacting with Uniswap v4
-liquidity pools and Mantua's Liquidity Hooks ("Stable
-Protection" and "Dynamic Fee") on **Base Mainnet, a public Ethereum
-Layer 2 network**. By
-connecting a wallet to the Service or otherwise using it, you accept
-these Terms.
+These terms are an agreement between you and Mantua Intelligence covering
+the website, application, and related services. Using them means you
+accept the terms; before your first trade the app asks you to accept the
+current version and records that acceptance.
 
-`[REVIEW: jurisdictional opt-in language; clickwrap vs. browsewrap; minor age gate.]`
+You must be at least 18 and legally able to enter this agreement. You may
+not use the service from a jurisdiction where it is prohibited, or if you
+appear on a sanctions list. You are responsible for knowing whether
+trading event contracts is lawful where you are.
 
-## 2. What Mantua is and isn't
+`[REVIEW: clickwrap sufficiency of the in-ticket acceptance; age gate; restricted-jurisdiction list and geo posture (DM-108: implied, not surfaced).]`
 
-The Service is a **non-custodial interface**. Mantua does not hold your
-private keys, route any of your funds through accounts we control, or
-custody assets at any point. Every transaction originates from a
-wallet you control and is broadcast to **Base Mainnet, a public
-Ethereum Layer 2 network**. Assets on Base Mainnet have real-world
-value — deposit only what you can afford to place at risk.
+## 2. What the service is
 
-The Service exposes:
+A non-custodial interface to smart contracts on a public blockchain:
+sports prediction markets (yes/no contracts on scheduled games), token
+swaps, and liquidity provision. We never take possession or control of
+your assets; you hold your keys and sign every transaction; submitted
+transactions generally cannot be reversed by you or by us.
 
-- A user interface for creating Uniswap v4 pools, providing liquidity,
-  swapping tokens, and viewing pool / portfolio information.
-- An optional "agent wallet" feature backed by a third-party custodian
-  (Coinbase Developer Platform). When you provision an agent wallet,
-  the keys are held by that third party under their terms; we do not
-  hold them. See § 6.
-- AI-assisted natural-language tools for navigating the Service. The
-  AI responses are advisory; they do not execute transactions
-  automatically and do not constitute trading or investment advice.
+## 3. Markets and settlement
 
-`[REVIEW: AI advisory language; whether AI outputs need a separate disclaimer surface in-app.]`
+- A winning contract pays one dollar; a losing contract pays nothing.
+- Buy or sell before **and during** the game; trading closes when the
+  game goes final, and no later than twelve hours after the scheduled
+  start (contract-enforced backstop). Prices are set by trading in the
+  market's pool.
+- **Resolution.** A Mantua-operated resolver reads live sports data and
+  submits results. Every resolution passes a mandatory review window
+  before it is final; results whose sources disagree may be held; a
+  manual override exists for missing, delayed, or contradictory data.
+  Final resolutions are irreversible and publicly recorded with source
+  and signer.
+- **Voids.** Postponed, cancelled, abandoned, or tied (no tie outcome)
+  games void the market; both sides settle at $0.50 per contract.
+- **Pauses and halts.** New buys on a live game are refused while the
+  live feed is behind (sells stay open); platform-wide trading may be
+  paused under pre-defined conditions; held positions settle normally.
 
-## 3. Eligibility and prohibited use
+`[REVIEW: whether the review window / override language creates duties; description of the resolver's discretion; void-at-0.50 disclosure adequacy.]`
 
-You agree that you:
+## 4. Fees and costs
 
-1. Are at least 18 years old.
-2. Are not a resident of, located in, or accessing the Service from a
-   jurisdiction subject to comprehensive U.S. economic sanctions
-   (currently Cuba, Iran, North Korea, Syria, and the Crimea, Donetsk,
-   and Luhansk regions of Ukraine).
-3. Are not on the U.S. Treasury OFAC Specially Designated Nationals
-   list or any equivalent list maintained by other governments.
-4. Will not use the Service to launder funds, evade sanctions,
-   manipulate markets, or commit fraud.
+- Regular-season games: no trading fee.
+- Playoff games: a dynamic fee between 0.10% and 0.70% of the amount
+  traded (liquidity, volatility, activity, uncertainty); 0.70% is a
+  contract-level ceiling. The exact fee is shown before confirmation
+  and is the fee paid.
+- Sponsored transactions cost nothing beyond the shown amount; where
+  sponsorship is unavailable the wallet pays the network cost, which
+  never flows to us. Bank transfers may carry a disclosed partner fee.
 
-`[REVIEW: jurisdictional carve-outs; whether to add a residency self-attestation at wallet connect.]`
+`[REVIEW: fee-change notice requirements; sponsored-gas characterisation.]`
 
-## 4. Risks you accept
+## 5. Funding your account
 
-You understand and accept that:
+USDC by wallet transfer, or dollars via a connected bank account that
+licensed partners convert to USDC and deliver to the wallet. Partners
+hold bank credentials and dollars under their own terms; we hold neither.
+Transfers may take business days and may be reversed by the partner
+before landing.
 
-- **Smart contracts can fail.** Uniswap v4 and Mantua's hooks have
-  undergone AI-assisted security review (per `docs/security/`), but
-  no audit eliminates risk. Bugs, reentrancy, oracle manipulation, or
-  governance attacks may cause partial or total loss of deposited
-  assets.
-- **Market risk applies in full.** Token prices, liquidity depth, and
-  pool composition can move dramatically. Impermanent loss, slippage,
-  and front-running may erode your position. Mantua's hooks are
-  designed to mitigate certain risks (e.g. peg drift) but do not
-  guarantee outcomes.
-- **Network risk applies.** Base or Ethereum congestion, chain
-  reorganizations, sequencer downtime, or RPC failures may delay or
-  prevent your transactions from confirming.
-- **The Service is provided "as is."** We make no warranties about
-  uptime, correctness, or fitness for any particular purpose.
-- **You are solely responsible** for the security of your wallet,
-  your private keys, your transaction parameters (slippage, deadline,
-  amount), and the tax / regulatory consequences of your activity in
-  your jurisdiction.
+`[REVIEW: partner-terms incorporation by reference; money-transmission posture of the partner arrangement.]`
 
-`[REVIEW: enforceability of "as is" / disclaimer-of-warranties in target markets; consumer protection laws may override.]`
+## 6. Agents and automated activity
 
-## 5. Fees
+An optional autonomous agent researches, trades, hedges, and manages
+liquidity from its own wallet, held by a regulated custodian under that
+custodian's terms. The user funds it and sets its daily limit, per-trade
+ceiling, leagues, and whether it may act unprompted. The user is
+responsible for the agent's actions within those limits; its analysis is
+an estimate, never a guarantee; paid data it buys is charged to its
+wallet and recorded; the user can stop it at any time.
 
-The current beta does **not** charge protocol fees. A Mantua service
-fee (capped at 25 bps) may be introduced later with notice. Network gas
-fees are paid in ETH to Base sequencers; nothing flows to Mantua while
-fee collection is off.
+`[REVIEW: agency/authorisation language for autonomous execution; custodian terms reference (Circle).]`
 
-`[REVIEW: confirm "no fees" stays accurate through the fee turn-on; notice requirements when it changes.]`
+## 7. Acceptable use, market integrity, and conflicts
 
-## 6. Agent wallets (Coinbase Developer Platform)
+No manipulation, trading on material non-public information, money
+laundering or sanctions evasion, multi-accounting or location disguise,
+interference with the service, or misrepresentation. The Market Integrity
+policy is incorporated. Persons with access to or influence over an event
+should assume they may not trade its markets.
 
-If you opt to provision a Mantua agent wallet, that wallet is created
-and held by Coinbase Developer Platform under their
-[Developer Platform Terms](https://www.coinbase.com/legal). Mantua
-acts as a UI layer on top of CDP for these flows and does not have
-direct custody of the resulting wallet's keys.
+## 8. No advice; risk
 
-You authorize Mantua to:
+Nothing is financial, investment, legal, or tax advice. Trading and
+liquidity provision can lose everything committed; a losing contract pays
+nothing; prices move sharply in play and a trade on live data may execute
+at a stale price; thin markets move against large orders; smart-contract,
+data-source, network, stablecoin, and third-party risks apply.
 
-- Provision an agent wallet keyed to your Mantua user identity.
-- Submit transactions you sign or instruct on behalf of that wallet.
-- Read public on-chain state about that wallet's balances and
-  positions.
+`[REVIEW: enforceability of disclaimers in target markets.]`
 
-You retain the right to revoke this authorization by disconnecting
-your Mantua user, terminating your CDP account, or moving the agent
-wallet's funds to a wallet you control.
+## 9. Third parties, IP, suspension, disclaimers, liability, indemnity
 
-`[REVIEW: pass-through liability vs. CDP terms; whether Mantua's agent UI creates additional fiduciary duty.]`
+As on the page: third-party services under their own terms; limited
+licence to the interface; suspension for breach or legal necessity
+(interface-level only — the contracts are permissionless); "as is"
+disclaimers; limitation of liability; indemnification.
 
-## 7. Intellectual property
+`[REVIEW: liability cap amount; consumer-law carve-outs.]`
 
-The Mantua interface (this Service) is licensed under the terms in the
-repository's `LICENSE` file. Mantua's hook contracts have their own
-licenses listed in the contract source headers. The Mantua brand,
-logo, and copy on this website are owned by [legal entity TBD].
+## 10. Governing law, changes, contact
 
-You receive a non-exclusive, non-transferable, revocable license to
-use the Service in accordance with these Terms.
-
-`[REVIEW: confirm legal entity name; trademark filings; open-source vs. proprietary boundary on UI vs. contracts.]`
-
-## 8. Termination
-
-We may suspend or terminate your access at any time, with or without
-notice, if we believe you have violated these Terms or applicable law.
-We may also suspend the Service entirely (the "kill switch" — see
-[`docs/INCIDENT-RUNBOOK.md`](../INCIDENT-RUNBOOK.md)) during a security
-incident. On-chain assets remain in your wallet regardless; the
-Service has no power to seize, freeze, or claw back funds.
-
-You may stop using the Service at any time by disconnecting your
-wallet.
-
-## 9. Disputes and governing law
-
-`[REVIEW: arbitration vs. court; class action waiver; choice of law (Delaware? UK? offshore?); jurisdiction for injunctive relief.]`
-
-## 10. Changes to these Terms
-
-We may update these Terms by posting a new version to this URL and
-updating the effective date. Material changes will be announced
-in-app and on the project's official communication channels at least
-14 days before they take effect, except in cases of urgent legal
-compliance.
-
-## 11. Contact
-
-[Contact channel TBD — likely a privacy@ alias and an in-app feedback link.]
-
----
+Delaware law; informal resolution first; **no forum or arbitration
+clause yet — counsel to add.** Material changes are re-accepted before the
+next trade and the accepted version is recorded. Contact via the Discord
+channel until a support inbox exists.
 
 ## Counsel review checklist
 
-Before publishing, counsel must:
-
-- [ ] Confirm legal entity, jurisdiction, and registered agent.
-- [ ] Confirm jurisdictional eligibility carve-outs (§3) match the
-      product's actual geo-blocking posture.
-- [ ] Confirm the "as is" / risk language (§4) is enforceable in the
-      target consumer markets.
-- [ ] Confirm fee disclosure (§5) and AI advisory language (§2)
-      meet applicable consumer-protection / financial-promotions
-      standards.
-- [ ] Confirm CDP pass-through (§6) doesn't create additional
-      fiduciary duty.
-- [ ] Specify dispute resolution clause (§9): arbitration provider,
-      seat, language, governing law.
-- [ ] Specify the contact mechanism (§11) and confirm it accepts
-      legal process.
-- [ ] Coordinate with the Privacy Policy (`PRIVACY-POLICY-DRAFT.md`)
-      so the two documents don't contradict.
+- [ ] Jurisdictional opt-in and geo posture (DM-108)
+- [ ] Clickwrap sufficiency of the recorded in-ticket acceptance
+- [ ] Event-contract regulatory characterisation in target markets
+- [ ] Resolver discretion, review window, override, void settlement
+- [ ] Fee model disclosure and change notice
+- [ ] Bank-rail partner terms and money-transmission posture
+- [ ] Agent authorisation and custodian (Circle) terms
+- [ ] Forum / arbitration; liability cap; consumer carve-outs

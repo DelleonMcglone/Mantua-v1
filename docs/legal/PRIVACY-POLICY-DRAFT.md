@@ -34,18 +34,21 @@ collect it.**
 
 ## 2. What we collect, why, and how long we keep it
 
-| Category              | What                                                                | Why                                                                                        | Retention                                                               |
-| --------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| Wallet address        | The public address you connect via Privy                            | Required to authenticate API requests, build calldata, and read your on-chain balances     | Until you delete your account or 2 years of inactivity, whichever first |
-| Privy user ID         | The opaque DID Privy issues for your authenticated session          | Required to bind your wallet to server-side records (positions, agent wallet, preferences) | Same as above                                                           |
-| Transaction records   | Hash, timestamp, action, USD value at submission                    | Power the in-app activity history + portfolio analytics                                    | 2 years                                                                 |
-| Position records      | Pool key, tick range, liquidity at mint time                        | Power the Positions tab + add / remove flows                                               | Until you close the position, then archived for 2 years                 |
-| Market positions      | Market ID, outcome side, size, entry price                          | Power the portfolio's open-position view and P/L                                           | Until the market settles, then archived for 2 years                     |
-| Hedging strategies    | Trigger, action, size, cap, expiry, arm/execute timestamps          | Run the strategy and give you its audit trail                                              | Until you disarm it, then archived for 1 year                           |
-| Preferences           | Slippage tolerance, hide-small-balances toggle, etc.                | Persist your settings across sessions                                                      | Until you change them or delete your account                            |
-| Agent wallet metadata | The agent wallet's address (created by Coinbase Developer Platform) | Power the agent surface                                                                    | Until you delete the agent wallet or your Mantua account                |
-| Server logs           | IP address, request path, status code, response time                | Operational health + abuse detection                                                       | 30 days                                                                 |
-| Audit log             | Action attempted, outcome, reason (e.g. slippage rejection)         | Security review + incident postmortems                                                     | 1 year                                                                  |
+| Category              | What                                                                          | Why                                                                                         | Retention                                                               |
+| --------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Wallet address        | The public address you connect via Privy                                      | Required to authenticate API requests, build calldata, and read your on-chain balances      | Until you delete your account or 2 years of inactivity, whichever first |
+| Privy user ID         | The opaque DID Privy issues for your authenticated session                    | Required to bind your wallet to server-side records (positions, agent wallet, preferences)  | Same as above                                                           |
+| Transaction records   | Hash, timestamp, action, USD value at submission                              | Power the in-app activity history + portfolio analytics                                     | 2 years                                                                 |
+| Position records      | Pool key, tick range, liquidity at mint time                                  | Power the Positions tab + add / remove flows                                                | Until you close the position, then archived for 2 years                 |
+| Market positions      | Market ID, outcome side, size, entry price                                    | Power the portfolio's open-position view and P/L                                            | Until the market settles, then archived for 2 years                     |
+| Hedging strategies    | Trigger, action, size, cap, expiry, arm/execute timestamps                    | Run the strategy and give you its audit trail                                               | Until you disarm it, then archived for 1 year                           |
+| Preferences           | Slippage tolerance, hide-small-balances toggle, etc.                          | Persist your settings across sessions                                                       | Until you change them or delete your account                            |
+| Agent wallet metadata | The agent wallet's address and Circle wallet id (custodied by Circle)         | Power the agent surface                                                                     | Until you delete the agent wallet or your Mantua account                |
+| Bank connection       | Opaque partner token, bank label (name + last digits), transfer status/amount | Fund the account from a bank; show transfer status (task 067)                               | Until you disconnect the bank, then archived 2 years                    |
+| Terms acceptances     | Document, version, timestamp                                                  | Prove which Terms version you accepted (task 067, G-014)                                    | For as long as the account exists                                       |
+| AI conversations      | Your questions to the analyst/agent, the conversation, market data            | Answer the question / run the agent (sent to the language-model provider; not for training) | Conversation lifetime; audit log entries 1 year                         |
+| Server logs           | IP address, request path, status code, response time                          | Operational health + abuse detection                                                        | 30 days                                                                 |
+| Audit log             | Action attempted, outcome, reason (e.g. slippage rejection)                   | Security review + incident postmortems                                                      | 1 year                                                                  |
 
 We do **not** collect: your private keys, the contents of your other
 wallets, your real-world identity (we have no KYC), your IP-derived
@@ -60,6 +63,8 @@ category. See the Market Integrity policy for what the analysis is for.
 `[REVIEW: confirm the legal basis for integrity monitoring (legitimate interest vs. contract necessity) and whether it needs its own disclosure under the applicable regime.]`
 
 `[REVIEW: confirm retention windows match counsel's recommendation for the target jurisdictions and the residual-risk posture in P5-026.]`
+
+`[REVIEW (task 067): bank-connection data — Plaid and the transfer partner are the controllers of bank credentials; confirm the disclosure and the partner-privacy-policy references. AI processing — confirm the provider's data-use terms (no training) are accurately represented.]`
 
 ## 3. Third parties we share data with
 
@@ -89,6 +94,20 @@ base pairs route per DM-112.
 We never sell your data. We never share it with advertisers.
 
 `[REVIEW: confirm the AI-vendor exposure language; ensure the questions sent to LLMs don't include identifiers that turn the request into a personal data transfer.]`
+
+Added 2026-09-13 (task 067) — parties the shipped product uses that the
+2026-08 draft did not list:
+
+| Party                       | What they receive                                             | Why                                        |
+| --------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
+| Circle (Developer Wallets)  | Agent wallet provisioning and transaction requests            | The agent's custodied wallet               |
+| Plaid                       | Your bank login (directly, in their widget) → an opaque token | Bank connection                            |
+| Licensed transfer partner   | Transfer instructions (amount, direction) keyed to that token | Dollar ↔ USDC transfers                    |
+| Anthropic                   | Analyst/agent questions, conversation, market + game data     | Language-model answers and agent reasoning |
+| Sportradar / ESPN (inbound) | Nothing about you — requests carry no user identifier         | Schedules, scores, resolution data         |
+| Vercel, Neon, Upstash       | Hosting, database, rate-limit/kill-switch state               | Running the service                        |
+
+`[REVIEW: sub-processor list completeness; cross-border transfer basis for each.]`
 
 ## 4. Cookies and local storage
 
