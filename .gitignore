@@ -14,6 +14,9 @@
 
 # Node
 node_modules/
+# Also the bare name: a worktree symlink named node_modules is not a
+# directory, so `node_modules/` alone would let it be committed (PR #52).
+node_modules
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
