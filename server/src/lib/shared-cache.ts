@@ -179,5 +179,10 @@ function clientFromEnv(): SharedCacheClient | null {
   };
 }
 
+/** The raw shared KV (Upstash) when configured — for stores that need
+ *  set/get/del semantics rather than get-or-compute (the agent's
+ *  confirmation store). Null when Redis is not configured. */
+export const sharedKvClient: SharedCacheClient | null = clientFromEnv();
+
 /** The process-wide cache — L2 when Upstash is configured, L1 only otherwise. */
-export const sharedCache = new SharedCache({ client: clientFromEnv() });
+export const sharedCache = new SharedCache({ client: sharedKvClient });

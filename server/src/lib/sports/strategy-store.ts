@@ -10,6 +10,7 @@ import { and, desc, eq, ne, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { hedgeStrategies, type HedgeStrategy } from "../../db/schema/markets.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
+import type { AuditAction } from "../../db/schema/safety.ts";
 import { users } from "../../db/schema/users.ts";
 import { BASE_CHAIN_ID } from "../chains.ts";
 import type { StrategyConfig } from "./strategies.ts";
@@ -30,7 +31,7 @@ function strategyType(config: StrategyConfig): string {
 
 async function audit(
   db: DB,
-  action: string,
+  action: AuditAction,
   outcome: string,
   params: Record<string, unknown>,
   reason?: string,
@@ -226,7 +227,13 @@ export async function engineRelease(
     );
     return "disarmed";
   }
-  await audit(db, "strategy_execute", "released", { strategyId: claimed.id, attempts: d.attempts }, reason);
+  await audit(
+    db,
+    "strategy_execute",
+    "released",
+    { strategyId: claimed.id, attempts: d.attempts },
+    reason,
+  );
   return "released";
 }
 

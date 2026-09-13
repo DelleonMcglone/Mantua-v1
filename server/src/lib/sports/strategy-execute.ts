@@ -24,6 +24,7 @@ import { baseRpcClient } from "../rpc-client.ts";
 import { parseAbi } from "viem";
 import { checkSpendingCap } from "../spending-cap.ts";
 import { agentMarketTrade } from "./market-agent-trade.ts";
+import { hedgePolicyGate, loadHedgeContext } from "../agent/policy.ts";
 import type { HedgeStrategy } from "../../db/schema/markets.ts";
 import type { StrategyDecision } from "./strategies.ts";
 
@@ -46,6 +47,9 @@ export interface ExecuteCloseDeps {
   checkSpendingCap?: typeof checkSpendingCap;
   agentMarketTrade?: typeof agentMarketTrade;
   balanceOf?: (token: string, owner: string) => Promise<bigint>;
+  /** Task 057 / A-038 — the user's hedge policy + history (D-109). */
+  hedgeContext?: typeof loadHedgeContext;
+  now?: () => number;
 }
 
 export type ExecuteOutcome =
@@ -89,6 +93,7 @@ export async function executeTriggeredClose(
     .select({
       yesToken: markets.yesToken,
       outcomeIndex: markets.outcomeIndex,
+      marketType: markets.marketType,
       providerEventId: events.providerEventId,
     })
     .from(markets)
@@ -118,12 +123,39 @@ export async function executeTriggeredClose(
       }));
   const balance = await readBalance(market.yesToken, wallet.address);
   if (balance === 0n) {
-    return { kind: "held", reason: "agent wallet holds no position in this market", retryable: false };
+    return {
+      kind: "held",
+      reason: "agent wallet holds no position in this market",
+      retryable: false,
+    };
   }
 
   // YES ≤ 1 USDC each, so the strategy's USD cap bounds tokens directly.
   const capTokens = BigInt(Math.round(Number(row.capUsd) * 1e6));
-  const amount = balance < capTokens ? balance : capTokens;
+  let amount = balance < capTokens ? balance : capTokens;
+
+  // Task 057 / A-038, A-041 — the user's hedge policy, enforced in code
+  // independent of the LLM and of the strategy's own cap: paused status,
+  // permitted market types, minimum confidence, cooldown between hedges,
+  // the daily hedge budget, and the per-hedge size ceiling (a clamp).
+  const hedgeCtx = await (deps.hedgeContext ?? loadHedgeContext)(db, row.userId);
+  const gate = hedgePolicyGate(hedgeCtx.view, {
+    sizeUsd: closeLegUsd(amount),
+    marketType: typeof market.marketType === "string" ? market.marketType : null,
+    confidenceBps: null,
+    lastHedgeAtMs: hedgeCtx.lastHedgeAtMs,
+    spentTodayUsd: hedgeCtx.spentTodayUsd,
+    nowMs: (deps.now ?? Date.now)(),
+  });
+  if (!gate.ok) {
+    return {
+      kind: "held",
+      reason: `policy: ${gate.reasons.join("; ")}`,
+      retryable: gate.retryable,
+    };
+  }
+  const policyTokens = BigInt(Math.round(gate.clampedSizeUsd * 1e6));
+  if (policyTokens < amount) amount = policyTokens;
 
   // C-019 — the cron close moves money, so it honors the wallet's daily
   // spending cap like every other trade path. A capped-out wallet HOLDS

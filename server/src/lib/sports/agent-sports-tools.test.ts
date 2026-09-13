@@ -14,6 +14,8 @@ import {
   getMarketHistory,
   getMarketVolume,
   getMarketLiquidity,
+  getMarketOverview,
+  analyzeMarket,
 } from "./agent-sports-tools.ts";
 import type {
   EventRow,
@@ -218,7 +220,13 @@ function fixtures(): Fixtures {
       },
     ],
     prices: [
-      { marketId: M0, impliedProbability: "0.60000", source: "opening", liquidityRaw: null, capturedAt: hours(-2) },
+      {
+        marketId: M0,
+        impliedProbability: "0.60000",
+        source: "opening",
+        liquidityRaw: null,
+        capturedAt: hours(-2),
+      },
       {
         marketId: M0,
         impliedProbability: "0.63000",
@@ -226,13 +234,43 @@ function fixtures(): Fixtures {
         liquidityRaw: "2500000000",
         capturedAt: hours(-1),
       },
-      { marketId: M0, impliedProbability: "0.66000", source: "pool", liquidityRaw: null, capturedAt: hours(-0.5) },
+      {
+        marketId: M0,
+        impliedProbability: "0.66000",
+        source: "pool",
+        liquidityRaw: null,
+        capturedAt: hours(-0.5),
+      },
     ],
     fills: [
-      { marketId: M0, direction: "buy", tokensRaw: "150000000", usdcRaw: "100000000", createdAt: hours(-2) },
-      { marketId: M0, direction: "buy", tokensRaw: "75000000", usdcRaw: "50000000", createdAt: hours(-3) },
-      { marketId: M0, direction: "sell", tokensRaw: "45000000", usdcRaw: "30000000", createdAt: hours(-4) },
-      { marketId: M0, direction: "buy", tokensRaw: "10000000", usdcRaw: "999000000", createdAt: hours(-48) },
+      {
+        marketId: M0,
+        direction: "buy",
+        tokensRaw: "150000000",
+        usdcRaw: "100000000",
+        createdAt: hours(-2),
+      },
+      {
+        marketId: M0,
+        direction: "buy",
+        tokensRaw: "75000000",
+        usdcRaw: "50000000",
+        createdAt: hours(-3),
+      },
+      {
+        marketId: M0,
+        direction: "sell",
+        tokensRaw: "45000000",
+        usdcRaw: "30000000",
+        createdAt: hours(-4),
+      },
+      {
+        marketId: M0,
+        direction: "buy",
+        tokensRaw: "10000000",
+        usdcRaw: "999000000",
+        createdAt: hours(-48),
+      },
     ],
   };
 }
@@ -275,7 +313,10 @@ function makeFakeDb(f: Fixtures): SportsToolsDb {
       ),
     listEventsForLeague: (leagueId, limit) =>
       Promise.resolve(
-        f.events.filter((e) => e.leagueId === leagueId).sort(byStartDesc).slice(0, limit),
+        f.events
+          .filter((e) => e.leagueId === leagueId)
+          .sort(byStartDesc)
+          .slice(0, limit),
       ),
     getEventByProviderEventId: (pid) =>
       Promise.resolve(f.events.find((e) => e.providerEventId === pid) ?? null),
@@ -297,7 +338,8 @@ function makeFakeDb(f: Fixtures): SportsToolsDb {
     hasAnyInjuries: () => Promise.resolve(f.injuries.length > 0),
     listMarketsForEvent: (eventId) =>
       Promise.resolve(f.markets.filter((m) => m.eventId === eventId)),
-    getMarket: (marketId) => Promise.resolve(f.markets.find((m) => m.marketId === marketId) ?? null),
+    getMarket: (marketId) =>
+      Promise.resolve(f.markets.find((m) => m.marketId === marketId) ?? null),
     listMarketPrices: (marketId, limit) =>
       Promise.resolve(
         f.prices
@@ -394,11 +436,11 @@ void describe("get_game (S-011)", () => {
     assert.equal(asR(res["opponent"])["name"], "New Orleans Saints");
     const markets = asArr(res["markets"]);
     assert.equal(markets.length, 2);
-    assert.deepEqual(
-      markets.map((m) => m["marketId"]).toSorted(),
-      [M0, M1].toSorted(),
+    assert.deepEqual(markets.map((m) => m["marketId"]).toSorted(), [M0, M1].toSorted());
+    assert.equal(
+      markets.find((m) => m["outcomeIndex"] === 0)?.["outcomeLabel"],
+      "Atlanta Falcons to win",
     );
-    assert.equal(markets.find((m) => m["outcomeIndex"] === 0)?.["outcomeLabel"], "Atlanta Falcons to win");
   });
 
   void it("selects by date window when a date is given", async () => {
@@ -792,10 +834,7 @@ void describe("get_play_by_play (S-019)", () => {
     assert.equal(plays.at(0)?.["sequence"], 1_698_611_137_531);
     assert.equal(plays.at(0)?.["playType"], "pass");
     assert.equal(plays.at(0)?.["scoringPlay"], true);
-    assert.deepEqual(
-      [plays.at(0)?.["homeScore"], plays.at(0)?.["awayScore"]],
-      [14, 10],
-    );
+    assert.deepEqual([plays.at(0)?.["homeScore"], plays.at(0)?.["awayScore"]], [14, 10]);
     assert.equal(plays.at(1)?.["playType"], "rush");
 
     // limit is honored.
@@ -986,5 +1025,85 @@ void describe("039 tools are read-only under the 030 audit rule", () => {
     ]) {
       assert.equal(auditActionForToolCall(tool, {}), null, tool);
     }
+  });
+});
+
+void describe("task 056 — mantua_get_market (getMarketOverview)", () => {
+  void it("composes game, markets, latest price, depth and 24h volume by providerEventId", async () => {
+    const res = asR(await getMarketOverview(db, { providerEventId: "pe-e-live" }, NOW));
+    assert.equal(res["status"], "ok");
+    assert.equal(asR(res["game"])["providerEventId"], "pe-e-live");
+    const ms = asArr(res["markets"]);
+    assert.equal(ms.length, 2);
+    const m0 = ms.find((m) => m["outcomeIndex"] === 0);
+    assert.ok(m0);
+    assert.equal(asR(m0["price"])["impliedProbabilityBps"], 6600);
+    assert.equal(asR(m0["price"])["ageSeconds"], 1800);
+    assert.equal(m0["liquidityUsdc"], 2500);
+    // three fills inside 24h: 100 + 50 + 30 USDC; the 48h-old one is out.
+    assert.equal(m0["volume24hUsdc"], 180);
+    assert.equal(m0["trades24h"], 3);
+    const m1 = ms.find((m) => m["outcomeIndex"] === 1);
+    assert.ok(m1);
+    assert.equal(m1["price"], null);
+    assert.equal(m1["liquidityUsdc"], null);
+    assert.equal(m1["poolDeployed"], false);
+  });
+
+  void it("resolves by marketId, and reports not_found honestly", async () => {
+    const res = asR(await getMarketOverview(db, { marketId: M0 }, NOW));
+    assert.equal(res["status"], "ok");
+    assert.equal(asR(res["game"])["providerEventId"], "pe-e-live");
+    const missing = asR(await getMarketOverview(db, { providerEventId: "999" }, NOW));
+    assert.equal(missing["status"], "not_found");
+    await assert.rejects(getMarketOverview(db, {}, NOW), /providerEventId or marketId/);
+  });
+});
+
+void describe("task 059 — mantua_analyze_market (sports_intelligence)", () => {
+  void it("composes the analysis for 'Falcons' from the canonical fixture and hands back the simulate arguments", async () => {
+    const res = asR(await analyzeMarket(db, { team: "Falcons" }, NOW));
+    assert.equal(res["status"], "ok");
+    assert.equal(res["skill"], "sports_intelligence");
+    assert.equal(res["side"], "home");
+    assert.equal(res["team"], "Atlanta Falcons");
+    assert.equal(res["opponent"], "New Orleans Saints");
+    const market = asR(res["market"]);
+    assert.equal(market["marketId"], M0);
+    assert.equal(market["impliedProbabilityBps"], 6600);
+    assert.equal(market["liquidityUsdc"], 2500);
+    const analysis = asR(res["analysis"]);
+    const p = Number(analysis["probabilityBps"]);
+    assert.ok(p >= 500 && p <= 9500);
+    const factors = asArr(analysis["evidence"]).map((e) => e["factor"]);
+    assert.ok(factors.includes("venue"));
+    assert.ok(factors.includes("recent form"));
+    assert.ok(factors.includes("injuries"), "the open WR injury is evidence");
+    assert.ok(factors.includes("live score"), "the game is in progress");
+    assert.ok(
+      (analysis["riskFactors"] as unknown[]).some(
+        (r) => typeof r === "string" && /in-play/.test(r),
+      ),
+    );
+    const inputs = asR(res["inputs"]);
+    assert.deepEqual(asR(inputs["team"])["recentForm"], ["W", "L", "W", "W"]);
+    assert.equal(asR(inputs["headToHead"])["teamWins"], 1);
+    assert.equal(asR(inputs["headToHead"])["opponentWins"], 1);
+    const next = res["next"];
+    if (next !== null) {
+      assert.equal(asR(next)["tool"], "mantua_simulate_trade");
+    }
+  });
+
+  void it("resolves by providerEventId + outcomeIndex and reports not_found honestly", async () => {
+    const away = asR(
+      await analyzeMarket(db, { providerEventId: "pe-e-live", outcomeIndex: 1 }, NOW),
+    );
+    assert.equal(away["status"], "ok");
+    assert.equal(away["side"], "away");
+    assert.equal(away["team"], "New Orleans Saints");
+    const missing = asR(await analyzeMarket(db, { providerEventId: "nope" }, NOW));
+    assert.equal(missing["status"], "not_found");
+    await assert.rejects(analyzeMarket(db, {}, NOW), /team, providerEventId or marketId/);
   });
 });

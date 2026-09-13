@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { env } from "../env.ts";
-import { runAgentChat, type AgentChatEvent } from "../lib/agent-chat.ts";
+import { agentModeFromEnv, runAgentChat, type AgentChatEvent } from "../lib/agent-chat.ts";
+import { modePolicy } from "../lib/agent/agent-mode.ts";
 import { isSupportedChainId } from "../lib/chains.ts";
 import { logger } from "../lib/logger.ts";
 import { requireAuth } from "../middleware/auth.ts";
@@ -17,13 +18,16 @@ const chatSchema = z.object({
 });
 
 /**
- * Conversational autonomous agent endpoint (Server-Sent Events).
+ * Conversational agent endpoint (Server-Sent Events).
  *
  * Streams `AgentChatEvent`s as `data:` lines: a `session` id, assistant `text`
  * deltas, `tool_start` / `tool_result` step events (which the UI renders as
- * live status + result cards), and a terminal `done`. Tools execute inline on
- * the server's Circle wallet with no confirmation — the daily spending cap is
- * the guardrail.
+ * live status + result cards), and a terminal `done`. Read tools execute
+ * inline on the server's Circle wallet; money-moving tools pass the Phase 8
+ * execution gate (`lib/agent/execution-gate.ts`, D-114) — preview, the
+ * user's explicit "confirm", a server-minted confirmation id — with the
+ * daily spending cap and the kill switch enforced in code underneath.
+ * `AGENT_MODE=disabled` answers 503 `AGENT_DISABLED`.
  */
 agentChatRouter.post(
   "/api/agent/chat",
@@ -47,6 +51,11 @@ agentChatRouter.post(
         error: "Agent is unavailable (ANTHROPIC_API_KEY not configured).",
         code: "ANTHROPIC_UNAVAILABLE",
       });
+      return;
+    }
+    // Phase 8 / A-028 — AGENT_MODE=disabled turns the agent off at the door.
+    if (!modePolicy(agentModeFromEnv()).enabled) {
+      res.status(503).json({ error: "The agent is disabled.", code: "AGENT_DISABLED" });
       return;
     }
 

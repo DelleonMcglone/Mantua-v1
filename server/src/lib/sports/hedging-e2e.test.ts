@@ -57,11 +57,7 @@ import { hedgeStrategies } from "../../db/schema/markets.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
 import { agentWallets, markets } from "../../db/schema/index.ts";
 import { SafetyError } from "../errors.ts";
-import {
-  pollReceipt,
-  type TransactionFetcher,
-  type TransactionState,
-} from "../circle/execute.ts";
+import { pollReceipt, type TransactionFetcher, type TransactionState } from "../circle/execute.ts";
 import { parseStrategyDraft, previewLines } from "./strategy-parse.ts";
 import {
   MAX_EVENT_DURATION_SECONDS,
@@ -69,7 +65,12 @@ import {
   ticksFromSlates,
   type StrategyConfig,
 } from "./strategies.ts";
-import { overlayPoolTicks, processStrategy, referencedMarketIds, type EngineDeps } from "./strategy-engine.ts";
+import {
+  overlayPoolTicks,
+  processStrategy,
+  referencedMarketIds,
+  type EngineDeps,
+} from "./strategy-engine.ts";
 import { armStrategy, listArmed, MAX_EXECUTE_ATTEMPTS } from "./strategy-store.ts";
 import { executeTriggeredClose, type ExecuteCloseDeps } from "./strategy-execute.ts";
 import { marketIdsFor } from "./resolution.ts";
@@ -166,7 +167,9 @@ const auditRows: AuditRow[] = [];
 const joinedMarkets: Record<string, unknown>[] = [];
 let idCounter = 0;
 
-function thenable<T>(rows: T[]): Promise<T[]> & { limit: () => Promise<T[]>; returning: () => Promise<T[]> } {
+function thenable<T>(
+  rows: T[],
+): Promise<T[]> & { limit: () => Promise<T[]>; returning: () => Promise<T[]> } {
   const p = Promise.resolve(rows);
   return Object.assign(p, { limit: () => p, returning: () => p });
 }
@@ -327,6 +330,30 @@ function makeExecDeps(opts: {
   const tradeCalls: TradeCall[] = [];
   const deps: ExecuteCloseDeps = {
     balanceOf: () => Promise.resolve(opts.balance),
+    // Task 057 — the user's hedge policy: the defaults, with a budget and
+    // per-leg ceiling above every amount this journey moves.
+    hedgeContext: () =>
+      Promise.resolve({
+        view: {
+          status: "active" as const,
+          autoTradeEnabled: false,
+          maxStakePerTradeUsd: 25,
+          riskLevel: "conservative" as const,
+          allowedLeagues: [],
+          hedge: {
+            maxSizeUsd: 10_000,
+            maxExposureUsd: 10_000,
+            minConfidenceBps: 0,
+            cooldownMinutes: 0,
+            dailyBudgetUsd: 10_000,
+            allowedMarketTypes: [],
+          },
+          updatedAt: null,
+          persisted: false,
+        },
+        lastHedgeAtMs: null,
+        spentTodayUsd: 0,
+      }),
     checkSpendingCap: (address, usd) => {
       opts.order?.push(`cap-check:${String(usd)}`);
       return opts.ledger.check(address, usd);
@@ -369,7 +396,9 @@ function engineDeps(execDeps: ExecuteCloseDeps): EngineDeps {
 /** One engine sweep, exactly as cron-strategies composes it. */
 async function sweep(
   slates: ProviderSlate[],
-  readPool: (providerEventId: string) => Promise<{ kind: "price"; bps: number } | { kind: "none" } | { kind: "unavailable" }>,
+  readPool: (
+    providerEventId: string,
+  ) => Promise<{ kind: "price"; bps: number } | { kind: "none" } | { kind: "unavailable" }>,
   deps: EngineDeps,
   onlyStrategyId?: string,
 ): Promise<Awaited<ReturnType<typeof processStrategy>>[]> {
@@ -449,7 +478,12 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
 
     // Stage 2a — inside thresholds (no pool trading yet → provider seed
     // 6000bps < 8000bps take-profit): the engine HOLDS, no claim, no money.
-    const holdResults = await sweep(slatesA, () => Promise.resolve({ kind: "none" }), deps, armed.id);
+    const holdResults = await sweep(
+      slatesA,
+      () => Promise.resolve({ kind: "none" }),
+      deps,
+      armed.id,
+    );
     assert.equal(holdResults.length, 1);
     assert.equal(holdResults[0].decision, "hold");
     assert.equal(strategyRow(armed.id).status, "armed");
@@ -539,7 +573,11 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
     assert.equal(tradeCalls.length, 0, "a cap block never reaches the trade executor");
 
     const row = strategyRow(armed.id);
-    assert.equal(row["status"], "armed", "released back for a later tick (cap resets at UTC midnight)");
+    assert.equal(
+      row["status"],
+      "armed",
+      "released back for a later tick (cap resets at UTC midnight)",
+    );
     assert.equal(row["executeAttempts"], 0, "a cap-hold consumes NO attempt");
   });
 
@@ -583,7 +621,12 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
         assert.equal(row["status"], "armed");
         assert.equal(row["executeAttempts"], attempt, "each SENT-stuck poll counts one attempt");
         if (attempt === 1) firstTriggeredAt = row["triggeredAt"];
-        else assert.equal(row["triggeredAt"], firstTriggeredAt, "first trigger time survives re-claims");
+        else
+          assert.equal(
+            row["triggeredAt"],
+            firstTriggeredAt,
+            "first trigger time survives re-claims",
+          );
       } else {
         assert.equal(result.execution, "disarmed", "the bound ends the retries");
         assert.equal(row["status"], "disarmed");
@@ -604,7 +647,10 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
     assert.match(disarm.reason ?? "", /execute-failed after 3 attempts/);
     assert.match(disarm.reason ?? "", /did not reach a terminal state/);
     // The engine never released the loop early: no armed row remains.
-    assert.equal((await listArmed(db)).some((r) => r.id === armed.id), false);
+    assert.equal(
+      (await listArmed(db)).some((r) => r.id === armed.id),
+      false,
+    );
   });
 
   it("stays armed and executes DURING the game (D-103 in-play) — kickoff no longer disarms", async () => {
@@ -613,9 +659,7 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
     // Kickoff has passed and the game is LIVE — under in-play trading this
     // is exactly the window hedging exists for.
     const slates = [
-      slateOf([
-        event({ providerEventId: EVT_E, startsAt: NOW - 60, status: "in_progress" }),
-      ]),
+      slateOf([event({ providerEventId: EVT_E, startsAt: NOW - 60, status: "in_progress" })]),
     ];
     const config: StrategyConfig = strategyConfigSchema.parse({
       kind: "take-profit-stop",
@@ -717,7 +761,10 @@ describe("B10-006 hedging E2E — arm → trigger → claim-once → execute und
 
     // A later trigger arriving after the freeze finds nothing to fire: the
     // engine sweep no longer sees the strategy at all.
-    assert.equal((await listArmed(db)).some((r) => r.id === armed.id), false);
+    assert.equal(
+      (await listArmed(db)).some((r) => r.id === armed.id),
+      false,
+    );
     const [again] = await sweep(
       slates,
       () => Promise.resolve({ kind: "price", bps: 9500 }),

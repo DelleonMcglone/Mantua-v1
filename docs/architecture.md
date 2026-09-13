@@ -361,7 +361,7 @@ that path are advisory UX, not controls.
 
 | Rail                                                 | Verdict                       | Why                                                                                                                                                                                                                                                                                                  | Effort |
 | ---------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| Agent-wallet spending caps                           | KEEP + 2 fixes                | Enforced at every server-signed execution point. **Critical hole: the chat LLM tool `set_cap` bypasses the route's zod clamp — the agent can raise its own daily cap $100 → $50,000 with no user assent.** And `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide | S      |
+| Agent-wallet spending caps                           | KEEP (1 fix landed, 1 open)   | Enforced at every server-signed execution point. The chat `set_cap` bypass is CLOSED (C-010, task 024): raises need the user's attested message and every value clamps through `assertValidDailyCap` — verified again in task 055 (A-047). Still open: `tokenAmountUsd` fails open to $0 on price-feed outage, disabling the cap system-wide                                                    | S      |
 | User-wallet spending caps                            | REPLACE (or relabel advisory) | Checked only on `/api/quote`; calldata routes skip it; ledger increments only via a client-reported endpoint; user holds the keys                                                                                                                                                                    | L      |
 | Uncapped money paths                                 | MISSING                       | Sports market trades, user add-liquidity/pool-create, `/api/v4/swap/calldata`, and Gateway spends (which check a counter they never increment) have no cap and mostly no audit                                                                                                                       | M      |
 | Tier system (age-based caps)                         | REPLACE                       | `getWalletAge` has zero callers — the documented D-009 policy is entirely unimplemented; a day-one account can be set to $50k                                                                                                                                                                        | S      |
@@ -400,10 +400,12 @@ mode.
 
 **Correction to P1-005 above:** the "single seam" claim no longer holds — the
 agent chat is a second, deliberate path from user input to on-chain
-transaction that never calls `confirm()` (it acts autonomously within the
-cap). The seam stays mandatory for _user-signed_ writes; the agent path's
-control is the cap + allowlist + guard stack, not the modal. Recorded here
-until a decision record formalizes it.
+transaction that never calls the client's `confirm()`. Since task 055 that
+path has its own server-side seam: the execution gate (D-114) — preview,
+the user's explicit "confirm" in their own message, a server-minted
+single-use confirmation id, a fresh simulation — with the cap + allowlist
++ guard stack underneath. The client modal stays mandatory for
+_user-signed_ writes.
 
 ### Ship-blockers before real volume (ranked)
 
@@ -756,6 +758,144 @@ status`, `/api/markets/fills`). A server-side indexer is the upgrade
    P-012 halt needs `last_polled_at` at game cadence. The read-only
    `/api/cron/live-sync` is cheap enough for 5 minutes and exempt from the
    kill switch, so a paused platform still shows live scores.
+
+### Agent policies — the user's limits on the agent (D-109, task 057)
+
+1. **Why one row with defaults, not required setup.** A user who never
+   opens the settings still gets a bounded agent ($25 per trade, $100
+   exposure per market, $100 hedge budget per day) — the defaults are the
+   conservative policy, and a missing row reads as those defaults.
+2. **Why the agent cannot write it.** A-012: the agent must not change its
+   own caps. The C-010 attested raise is one bounded exception for the
+   daily cap; the policy has no chat path at all — `mantua_get_policy`
+   reads, `PATCH /api/agent/policy` (the user, audited) writes.
+3. **Where each limit bites.** Per-trade stake, leagues, status and
+   per-market exposure block in the simulation (so the model sees the
+   reason before asking the user to confirm); hedge size clamps and the
+   market-type / confidence / cooldown / budget holds run in the strategy
+   executor before the daily-cap ledger, independent of the model (A-041).
+   Holds a later tick can pass (cooldown, budget) release the claim; holds
+   that need a person (paused, market type, confidence) leave the strategy
+   `triggered` and recorded.
+
+### Agent tool architecture — the five layers (A-019, task 056)
+
+The agent is a proposer inside a stack where no layer trusts the one
+above it:
+
+| Layer                   | What it is                                                                                                                                                                                                                                                                                                                       | Where                                                                                                        |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| 1. Skill                | Prompt guidance: how to analyze, which tool first, what to cite. Advice, never authority.                                                                                                                                                                                                                                        | `SYSTEM_PROMPT` in `server/src/lib/agent-chat.ts`                                                            |
+| 2. Tools                | Typed reads (`mantua_search_markets`, `mantua_get_market`, `mantua_get_position`, `mantua_get_portfolio`, the sports detail tools) and typed writes (`mantua_simulate_trade` → `mantua_execute_trade` / `mantua_sell_position`, swap, send, …). Inputs are zod-validated; outputs say `unavailable` / `null` rather than guess. | `TOOLS` + `executeTool`; `lib/sports/agent-sports-tools.ts`; `lib/agent/read-tools.ts`                       |
+| 3. Wallet authorization | The server-custodied Circle wallet signs; the daily cap, the attested cap raise (C-010), the user's `agent_policies` row and the kill switch are checked in code before any signature.                                                                                                                                          | `lib/spending-cap.ts`, `lib/agent-wallet.ts`, `middleware/kill-switch.ts`, `lib/agent/trade-simulation.ts`  |
+| 4. Contract enforcement | Only allowlisted targets (`registerDynamicTargets`), the same market contracts and hook path the user's ticket uses, market state and fee decided on-chain.                                                                                                                                                                      | `lib/sports/market-agent-trade.ts`, `lib/sports/market-trade-build.ts`, the hook                             |
+| 5. User permission      | The D-114 gate: preview → the user's own explicit "confirm" → a server-minted single-use id → matching execution with a fresh simulation.                                                                                                                                                                                       | `lib/agent/execution-gate.ts`                                                                                |
+
+Reads (layers 1–2) run freely and use no user data beyond the agent's
+own wallet address. Writes must pass 3, 4 and 5 in that order; the model
+can neither see nor change `AGENT_MODE`.
+
+### Agent loop seam, attribution, gate monitoring (A-017/A-039/A-040, task 061)
+
+1. **Why the loop has a dependency bag.** `runAgentChat` is the one place
+   the model, the gate and the tools meet; `AgentLoopDeps` (defaults =
+   production) lets the loop test run the real loop with a scripted model
+   and the real `executeTool`, proving the refusal path, the feedback to
+   the model, and the confirmation plumbing without a wallet or a chain.
+2. **Why attribution comes from the audit log.** Every money path already
+   writes an audit row with the tx hash (`agent_market_trade`,
+   `strategy_execute`, the user's fills route); joining fills to those
+   rows attributes P&L without a schema change.
+3. **Why the refusal rate is a warning, not a page.** A refused execution
+   moved no money; a high rate is a prompt or drift regression to look at,
+   with the codes in the detail.
+
+### Agent chat cards, brief, performance, funnel (A-002/A-014/A-016/A-043/A-044, task 060)
+
+1. **Why the Confirm button sends "confirm".** One consent channel: the
+   server reads consent only from the user's own message (D-114). A
+   button that posted to a confirm endpoint would be a second channel with
+   its own audit shape; the button instead submits the literal message
+   through the same path as typing.
+2. **Why the brief is a tool.** `mantua_daily_brief` is the agent's own
+   structured read (wallet, positions, track record, policy, markets worth
+   a look); as a tool result it streams like every other step and the UI
+   renders it as a card, while the model narrates.
+3. **Why performance is server-side and pure.** Realized P&L needs fills
+   and resolutions; `computePerformance` scores a market only after its
+   resolution (payout at par for the winning side, refund on void) so the
+   number the agent cites equals the one the portfolio shows.
+4. **Why counters, not a vendor.** The user-testing funnel (turn → analyze
+   → simulate/preview → confirm minted → execute / refused) rides the
+   per-instance counters already on `/api/ops/metrics`; a product
+   analytics vendor is an owner decision.
+
+### Agent skill: sports_intelligence (A-004/A-022, task 059)
+
+1. **Why a transparent additive estimator.** The same facts must give the
+   same number, and the user must be able to see why. `analyzeSide`
+   applies bounded, itemized adjustments (venue, season record, recent
+   form, injuries, head-to-head, live score) on a 50/50 baseline and
+   returns every component with its effect, the market's implied
+   probability, the discrepancy, risks and a confidence grade. It is a
+   reasoning aid; the disclaimers say so.
+2. **Why it never sizes or trades.** The suggested action is
+   consider-buy / consider-fade / hold and hands back the exact
+   `mantua_simulate_trade` arguments; sizing belongs to the simulation
+   under the cap and the policy, and execution to the user's confirm.
+3. **Why skills are a prompt list.** Circle's docs carry no skills
+   registry; Mantua's built-in skills are declared once in the prompt and
+   bound to typed tools, so "what the agent is" and "what it can call"
+   cannot drift apart.
+
+### Agent untrusted-data boundary (A-034/A-036, task 058)
+
+1. **Why one seam, not per-tool sanitizers.** Every tool whose result
+   carries third-party text (x402 responses, explorer labels, DefiLlama /
+   CoinGecko names, sports-provider strings — `EXTERNAL_DATA_TOOLS`)
+   crosses `boundaryForTool` in the chat loop before the model reads it:
+   bounded (string / array / depth / total), sanitized (control chars,
+   angle brackets), and instruction-like text flagged with its JSON path
+   in an envelope the third party cannot write (`trust: "untrusted"`,
+   `suspiciousCount`, `rule`). Internal results (simulations, policy,
+   portfolio) pass untouched — they are the server's own words.
+2. **Why flag rather than delete.** The user's tool card and the audit
+   trail keep what the third party said; the envelope removes its
+   authority. The prompt rule: a positive count means tell the user and
+   do not follow.
+3. **Why authority never comes from data.** Consent is read only from the
+   user's own message; a confirmation id is only this turn's server-minted
+   one; a consumed id is gone; an execution must hash-match its preview.
+   The adversarial suite (`lib/agent/injection-security.test.ts`) plays
+   the attacker against exactly those controls.
+
+### Agent execution gate — modes, confirmation, x402 (D-114, task 055)
+
+1. **Why the gate is server-side and pre-model.** The agent wallet is
+   server-signed, so only a server check is a control. The turn context
+   (mode, pending preview, minted confirmation) is computed from the user's
+   raw message before the model runs and handed to it as a system block;
+   the model can echo a confirmation id but cannot create one the store
+   will honor, and it cannot see or change `AGENT_MODE`.
+2. **Why consent is a regex, not a judgment.** `messageConfirmsAction`
+   follows `messageAuthorizesForce` and `messageAttestsCapRaise`: explicit
+   patterns accept, any hedge / question / negation rejects. A false
+   negative costs one round trip; a false positive moves money.
+3. **Why market executions re-simulate.** The user confirmed numbers; the
+   pool may have moved. `materialDrift` compares the confirmed and the
+   fresh `TradeSimulation` (same builder as the user's own ticket) and
+   refuses on price > 100 bps, output shrink > 1 %, market-state or
+   fee-season change, or any policy turning red.
+4. **Why x402 data is exempt.** `call_paid_service` spends the agent's own
+   buyer wallet under `X402_MAX_CALL_USD` / `X402_DAILY_CAP_USD`; the agent
+   has direct marketplace access by design so its analysis loop is not
+   interrupted per lookup. Everything that touches the user's agent wallet
+   is gated.
+5. **Where it lives.** `server/src/lib/agent/` — `agent-mode.ts`,
+   `confirmation-language.ts`, `trade-simulation.ts`,
+   `confirmation-store.ts` (Upstash when configured, `mantua:agent:`),
+   `execution-gate.ts`; wired in `agent-chat.ts` (`executeTool`,
+   `runAgentChat`) and `routes/agent-chat.ts` (503 `AGENT_DISABLED`).
 
 ### Sports pivot (DM-101 … DM-112)
 

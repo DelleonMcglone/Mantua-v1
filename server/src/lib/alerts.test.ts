@@ -160,6 +160,31 @@ void describe("evaluateAlerts", () => {
     assert.deepEqual(ids(ok), [], "5% failures is under the 10% threshold");
   });
 
+  void it("A-040: the agent gate's refusal rate warns past 50% once enough executions were gated", () => {
+    const tooFew = evaluateAlerts(
+      input({ counters: { "agent.funnel.refused.CONFIRMATION_REQUIRED": 5 } }),
+    );
+    assert.deepEqual(ids(tooFew), [], "10 gated samples needed");
+    const bad = evaluateAlerts(
+      input({
+        counters: {
+          "agent.funnel.execute_ok": 3,
+          "agent.funnel.refused.CONFIRMATION_REQUIRED": 6,
+          "agent.funnel.refused.SIMULATION_DRIFT": 2,
+        },
+      }),
+    );
+    assert.deepEqual(ids(bad), ["warn:agent_refusal_rate"]);
+    assert.match(bad[0]?.title ?? "", /73%/);
+    assert.match(bad[0]?.detail ?? "", /CONFIRMATION_REQUIRED 6/);
+    const ok = evaluateAlerts(
+      input({
+        counters: { "agent.funnel.execute_ok": 8, "agent.funnel.refused.CONFIRMATION_EXPIRED": 4 },
+      }),
+    );
+    assert.deepEqual(ids(ok), [], "33% is under the 50% threshold");
+  });
+
   void it("M-01: a FROZEN market whose game is not final pages after the grace window", () => {
     const young = evaluateAlerts(
       input({

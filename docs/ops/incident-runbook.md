@@ -127,6 +127,7 @@ while data is unconfirmed.
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Strategy misbehaving                      | that strategy's Disarm button / endpoint                                                                |
 | All strategies suspect                    | `STRATEGIES_KILL_SWITCH=1`                                                                              |
+| Chat agent misbehaving                    | `AGENT_MODE=simulation` (previews only) or `AGENT_MODE=disabled` (503) + redeploy — §12                 |
 | Bad data suspected                        | pull `MARKET_SIGNER_PRIVATE_KEY` (stops settlement)                                                     |
 | Rate limit blocking legit users           | §7 — delete the `mantua:rl:*` key in Upstash                                                            |
 | Signer key leaked                         | `setSigner` rotation + pull env key                                                                     |
@@ -282,3 +283,64 @@ section. `GET /api/ops/metrics` adds the numbers behind it. The alert
 policy, the latency budgets and the log-drain recipe are in
 `docs/ops/monitoring.md`; each live-sync tick also logs firing alerts as
 structured `alert` events.
+
+## 11. Circle SCA version pin (platform default changes 2026-09-14)
+
+Circle's default smart-contract-account version for new Developer-Controlled
+Wallets becomes `circle_6900_singleowner_v4` on 2026-09-14 (EntryPoint v0.7,
+new address derivation). Existing wallets are untouched. Mantua **does**
+depend on matching addresses across chains: a Gateway spend to another chain
+defaults its recipient to the agent's own address (`unified-balance.ts`,
+`recipientAddress ?? wallet.address`), so a wallet created later on that
+chain must derive the same address or the funds land where no agent wallet
+exists.
+
+**What is pinned.** `getOrCreateAgentWallet` passes
+`scaConfiguration.scaCore = CIRCLE_SCA_CORE` (default
+`circle_6900_singleowner_v3`, matching the existing wallet set) on every
+create. Do not change it for the current wallet set. To adopt v4, create a
+NEW wallet set (`CIRCLE_WALLET_SET_ID`) and set `CIRCLE_SCA_CORE=…_v4`
+together — never one without the other.
+
+**Reproducing one existing address on a new chain** (e.g. Arc after D-112):
+use Circle's Derive Wallet API (`client.deriveWallet`) against the existing
+wallet id rather than Create Wallets; it reproduces the address regardless
+of the platform default.
+
+**If a spend already landed at an address with no wallet:** derive the
+wallet for that chain from the Base wallet id — the funds are recoverable as
+long as the derivation matches (v3). Check the Circle console for the
+wallet's `scaCore` before deriving.
+
+## 12. Agent execution modes (Phase 8, task 055, D-114)
+
+`AGENT_MODE` is a server setting the model cannot read or change:
+
+| Mode                     | Endpoint | Money-moving tools                                                                                                     |
+| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `disabled`               | 503      | —                                                                                                                      |
+| `simulation`             | 200      | Preview and simulate only; every execution is refused `SIMULATION_MODE`                                                |
+| `user_testing` (default) | 200      | Preview → the user's own explicit "confirm" → server-minted single-use id → matching execution                         |
+| `autonomous`             | 200      | As `user_testing` unless the user's policy has `auto_trade_enabled` — then a fresh executable simulation is the ticket |
+
+In every mode the daily cap, the user's policy, the kill switch and the
+contract allowlist are enforced in code underneath the gate. x402 paid
+data (`call_paid_service`) is the agent's own pre-capped spend
+(`X402_MAX_CALL_USD`, `X402_DAILY_CAP_USD`) and is not gated. To stop
+the agent moving money without a redeploy, the runtime kill switch (§1)
+already refuses every write; `AGENT_MODE` is the finer lever.
+
+Confirmations live in Upstash under `mantua:agent:` (5 min TTL; previews
+10 min). Deleting `mantua:agent:confirmation:<id>` voids one; deleting
+`mantua:agent:preview:<sessionId>` clears a pending preview.
+
+**Alert `agent_refusal_rate`** (task 061): more than half of gated
+executions refused. Read the refusal codes in the alert detail:
+`CONFIRMATION_REQUIRED` means the model is calling money tools without
+the user's confirm (a prompt regression — compare the prompt's
+confirmation protocol against the last deploy); `SIMULATION_DRIFT`
+means previews are going stale before users confirm (check pool
+activity and the 5-minute confirmation TTL); `CONFIRMATION_EXPIRED` /
+`CONFIRMATION_INVALID` in volume suggests a client that re-sends or an
+injection attempt (see the untrusted-data envelope's `suspiciousCount`
+in the tool cards). No money moved in any refused case.

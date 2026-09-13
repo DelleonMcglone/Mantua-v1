@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.ts";
+import { env } from "../env.ts";
 import { agentWallets, type AgentWallet } from "../db/schema/agent.ts";
 import { users } from "../db/schema/users.ts";
 import { deriveAgentAccountName } from "./agent-wallet-name.ts";
@@ -106,14 +107,24 @@ export async function getOrCreateAgentWallet(
   if (existing) return existing;
 
   const walletSetId = await getAgentWalletSetId();
-  const created = await (
-    await getCircleClient()
-  ).createWallets({
+  const client = await getCircleClient();
+  // Pin the SCA version (CIRCLE_SCA_CORE) so a wallet created on any chain
+  // under this wallet set derives the same address as the existing ones —
+  // the property gateway spends rely on (they default the destination
+  // recipient to the agent's own address). Circle's platform default
+  // changes on 2026-09-14; the installed SDK types predate the field, but
+  // the client spreads every input into the request body, so it reaches
+  // the API. Runbook §11.
+  const input: Parameters<typeof client.createWallets>[0] & {
+    scaConfiguration: { scaCore: string };
+  } = {
     blockchains: [blockchain],
     count: 1,
     walletSetId,
     accountType: "SCA",
-  });
+    scaConfiguration: { scaCore: env.CIRCLE_SCA_CORE },
+  };
+  const created = await client.createWallets(input);
   const wallet = created.data?.wallets.at(0);
   if (!wallet?.id || !wallet.address) {
     throw new Error("Circle createWallets returned no wallet");

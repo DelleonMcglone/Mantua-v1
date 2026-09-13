@@ -124,6 +124,18 @@ const schema = z.object({
    *  preflight evidence or fixtures). Never set this in production — the
    *  override redirects ALL Circle traffic. */
   CIRCLE_API_BASE_URL: z.url().optional(),
+  /** Circle SCA version pinned at wallet creation. Circle's platform default
+   *  moves to `circle_6900_singleowner_v4` on 2026-09-14 (new address
+   *  derivation, EntryPoint v0.7). Mantua's gateway spends default to "the
+   *  agent's own address" on the destination chain, which only holds if a
+   *  wallet created later on another chain derives the SAME address — so
+   *  creation pins the version explicitly instead of inheriting the
+   *  platform default. Keep v3 for the existing wallet set; move to v4 only
+   *  with a fresh wallet set. Runbook §11. */
+  CIRCLE_SCA_CORE: z
+    .string()
+    .regex(/^circle_6900_singleowner_v\d+$/, "expected circle_6900_singleowner_vN")
+    .default("circle_6900_singleowner_v3"),
 
   /** Webhook signature key id for Circle transaction notifications. Circle
    *  recommends webhooks over polling for terminal transaction state; absent
@@ -153,6 +165,12 @@ const schema = z.object({
   /** B9-007 — strategies-only global kill: every armed hedging strategy
    *  disarms on the next engine tick and nothing new fires. Narrower than
    *  MANTUA_KILL_SWITCH (which blocks all writes app-wide). */
+  /** Phase 8 / A-028 — the agent's trading mode, a server setting the model
+   *  cannot move: disabled | simulation | user_testing (default, "Always
+   *  Ask") | autonomous (future; also needs the user's policy). */
+  AGENT_MODE: z
+    .enum(["disabled", "simulation", "user_testing", "autonomous"])
+    .default("user_testing"),
   STRATEGIES_KILL_SWITCH: z
     .union([z.literal("0"), z.literal("1")])
     .default("0")
