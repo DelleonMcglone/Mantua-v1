@@ -65,19 +65,35 @@ export interface TurnContext {
   pendingPreview: Preview | null;
   /** The user's policy allows unprompted execution (autonomous mode only). */
   autoTradeEnabled: boolean;
+  /** The message was spoken, so it can never carry a confirmation (V-009). */
+  spoken: boolean;
 }
 
 /**
  * Build the turn context: mint a confirmation when, and only when, the
  * user's own message explicitly confirms a pending preview.
+ *
+ * Task 069 (V-009) adds one interlock: a **spoken** message never mints a
+ * confirmation, whatever words it contains. Transcription can mishear, a
+ * microphone can be pressed by accident, and a room can hold someone else's
+ * voice — so consent to move money is a deliberate press, not a sound.
+ * Speech can still ask for anything, preview anything and research
+ * anything; it simply cannot be the last step before execution.
  */
 export async function buildTurnContext(
   store: ConfirmationStore,
-  input: { mode: AgentMode; sessionId: string; message: string; autoTradeEnabled: boolean },
+  input: {
+    mode: AgentMode;
+    sessionId: string;
+    message: string;
+    autoTradeEnabled: boolean;
+    spoken?: boolean;
+  },
 ): Promise<TurnContext> {
+  const spoken = input.spoken ?? false;
   const pending = await store.pendingPreview(input.sessionId);
   let confirmation: Confirmation | null = null;
-  if (pending && messageConfirmsAction(input.message)) {
+  if (pending && !spoken && messageConfirmsAction(input.message)) {
     confirmation = await store.mint(input.sessionId, pending, input.message);
   }
   return {
@@ -87,6 +103,7 @@ export async function buildTurnContext(
     confirmation,
     pendingPreview: confirmation ? null : pending,
     autoTradeEnabled: input.autoTradeEnabled,
+    spoken,
   };
 }
 
@@ -106,6 +123,11 @@ export function turnContextPrompt(ctx: TurnContext): string {
   } else {
     lines.push(
       'No confirmation is present in this turn. Money-moving tools will be refused; to act, first preview (mantua_simulate_trade or mantua_preview_action), show the user the numbers, and ask them to reply with "confirm".',
+    );
+  }
+  if (ctx.spoken) {
+    lines.push(
+      "This message was SPOKEN. A spoken message can never confirm a money-moving action, whatever it says. Answer it, and preview anything it asks for, but if it needs confirming tell the user to press Confirm rather than to say it.",
     );
   }
   return lines.join("\n");
@@ -141,7 +163,11 @@ export async function authorizeExecution(
       `${call.tool} was not executed: the agent is in ${ctx.mode} mode. The preview stands; nothing moved.`,
     );
   }
-  const autonomous = !policy.confirmationRequired && ctx.autoTradeEnabled;
+  // Task 069 (V-009): a spoken turn is never autonomous either. Autonomy
+  // is a standing arrangement the user set up by hand; letting a
+  // transcription trigger it would make speech a stronger path than
+  // typing rather than an equal one.
+  const autonomous = !policy.confirmationRequired && ctx.autoTradeEnabled && !ctx.spoken;
   if (!autonomous) {
     const presented = call.args["confirmationId"];
     if (typeof presented !== "string" || presented.length === 0) {

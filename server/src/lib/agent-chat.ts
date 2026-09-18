@@ -2403,6 +2403,11 @@ export async function* runAgentChat(
     message: string;
     /** The user's selected chain (from the app's chain selector). */
     chainId?: SupportedChainId | undefined;
+    /**
+     * Task 069 (V-009) — the message was transcribed from speech. A spoken
+     * turn never mints a confirmation and never executes autonomously.
+     */
+    spoken?: boolean | undefined;
   },
   deps: AgentLoopDeps = {},
 ): AsyncGenerator<AgentChatEvent> {
@@ -2451,6 +2456,7 @@ export async function* runAgentChat(
     sessionId,
     message,
     autoTradeEnabled: policy.autoTradeEnabled && policy.status !== "paused",
+    spoken: params.spoken ?? false,
   });
   // A-044 — the user-testing funnel, per instance: turns → analyses →
   // simulations/previews → confirmations minted → executions / refusals.

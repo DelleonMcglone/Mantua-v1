@@ -37,7 +37,17 @@ interface ApiErrorBody {
  * caller can show auth/unavailable errors.
  */
 export async function streamAgentChat(
-  params: { message: string; sessionId?: string | undefined; chainId?: number | undefined },
+  params: {
+    message: string;
+    sessionId?: string | undefined;
+    chainId?: number | undefined;
+    /**
+     * Task 069 (V-009) — how the user entered this message. `"voice"`
+     * makes the server refuse to mint a confirmation for the turn, so a
+     * spoken word can never be the last step before money moves.
+     */
+    source?: "text" | "voice" | undefined;
+  },
   onEvent: (event: AgentChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {

@@ -24,6 +24,7 @@ import { marketDetailRouter } from "./routes/market-detail.ts";
 import { marketAnalysisRouter } from "./routes/market-analysis.ts";
 import { marketDepthRouter } from "./routes/market-depth.ts";
 import { marketHistoryRouter } from "./routes/market-history.ts";
+import { voiceTokenRouter } from "./routes/voice-token.ts";
 import { marketDiscoverRouter } from "./routes/market-discover.ts";
 import { legalRouter } from "./routes/legal.ts";
 import { marketRedeemRouter } from "./routes/market-redeem.ts";
@@ -141,6 +142,8 @@ app.use(marketDiscoverRouter);
 app.use(marketDepthRouter);
 app.use(marketAnalysisRouter);
 app.use(marketHistoryRouter);
+// Task 069 (V-001) — the single-use token the browser transcribes with.
+app.use(voiceTokenRouter);
 // Task 067 (G-014) — recorded Terms acceptance.
 app.use(legalRouter);
 app.use(cspReportRouter);

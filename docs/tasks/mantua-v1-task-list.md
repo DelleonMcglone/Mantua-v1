@@ -4,6 +4,10 @@
 > numbering and row IDs (received 2026-09-16). The repository roadmap
 > (`v2-roadmap.md`) and each task document reconcile to this list; when
 > the two disagree, this list wins and the roadmap is corrected.
+>
+> Status columns here are the owner's own as received and are left
+> untouched, so this stays a faithful copy. What has actually shipped is
+> tracked in `v2-roadmap.md` — read that for progress, this for numbering.
 
 ---
 

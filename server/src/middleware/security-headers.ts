@@ -10,7 +10,11 @@ import type { RequestHandler } from "express";
  * - `X-Frame-Options: DENY`: the API is never framed (the SPA is served
  *   separately and carries its own headers via vercel.json).
  * - `Referrer-Policy`: never leak a query string cross-origin.
- * - `Permissions-Policy`: the API needs no device capabilities.
+ * - `Permissions-Policy`: the API needs no device capabilities, and keeps
+ *   all four closed. Task 069 (V-001) opened `microphone=(self)` for the
+ *   **SPA document** in `vercel.json`, which is the response the browser
+ *   applies the policy from; an API JSON response never hosts a
+ *   microphone, so this stays shut.
  * - `Strict-Transport-Security`: only when the request arrived over TLS
  *   (directly or via the platform's `x-forwarded-proto`), so local HTTP
  *   dev is never pinned to HTTPS.

@@ -42,6 +42,11 @@ void describe("securityHeaders", () => {
     assert.equal(res.headers.get("x-frame-options"), "DENY");
     assert.equal(res.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
     assert.match(res.headers.get("permissions-policy") ?? "", /camera=\(\)/);
+    assert.match(
+      res.headers.get("permissions-policy") ?? "",
+      /microphone=\(\)/,
+      "task 069 opened the microphone for the SPA document only — an API response never hosts one",
+    );
     assert.equal(res.headers.get("cross-origin-opener-policy"), "same-origin");
     assert.equal(res.headers.get("strict-transport-security"), null, "plain HTTP: no HSTS");
     assert.equal(res.headers.get("cache-control"), null, "anonymous: no default cache header");

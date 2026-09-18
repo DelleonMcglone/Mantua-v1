@@ -20,7 +20,9 @@ import path from "node:path";
  */
 const e2eAuthShim = process.env.VITE_E2E_AUTH === "shim";
 const alias = [
-  { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
+  // The shims come first: the `@` entry below matches any `@/…` specifier,
+  // and the first matching alias wins, so a shim for a path under `@/`
+  // would never be reached if it came after.
   ...(e2eAuthShim
     ? [
         {
@@ -31,8 +33,19 @@ const alias = [
           find: /^@privy-io\/react-auth$/,
           replacement: path.resolve(import.meta.dirname, "e2e/privy-shim.tsx"),
         },
+        /**
+         * Task 069 (V-011): the microphone and the transcription socket,
+         * replaced by a scripted stand-in. Only this one module is
+         * swapped — the transcript assembly, the activation rules and the
+         * confirmation guard are the real ones under test.
+         */
+        {
+          find: /^@\/features\/voice\/voice-transport\.ts$/,
+          replacement: path.resolve(import.meta.dirname, "e2e/voice-transport-shim.ts"),
+        },
       ]
     : []),
+  { find: "@", replacement: path.resolve(import.meta.dirname, "src") },
 ];
 
 export default defineConfig({

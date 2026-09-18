@@ -15,6 +15,13 @@ const chatSchema = z.object({
   sessionId: z.uuid().optional(),
   /** The user's selected chain; omitted means Base (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
+  /**
+   * Task 069 (V-009) — how the user entered this message. `"voice"` means
+   * it was transcribed from speech, and the turn then refuses to mint a
+   * confirmation for any money-moving action however the words read.
+   * Omitted means typed, which is the safe default for an older client.
+   */
+  source: z.enum(["text", "voice"]).optional(),
 });
 
 /**
@@ -83,6 +90,7 @@ agentChatRouter.post(
         sessionId: parsed.data.sessionId,
         message: parsed.data.message,
         chainId: parsed.data.chainId,
+        spoken: parsed.data.source === "voice",
       })) {
         if (res.closed) break;
         write(event);

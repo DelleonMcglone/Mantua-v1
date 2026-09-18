@@ -438,6 +438,16 @@ game, research, fees and execution, past markets — is served by
 `GET /api/markets/depth`, `/analysis`, and `/history` and proven by
 `client/e2e/market.spec.ts`.
 
+Voice input (Phase 12, task 069) puts a hold-to-speak microphone in the
+command bar. It produces text and hands it to the same submit the Send
+button uses, so a spoken command takes the pipeline a typed one takes.
+`ELEVENLABS_API_KEY` stays server-side: `POST /api/voice/token` spends it
+on a single-use token the browser opens the transcription socket with.
+Set no key and the microphone is simply not offered. Speech can ask for
+anything but can never confirm a trade — the server refuses to mint a
+confirmation from a spoken turn, so Confirm stays a press
+(`client/e2e/voice.spec.ts`).
+
 The browser suite (`client/e2e/`, task 067) needs no Privy app id,
 database, or chain: it starts Vite with `VITE_E2E_AUTH=shim` and answers
 the API and the RPC from Playwright routes. Set
