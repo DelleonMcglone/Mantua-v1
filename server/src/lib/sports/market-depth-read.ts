@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-001/D-002/D-005/D-006) — one read behind the market page's
+ * Phase 11 (D-001/D-002/D-005/D-006) — one read behind the market page's
  * deeper layer, keyed by event (never a market id, T-020): metrics, the
  * depth curve, the live game state, and chart annotations. The `DepthDb`
  * seam keeps the assembly pure; `market-depth-db.ts` binds it.

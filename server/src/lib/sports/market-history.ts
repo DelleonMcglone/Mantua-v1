@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-007) — the historical market browser's pure half: resolved
+ * Phase 11 (D-007) — the historical market browser's pure half: resolved
  * markets with their final outcome, the settlement price, and a sampled
  * price path. `market-history-db.ts` reads the rows; this file shapes them.
  */

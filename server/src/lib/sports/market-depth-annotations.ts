@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-005) — the events a price chart is annotated with, from the
+ * Phase 11 (D-005) — the events a price chart is annotated with, from the
  * data the layer actually carries: kickoff, period starts (the first
  * ingested play of each period), the freeze and the resolution, and injury
  * reports for either team. Nothing is estimated: a halftime with no play

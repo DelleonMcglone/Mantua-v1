@@ -18,6 +18,7 @@ import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
 import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
+import { AGENT_INPUT_EVENT, readAgentInput, sourceOf } from "@/features/voice/spoken-command.ts";
 import {
   analysisCard,
   dailyBriefCard,
@@ -47,12 +48,19 @@ const AgentActionsContext = createContext<{ send: (text: string) => void; busy: 
  * Circle wallet. There are no forms: reads run as the agent goes, and every
  * money-moving action is previewed in the chat and executed only after the
  * user replies "confirm" (Phase 8 execution gate, D-114).
+ *
+ * Task 069 (V-009): a message that arrived by microphone is sent with
+ * `source: "voice"`, and the server then refuses to mint a confirmation
+ * from that turn. Speech can ask for anything and preview anything; only a
+ * press can be the last step before money moves.
  */
 
 interface Props {
   onClose: () => void;
   /** Command forwarded from another panel — auto-sent once on mount. */
   initialMessage?: string;
+  /** Task 069 (V-009) — that command was spoken, not typed. */
+  initialSpoken?: boolean;
 }
 
 interface ToolStep {
@@ -134,7 +142,7 @@ const uid = () => {
   return `m${String(seq)}`;
 };
 
-export function CircleAgentChat({ onClose, initialMessage }: Props) {
+export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Props) {
   const agent = useAgentPortfolio();
   const chainId = BASE_CHAIN_ID;
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -153,7 +161,7 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
   }, []);
 
   const send = useCallback(
-    (raw: string) => {
+    (raw: string, spoken = false) => {
       const text = raw.trim();
       if (!text || busyRef.current) return;
 
@@ -207,7 +215,7 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
       };
 
       streamAgentChat(
-        { message: text, sessionId: sessionIdRef.current, chainId },
+        { message: text, sessionId: sessionIdRef.current, chainId, source: sourceOf(spoken) },
         onEvent,
         controller.signal,
       )
@@ -239,11 +247,12 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
   }, [send]);
   useEffect(() => {
     const onInput = (e: Event) => {
-      sendRef.current((e as CustomEvent<string>).detail);
+      const command = readAgentInput((e as CustomEvent<unknown>).detail);
+      if (command.text !== "") sendRef.current(command.text, command.spoken);
     };
-    window.addEventListener("mantua:agent-input", onInput);
+    window.addEventListener(AGENT_INPUT_EVENT, onInput);
     return () => {
-      window.removeEventListener("mantua:agent-input", onInput);
+      window.removeEventListener(AGENT_INPUT_EVENT, onInput);
     };
   }, []);
 
@@ -254,8 +263,8 @@ export function CircleAgentChat({ onClose, initialMessage }: Props) {
   useEffect(() => {
     if (seededRef.current || !initialMessage) return;
     seededRef.current = true;
-    sendRef.current(initialMessage);
-  }, [initialMessage]);
+    sendRef.current(initialMessage, initialSpoken === true);
+  }, [initialMessage, initialSpoken]);
 
   const newChat = useCallback(() => {
     abortRef.current?.abort();

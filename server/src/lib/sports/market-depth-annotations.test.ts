@@ -1,5 +1,5 @@
 /**
- * Phase 12 — chart annotations come only from data the layer holds:
+ * Phase 11 — chart annotations come only from data the layer holds:
  * period labels per league, the freeze and the resolution, a capped
  * injury list, all sorted by time.
  */

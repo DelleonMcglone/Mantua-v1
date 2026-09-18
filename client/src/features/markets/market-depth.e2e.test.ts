@@ -10,7 +10,7 @@ import { researchView } from "./detail/research-core.ts";
 import { historyRowView } from "./history/history-core.ts";
 
 /**
- * Phase 12 (D-008), composed: the three wire reads a market page makes
+ * Phase 11 (D-008), composed: the three wire reads a market page makes
  * flow through every pure module the page renders from, so each listed
  * data point has a value on one page. The browser spec (client/e2e/
  * market.spec.ts) proves the same over the real components.

@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-002) — the live game panel's text, from the fields the data
+ * Phase 11 (D-002) — the live game panel's text, from the fields the data
  * layer carries. A field the provider did not send is absent, never
  * invented. Pure; rendered by `LiveGamePanel.tsx`.
  */

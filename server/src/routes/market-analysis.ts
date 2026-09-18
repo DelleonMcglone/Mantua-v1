@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-003) — `GET /api/markets/analysis?providerEventId=…&outcomeIndex=0|1`:
+ * Phase 11 (D-003) — `GET /api/markets/analysis?providerEventId=…&outcomeIndex=0|1`:
  * the analyst's own research for one side of a market, the same
  * `mantua_analyze_market` the agent runs (`sports_intelligence`). It is a
  * deterministic read over the canonical database — no model call — so it

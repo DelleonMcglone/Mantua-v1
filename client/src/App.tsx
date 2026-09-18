@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, mentionsHook, type Intent } from "./lib/chat-intent.ts";
+import { agentInputEvent } from "./features/voice/spoken-command.ts";
 import { LandingPage } from "./components/landing/LandingPage.tsx";
 import { LoginModal } from "./components/auth/LoginModal.tsx";
 import { type NavDestination } from "./components/shell/MarketNav.tsx";
@@ -98,7 +99,12 @@ type Route =
       /** Free-form symbol to pass to the `token-price` runner. */
       symbol?: string;
     }
-  | { kind: "agent"; message?: string };
+  | {
+      kind: "agent";
+      message?: string;
+      /** Task 069 (V-009) — the seed message came from speech. */
+      spoken?: boolean;
+    };
 
 // Intents that the manual Uniswap-v4 panels own when a hook is named.
 const HOOK_ACTION_KINDS = new Set<Intent["kind"]>([
@@ -330,7 +336,7 @@ export default function App() {
   // The universal command router — the dock at the bottom of every page
   // feeds this. A command only starts a mode, it never locks it: every
   // submission re-detects intent and routes to the right surface.
-  const handleCommand = (text: string) => {
+  const handleCommand = (text: string, spoken = false) => {
     // Freemium chat (owner decision 2026-08-18): logged-out users may ask
     // the ANALYST — three free questions, enforced server-side — but any
     // actionable command (trade, agent, liquidity…) demands login here.
@@ -353,11 +359,11 @@ export default function App() {
       return;
     }
     if (route.kind === "agent") {
-      window.dispatchEvent(new CustomEvent("mantua:agent-input", { detail: text }));
+      window.dispatchEvent(agentInputEvent({ text, spoken }));
       return;
     }
     if (intent && (AGENT_ACTION_KINDS.has(intent.kind) || intent.kind === "agent")) {
-      setRoute({ kind: "agent", message: text });
+      setRoute({ kind: "agent", message: text, spoken });
       return;
     }
     if (route.kind === "analyze" && (!intent || intent.kind === "analyze")) {
@@ -616,6 +622,7 @@ function fullPage(
         <PanelPage>
           <AgentPanel
             {...(route.message ? { initialMessage: route.message } : {})}
+            {...(route.spoken ? { initialSpoken: true } : {})}
             onClose={home}
           />
         </PanelPage>

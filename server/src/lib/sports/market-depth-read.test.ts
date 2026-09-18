@@ -1,4 +1,4 @@
-/** Phase 12 — the depth read over a fake seam: live fields only while in progress, metrics and depth only with a market. */
+/** Phase 11 — the depth read over a fake seam: live fields only while in progress, metrics and depth only with a market. */
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { readMarketDepth, type DepthDb, type DepthEvent } from "./market-depth-read.ts";

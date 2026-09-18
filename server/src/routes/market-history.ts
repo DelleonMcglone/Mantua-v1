@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-007) — `GET /api/markets/history?league=nfl&limit=30`: resolved
+ * Phase 11 (D-007) — `GET /api/markets/history?league=nfl&limit=30`: resolved
  * markets with the final score, the outcome, the settlement price, and a
  * sampled price path. Public chain-and-scores data, cached a minute.
  */

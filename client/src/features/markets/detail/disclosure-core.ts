@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-004) — layered disclosure as data. The simple surface
+ * Phase 11 (D-004) — layered disclosure as data. The simple surface
  * (summary, live game, chart) is always visible; everything deeper is a
  * section that starts closed and opens one tap at a time, so a first-time
  * user is never shown a depth ladder they did not ask for and a pro can

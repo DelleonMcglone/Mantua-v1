@@ -2,7 +2,7 @@ import { depthRows, depthSummary, metricLines } from "./depth-core.ts";
 import type { DepthCurve, DepthMetrics } from "./depth-types.ts";
 
 /**
- * Phase 12 (D-001 / D-006) — the Depth section: the market's numbers and
+ * Phase 11 (D-001 / D-006) — the Depth section: the market's numbers and
  * the depth ladder. An automated market maker has no order book, so the
  * ladder is the cost of moving the price through the pool's liquidity,
  * quoted before fees — the honest artefact for the pro layer.

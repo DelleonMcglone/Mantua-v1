@@ -825,12 +825,7 @@ are the owner's and name the artifact that flips them.
 | G-015       | Counsel review — owner                                                                                | 🟡     |
 | G-017/G-018 | Staging drill + dogfood + funded run; M-01 / L-03 / fork suites / human audit — owner                 | 🟡     |
 
-## ⏸ PHASE 11 — deferred
-
-Skipped for now on the owner's instruction (2026-09-13); no scope recorded
-in the repository yet. To be supplied with its row table.
-
-## 🔍 PHASE 12: Market Depth & Research Layer (task 068)
+## 🔍 PHASE 11: Market Depth & Research Layer (task 068) — 🟡 P1
 
 Progressively deeper information per market — users never leave the
 market page to understand what they're trading. Ledger and evidence:
@@ -846,6 +841,53 @@ market page to understand what they're trading. Ledger and evidence:
 | D-006 | Depth ladder for the pro layer (an AMM has no order book; the cost to move the price is shown instead)                | ✅     |
 | D-007 | Historical market browser: resolved markets with outcomes, settlement, and price paths                                | ✅     |
 | D-008 | E2E: every listed data point reachable from a market page without leaving it (`client/e2e/market.spec.ts`)            | ✅     |
+
+---
+
+## 🎙️ PHASE 12: Voice — ElevenLabs Scribe v2 Realtime (task 069) — 🟡 P1
+
+Hold to speak; the words arrive in the command bar as text and take the
+pipeline a typed command takes. The whole phase rests on one decision:
+**voice is an input method, not a command path.** There is no voice
+parser, no voice intent type and no voice execution route, which is why
+V-004, V-005 and V-008 hold by construction — `voice-audit.test.ts` fails
+if any module under the feature imports a parse, confirm, sign or execute
+path. The one place voice is deliberately _weaker_ than typing is V-009:
+the server refuses to mint a confirmation from a spoken turn, so saying
+"confirm" can never move money. Confirmation stays a press.
+
+| ID    | Task                                                                                                | Status |
+| ----- | --------------------------------------------------------------------------------------------------- | ------ |
+| V-001 | Scribe v2 Realtime integrated; the key stays server-side and is spent on a single-use token         | ✅     |
+| V-002 | Push-to-talk in the command interface — agent chat and trading flows                                | ✅     |
+| V-003 | Streaming transcription UX: provisional text while speaking, settled text as it commits             | ✅     |
+| V-004 | Voice → agent command through the same parse/confirm pipeline as text (enforced by a static audit)  | ✅     |
+| V-005 | Trading, research, portfolio and market-discovery commands, all by the shared router                | ✅     |
+| V-006 | Corrections: the model revising its own partial, and the speaker correcting themselves              | ✅     |
+| V-007 | Accidental activation: a sub-350 ms press passes in silence, a speechless press earns the retry     | ✅     |
+| V-008 | Voice respects agent permissions, mode policy and the spending cap — it is the same request         | ✅     |
+| V-009 | Voice cannot confirm: `buildTurnContext` will not mint from a spoken turn, nor execute autonomously | ✅     |
+| V-010 | Every failure falls back to typing with one plain line; "I didn't catch that" retry                 | ✅     |
+| V-011 | E2E: a spoken research request and a spoken trade that executes only on the Confirm press           | ✅     |
+
+---
+
+## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
+
+The owner's master task list is stored verbatim at
+**`docs/tasks/mantua-v1-task-list.md`** and is the source of truth for
+phase numbering and row IDs. Phases 0–12 above reconcile to it (its
+Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
+`launch-gate.md`). The phases not yet started:
+
+| Phase                                                       | Tier  | Rows            | Status |
+| ----------------------------------------------------------- | ----- | --------------- | ------ |
+| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ⬜     |
+| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜     |
+| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | ⬜     |
+| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜     |
+| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜     |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜     |
 
 ---
 
@@ -908,8 +950,9 @@ market page to understand what they're trading. Ledger and evidence:
 | Phase N: Natural Language Command Bar             | 11      |
 | Phase 9: E2E & Launch                             | 13      |
 | Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
-| Phase 12: Market Depth & Research Layer           | 8       |
-| **Grand Total**                                   | **170** |
+| Phase 11: Market Depth & Research Layer           | 8       |
+| Phase 12: Voice (ElevenLabs Scribe v2 Realtime)   | 11      |
+| **Grand Total**                                   | **181** |
 
 ### Future phases
 

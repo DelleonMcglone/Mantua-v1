@@ -693,7 +693,7 @@ marked as the owner's with the artifact that would close it.
   Linux runners; the Vercel build should move from `npm install
 --no-package-lock` to `npm ci` (review §6).
 
-## Market depth & research layer (Phase 12, task 068)
+## Market depth & research layer (Phase 11, task 068)
 
 The market page grows downward, never sideways: every deeper data point
 is a section on the same page, and the rules for what shows are pure
@@ -740,6 +740,66 @@ modules with tests.
   browser spec asserts each data point with the page heading still
   visible; the node test composes the shared wire fixtures through every
   pure module.
+
+## Voice input (Phase 12, task 069)
+
+The microphone is an input method, not a command path. It produces text;
+the text goes into the command bar's `onSubmit` — the same function the
+Send button calls — and everything after that is the pipeline typed
+commands already used. There is no voice parser, no voice intent type and
+no voice execution route, which is what makes V-004, V-005 and V-008 hold
+by construction rather than by a check someone has to remember.
+
+- **The key never reaches the browser** (`server/src/lib/voice/`,
+  `routes/voice-token.ts`). `ELEVENLABS_API_KEY` is spent server-side on a
+  **single-use token** (`POST /v1/single-use-token/realtime_scribe`), which
+  expires in fifteen minutes and is consumed on first use. `POST
+/api/voice/token` is authenticated, rate-limited per user, and answers
+  the token, its expiry and the model id — a test asserts the body has no
+  fourth field. No key means 503, and the microphone is simply not offered.
+- **The browser holds the socket, not our server.** The page opens
+  `wss://api.elevenlabs.io/v1/speech-to-text/realtime` itself with that
+  token. Relaying audio through our server would double the latency the
+  model's 150 ms design exists to avoid, and would buy nothing: the token
+  already keeps the key server-side. The origin is listed in the CSP
+  `connect-src`, and `Permissions-Policy` grants `microphone=(self)` on the
+  SPA document only — the API's own responses keep it closed.
+- **Push-to-talk, and only that.** No wake word, no open microphone. That
+  is most of the answer to accidental activation (V-007): a press shorter
+  than 350 ms is treated as a slip and passes in silence, and a real press
+  that yielded no words gets "I didn't catch that" rather than submitting
+  nothing-shaped text.
+- **Two kinds of correction** (V-006). The model revising its own partial
+  transcript is handled by replacing the provisional text in place
+  (`transcript-core.ts`). The speaker correcting themselves is handled by
+  `correction-core.ts`, deliberately narrowly: a restart marker drops what
+  came before, an amount marker swaps the last figure, and **anything else
+  is left exactly as spoken**. Guessing more broadly is how a voice
+  interface puts words in a user's mouth.
+- **Speech is never consent** (V-009). This is the one place voice is
+  deliberately weaker than typing. `buildTurnContext` refuses to mint a
+  confirmation from a turn marked `source: "voice"`, and a spoken turn is
+  never eligible for autonomous execution either, so the same words that
+  confirm when typed confirm nothing when spoken. The client half
+  (`confirm-guard.ts`) catches a bare "yes" or "confirm" before it is sent
+  and says why — not because the server needs the help, but because a user
+  who watches the word land in the chat would otherwise believe it counted.
+  Confirmation stays a press.
+- **Failure always lands on the keyboard** (V-010). Permission refused, no
+  device, token rejected, quota gone, socket dropped, silence — each maps
+  to one sentence in `voice-status-core.ts`, and the text input never stops
+  working. The three failures a second press cannot fix retire the button
+  for the visit; the rest leave it usable.
+- **No new dependency, and no stored audio.** The server mints with one
+  `fetch`; the browser uses its own `WebSocket` and an `AudioWorklet`
+  served from `client/public/voice/`. Audio is streamed to the
+  transcription service and discarded — nothing is written to disk or to
+  the database, and only the resulting text enters the command interface.
+- **Proof.** `voice-audit.test.ts` walks the feature and fails if any
+  module imports a parse, confirm, sign or execute path, or names an
+  endpoint other than the token mint. `client/e2e/voice.spec.ts` drives a
+  scripted microphone through both journeys of V-011 and asserts that
+  saying "confirm" does not fill an order while pressing Confirm does.
 
 ## Decision log
 

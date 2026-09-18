@@ -8,7 +8,7 @@ import { useMarketAnalysis } from "./use-market-analysis.ts";
 const DIRECTION_TONE = { up: "text-green", down: "text-yellow", flat: "text-text-mute" } as const;
 
 /**
- * Phase 12 (D-003) — the analyst's research for one side of the market,
+ * Phase 11 (D-003) — the analyst's research for one side of the market,
  * powered by the same `sports_intelligence` the agent uses. The
  * probability is an agent estimate and is tagged as one (T-021); the
  * standing prediction note closes the section (T-022).

@@ -17,6 +17,11 @@ export default tseslint.config(
       // Throwaway operator scripts (verification/one-off ops) — outside the
       // tsconfig project, so typed lint rules crash on them.
       "**/*.scratch.*",
+      // Static files the SPA serves verbatim — outside the tsconfig project,
+      // so the typed rules have no program to consult. Today this is the
+      // audio worklet (task 069), which also runs in the audio rendering
+      // realm and so does not share the browser globals the config assumes.
+      "client/public/**",
       "**/.vercel/**",
       "**/.vite/**",
       // esbuild-generated server bundles for the Vercel function (see

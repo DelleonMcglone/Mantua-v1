@@ -200,6 +200,73 @@ void describe("buildTurnContext", () => {
     });
     assert.equal(again.confirmation, null, "the preview was spent by the first confirmation");
   });
+
+  /**
+   * Task 069 (V-009) — voice cannot confirm. The same words that mint a
+   * confirmation when typed mint nothing when spoken, so a mis-heard
+   * phrase, a bumped microphone, or a voice in the room can never be the
+   * last step before money moves.
+   */
+  void it("never mints from a spoken message, whatever it says", async () => {
+    const { store } = newStore();
+    await store.savePreview({
+      sessionId: "s",
+      kind: "action",
+      tool: "send",
+      argsHash: argsHash("send", { to: "0xabc", amount: "1" }),
+      simulation: null,
+      summary: "send 1 USDC",
+    });
+
+    for (const message of ["confirm", "yes, confirm", "do it", "go ahead"]) {
+      const spoken = await buildTurnContext(store, {
+        mode: "user_testing",
+        sessionId: "s",
+        message,
+        autoTradeEnabled: false,
+        spoken: true,
+      });
+      assert.equal(spoken.confirmation, null, message);
+      assert.equal(spoken.pendingPreview?.summary, "send 1 USDC", "the preview survives");
+      assert.match(turnContextPrompt(spoken), /SPOKEN/);
+      assert.match(turnContextPrompt(spoken), /press Confirm/);
+    }
+
+    // The same preview, the same words, typed: minted.
+    const typed = await buildTurnContext(store, {
+      mode: "user_testing",
+      sessionId: "s",
+      message: "confirm",
+      autoTradeEnabled: false,
+    });
+    assert.ok(typed.confirmation, "typing still confirms");
+  });
+});
+
+void describe("authorizeExecution — spoken turns (V-009)", () => {
+  void it("refuses an autonomous execution that arrived by voice", async () => {
+    const { store } = newStore();
+    const spoken = {
+      mode: "autonomous" as const,
+      sessionId: "s",
+      message: "buy it",
+      confirmation: null,
+      pendingPreview: null,
+      autoTradeEnabled: true,
+      spoken: true,
+    };
+    assert.equal(
+      await refusal(authorizeExecution(store, spoken, { tool: "send", args: {} })),
+      "CONFIRMATION_REQUIRED",
+      "autonomy is a standing arrangement, not something speech can trigger",
+    );
+
+    // The identical turn, typed, is allowed to run autonomously.
+    assert.equal(
+      await authorizeExecution(store, { ...spoken, spoken: false }, { tool: "send", args: {} }),
+      null,
+    );
+  });
 });
 
 void describe("authorizeExecution — user_testing (Always Ask)", () => {
@@ -212,7 +279,7 @@ void describe("authorizeExecution — user_testing (Always Ask)", () => {
 
   void it("passes reads through untouched", async () => {
     const { store } = newStore();
-    const ctx = { ...base, confirmation: null, pendingPreview: null };
+    const ctx = { ...base, confirmation: null, pendingPreview: null, spoken: false };
     assert.equal(
       await authorizeExecution(store, ctx, { tool: "get_sports_slate", args: {} }),
       null,
@@ -436,6 +503,7 @@ void describe("authorizeExecution — other modes", () => {
       confirmation: null,
       pendingPreview: null,
       autoTradeEnabled: false,
+      spoken: false,
     };
     assert.equal(
       await refusal(authorizeExecution(store, off, { tool: "send", args: {} })),

@@ -1,5 +1,5 @@
 /**
- * Phase 12 — history rows carry an honest outcome label, the settlement
+ * Phase 11 — history rows carry an honest outcome label, the settlement
  * price the contract paid, and a bounded path that keeps its ends.
  */
 import assert from "node:assert/strict";

@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-001 / D-006) — the numbers behind the Depth section, shaped
+ * Phase 11 (D-001 / D-006) — the numbers behind the Depth section, shaped
  * for display: labelled metric lines and the depth ladder as rows with a
  * bar share. Pure; rendered by `DepthPanel.tsx`.
  */

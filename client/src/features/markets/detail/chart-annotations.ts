@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-005) — places market-event annotations on the price chart's
+ * Phase 11 (D-005) — places market-event annotations on the price chart's
  * time axis: only the ones inside the drawn window, nudged into two lanes
  * so neighbouring labels do not overlap. Pure; rendered by
  * `ChartAnnotations.tsx`.

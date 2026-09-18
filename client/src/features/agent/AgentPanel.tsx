@@ -2,17 +2,24 @@ import { CircleAgentChat } from "./CircleAgentChat.tsx";
 
 interface AgentPanelProps {
   onClose: () => void;
-  /** Command typed from another panel — auto-sent once when the agent opens. */
   initialMessage?: string;
+  /**
+   * Task 069 (V-009) — the seed message arrived by voice. Carried so the
+   * first turn is sent with its provenance and cannot mint a confirmation.
+   */
+  initialSpoken?: boolean;
 }
 
 /**
- * Agent panel entry point — "Your Circle Agent", a free-form conversational
- * surface. The user types in the global bar; each turn streams from
- * `/api/agent/chat`, with the agent executing tools (swap / send / data /
- * portfolio) on its Circle wallet on Base. No forms; money-moving actions are
- * previewed and run only after the user's explicit "confirm" (D-114).
+ * The agent surface. A thin wrapper over the chat so the route can open it
+ * with, or without, an opening message.
  */
-export function AgentPanel({ onClose, initialMessage }: AgentPanelProps) {
-  return <CircleAgentChat onClose={onClose} {...(initialMessage ? { initialMessage } : {})} />;
+export function AgentPanel({ onClose, initialMessage, initialSpoken }: AgentPanelProps) {
+  return (
+    <CircleAgentChat
+      onClose={onClose}
+      {...(initialMessage ? { initialMessage } : {})}
+      {...(initialSpoken ? { initialSpoken: true } : {})}
+    />
+  );
 }

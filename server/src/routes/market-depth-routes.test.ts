@@ -1,5 +1,5 @@
 /**
- * Phase 12 — the three public reads behind the market page's deeper layer:
+ * Phase 11 — the three public reads behind the market page's deeper layer:
  * validation, the 404 for an unknown game, the status mapping for the
  * analyst, and the history query bounds. Data comes from injected fakes.
  */

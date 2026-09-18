@@ -1,5 +1,5 @@
 /**
- * Phase 12 wire shapes for the market page's deeper layer. Mirrors
+ * Phase 11 wire shapes for the market page's deeper layer. Mirrors
  * server/src/lib/sports/market-depth-read.ts (`GET /api/markets/depth`),
  * routes/market-analysis.ts (`GET /api/markets/analysis`), and
  * lib/sports/market-history.ts (`GET /api/markets/history`).

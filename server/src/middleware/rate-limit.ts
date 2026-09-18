@@ -139,6 +139,30 @@ export const walletRateLimiter: RequestHandler = rateLimit(
 );
 
 /**
+ * Task 069 (V-001) — the voice token mint. Each push-to-talk press costs
+ * one token and one slice of the transcription allowance, so this is
+ * keyed on the signed-in user rather than the IP: the route already
+ * requires auth, and a shared office IP must not throttle everyone. The
+ * ceiling is generous for a person holding a button and tight enough that
+ * a loop cannot drain the allowance.
+ */
+export const voiceTokenRateLimiter: RequestHandler = rateLimit(
+  withSharedStore("mantua:rl:voice-token:", ONE_MIN_MS, {
+    windowMs: ONE_MIN_MS,
+    limit: 30,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skip: skipLimiter,
+    keyGenerator: (req: Request) => {
+      const user = req.privyUserId;
+      if (user) return `user:${user}`;
+      return `ip:${ipKeyGenerator(req.ip ?? "")}`;
+    },
+    message: { error: "Too many voice sessions. Try again in a moment.", code: "RATE_LIMITED" },
+  }),
+);
+
+/**
  * The anonymous analyst quota (owner decision 2026-08-18): three free
  * questions per IP per day, then the login gate. Logged-in users skip it
  * entirely (their traffic is governed by walletRateLimiter). Counted

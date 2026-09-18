@@ -1,4 +1,8 @@
-# Prompt History — Market Depth & Research Layer (Phase 12, task 068)
+# Prompt History — Market Depth & Research Layer (Phase 11, task 068)
+
+> Recorded under the directive's numbering ("Phase 12"); the owner's master
+> list of 2026-09-16 numbers this work Phase 11. The record below is kept
+> as written.
 
 **Date:** 2026-09-13
 **Branch:** `claude/admiring-tesla-4yvv4o` (the session's designated branch; stacked after the Phase 10 commits in PR #56)

@@ -43,6 +43,10 @@ export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "fon
     { origin: "https://*.plaid.com", why: "Plaid Link API" },
     { origin: "https://mainnet.base.org", why: "Base RPC (public)" },
     { origin: "https://base-rpc.publicnode.com", why: "Base RPC (public fallback)" },
+    {
+      origin: "wss://api.elevenlabs.io",
+      why: "Scribe v2 Realtime transcription socket (task 069, V-001)",
+    },
   ],
   style: [{ origin: "https://fonts.googleapis.com", why: "Inter / JetBrains Mono stylesheet" }],
   font: [{ origin: "https://fonts.gstatic.com", why: "Google Fonts files" }],

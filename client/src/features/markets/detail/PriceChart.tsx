@@ -22,7 +22,7 @@ function polyline(points: PricePoint[], t0: number, t1: number): string {
 
 /**
  * The recorded price series for both sides, anchored to the live price,
- * with Phase 12's market-event annotations (D-005) drawn as guide lines
+ * with Phase 11's market-event annotations (D-005) drawn as guide lines
  * and a label strip.
  */
 export function PriceChart({

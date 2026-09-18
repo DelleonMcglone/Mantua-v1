@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-007) — the historical market browser's pure half: one row's
+ * Phase 11 (D-007) — the historical market browser's pure half: one row's
  * text, the sparkline geometry for its price path, and the league filter.
  * Rendered by `HistoryPage.tsx` and the market page's Past markets section.
  */

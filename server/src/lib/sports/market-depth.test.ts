@@ -1,5 +1,5 @@
 /**
- * Phase 12 — the depth curve is the constant-product cost to move the
+ * Phase 11 — the depth curve is the constant-product cost to move the
  * price: symmetric at 50¢, monotone in the step, clamped at the edges, and
  * absent when the pool or the price is unknown.
  */

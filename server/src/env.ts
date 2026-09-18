@@ -145,6 +145,17 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
 
+  /** ElevenLabs key for Scribe v2 Realtime speech-to-text (task 069,
+   *  V-001). Server-only: it is exchanged for short-lived single-use
+   *  tokens at POST /api/voice/token and never reaches the browser.
+   *  Absent → that route answers 503, the microphone is not offered, and
+   *  the command interface stays text-only (V-010). */
+  ELEVENLABS_API_KEY: z
+    .string()
+    .min(1)
+    .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
+    .optional(),
+
   MANTUA_KILL_SWITCH: z
     .union([z.literal("0"), z.literal("1")])
     .default("0")

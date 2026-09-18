@@ -1,5 +1,5 @@
 /**
- * Phase 12 — `GET /api/markets/depth?providerEventId=…`: the market page's
+ * Phase 11 — `GET /api/markets/depth?providerEventId=…`: the market page's
  * deeper layer (metrics, depth curve, live game, chart annotations) from
  * `lib/sports/market-depth-read.ts`. Public like the slate and the detail
  * read; cached briefly across instances; an unknown game is a 404.
