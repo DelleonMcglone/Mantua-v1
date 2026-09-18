@@ -116,9 +116,21 @@ enters the existing pipeline unchanged.
 - [x] `voice-status-core.ts` (+ test) — failure to sentence, and the
       "I didn't catch that" retry.
 - [x] `confirm-guard.ts` (+ test) — the client half of V-009.
+- [x] `press-outcome.ts` (+ test) — the single verdict for one finished
+      press, composing the four rules above, plus the rule for when a
+      release can be judged at once instead of waiting for the tail.
+- [x] `voice-wire.ts` (+ test) — the socket's URL, its audio and commit
+      messages, and the reading of every inbound frame.
+- [x] `spoken-command.ts` — the payload that carries "this was spoken"
+      from the command bar to the agent panel, tolerating the older
+      plain-string form.
 - [x] `voice-transport.ts` — microphone capture at 16 kHz and the
-      WebSocket, behind an interface the tests replace.
-- [x] `pcm-worklet.ts` — the audio worklet that converts frames to PCM 16.
+      WebSocket, behind an interface the tests replace; the failure
+      mapping and the base64 encoding split into `transport-failures.ts`.
+- [x] `client/public/voice/pcm-worklet.js` — the audio worklet that
+      converts the browser's float frames to PCM 16. A static file served
+      from our own origin, so `script-src 'self'` covers it without the
+      `blob:` source a bundled worklet would have needed.
 - [x] `use-voice-input.ts` — the hook binding the transport to the cores.
 - [x] `MicButton.tsx` — the push-to-talk control.
 - [x] `InputBar.tsx` — the button mounted, live text rendered.
