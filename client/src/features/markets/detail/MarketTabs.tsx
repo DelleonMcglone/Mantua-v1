@@ -21,7 +21,7 @@ const TABS: { id: Tab; label: string }[] = [
 
 /**
  * T-010 — the market page's "More" layer: positions, comments, activity,
- * holders, agent, behind one toggle. Phase 12's deeper sections sit above
+ * holders, agent, behind one toggle. Phase 11's deeper sections sit above
  * it (`MarketDepthSections.tsx`).
  */
 export function MarketTabs({

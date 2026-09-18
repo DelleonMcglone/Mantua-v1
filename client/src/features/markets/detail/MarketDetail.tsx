@@ -19,13 +19,13 @@ interface Props {
   league: SportId;
   onBack: () => void;
   onAgent: (message: string) => void;
-  /** Phase 12 — the full historical browser, from the Past markets section. */
+  /** Phase 11 — the full historical browser, from the Past markets section. */
   onBrowseHistory: () => void;
 }
 
 /**
  * The market page. Simple layer first (T-010): summary, the live game when
- * there is one, claim, chart. Then Phase 12's deeper layer — depth, fees
+ * there is one, claim, chart. Then Phase 11's deeper layer — depth, fees
  * and execution, research, past markets — each section closed until
  * opened (D-004), and the "More" tabs below. Nothing here leaves the page.
  */

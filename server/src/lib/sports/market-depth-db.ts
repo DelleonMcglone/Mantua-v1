@@ -1,5 +1,5 @@
 /**
- * Phase 12 — binds the depth read's `DepthDb` seam to Postgres: the event
+ * Phase 11 — binds the depth read's `DepthDb` seam to Postgres: the event
  * with its league and teams, the moneyline markets, the metrics module,
  * the latest play and the first play of each period, and injury reports
  * for the two teams.

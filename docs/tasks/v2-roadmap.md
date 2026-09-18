@@ -825,12 +825,7 @@ are the owner's and name the artifact that flips them.
 | G-015       | Counsel review — owner                                                                                | 🟡     |
 | G-017/G-018 | Staging drill + dogfood + funded run; M-01 / L-03 / fork suites / human audit — owner                 | 🟡     |
 
-## ⏸ PHASE 11 — deferred
-
-Skipped for now on the owner's instruction (2026-09-13); no scope recorded
-in the repository yet. To be supplied with its row table.
-
-## 🔍 PHASE 12: Market Depth & Research Layer (task 068)
+## 🔍 PHASE 11: Market Depth & Research Layer (task 068) — 🟡 P1
 
 Progressively deeper information per market — users never leave the
 market page to understand what they're trading. Ledger and evidence:
@@ -846,6 +841,26 @@ market page to understand what they're trading. Ledger and evidence:
 | D-006 | Depth ladder for the pro layer (an AMM has no order book; the cost to move the price is shown instead)                | ✅     |
 | D-007 | Historical market browser: resolved markets with outcomes, settlement, and price paths                                | ✅     |
 | D-008 | E2E: every listed data point reachable from a market page without leaving it (`client/e2e/market.spec.ts`)            | ✅     |
+
+---
+
+## 🗂 Phases 12–18 (owner's master list, 2026-09-16)
+
+The owner's master task list is stored verbatim at
+**`docs/tasks/mantua-v1-task-list.md`** and is the source of truth for
+phase numbering and row IDs. Phases 0–11 above reconcile to it (its
+Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
+`launch-gate.md`). The phases not yet started:
+
+| Phase                                                       | Tier  | Rows            | Status |
+| ----------------------------------------------------------- | ----- | --------------- | ------ |
+| 12 — Voice: ElevenLabs Scribe v2 Realtime                   | 🟡 P1 | V-001 … V-011   | ⬜     |
+| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ⬜     |
+| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜     |
+| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | ⬜     |
+| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜     |
+| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜     |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜     |
 
 ---
 
@@ -908,7 +923,7 @@ market page to understand what they're trading. Ledger and evidence:
 | Phase N: Natural Language Command Bar             | 11      |
 | Phase 9: E2E & Launch                             | 13      |
 | Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
-| Phase 12: Market Depth & Research Layer           | 8       |
+| Phase 11: Market Depth & Research Layer           | 8       |
 | **Grand Total**                                   | **170** |
 
 ### Future phases

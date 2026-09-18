@@ -9,7 +9,7 @@ const TONE: Record<PlacedAnnotation["kind"], string> = {
 };
 
 /**
- * Phase 12 (D-005) — the label strip under the price chart, one marker
+ * Phase 11 (D-005) — the label strip under the price chart, one marker
  * per annotation at the same x as its guide line in the SVG. HTML rather
  * than SVG text so labels keep their aspect when the chart stretches.
  */

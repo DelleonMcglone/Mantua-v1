@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-007) — reads resolved moneyline markets (home side) with their
+ * Phase 11 (D-007) — reads resolved moneyline markets (home side) with their
  * event, league, latest resolution, and recorded price path, and shapes
  * them through `market-history.ts`.
  */

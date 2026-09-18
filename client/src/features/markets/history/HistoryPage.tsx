@@ -12,7 +12,7 @@ interface Props {
 }
 
 /**
- * Phase 12 (D-007) — the historical market browser: every resolved market
+ * Phase 11 (D-007) — the historical market browser: every resolved market
  * with its final score, outcome, settlement, and price path, filtered by
  * league. Reachable from any market page's Past markets section and from
  * Discover; never needs a market id.

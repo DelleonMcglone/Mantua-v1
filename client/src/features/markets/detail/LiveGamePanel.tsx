@@ -4,7 +4,7 @@ import type { LiveGame } from "./depth-types.ts";
 import { liveGameView } from "./live-game-core.ts";
 
 /**
- * Phase 12 (D-002) — the live game panel: score, period and clock,
+ * Phase 11 (D-002) — the live game panel: score, period and clock,
  * possession, and the latest play, straight from the sports data layer,
  * with the stamp of the play it was read from. Renders only while the
  * game is in progress; fields the provider did not send are absent.

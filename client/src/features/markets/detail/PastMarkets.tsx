@@ -2,7 +2,7 @@ import { HistoryRowCard } from "../history/HistoryRowCard.tsx";
 import { useMarketHistory } from "../history/use-market-history.ts";
 
 /**
- * Phase 12 (D-007) — the Past markets section on a market page: the last
+ * Phase 11 (D-007) — the Past markets section on a market page: the last
  * few resolved games in this league, and the way into the full browser.
  */
 export function PastMarkets({

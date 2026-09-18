@@ -3,7 +3,7 @@ import { sparklinePoints } from "./history-core.ts";
 const W = 120;
 const H = 32;
 
-/** Phase 12 (D-007) — a resolved market's home-side price path, at a glance. */
+/** Phase 11 (D-007) — a resolved market's home-side price path, at a glance. */
 export function Sparkline({
   path,
   tone,

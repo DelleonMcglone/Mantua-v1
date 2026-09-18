@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { launchApp, mockApi } from "./harness.ts";
 
 /**
- * Phase 12 (D-008) — every listed data point is reachable from one market
+ * Phase 11 (D-008) — every listed data point is reachable from one market
  * page without leaving it: price and implied probability, the live game,
  * the annotated chart, depth and liquidity, volume, open interest, fees
  * and execution, research, and past markets. The page heading is asserted

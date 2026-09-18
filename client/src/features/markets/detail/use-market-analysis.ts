@@ -3,7 +3,7 @@ import { api } from "@/lib/api.ts";
 import type { AnalysisRead } from "./depth-types.ts";
 
 /**
- * Phase 12 (D-003) — the analyst's research for one side of a market
+ * Phase 11 (D-003) — the analyst's research for one side of a market
  * (`GET /api/markets/analysis`). Read once per side when the Research
  * section is open; the server caches it for a minute. Loading is derived
  * from the key the last answer was for, so a side switch never shows the

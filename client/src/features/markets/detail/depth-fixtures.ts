@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-008) — the deeper layer's wire shapes, shared by the browser
+ * Phase 11 (D-008) — the deeper layer's wire shapes, shared by the browser
  * suite (client/e2e/harness.ts) and the composed node test:
  * `GET /api/markets/depth`, `/analysis`, and `/history`, mirroring
  * server/src/lib/sports/market-depth-read.ts, routes/market-analysis.ts,

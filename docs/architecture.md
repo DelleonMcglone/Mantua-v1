@@ -693,7 +693,7 @@ marked as the owner's with the artifact that would close it.
   Linux runners; the Vercel build should move from `npm install
 --no-package-lock` to `npm ci` (review §6).
 
-## Market depth & research layer (Phase 12, task 068)
+## Market depth & research layer (Phase 11, task 068)
 
 The market page grows downward, never sideways: every deeper data point
 is a section on the same page, and the rules for what shows are pure

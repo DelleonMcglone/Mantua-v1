@@ -14,7 +14,7 @@ interface Props {
   /** A game (and optionally a side) → the league page with the ticket set. */
   onOpenGame: (sport: SportId, eventId: string, side: 0 | 1 | null) => void;
   onBack: () => void;
-  /** Phase 12 — the historical market browser. */
+  /** Phase 11 — the historical market browser. */
   onBrowseHistory?: (() => void) | undefined;
 }
 

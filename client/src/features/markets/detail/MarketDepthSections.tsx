@@ -16,7 +16,7 @@ import { PastMarkets } from "./PastMarkets.tsx";
 import { ResearchSection } from "./ResearchSection.tsx";
 
 /**
- * Phase 12 (D-004) — layered disclosure. Every deeper section starts
+ * Phase 11 (D-004) — layered disclosure. Every deeper section starts
  * closed under one heading; a casual user never sees a depth ladder they
  * did not open, and "Open all" gives a pro the whole layer in one tap. The
  * section model and its rules live in `disclosure-core.ts`.

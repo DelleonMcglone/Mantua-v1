@@ -9,7 +9,7 @@ const TONE = {
   pending: "text-text-dim",
 } as const;
 
-/** Phase 12 (D-007) — one resolved market: who played, who won, what a contract paid, and the path. */
+/** Phase 11 (D-007) — one resolved market: who played, who won, what a contract paid, and the path. */
 export function HistoryRowCard({ row }: { row: HistoryRow }) {
   const v = historyRowView(row);
   return (

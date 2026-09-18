@@ -17,7 +17,7 @@ interface Props {
   onAgent: (message: string) => void;
   /** "View position" from the executed card. */
   onViewPositions: () => void;
-  /** Phase 12 — the historical market browser for this league. */
+  /** Phase 11 — the historical market browser for this league. */
   onBrowseHistory: () => void;
   /** The game in view, for the dock's contextual quick actions (T-016). */
   onFocusGame?: ((game: { away: string; home: string } | null) => void) | undefined;

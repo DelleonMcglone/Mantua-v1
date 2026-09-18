@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-003) — the analyst's research shaped for the page. The
+ * Phase 11 (D-003) — the analyst's research shaped for the page. The
  * probability is an agent estimate and is labelled as one (T-021); the
  * evidence keeps its direction and size; the action is a sentence, not a
  * button. Pure; rendered by `ResearchSection.tsx`.

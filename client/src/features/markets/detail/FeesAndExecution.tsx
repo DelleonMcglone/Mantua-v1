@@ -1,7 +1,7 @@
 import { FeeExplainer } from "../FeeExplainer.tsx";
 
 /**
- * Phase 12 (D-004) — the Fees & execution section of the deeper layer:
+ * Phase 11 (D-004) — the Fees & execution section of the deeper layer:
  * the fee model (the same explainer the ticket links to, open) and the
  * exact mechanics of a fill, for users who want to know what happens
  * between Confirm and "Trade executed".

@@ -39,3 +39,25 @@
   and G-004/G-005 (hosting, CI/CD) can run now; G-011 (deploy) after
   G-018's audit items; G-017 (drill, dogfood, funded run) after G-011;
   G-003 whenever an RPC secret exists.
+
+## Mapping to the owner's Launch Gate rows (L-001 … L-018)
+
+The owner's master list (`mantua-v1-task-list.md`, 2026-09-16) numbers
+the launch gate L-001 … L-018; this ledger's G rows were derived before
+that list existed and are not 1:1. The correspondence:
+
+| Owner row     | Ledger rows          | Note                                                                  |
+| ------------- | -------------------- | --------------------------------------------------------------------- |
+| L-001         | G-001, G-002         | browser suite + CI                                                    |
+| L-002         | G-003                | fork suites in CI                                                     |
+| L-003         | G-006 … G-010, G-018 | headers, guards, secret scan, triage, review; acceptances owner-gated |
+| L-004         | G-012 … G-015        | Terms / Privacy / acceptance; counsel review owner-gated              |
+| L-005         | G-016                | runbook + drill runner                                                |
+| L-006         | G-004, G-005         | hosting and CI/CD, owner-gated                                        |
+| L-007, L-008  | G-017                | dogfood + funded run, bundled here                                    |
+| L-009         | —                    | load/chaos sign-off; R-008's spike run is owner-gated                 |
+| L-010         | —                    | fee model observed in production telemetry, after G-011               |
+| L-011, L-012  | —                    | soft and public launch                                                |
+| L-013 … L-016 | —                    | activity proofs, closed in Phase 9 (tasks 062–066)                    |
+| L-017         | —                    | the Launch Standard loop, after G-011 and G-017                       |
+| L-018         | G-011                | mainnet deployments                                                   |

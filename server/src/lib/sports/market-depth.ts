@@ -1,5 +1,5 @@
 /**
- * Phase 12 (D-001 / D-006) — market depth for a constant-product pool.
+ * Phase 11 (D-001 / D-006) — market depth for a constant-product pool.
  *
  * A Uniswap v4 pool has no order book; the honest depth artefact is the
  * cost of moving the price. With active-range liquidity L (raw, the v4

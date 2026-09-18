@@ -433,7 +433,7 @@ npm test -w @mantua/client   # 240 tests
 npm run e2e                  # browser suite: the real client in Chromium, auth shimmed, API + chain scripted
 ```
 
-The market page's deeper layer (Phase 12, task 068) — depth ladder, live
+The market page's deeper layer (Phase 11, task 068) — depth ladder, live
 game, research, fees and execution, past markets — is served by
 `GET /api/markets/depth`, `/analysis`, and `/history` and proven by
 `client/e2e/market.spec.ts`.

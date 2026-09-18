@@ -1,8 +1,12 @@
-# Task 068 — Market Depth & Research Layer (Phase 12, D-001 … D-008)
+# Task 068 — Market Depth & Research Layer (Phase 11, D-001 … D-008)
+
+> Numbering: built as "Phase 12" under the directive of 2026-09-13; the
+> owner's master list of 2026-09-16 (`docs/tasks/mantua-v1-task-list.md`)
+> numbers it **Phase 11** and makes Phase 12 the voice layer. Row IDs are
+> unchanged.
 
 > Owner directive 2026-09-13 ("skip phase 11 for now and complete phase
 > 12 please"). Prompt record: `docs/promptHistory/2026-09-13-market-depth.md`.
-> Phase 11 is deferred by the owner without a scope; the roadmap says so.
 
 ## Task description
 
@@ -83,8 +87,8 @@ proven reachable without leaving the page.
       `default-selection.ts` + test); `MarketDetail` split (`MarketTabs`).
 - [x] E2E: `depth-fixtures.ts` shared by the harness and the composed
       test; `market.spec.ts` (3 specs); harness `liveGame` option.
-- [x] Docs: this file, prompt history, roadmap Phase 12 block (+ Phase 11
-      deferred), architecture section, README.
+- [x] Docs: this file, prompt history, roadmap block, architecture
+      section, README (renumbered to Phase 11 on 2026-09-16).
 
 ## Outcome (2026-09-13)
 

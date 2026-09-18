@@ -3,7 +3,7 @@ import { api } from "@/lib/api.ts";
 import type { MarketDepthRead } from "./depth-types.ts";
 
 /**
- * Phase 12 — the market page's deeper read (`GET /api/markets/depth`),
+ * Phase 11 — the market page's deeper read (`GET /api/markets/depth`),
  * refreshed every 20 s while the game is live and once a minute otherwise.
  * A failed read leaves the last good one in place and flags it.
  */

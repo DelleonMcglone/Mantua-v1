@@ -3,7 +3,7 @@ import { api } from "@/lib/api.ts";
 import type { HistoryResponse, HistoryRow } from "../detail/depth-types.ts";
 
 /**
- * Phase 12 (D-007) — resolved markets with outcomes and price paths
+ * Phase 11 (D-007) — resolved markets with outcomes and price paths
  * (`GET /api/markets/history`), for one league or all of them. Loading is
  * derived from the key the last answer was for, so a league switch never
  * shows the previous league's rows as current.
