@@ -931,6 +931,29 @@ handle; per-agent OAuth is the recorded next step (D-107).
 
 ---
 
+## 🎰 PHASE 16: Prediction Market Combos (task 072, D-119) — 🟢 P2
+
+> Parlay-like, prediction-market mechanics: **a combo is a market** — a
+> conjunction market created through the existing factory, priced by its
+> own pool and hook fee, bought with one swap, settled by the resolver from
+> its legs' outcomes. No new contract. Ledger: `072-prediction-market-combos.md`.
+> Deployment-gated like every on-chain leg (D-112).
+
+| ID     | Task                                                                                                                                                              | Status |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| CB-001 | Mechanism: conjunction market named by its sorted legs (`computeComboMarketId`), startsAt = latest kickoff, correlated legs refused in code                       | ✅     |
+| CB-002 | Combo Builder: `+ Combo` on any game row → legs list → stake → review (odds, payout, fee lines) → Confirm; the trade ticket's own pieces                          | ✅     |
+| CB-003 | Pricing engine: fair = Π leg prices, pool quote or planned opening estimate, combined odds, shares, payout at par, premium over fair                              | ✅     |
+| CB-004 | Fee display: Position / Fee / Fee rate / Total from the hook's quote, ceiling guard, plus the same legs as separate tickets                                       | ✅     |
+| CB-005 | One transaction: prepare (create + seed when absent) → one calldata, cap-checked once → verified fill records the ticket; pending register re-reports             | ✅     |
+| CB-006 | Agent-constructed combos: proposal by edge under the risk level and limits, `combo` preview kind, drift-checked execution from the agent wallet                   | ✅     |
+| CB-007 | Settlement: any lost → lost, every non-void won → won, all void → void, void legs drop out; freeze then resolve through the resolver with the combo authorization | ✅     |
+| CB-008 | Portfolio: tickets with legs, mark, P&L and payout on the profile; holdings part; `combo_open` / `combo_close` / `combo_settle` on the timeline                   | ✅     |
+| CB-009 | Monitor every 15 min: stamps legs, marks dead, take-profit sale or last-leg hedge for autonomous agent tickets, recommendations for the rest                      | ✅     |
+| CB-010 | Limits: env platform limits, the policy's `combo` block (legs, stake, exposure, payout, take-profit, auto-manage), one gate before quote and calldata             | ✅     |
+
+---
+
 ## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
 
 The owner's master task list is stored verbatim at
@@ -944,7 +967,7 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ✅                                                     |
 | 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜                                                     |
 | 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark) |
-| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜                                                     |
+| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ✅ (task 072; operator seeds combo pools)              |
 | 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜                                                     |
 | 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                     |
 
@@ -1013,7 +1036,8 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | Phase 12: Voice (ElevenLabs Scribe v2 Realtime)    | 11      |
 | Phase 13: Agent Extended (social, ledger, support) | 14      |
 | Phase 15: Mobile Experience                        | 9       |
-| **Grand Total**                                    | **204** |
+| Phase 16: Prediction Market Combos                 | 10      |
+| **Grand Total**                                    | **214** |
 
 ### Future phases
 

@@ -32,6 +32,9 @@ import { marketRedeemRouter } from "./routes/market-redeem.ts";
 import { activityRouter } from "./routes/activity.ts";
 import { portfolioEconomicsRouter } from "./routes/portfolio-economics.ts";
 import { cronStrategiesRouter } from "./routes/cron-strategies.ts";
+import { combosRouter } from "./routes/combos.ts";
+import { combosTradeRouter } from "./routes/combos-trade.ts";
+import { cronCombosRouter } from "./routes/cron-combos.ts";
 import { cronResolutionRouter } from "./routes/cron-resolution.ts";
 import { resolutionOpsRouter } from "./routes/resolution-ops.ts";
 import { cronIntentsRouter } from "./routes/cron-intents.ts";
@@ -160,6 +163,11 @@ app.use(activityRouter);
 app.use(portfolioEconomicsRouter);
 app.use(cronStrategiesRouter);
 app.use(cronResolutionRouter);
+// Task 072 (Phase 16) — combo tickets: builder reads, the single-transaction
+// trade path, and the fifteen-minute monitor tick.
+app.use(combosRouter);
+app.use(combosTradeRouter);
+app.use(cronCombosRouter);
 app.use(resolutionOpsRouter);
 // Phase 7 / R-010 — operator metrics + alerts (cron-secret guarded).
 app.use(opsMetricsRouter);

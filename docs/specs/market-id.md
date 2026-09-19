@@ -68,6 +68,22 @@ away; the market ID consumes that assignment.
 get their own `marketType` string, so their IDs cannot collide with an existing
 moneyline. Adding one does not invalidate anything already deployed.
 
+**Combo markets are named by their legs (task 072, D-119).** A combo is a
+conjunction market over a set of leg markets. Its id is
+
+```
+comboMarketId = keccak256(abi.encode("combo", sortedLegIds))   // bytes32[]
+```
+
+with the leg ids lower-cased, de-duplicated and sorted first, so the same
+legs in any order name one market and two users who build the same combo
+share its liquidity. Fewer than two legs or a repeated leg is refused before
+hashing. Off the default chain the chain id is mixed in as a fourth field,
+exactly as for a game market. `"combo"` is a `marketType` in the additive
+sense above; a combo id cannot collide with a moneyline id because the
+encoded field shapes differ (`string, bytes32[]` vs `string, string, uint8`).
+Implementation: `computeComboMarketId` in `server/src/lib/market-id.ts`.
+
 **Multi-outcome markets do not fit yet.** `outcomeIndex` supports more than two
 outcomes at the ID level, but DM-102's binary token pair does not. A three-way
 soccer result needs the token model revisited first.

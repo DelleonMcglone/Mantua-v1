@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { useIsMobile } from "./hooks/use-media-query.ts";
 import {
   launchedFromInstalledApp,
@@ -50,6 +50,14 @@ import { PublicAgentPage } from "./features/reputation/PublicAgentPage.tsx";
 import { agentHandleFromPath, agentPagePath } from "./features/reputation/reputation-core.ts";
 import { SocialPanel } from "./features/social/SocialPanel.tsx";
 import { SupportPanel } from "./features/support/SupportPanel.tsx";
+import { PanelLoading } from "./components/shell/PanelLoading.tsx";
+import { SPORTS } from "./features/markets/sports.ts";
+/** Where "Add legs from a league" lands: the first tradable league. */
+const DEFAULT_SPORT = (SPORTS.find((s) => s.coverage === "launch") ?? SPORTS[0]).id;
+// Task 072 — off the critical path (mobile budget MX-006): loaded on first open.
+const ComboBuilder = lazy(() =>
+  import("./features/combos/ComboBuilder.tsx").then((m) => ({ default: m.ComboBuilder })),
+);
 import { Board } from "./features/markets/Board.tsx";
 import type { AddLiquidityContext } from "./features/liquidity/AddLiquidityForm.tsx";
 import type { HookName } from "./features/liquidity/use-create-pool.ts";
@@ -126,7 +134,9 @@ type Route =
   /** Task 070 — the agent's voice: handle, posting policy, approval queue. */
   | { kind: "social" }
   /** Task 070 — help & support, signed in or not. */
-  | { kind: "support" };
+  | { kind: "support" }
+  /** Task 072 — the Combo Builder (legs picked from league pages). */
+  | { kind: "combos" };
 
 // Intents that the manual Uniswap-v4 panels own when a hook is named.
 const HOOK_ACTION_KINDS = new Set<Intent["kind"]>([
@@ -165,6 +175,7 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "agent",
   "social",
   "support",
+  "combos",
 ];
 
 /** What we persist. Never store the public pages — landing, legal, docs,
@@ -249,6 +260,23 @@ export default function App() {
     window.addEventListener("mantua:open-support", handler);
     return () => {
       window.removeEventListener("mantua:open-support", handler);
+    };
+  }, []);
+
+  // Task 072 — `+ Combo` on a game row and the executed card open the
+  // builder / the profile without prop-drilling, like support above.
+  useEffect(() => {
+    const openCombos = () => {
+      setRoute({ kind: "combos" });
+    };
+    const openProfile = () => {
+      setRoute({ kind: "profile" });
+    };
+    window.addEventListener("mantua:open-combos", openCombos);
+    window.addEventListener("mantua:open-profile", openProfile);
+    return () => {
+      window.removeEventListener("mantua:open-combos", openCombos);
+      window.removeEventListener("mantua:open-profile", openProfile);
     };
   }, []);
 
@@ -588,6 +616,7 @@ function RouteContent({ route, setRoute }: { route: Route; setRoute: (r: Route) 
     case "trading":
     case "social":
     case "support":
+    case "combos":
       return null;
     case "profile":
       return <ProfileRoute setRoute={setRoute} />;
@@ -736,6 +765,19 @@ function fullPage(
       return (
         <PanelPage>
           <SupportPanel onClose={home} />
+        </PanelPage>
+      );
+    case "combos":
+      return (
+        <PanelPage>
+          <Suspense fallback={<PanelLoading />}>
+            <ComboBuilder
+              onClose={home}
+              onBrowse={() => {
+                setRoute({ kind: "market", sport: DEFAULT_SPORT });
+              }}
+            />
+          </Suspense>
         </PanelPage>
       );
     case "analyze":
@@ -992,6 +1034,8 @@ function navDestinationToRoute(destination: NavDestination): Route {
       return { kind: "agent" };
     case "trading":
       return { kind: "trading" };
+    case "combos":
+      return { kind: "combos" };
   }
 }
 

@@ -73,12 +73,13 @@ void describe("holdings aggregate", () => {
       agentWalletUsd: 30,
       unifiedBalanceUsd: null,
       marketPositionsUsd: 11.92,
+      comboPositionsUsd: 4,
       lpPositionsUsd: 0,
     });
-    assert.equal(s.totalUsd, 162.42);
+    assert.equal(s.totalUsd, 166.42);
     assert.deepEqual(
       s.parts.map((p) => p.label),
-      ["Wallet", "Agent wallet", "Market positions"],
+      ["Wallet", "Agent wallet", "Market positions", "Combos"],
     );
     assert.deepEqual(s.missing, ["Unified balance"]);
   });

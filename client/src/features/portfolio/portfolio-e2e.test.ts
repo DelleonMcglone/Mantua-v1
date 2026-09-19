@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { groupByDay, metaLine, type ActivityItem } from "../activity/activity-core.ts";
+import { sumComboValueUsd, verdictLine, type ComboTicket } from "../combos/combo-ticket-core.ts";
 import {
   aggregateHoldings,
   groupPositionsByGame,
@@ -107,6 +108,45 @@ const economics: PortfolioEconomics = {
   },
 };
 // GET /api/portfolio/settled
+/** Task 072 — one open combo ticket, the exact `GET /api/combos` wire shape. */
+const comboTickets: ComboTicket[] = [
+  {
+    id: "combo-1",
+    status: "open",
+    label: "Falcons + Chiefs",
+    marketId: "0xc1",
+    stakeRaw: "10000000",
+    sharesRaw: "40000000",
+    potentialPayoutRaw: "40000000",
+    entryPriceBps: 2500,
+    combinedOdds: 4,
+    markBps: 6250,
+    valueRaw: "25000000",
+    pnlRaw: "15000000",
+    verdict: { kind: "pending", won: 1, lost: 0, void: 0, pending: 1 },
+    placedAt: iso(2),
+    settledAt: null,
+    settlementPrice: null,
+    source: "agent",
+    legs: [
+      {
+        marketId: "0xm1",
+        label: "Atlanta Falcons",
+        opponent: "New Orleans Saints",
+        result: "won",
+        entryPriceBps: 5000,
+      },
+      {
+        marketId: "0xm3",
+        label: "Kansas City Chiefs",
+        opponent: "Las Vegas Raiders",
+        result: "pending",
+        entryPriceBps: 5000,
+      },
+    ],
+  },
+];
+
 const settled: SettledRow[] = [
   {
     marketId: "0xwin",
@@ -188,10 +228,12 @@ void describe("PF-013 — every portfolio section renders real data for one comp
       agentWalletUsd: sumUsd(agentBalances),
       unifiedBalanceUsd: Number(unified.totalUsdc),
       marketPositionsUsd: sumMarketValueUsd(userPositions) + sumMarketValueUsd(agentPositions),
+      comboPositionsUsd: sumComboValueUsd(comboTickets),
       lpPositionsUsd: economics.lpTotals.currentValueUsd,
     });
-    assert.equal(h.totalUsd, 387.46);
-    assert.equal(h.parts.length, 5);
+    assert.equal(h.totalUsd, 412.46);
+    assert.equal(h.parts.length, 6);
+    assert.equal(h.parts.find((p) => p.key === "comboPositionsUsd")?.usd, 25);
     assert.deepEqual(h.missing, []);
   });
 
@@ -211,6 +253,13 @@ void describe("PF-013 — every portfolio section renders real data for one comp
     const agent = groupPositionsByGame(agentPositions);
     assert.equal(agent[0]?.rows[0]?.marketId, "0xm2");
     assert.equal(agent[0]?.potentialPayoutUsd, 5);
+  });
+
+  void it("§ combos (task 072): the ticket carries its legs, verdict and mark, and counts in holdings", () => {
+    const t = comboTickets[0];
+    assert.equal(verdictLine(t), "1 of 2 won · 1 pending");
+    assert.equal(t.legs.map((l) => l.result).join(","), "won,pending");
+    assert.equal(sumComboValueUsd(comboTickets), 25);
   });
 
   void it("§10 hedging: the executed strategy resolves to its hedge entry with value and market", () => {

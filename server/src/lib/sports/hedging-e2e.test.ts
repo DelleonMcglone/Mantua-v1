@@ -58,6 +58,7 @@ import { hedgeStrategies } from "../../db/schema/markets.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
 import { agentWallets, markets } from "../../db/schema/index.ts";
 import { SafetyError } from "../errors.ts";
+import { DEFAULT_POLICY } from "../agent/policy.ts";
 import { pollReceipt, type TransactionFetcher, type TransactionState } from "../circle/execute.ts";
 import { parseStrategyDraft, previewLines } from "./strategy-parse.ts";
 import {
@@ -356,6 +357,7 @@ function makeExecDeps(opts: {
             dailyBudgetUsd: 10_000,
             allowedMarketTypes: [],
           },
+          combo: DEFAULT_POLICY.combo,
           updatedAt: null,
           persisted: false,
         },

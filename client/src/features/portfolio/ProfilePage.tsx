@@ -1,6 +1,7 @@
 import { Bot, Droplet, LogOut, Megaphone } from "lucide-react";
 import { StrategiesSection } from "./StrategiesSection.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
+import { ComboPositionsSection } from "@/features/combos/ComboPositionsSection.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
 import { ProfileWalletSection } from "./ProfileWalletSection.tsx";
 import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
@@ -53,6 +54,11 @@ export function ProfilePage({
         <ProfileWalletSection walletAddress={walletAddress} />
 
         <MarketPositionsSection />
+        <ComboPositionsSection
+          onOpenBuilder={() => {
+            window.dispatchEvent(new Event("mantua:open-combos"));
+          }}
+        />
         <SettledPositionsSection econ={economics} />
         <LpEconomicsSection econ={economics} />
 

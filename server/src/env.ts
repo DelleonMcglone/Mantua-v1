@@ -174,6 +174,15 @@ const schema = z.object({
     .optional(),
   /** The app's public origin, for the performance-page link in posts. */
   PUBLIC_APP_URL: z.url().default("https://mantua.ai"),
+  /** Task 072 (Phase 16, CB-010) — platform combo limits, applied to every
+   *  user on top of their own policy block. Legs per ticket (≤ 8), the
+   *  largest ticket in USDC, how many distinct combo markets the operator
+   *  will seed and keep open at once (each one costs COMBO_SEED_USDC of
+   *  working float, like MARKET_SEED_USDC for a game market). */
+  COMBO_MAX_LEGS: z.coerce.number().int().min(2).max(8).default(6),
+  COMBO_MAX_STAKE_USDC: z.coerce.number().positive().max(100_000).default(1_000),
+  COMBO_MAX_OPEN_MARKETS: z.coerce.number().int().min(0).max(10_000).default(50),
+  COMBO_SEED_USDC: z.coerce.number().int().min(0).max(50_000_000).default(10_000_000),
   /** AE-010 — where an escalation is POSTed (a Slack/Discord/incoming
    *  webhook). Absent → the ticket row and the log line are the signal. */
   SUPPORT_ESCALATION_WEBHOOK_URL: z.url().optional(),

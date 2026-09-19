@@ -88,3 +88,33 @@ void describe("computeMarketId", () => {
     }
   });
 });
+
+void describe("computeComboMarketId (task 072 / CB-001)", async () => {
+  const { computeComboMarketId, InvalidComboLegsError } = await import("./market-id.ts");
+  const { home: a } = moneylineMarketIds("401671789");
+  const { home: b } = moneylineMarketIds("401671790");
+  const { away: c } = moneylineMarketIds("401671791");
+
+  void it("is order-independent and deterministic", () => {
+    assert.equal(computeComboMarketId([a, b, c]), computeComboMarketId([c, a, b]));
+    assert.match(computeComboMarketId([a, b]), /^0x[0-9a-f]{64}$/);
+  });
+
+  void it("differs from every leg and from a different leg set", () => {
+    const id = computeComboMarketId([a, b]);
+    assert.notEqual(id, a);
+    assert.notEqual(id, b);
+    assert.notEqual(id, computeComboMarketId([a, c]));
+    assert.notEqual(id, computeComboMarketId([a, b, c]));
+  });
+
+  void it("mixes the chain id off Base", () => {
+    assert.notEqual(computeComboMarketId([a, b]), computeComboMarketId([a, b], 84532));
+  });
+
+  void it("refuses fewer than two legs, a repeated leg and a non-id", () => {
+    assert.throws(() => computeComboMarketId([a]), InvalidComboLegsError);
+    assert.throws(() => computeComboMarketId([a, a.toUpperCase()]), InvalidComboLegsError);
+    assert.throws(() => computeComboMarketId([a, "0x12"]), InvalidComboLegsError);
+  });
+});

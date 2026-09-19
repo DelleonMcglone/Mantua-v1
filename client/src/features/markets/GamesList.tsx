@@ -76,6 +76,7 @@ export function GamesList({
               <GameRow
                 key={event.providerEventId}
                 event={event}
+                league={slate?.league ?? ""}
                 selected={selected?.event.providerEventId === event.providerEventId}
                 selectedOutcome={
                   selected?.event.providerEventId === event.providerEventId

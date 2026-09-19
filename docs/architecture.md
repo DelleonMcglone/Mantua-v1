@@ -936,6 +936,84 @@ sheet. `TOUCH_TARGET_PX` is 44 and the mobile suite measures it.
   the desktop suite; `docs/design/mobile-audit.md` cites a spec for every
   tap count and `docs/design/mobile-benchmark.md` records the numbers.
 
+## Combos — a combo is a market (Phase 16, task 072, D-119)
+
+A combo ticket (_Cowboys + Chiefs + Raiders_) is one buy of a conjunction
+market: a full-collateral market, created through the same factory as a
+game market, whose YES pays $1 if every leg's YES pays. Nothing new on
+chain; the composition, the settlement rule, the ticket and the agent are
+new.
+
+**Identity and creation.** `computeComboMarketId(sortedLegIds)`
+(`server/src/lib/market-id.ts`, spec `docs/specs/market-id.md`) — order
+independent, distinct from every moneyline id, chain-mixed off Base. The
+market's `startsAt` is the latest leg kickoff (the 12 h backstop outlives
+every leg), its label the legs joined, its opening price Π leg prices, its
+season flag on if any leg is a playoff game. `POST /api/combos/prepare`
+creates it when absent through `createMarketsOnChain` with the combo seed
+(`COMBO_SEED_USDC`), under `COMBO_MAX_OPEN_MARKETS` (409 `COMBO_CAPACITY`).
+
+**Rules and limits (CB-001, CB-010).** `combo-rules.ts` refuses fewer than
+two legs, more than the cap, a duplicate market, two legs from one game,
+one team twice, a leg whose market is not OPEN or whose game is over, an
+unpriced leg, a league outside the policy — each naming the leg.
+`combo-policy.ts` is the user's `combo` block on the agent policy
+(enabled, max legs, max stake, max open exposure, max payout, take-profit
+line, auto-manage) plus the platform env limits, enforced by one
+`comboPolicyGate` before any quote and again at calldata.
+
+**Pricing (CB-003, CB-004).** `combo-pricing.ts`: fair probability = Π leg
+prices (independence, disclosed); the pool's own quote when the market
+exists, an opening estimate with the hook's fee formula (`planned`) before;
+combined odds, shares, payout at par, the premium of pool over fair. The
+quote (`combo-quote.ts`, `POST /api/combos/quote`) also carries each leg's
+own hook fee for an equal split of the stake, so the ticket shows what the
+same legs cost as separate tickets. The client renders
+`feeLines(feeSummary(stake, hookFee))` — the single-trade standard, the
+0.70 % ceiling enforced as a render refusal.
+
+**One transaction (CB-005).** `POST /api/combos/calldata` is one swap on
+the combo pool through `buildMarketSwap` (the swap half of
+`buildMarketTrade`, extracted so both share it), cap-checked and recorded
+once for the whole stake (`guardSpend`), refused for a dead combo (a leg
+lost), a closed market, or a dark in-play feed (P-012). `POST
+/api/combos/fills` verifies the receipt (success, our router as target,
+sender from the chain) and records the ticket; the legs the client reports
+must recompute to the market id — the id is the commitment over exactly
+those legs. The pending register re-reports a combo fill after a reload.
+
+**Settlement (CB-007).** `combo-settlement.ts`: `legResultFrom` reads a
+leg from its market state and the resolutions log (never guesses a
+winner); `comboOutcome`: any lost → lost, every non-void won → won, every
+leg void → void, a void leg drops out. `planComboResolution` freezes then
+resolves/voids through the resolver once the combo's `startsAt` has
+passed (the contract's rule for the resolver). The resolution cron runs
+`runComboSettlement` after the leg pass: stamps leg results, marks dead
+tickets, submits through `authorizeComboResolution` (evidence = the legs'
+results), settles tickets with `combo_settle` on the timeline.
+
+**Portfolio (CB-008).** `GET /api/combos` lists the caller's tickets
+(`combo-tickets.ts`) with live leg results, the combo pool mark, value,
+P&L and payout; the profile's Combos section (desktop and the phone's
+Positions tab) shows every ticket whatever its outcome; the holdings
+aggregate has a Combos part; `combo_open` / `combo_close` /
+`combo_settle` are timeline kinds with pushes.
+
+**Agent (CB-006, CB-009).** `combo-agent.ts` proposes legs by edge (the
+provider's own probability vs the recorded pool price) sized by the risk
+level under every limit; `mantua_build_combo` saves the quote as a `combo`
+preview; `mantua_execute_combo` passes the execution gate with a fresh
+re-quote and `materialComboDrift` (the single-trade thresholds), then
+ensures the market, cap-checks once, swaps from the Circle agent wallet
+and records the ticket with mode `user_confirmed` or `autonomous`. The
+monitor (`GET /api/cron/combos`, every 15 min from
+`.github/workflows/combos.yml`) plans per ticket (`combo-monitor.ts`): mark
+dead, take profit at the policy line, or hedge the last pending leg in
+that leg's own market sized to recover the stake — executed for
+agent-built tickets under `autoManage` in autonomous mode, recommended on
+the timeline otherwise, never repeated for one ticket and action in a day.
+A conjunction token cannot cash out one leg; nothing here pretends it can.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.

@@ -23,6 +23,8 @@ export function pushEventForActivity(row: ActivityLike): PushEvent | null {
   switch (row.kind) {
     case "market_buy":
     case "market_sell":
+    case "combo_open":
+    case "combo_close":
       if (row.actor === "agent") {
         return { kind: "agent_action", action: "trade", summary: row.summary, ref };
       }
@@ -33,7 +35,8 @@ export function pushEventForActivity(row: ActivityLike): PushEvent | null {
       return { kind: "agent_action", action: "hedge", summary: row.summary, ref };
     case "agent_recommendation":
       return { kind: "agent_action", action: "recommendation", summary: row.summary, ref };
-    case "settlement": {
+    case "settlement":
+    case "combo_settle": {
       const price = Number((row.data as { settlementPrice?: unknown } | null)?.settlementPrice);
       const won = Number.isFinite(price) ? price >= 1 : null;
       return { kind: "settlement", summary: row.summary, ref, won };

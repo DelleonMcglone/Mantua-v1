@@ -4,6 +4,12 @@ import type { DB } from "../../db/client.ts";
 import { agentPolicies, type AgentPolicy } from "../../db/schema/agent.ts";
 import { hedgeStrategies } from "../../db/schema/markets.ts";
 import { HARD_DAILY_CAP_USD } from "../constants.ts";
+import {
+  DEFAULT_COMBO_POLICY,
+  comboPolicyFrom,
+  comboPolicySchema,
+  type ComboPolicy,
+} from "../combos/combo-policy.ts";
 import type { UserPolicyRead } from "./trade-simulation.ts";
 
 /**
@@ -60,6 +66,8 @@ export interface AgentPolicyView {
   /** Empty = every launch league. */
   allowedLeagues: string[];
   hedge: HedgePolicy;
+  /** Task 072 (CB-010) — the user's combo limits. */
+  combo: ComboPolicy;
   updatedAt: string | null;
   /** False when no row exists yet (defaults shown). */
   persisted: boolean;
@@ -72,6 +80,7 @@ export const DEFAULT_POLICY: AgentPolicyView = {
   riskLevel: "conservative",
   allowedLeagues: [],
   hedge: DEFAULT_HEDGE_POLICY,
+  combo: DEFAULT_COMBO_POLICY,
   updatedAt: null,
   persisted: false,
 };
@@ -84,6 +93,7 @@ export const policyPatchSchema = z
     riskLevel: z.enum(RISK_LEVELS).optional(),
     allowedLeagues: z.array(z.enum(LAUNCH_LEAGUES)).max(8).optional(),
     hedge: hedgePolicySchema.partial().strict().optional(),
+    combo: comboPolicySchema.partial().strict().optional(),
   })
   .strict()
   .refine((v) => Object.keys(v).length > 0, { message: "empty patch" });
@@ -91,14 +101,14 @@ export type PolicyPatch = z.infer<typeof policyPatchSchema>;
 
 /** A partial parse yields `undefined` for absent keys; spreading those would
  *  erase defaults, so keep only the keys that carry a value. */
-type LooseHedgePatch = { [K in keyof HedgePolicy]?: HedgePolicy[K] | undefined };
+type LoosePatch<T> = { [K in keyof T]?: T[K] | undefined };
 
-function definedHedge(partial: LooseHedgePatch): Partial<HedgePolicy> {
+function definedHedge<T extends object>(partial: LoosePatch<T>): Partial<T> {
   const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(partial) as [string, unknown][]) {
+  for (const [k, v] of Object.entries(partial)) {
     if (v !== undefined) out[k] = v;
   }
-  return out;
+  return out as Partial<T>;
 }
 
 function isRiskLevel(v: unknown): v is RiskLevel {
@@ -132,6 +142,7 @@ export function viewFromRow(row: AgentPolicy | null): AgentPolicyView {
     riskLevel: isRiskLevel(row.riskLevel) ? row.riskLevel : "conservative",
     allowedLeagues: leagues,
     hedge,
+    combo: comboPolicyFrom(config["combo"]),
     updatedAt: row.updatedAt.toISOString(),
     persisted: true,
   };
@@ -161,6 +172,7 @@ export async function updatePolicy(
     ...(patch.riskLevel !== undefined ? { riskLevel: patch.riskLevel } : {}),
     ...(patch.allowedLeagues !== undefined ? { allowedLeagues: [...patch.allowedLeagues] } : {}),
     hedge: { ...current.hedge, ...definedHedge(patch.hedge ?? {}) },
+    combo: comboPolicyFrom({ ...current.combo, ...definedHedge(patch.combo ?? {}) }),
   };
   const values = {
     userId,
@@ -169,7 +181,7 @@ export async function updatePolicy(
     maxStakePerTradeUsd: next.maxStakePerTradeUsd.toFixed(2),
     riskLevel: next.riskLevel,
     allowedLeagues: next.allowedLeagues,
-    config: { hedge: next.hedge },
+    config: { hedge: next.hedge, combo: next.combo },
     updatedAt: new Date(),
   };
   const rows = await db

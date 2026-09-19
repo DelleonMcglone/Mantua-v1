@@ -20,8 +20,9 @@ import { BASE_CHAIN_ID } from "./chains.ts";
  * Spec: `docs/specs/market-id.md`.
  */
 
-/** Market types. Moneyline only at launch per DM-106. */
-export const MARKET_TYPES = ["moneyline"] as const;
+/** Market types. Moneyline at launch per DM-106; `combo` (task 072,
+ *  D-119) is the conjunction market whose YES pays iff every leg's YES pays. */
+export const MARKET_TYPES = ["moneyline", "combo"] as const;
 export type MarketType = (typeof MARKET_TYPES)[number];
 
 export interface MarketIdInput {
@@ -107,4 +108,44 @@ export function moneylineMarketIds(
       ...(chainId !== undefined ? { chainId } : {}),
     }),
   };
+}
+
+/** Task 072 / CB-001 — a combo market is named by its legs. */
+export const COMBO_MARKET_TYPE = "combo";
+
+export class InvalidComboLegsError extends Error {}
+
+/**
+ * Deterministic id for the conjunction market over a set of leg markets:
+ * `keccak256(abi.encode("combo", sortedLegIds))`, with the chain id mixed
+ * in off the default chain exactly as `computeMarketId` does. Sorting
+ * makes the id order-independent, so two users who bundle the same legs
+ * in any order name — and share the liquidity of — one market. Fewer than
+ * two legs or a repeated leg is refused here, before any hashing.
+ */
+export function computeComboMarketId(
+  legMarketIds: readonly string[],
+  chainId?: number,
+): `0x${string}` {
+  const legs = [...new Set(legMarketIds.map((id) => id.trim().toLowerCase()))].sort();
+  if (legs.length !== legMarketIds.length) {
+    throw new InvalidComboLegsError("a combo cannot hold the same market twice");
+  }
+  if (legs.length < 2) throw new InvalidComboLegsError("a combo needs at least two legs");
+  for (const id of legs) {
+    if (!/^0x[0-9a-f]{64}$/.test(id)) throw new InvalidComboLegsError(`not a market id: ${id}`);
+  }
+  const ids = legs as `0x${string}`[];
+  const chain = chainId ?? BASE_CHAIN_ID;
+  if (chain !== BASE_CHAIN_ID) {
+    return keccak256(
+      encodeAbiParameters(
+        [{ type: "string" }, { type: "bytes32[]" }, { type: "uint256" }],
+        [COMBO_MARKET_TYPE, ids, BigInt(chain)],
+      ),
+    );
+  }
+  return keccak256(
+    encodeAbiParameters([{ type: "string" }, { type: "bytes32[]" }], [COMBO_MARKET_TYPE, ids]),
+  );
 }

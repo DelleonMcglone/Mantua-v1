@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { SharedCacheClient } from "../shared-cache.ts";
+import type { ComboQuoteOk } from "../combos/combo-quote-types.ts";
 import type { TradeSimulation } from "./trade-simulation.ts";
 
 /**
@@ -23,7 +24,8 @@ import type { TradeSimulation } from "./trade-simulation.ts";
  * lambda must be honored on another); in-memory otherwise (dev, tests).
  */
 
-export type PreviewKind = "market_trade" | "action";
+/** `combo` (task 072): a quoted combo ticket, re-quoted and drift-checked at execution. */
+export type PreviewKind = "market_trade" | "action" | "combo";
 
 export interface Preview {
   previewId: string;
@@ -35,6 +37,8 @@ export interface Preview {
   argsHash: string;
   /** For market trades, the confirmed simulation. */
   simulation: TradeSimulation | null;
+  /** For combos, the confirmed quote (task 072). */
+  combo?: ComboQuoteOk | null;
   summary: string;
   createdAt: number;
   expiresAt: number;

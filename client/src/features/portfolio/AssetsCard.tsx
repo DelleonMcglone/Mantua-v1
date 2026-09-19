@@ -20,6 +20,8 @@ import { ActivityFeed } from "@/features/activity/ActivityFeed.tsx";
 import { useActivity } from "@/features/activity/use-activity.ts";
 import { AgentStatusStrip } from "./AgentStatusStrip.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
+import { sumComboValueUsd } from "@/features/combos/combo-ticket-core.ts";
+import { useCombos } from "@/features/combos/use-combos.ts";
 import { aggregateHoldings, sumMarketValueUsd, sumUsd } from "./portfolio-core.ts";
 import { useMarketPositions } from "./use-market-positions.ts";
 import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
@@ -135,6 +137,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
   const economics = usePortfolioEconomics(portfolio.walletAddress);
   const userMarkets = useMarketPositions(portfolio.walletAddress);
   const agentMarkets = useMarketPositions(agent.agentAddress);
+  const combos = useCombos(Boolean(portfolio.walletAddress));
   const holdings = useMemo(
     () =>
       aggregateHoldings({
@@ -153,6 +156,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
             ? null
             : sumMarketValueUsd(userMarkets.rows ?? []) +
               sumMarketValueUsd(agentMarkets.rows ?? []),
+        comboPositionsUsd: combos.tickets === null ? null : sumComboValueUsd(combos.tickets),
         lpPositionsUsd: economics.economics ? economics.economics.lpTotals.currentValueUsd : null,
       }),
     [
@@ -164,6 +168,7 @@ export function AssetsCard({ onSelectPool, onSelectAsset }: AssetsCardProps = {}
       unifiedBalance.data,
       userMarkets.rows,
       agentMarkets.rows,
+      combos.tickets,
       economics.economics,
     ],
   );

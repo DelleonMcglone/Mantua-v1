@@ -1,3 +1,4 @@
+import { dispatchAddLeg } from "@/features/combos/combo-draft.ts";
 import { isTradableStatus } from "./market-trade-core.ts";
 import { formatProbability } from "./probability-source.ts";
 import { ProbabilityTag } from "./ProbabilityTag.tsx";
@@ -22,12 +23,15 @@ export function TeamMark({ team }: { team: SlateTeam }) {
  */
 export function GameRow({
   event,
+  league,
   selected,
   selectedOutcome,
   onPick,
   onOpen,
 }: {
   event: SlateEvent;
+  /** Task 072 — the league slug a `+ Combo` leg carries. */
+  league: string;
   selected: boolean;
   selectedOutcome: 0 | 1 | null;
   onPick: (outcome: 0 | 1) => void;
@@ -97,6 +101,31 @@ export function GameRow({
             }`}
           >
             {team.abbreviation} {formatProbability(event.homeWinProbabilityBps, side).cents}
+          </button>
+          <button
+            type="button"
+            data-combo-side={side}
+            disabled={!tradeable}
+            aria-label={`Add ${team.name} to a combo`}
+            title="Add to combo"
+            onClick={(e) => {
+              e.stopPropagation();
+              dispatchAddLeg({
+                providerEventId: event.providerEventId,
+                outcomeIndex: side,
+                teamName: team.name,
+                opponentName: side === 0 ? event.away.name : event.home.name,
+                league,
+                kickoffAt: event.startsAt,
+              });
+            }}
+            className={`min-h-11 rounded-md border px-2 py-2 font-mono text-[11px] md:min-h-0 md:py-1 ${
+              tradeable
+                ? "border-border-soft text-text-dim hover:border-accent/40 hover:text-text cursor-pointer"
+                : "border-border-soft/50 text-text-mute"
+            }`}
+          >
+            + Combo
           </button>
         </div>
       ))}

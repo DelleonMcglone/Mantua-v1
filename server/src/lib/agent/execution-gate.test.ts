@@ -540,3 +540,149 @@ void describe("authorizeExecution — other modes", () => {
     );
   });
 });
+
+void describe("combo previews (task 072)", async () => {
+  const { materialComboDrift } = await import("../combos/combo-drift.ts");
+  type ComboQuoteOk = import("../combos/combo-quote-types.ts").ComboQuoteOk;
+  const quote: ComboQuoteOk = {
+    ok: true,
+    marketId: "0xc",
+    label: "A + B",
+    startsAt: 1,
+    source: "pool",
+    deployed: true,
+    exists: true,
+    marketState: "OPEN",
+    stakeRaw: "10000000",
+    fairProbabilityBps: 2_500,
+    effectivePriceBps: 2_600,
+    combinedOdds: 3.85,
+    sharesRaw: "38000000",
+    potentialPayoutRaw: "38000000",
+    premiumBps: 100,
+    fee: {
+      feePips: 0,
+      ratePips: 0,
+      probabilityBps: 2_500,
+      playoffs: false,
+      feeRaw: "0",
+      feeUsdcRaw: "0",
+    },
+    separateTicketsFeeUsdcRaw: "0",
+    legs: [],
+    gate: { ok: true, reasons: [] },
+    limits: { maxLegs: 3, maxStakeUsd: 25, openExposureUsd: 0, maxOpenExposureUsd: 100 },
+  };
+  const execArgs = {
+    marketId: "0xc",
+    legs: [{ providerEventId: "1", outcomeIndex: 0 }],
+    stakeUsd: 10,
+  };
+
+  async function confirmed() {
+    const { store } = newStore();
+    await store.savePreview({
+      sessionId: "s",
+      kind: "combo",
+      tool: "mantua_execute_combo",
+      argsHash: argsHash("mantua_execute_combo", execArgs),
+      simulation: null,
+      combo: quote,
+      summary: "combo A + B",
+    });
+    const ctx = await buildTurnContext(store, {
+      mode: "user_testing",
+      sessionId: "s",
+      message: "confirm",
+      autoTradeEnabled: false,
+    });
+    assert.ok(ctx.confirmation);
+    assert.match(turnContextPrompt(ctx), /CONFIRMED the pending combo/);
+    return { store, ctx, id: ctx.confirmation.confirmationId };
+  }
+
+  void it("executes a confirmed combo whose fresh quote has not drifted", async () => {
+    const { store, ctx, id } = await confirmed();
+    const c = await authorizeExecution(
+      store,
+      ctx,
+      { tool: "mantua_execute_combo", args: { ...execArgs, confirmationId: id } },
+      undefined,
+      () => Promise.resolve(quote),
+    );
+    assert.equal(c?.preview.kind, "combo");
+    assert.deepEqual(materialComboDrift(quote, quote), []);
+  });
+
+  void it("refuses changed parameters, drift, and a missing fresh quote", async () => {
+    const a = await confirmed();
+    assert.equal(
+      await refusal(
+        authorizeExecution(
+          a.store,
+          a.ctx,
+          {
+            tool: "mantua_execute_combo",
+            args: { ...execArgs, stakeUsd: 11, confirmationId: a.id },
+          },
+          undefined,
+          () => Promise.resolve(quote),
+        ),
+      ),
+      "CONFIRMATION_MISMATCH",
+    );
+    const b = await confirmed();
+    assert.equal(
+      await refusal(
+        authorizeExecution(
+          b.store,
+          b.ctx,
+          { tool: "mantua_execute_combo", args: { ...execArgs, confirmationId: b.id } },
+          undefined,
+          () => Promise.resolve({ ...quote, effectivePriceBps: 3_000 }),
+        ),
+      ),
+      "SIMULATION_DRIFT",
+    );
+    const c = await confirmed();
+    assert.equal(
+      await refusal(
+        authorizeExecution(c.store, c.ctx, {
+          tool: "mantua_execute_combo",
+          args: { ...execArgs, confirmationId: c.id },
+        }),
+      ),
+      "CONFIRMATION_MISMATCH",
+    );
+  });
+
+  void it("autonomous: a fresh quote the gate refuses is not executable", async () => {
+    const { store } = newStore();
+    const ctx = await buildTurnContext(store, {
+      mode: "autonomous",
+      sessionId: "s",
+      message: "go",
+      autoTradeEnabled: true,
+    });
+    assert.equal(
+      await refusal(
+        authorizeExecution(
+          store,
+          ctx,
+          { tool: "mantua_execute_combo", args: execArgs },
+          undefined,
+          () => Promise.resolve({ ...quote, gate: { ok: false, reasons: ["paused"] } }),
+        ),
+      ),
+      "NOT_EXECUTABLE",
+    );
+    const ok = await authorizeExecution(
+      store,
+      ctx,
+      { tool: "mantua_execute_combo", args: execArgs },
+      undefined,
+      () => Promise.resolve(quote),
+    );
+    assert.equal(ok, null);
+  });
+});

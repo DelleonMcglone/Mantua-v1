@@ -103,7 +103,7 @@ import {
 import { getTrendingCoins } from "./trending.ts";
 import { randomUUID } from "node:crypto";
 import { modePolicy, type AgentMode } from "./agent/agent-mode.ts";
-import { ConfirmationStore } from "./agent/confirmation-store.ts";
+import { ConfirmationStore, argsHash } from "./agent/confirmation-store.ts";
 import {
   ExecutionRefusedError,
   MONEY_TOOLS,
@@ -124,6 +124,14 @@ import { quoteMarketTrade } from "./sports/market-trade-build.ts";
 import { getDailyCap, getDailySpend } from "./spending-cap.ts";
 import { sharedKvClient } from "./shared-cache.ts";
 import { readPolicy, toUserPolicyRead, type AgentPolicyView } from "./agent/policy.ts";
+import {
+  buildComboInputSchema,
+  buildComboPreview,
+  comboExecutionArgs,
+  executeComboBuy,
+  executeComboInputSchema,
+  quoteForAgent,
+} from "./combos/combo-agent-tools.ts";
 import { events, leagues, marketPrices, markets } from "../db/schema/markets.ts";
 
 /**
@@ -1019,6 +1027,53 @@ const RAW_TOOLS: Anthropic.Tool[] = [
       required: ["marketId"],
     },
   },
+  {
+    name: "mantua_build_combo",
+    description:
+      "Task 072 — build a combo (parlay-like ticket: several teams that must ALL win, one trade, one payout). With no legs given, the server proposes legs from the slate by edge (consensus vs pool price) sized by the user's risk level and combo limits; with legs given, it quotes exactly those. Returns the fair probability, combined odds, shares, payout at par, the hook fee, each leg's price and what the same legs cost as separate tickets, plus the policy gate result. Saves the quote as the pending preview. Show the user the numbers and ask them to reply \"confirm\"; never execute from this tool.",
+    input_schema: {
+      type: "object",
+      properties: {
+        stakeUsd: { type: "number", description: "USDC to stake. Optional when proposing." },
+        legs: {
+          type: "array",
+          description: "Optional explicit legs: the team's YES market per game.",
+          items: {
+            type: "object",
+            properties: {
+              providerEventId: { type: "string" },
+              outcomeIndex: { type: "number", enum: [0, 1] },
+            },
+            required: ["providerEventId", "outcomeIndex"],
+          },
+        },
+      },
+    },
+  },
+  {
+    name: "mantua_execute_combo",
+    description:
+      "Execute a combo BUY the user explicitly confirmed, from the agent wallet. Requires confirmationId from this turn's context and the exact marketId, legs and stakeUsd the preview returned; the server re-quotes immediately before executing and refuses on material drift, an expired or reused id, or a parameter mismatch. Counts against the daily cap once for the whole stake.",
+    input_schema: {
+      type: "object",
+      properties: {
+        marketId: { type: "string", description: "The combo market id from the preview." },
+        legs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              providerEventId: { type: "string" },
+              outcomeIndex: { type: "number", enum: [0, 1] },
+            },
+            required: ["providerEventId", "outcomeIndex"],
+          },
+        },
+        stakeUsd: { type: "number", description: "USDC to stake, exactly as previewed." },
+      },
+      required: ["marketId", "legs", "stakeUsd"],
+    },
+  },
 ];
 
 /** Every money-moving tool carries the optional confirmationId (A-031). */
@@ -1073,6 +1128,7 @@ const MUTATING_TOOL_ACTIONS: Record<string, AuditAction> = {
   trade_market: "agent_market_trade",
   mantua_execute_trade: "agent_market_trade",
   mantua_sell_position: "agent_market_trade",
+  mantua_execute_combo: "combo_open",
   bridge: "agent_bridge",
   add_liquidity: "agent_add_liquidity",
   remove_liquidity: "agent_remove_liquidity",
@@ -1351,6 +1407,7 @@ async function executeTool(
   let confirmedSimulation: TradeSimulation | null = null;
   if (turn && isMoneyCall(name, input)) {
     const isMarket = name === "mantua_execute_trade" || name === "mantua_sell_position";
+    const isCombo = name === "mantua_execute_combo";
     const consumed = await authorizeExecution(
       confirmationStore,
       turn,
@@ -1365,6 +1422,14 @@ async function executeTool(
               }),
               chainId,
             )
+        : undefined,
+      isCombo
+        ? async () => {
+            const args = executeComboInputSchema.parse(input);
+            const user = await resolveUserId(privyUserId);
+            if (!user) throw new Error("No user record for this session.");
+            return quoteForAgent(db, user, args.legs, args.stakeUsd, chainId);
+          }
         : undefined,
     );
     if (isMarket) {
@@ -1436,7 +1501,6 @@ async function executeTool(
       if (typeof args !== "object" || args === null) throw new Error("args (object) is required");
       const previewArgs = args as Record<string, unknown>;
       const summary = await previewActionSummary(tool, previewArgs, chainId);
-      const { argsHash } = await import("./agent/confirmation-store.ts");
       await confirmationStore.savePreview({
         sessionId: turn.sessionId,
         kind: "action",
@@ -1450,6 +1514,75 @@ async function executeTool(
         args: previewArgs,
         summary,
         next: 'Show the user this preview and ask them to reply "confirm". Execute with the identical arguments plus the confirmationId once it is present.',
+      };
+    }
+    case "mantua_build_combo": {
+      if (!turn) throw new Error("mantua_build_combo needs a turn context");
+      counters.inc("agent.funnel.combo_preview");
+      const args = buildComboInputSchema.parse(input);
+      const user = await resolveUserId(privyUserId);
+      if (!user) throw new Error("No user record for this session.");
+      const preview = await buildComboPreview(
+        db,
+        user,
+        args,
+        chainId,
+        Math.floor(Date.now() / 1000),
+      );
+      if ("refused" in preview) {
+        return {
+          ok: false,
+          reasons: preview.refused,
+          next: "Explain why no combo can be built now. Do not ask the user to confirm.",
+        };
+      }
+      const { quote } = preview;
+      if (!quote.ok) {
+        return {
+          ...quote,
+          rationale: preview.rationale,
+          next: "Explain the rule violations to the user. Do not ask them to confirm.",
+        };
+      }
+      const execArgs = comboExecutionArgs(quote.marketId, preview.legs, preview.stakeUsd);
+      await confirmationStore.savePreview({
+        sessionId: turn.sessionId,
+        kind: "combo",
+        tool: "mantua_execute_combo",
+        argsHash: argsHash("mantua_execute_combo", execArgs),
+        simulation: null,
+        combo: quote,
+        summary: `combo ${quote.label} · stake ${preview.stakeUsd.toFixed(2)} USDC · pays ${(Number(quote.potentialPayoutRaw) / 1e6).toFixed(2)} at ${String(quote.combinedOdds)}x`,
+      });
+      return {
+        ...quote,
+        rationale: preview.rationale,
+        execute: execArgs,
+        next: quote.gate.ok
+          ? 'Show the user the legs, the combined odds, the payout and the fee, and ask them to reply "confirm". Do not execute yet.'
+          : "The policy gate refused — explain the reasons. Do not ask the user to confirm.",
+      };
+    }
+    case "mantua_execute_combo": {
+      const args = executeComboInputSchema.parse(input);
+      const user = await resolveUserId(privyUserId);
+      if (!user) throw new Error("No user record for this session.");
+      await requireAgentBalance(privyUserId, "USDC", String(args.stakeUsd), chainId);
+      const wallet = await getAgentWallet(privyUserId, chainId);
+      if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
+      const result = await executeComboBuy(db, user, args, {
+        wallet: { circleWalletId: wallet.circleWalletId, address: wallet.address },
+        chainId,
+        mode: typeof input["confirmationId"] === "string" ? "user_confirmed" : "autonomous",
+        nowMs: Date.now(),
+      });
+      counters.inc("agent.funnel.combo_execute_ok");
+      return {
+        ...result,
+        confirmationId:
+          typeof input["confirmationId"] === "string" ? input["confirmationId"] : null,
+        received: `${(Number(result.sharesRaw) / 1e6).toFixed(2)} combo shares (pays $1 each if every leg wins)`,
+        explorer: `${getChainInfo(chainId).explorerUrl}/tx/${result.txHash}`,
       };
     }
     case "mantua_execute_trade":
