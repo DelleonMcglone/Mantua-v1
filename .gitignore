@@ -103,3 +103,6 @@ api/_ubk.mjs
 # Playwright (client/e2e) — task 067
 client/test-results/
 client/playwright-report/
+
+# Playwright run artifacts (a run started from the root lands here)
+test-results/
