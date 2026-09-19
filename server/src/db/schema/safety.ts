@@ -106,6 +106,9 @@ export type AuditAction =
   | "agent_market_trade"
   | "agent_gateway"
   | "agent_x402"
+  // Phase 17 (MP-004) — the SELLER-side mirror: one row per settled x402
+  // payment Mantua receives for a catalog service (payer, service, price).
+  | "agent_x402_sale"
   // B9 hedge engine (task 061 folds the store's string literals into the union)
   | "strategy_arm"
   | "strategy_disarm"

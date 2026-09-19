@@ -41,6 +41,9 @@ import { cronIntentsRouter } from "./routes/cron-intents.ts";
 import { circleWebhookRouter } from "./routes/circle-webhook.ts";
 import { fiatWebhookRouter } from "./routes/fiat-webhook.ts";
 import { x402ServiceRouter } from "./routes/x402-service.ts";
+// Phase 17 (MP-004/007) — the paid /api/x402/v1 services (dual-rail paywall).
+// Mounted among the app routers so the C-020 kill switch covers them.
+import { x402TradingRouter } from "./routes/x402-trading.ts";
 import { agentQueryRouter } from "./routes/agent-query.ts";
 import { agentSendRouter } from "./routes/agent-send.ts";
 import { agentSwapRouter } from "./routes/agent-swap.ts";
@@ -173,6 +176,9 @@ app.use(resolutionOpsRouter);
 app.use(opsMetricsRouter);
 app.use(cronIntentsRouter);
 app.use(x402ServiceRouter);
+// Phase 17 (MP-007) — the paid trading services; kill-switch covered by
+// virtue of running after app.use(killSwitch) above.
+app.use(x402TradingRouter);
 app.use(agentChatRouter);
 app.use(agentInstructionRouter);
 app.use(commandParseRouter);
