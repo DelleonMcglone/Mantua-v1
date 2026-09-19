@@ -19,14 +19,21 @@ From a single natural-language prompt you can:
   liquidity, and hedges under a spending cap.
 - **Bridge & manage treasury** move USDC cross-chain (Circle CCTP) and hold a unified,
   multi-chain USDC balance (Circle Gateway).
+- **Give your agent a public record and a voice** a performance page at `/agents/<handle>`
+  derived from its chain-verified trades, and template-based market posts to X under a
+  posting policy you approve.
+- **Get help** a read-only support agent that explains markets, your own deposits,
+  withdrawals and positions, walks through troubleshooting, and hands off to a person.
 
 > **Status: live at [mantua.ai](https://mantua.ai) on Base Mainnet (8453).** The app —
 > swaps, liquidity, agent, analytics — runs against Base Mainnet. **Mantua's own contracts
 > (the hooks, the market factory/resolver, and the agent-commerce escrow) are awaiting their
 > Base Mainnet deployment**; until they are deployed, hook-gated pools and on-chain market
 > minting stay dark and the app degrades gracefully (addresses are env-driven, `null` by
-> default). [`docs/tasks/sports-pivot.md`](docs/tasks/sports-pivot.md) tracks the build plan
-> (phases B0–B10 complete; a handful of P2/P3 refinements remain), and
+> default). [`docs/tasks/v2-roadmap.md`](docs/tasks/v2-roadmap.md) tracks the build plan
+> (Phases 0–13 shipped: market protocol, trading UX, live-sports reliability, the agent core,
+> portfolio and activity, the launch gate, market depth, voice, and the agent's public ledger,
+> social posting and AI support; Phases 14–18 are next), and
 > [`docs/security/hook-deployments.md`](docs/security/hook-deployments.md) tracks the
 > deployment checklist.
 
@@ -378,9 +385,11 @@ attested in
 
 ```
 client/      Vite + React + TypeScript SPA (port 5173) landing, docs, legal, market pages,
-             swap/LP/agent panels
+             swap/LP/agent panels, the public agent page (/agents/<handle>), the agent's
+             voice settings, and the support panel
 server/      Express + TypeScript API (port 3001) calldata builders, quotes, agent, portfolio,
-             market id + probability utils, Drizzle schema
+             market id + probability utils, the derived performance ledger (lib/agent),
+             social posting (lib/social), the support agent (lib/support), Drizzle schema
 contracts/   Foundry contracts: market primitives (MarketFactory, Market, OutcomeToken,
              Resolver, pool bootstrap), the Dynamic Market Hook (8 modules), full-lifecycle
              E2E tests, and the deploy scripts (contracts/script/). The Stable Protection and
@@ -438,8 +447,8 @@ Requires Postgres + a `.env` (see `server/.env.example`, `client/.env.example`).
 ```bash
 npm run typecheck            # all workspaces
 npm run lint                 # eslint, zero warnings tolerated
-npm test -w @mantua/server   # 937 tests
-npm test -w @mantua/client   # 240 tests
+npm test -w @mantua/server   # node:test via tsx; needs a .env for the chain/provider suites
+npm test -w @mantua/client   # node:test via tsx over the pure *-core modules
 npm run e2e                  # browser suite: the real client in Chromium, auth shimmed, API + chain scripted
 ```
 
