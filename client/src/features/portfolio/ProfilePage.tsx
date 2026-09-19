@@ -1,11 +1,10 @@
-import { useState } from "react";
-import { ArrowDownToLine, ArrowUpFromLine, Bot, Droplet, LogOut } from "lucide-react";
+import { Bot, Droplet, LogOut } from "lucide-react";
 import { StrategiesSection } from "./StrategiesSection.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
+import { ProfileWalletSection } from "./ProfileWalletSection.tsx";
 import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
-import { DepositCard } from "./DepositCard.tsx";
-import { WithdrawModal } from "./WithdrawModal.tsx";
+import { NotificationSettings } from "@/features/notifications/NotificationSettings.tsx";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
@@ -23,7 +22,7 @@ interface Props {
  * portfolio lives here rather than as standalone nav: while this route is
  * open, the left column shows the full portfolio (balances + assets), and
  * this panel holds the account itself — wallet, market positions, LP
- * positions, and the agent wallet.
+ * positions, the agent wallet, and (task 071) notifications.
  *
  * Market positions (B6-009) render an honest empty state until the Dynamic
  * Market Hook deploys — there is nothing to show before markets exist, and
@@ -36,13 +35,8 @@ export function ProfilePage({
   onLogout,
   onClose,
 }: Props) {
-  // 029 / C-011 — deposit + withdraw entry points live here, next to the
-  // wallet they act on. "Send from my wallet" on the deposit surface's
-  // agent tab hands the agent address across as the withdraw recipient.
-  const [modal, setModal] = useState<"deposit" | "withdraw" | null>(null);
   // Phase 9 / PF-009, PF-012 — the per-pool LP view and settled history.
   const economics = usePortfolioEconomics(walletAddress ?? null);
-  const [withdrawRecipient, setWithdrawRecipient] = useState<string | undefined>(undefined);
 
   return (
     <>
@@ -53,62 +47,7 @@ export function ProfilePage({
         {...(onClose ? { onClose } : {})}
       />
       <div className="flex-1 overflow-auto px-5 pb-6">
-        <section className="rounded-md border border-border-soft px-4 py-3.5">
-          <h3 className="text-[11px] font-medium uppercase tracking-wider text-text-mute">
-            Wallet
-          </h3>
-          {walletAddress ? (
-            <p className="mt-1.5 break-all font-mono text-[13px]">{walletAddress}</p>
-          ) : (
-            <p className="mt-1.5 text-[12.5px] text-text-dim">No wallet connected.</p>
-          )}
-          <p className="mt-1 text-[11px] text-text-mute">
-            Balances and assets are in the portfolio panel on the left.
-          </p>
-          <div className="mt-2.5 flex gap-2">
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => {
-                setModal("deposit");
-              }}
-            >
-              <ArrowDownToLine className="mr-1.5 h-3.5 w-3.5" /> Deposit
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={!walletAddress}
-              onClick={() => {
-                setWithdrawRecipient(undefined);
-                setModal("withdraw");
-              }}
-            >
-              <ArrowUpFromLine className="mr-1.5 h-3.5 w-3.5" /> Withdraw
-            </Button>
-          </div>
-        </section>
-
-        {modal === "deposit" && (
-          <DepositCard
-            walletAddress={walletAddress}
-            onClose={() => {
-              setModal(null);
-            }}
-            onSendFromWallet={(recipient) => {
-              setWithdrawRecipient(recipient);
-              setModal("withdraw");
-            }}
-          />
-        )}
-        {modal === "withdraw" && (
-          <WithdrawModal
-            initialRecipient={withdrawRecipient}
-            onClose={() => {
-              setModal(null);
-            }}
-          />
-        )}
+        <ProfileWalletSection walletAddress={walletAddress} />
 
         <MarketPositionsSection />
         <SettledPositionsSection econ={economics} />
@@ -139,6 +78,8 @@ export function ProfilePage({
             Open agent
           </Button>
         </section>
+
+        <NotificationSettings />
 
         <Button variant="ghost" size="sm" className="mt-4 w-full" onClick={onLogout}>
           <LogOut className="mr-1.5 h-3.5 w-3.5" /> Log out

@@ -53,7 +53,9 @@ export function Header({
 
   return (
     <header className="border-b border-border-soft">
-      <div className="flex items-center gap-4 lg:gap-6 px-5 py-4 md:px-8">
+      {/* Task 071: fits a 360 px phone logged out — tighter gaps, the wordmark
+          from `sm`, the auth buttons compact below `md`. */}
+      <div className="flex items-center gap-2 px-3 py-3 md:gap-4 md:px-8 md:py-4 lg:gap-6">
         <Button
           variant="icon"
           size="icon"
@@ -73,10 +75,10 @@ export function Header({
           className="flex shrink-0 items-center gap-3 bg-transparent border-none p-0 cursor-pointer disabled:cursor-default"
         >
           <Logo size={30} />
-          <span className="text-[17px] font-semibold tracking-tight">Mantua</span>
+          <span className="hidden text-[17px] font-semibold tracking-tight sm:inline">Mantua</span>
         </button>
         <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
-        <div className="ml-auto flex shrink-0 items-center gap-2.5 md:ml-0">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0 md:gap-2.5">
           <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
             <Icon className="h-[18px] w-[18px]" />
           </Button>
@@ -89,10 +91,10 @@ export function Header({
             />
           ) : (
             <>
-              <Button variant="ghost" onClick={onLogin}>
+              <Button variant="ghost" className="px-2.5 md:px-4" onClick={onLogin}>
                 Log in
               </Button>
-              <Button variant="primary" onClick={onSignup}>
+              <Button variant="primary" className="px-3 md:px-4" onClick={onSignup}>
                 Sign up
               </Button>
             </>

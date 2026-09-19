@@ -41,8 +41,11 @@ export function InputBar({ onSubmit, placeholder }: Props) {
   const shown = speaking && heard !== "" ? heard : value;
 
   return (
-    <div className="px-5 pt-3.5 pb-4 border-t border-border-soft">
-      <div className="flex items-center gap-2 px-3.5 py-2.5 bg-bg-elev rounded-md border border-border-soft">
+    <div className="border-t border-border-soft px-3 pt-2.5 pb-[max(12px,env(safe-area-inset-bottom))] md:px-5 md:pt-3.5 md:pb-4">
+      {/* Task 071 (MX-005): 16 px text stops iOS zooming the page on focus;
+          the keyboard's action key reads "send"; the mic and send buttons
+          are 44 px targets on phones. */}
+      <div className="flex items-center gap-1 rounded-md border border-border-soft bg-bg-elev px-2 py-1 md:gap-2 md:px-3.5 md:py-2.5">
         <input
           value={shown}
           onChange={(e) => {
@@ -51,10 +54,12 @@ export function InputBar({ onSubmit, placeholder }: Props) {
           onKeyDown={(e) => {
             if (e.key === "Enter") submit(value);
           }}
+          enterKeyHint="send"
+          autoCapitalize="sentences"
           aria-label="Ask Mantua anything or type a trade command"
           placeholder={placeholder ?? "Ask Mantua anything or type a trade command..."}
           data-testid="command-input"
-          className={`flex-1 bg-transparent border-none outline-none text-[13px] ${
+          className={`min-w-0 flex-1 bg-transparent border-none outline-none text-[16px] md:text-[13px] ${
             speaking && voice.transcript.partial !== "" ? "text-text-dim italic" : "text-text"
           }`}
         />
@@ -66,10 +71,10 @@ export function InputBar({ onSubmit, placeholder }: Props) {
           onClick={() => {
             submit(value);
           }}
-          className="bg-transparent border-none text-text-dim cursor-pointer flex p-1"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent border-none text-text-dim cursor-pointer md:h-auto md:w-auto md:rounded-none md:p-1"
           aria-label="Send"
         >
-          <Send className="h-4 w-4" />
+          <Send className="h-5 w-5 md:h-4 md:w-4" />
         </button>
       </div>
       {voice.notice ? (

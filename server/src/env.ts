@@ -156,6 +156,26 @@ const schema = z.object({
     .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
     .optional(),
 
+  /** Task 071 (Phase 15, MX-004) — Web Push application keys (RFC 8292
+   *  VAPID), base64url: the raw 65-byte P-256 public point and the 32-byte
+   *  private scalar, plus the contact the push services may use about a
+   *  misbehaving sender. Mint a pair with
+   *  `npm run push:generate-keys -w @mantua/server`. Absent → push is off:
+   *  the subscribe route answers 503, the client never asks for
+   *  notification permission, and nothing is ever sent. */
+  VAPID_PUBLIC_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{87}$/, "must be the base64url 65-byte P-256 public key")
+    .optional(),
+  VAPID_PRIVATE_KEY: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{43}$/, "must be the base64url 32-byte private scalar")
+    .optional(),
+  VAPID_SUBJECT: z
+    .string()
+    .regex(/^(mailto:[^\s@]+@[^\s@]+|https:\/\/\S+)$/, "must be a mailto: or https: contact")
+    .optional(),
+
   MANTUA_KILL_SWITCH: z
     .union([z.literal("0"), z.literal("1")])
     .default("0")

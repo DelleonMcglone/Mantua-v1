@@ -81,8 +81,10 @@ export function usePortfolioEconomics(walletAddress: string | null): UsePortfoli
         api.get<PortfolioEconomics>("/api/portfolio/economics"),
         api.get<SettledHistory>("/api/portfolio/settled"),
       ]);
-      setEconomics(e);
-      setSettled(s);
+      // Task 071 — a response without its rows (a proxy, a cached error page,
+      // a mock) reads as "not loaded", never as a crash in the section.
+      setEconomics(Array.isArray(e.lp) ? e : null);
+      setSettled(Array.isArray(s.rows) ? s : null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load portfolio economics");
     } finally {

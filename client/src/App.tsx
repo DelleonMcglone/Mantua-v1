@@ -1,4 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
+import { useIsMobile } from "./hooks/use-media-query.ts";
+import {
+  launchedFromInstalledApp,
+  parseLaunchParams,
+  stripLaunchParams,
+  type LaunchTarget,
+} from "./lib/launch-route.ts";
+import { InstallBanner } from "./features/pwa/InstallBanner.tsx";
+import {
+  AddLiquidityForm,
+  AgentPanel,
+  AnalyzePanel,
+  AssetDetailPanel,
+  AssetsCard,
+  DocsPage,
+  HistoryPage,
+  LiquidityListPage,
+  MarketIntegrityPage,
+  MobileProfile,
+  PoolDetailPage,
+  PortfolioCard,
+  PositionsList,
+  PrivacyPage,
+  ProfilePage,
+  SwapPanel,
+  TermsPage,
+} from "./app-lazy.ts";
 import { usePrivy } from "@privy-io/react-auth";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, mentionsHook, type Intent } from "./lib/chat-intent.ts";
@@ -6,14 +33,9 @@ import { agentInputEvent } from "./features/voice/spoken-command.ts";
 import { LandingPage } from "./components/landing/LandingPage.tsx";
 import { LoginModal } from "./components/auth/LoginModal.tsx";
 import { type NavDestination } from "./components/shell/MarketNav.tsx";
-import { PrivacyPage } from "./components/legal/PrivacyPage.tsx";
-import { TermsPage } from "./components/legal/TermsPage.tsx";
-import { MarketIntegrityPage } from "./components/legal/MarketIntegrityPage.tsx";
 import type { LegalDoc } from "./components/legal/LegalPage.tsx";
-import { DocsPage } from "./components/docs/DocsPage.tsx";
 import { LeaguePage } from "./features/markets/LeaguePage.tsx";
 import { DiscoverPage } from "./features/markets/discover/DiscoverPage.tsx";
-import { HistoryPage } from "./features/markets/history/HistoryPage.tsx";
 import type { DiscoverFilters } from "./features/markets/discovery.ts";
 import { isSportId, type SportId } from "./features/markets/sports.ts";
 import { rawToHuman6 } from "./features/markets/market-trade-core.ts";
@@ -23,20 +45,9 @@ import { AppShell } from "./components/shell/AppShell.tsx";
 import { Card } from "./components/shell/Card.tsx";
 import { HomePromptRow, type HomePromptId } from "./components/shell/HomeMenu.tsx";
 import { InputBar } from "./components/shell/InputBar.tsx";
-import { AgentPanel } from "./features/agent/AgentPanel.tsx";
-import { AnalyzePanel } from "./features/analyze/AnalyzePanel.tsx";
-import { PortfolioCard } from "./features/portfolio/PortfolioCard.tsx";
-import { ProfilePage } from "./features/portfolio/ProfilePage.tsx";
 import { Board } from "./features/markets/Board.tsx";
-import { AssetsCard } from "./features/portfolio/AssetsCard.tsx";
-import { AssetDetailPanel } from "./features/portfolio/AssetDetailPanel.tsx";
-import { SwapPanel } from "./features/swap/SwapPanel.tsx";
-import { AddLiquidityForm } from "./features/liquidity/AddLiquidityForm.tsx";
 import type { AddLiquidityContext } from "./features/liquidity/AddLiquidityForm.tsx";
 import type { HookName } from "./features/liquidity/use-create-pool.ts";
-import { LiquidityListPage } from "./features/liquidity/LiquidityListPage.tsx";
-import { PoolDetailPage } from "./features/liquidity/PoolDetailPage.tsx";
-import { PositionsList } from "./features/liquidity/PositionsList.tsx";
 import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 
 type AnalyzeTopic =
@@ -173,7 +184,18 @@ function loadStoredRoute(): Route | null {
 
 export default function App() {
   const { ready, authenticated, logout, user } = usePrivy();
-  const [route, setRoute] = useState<Route>(() => loadStoredRoute() ?? { kind: "landing" });
+  // Task 071 (MX-004 / MX-007) — a notification tap or a home-screen
+  // shortcut names its surface in the URL; the installed app skips landing.
+  const [route, setRoute] = useState<Route>(
+    () => launchRoute(window.location.search) ?? loadStoredRoute() ?? { kind: "landing" },
+  );
+  const isMobile = useIsMobile();
+  useEffect(() => {
+    const clean = stripLaunchParams(window.location.href);
+    if (clean !== window.location.pathname + window.location.search + window.location.hash) {
+      window.history.replaceState(null, "", clean);
+    }
+  }, []);
   const [showLogin, setShowLogin] = useState(false);
   // The game in view on a league page, for the dock's contextual quick
   // actions (T-016). Reported by LeaguePage; cleared when it unmounts.
@@ -405,9 +427,10 @@ export default function App() {
         onQuickAction={(id) => {
           setRoute(promptToRoute(id));
         }}
-        full={fullPage(route, setRoute, onFocusGame)}
+        full={fullPage(route, setRoute, onFocusGame, isMobile)}
         dock={
           <>
+            <InstallBanner />
             {/* T-015/T-016: the bar stays primary; chips feed the same handler. */}
             <QuickActions
               actions={quickActionsFor(quickActionContext(route, focusedGame))}
@@ -551,6 +574,7 @@ function fullPage(
   route: Route,
   setRoute: (r: Route) => void,
   onFocusGame: (game: { away: string; home: string } | null) => void,
+  mobile: boolean,
 ): React.ReactNode | undefined {
   const home = () => {
     setRoute({ kind: "home" });
@@ -558,6 +582,10 @@ function fullPage(
   switch (route.kind) {
     case "home":
       return <HomeFullPage setRoute={setRoute} />;
+    case "profile":
+      // Task 071 (MX-008) — on phones the profile is one tabbed page rather
+      // than a stacked portfolio column above the account panel.
+      return mobile ? <MobileProfileRoute setRoute={setRoute} /> : undefined;
     case "market":
       return (
         <LeaguePage
@@ -690,7 +718,7 @@ function fullPage(
 function PanelPage({ children, wide }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <div
-      className={`mx-auto flex h-full w-full ${wide ? "max-w-6xl" : "max-w-3xl"} flex-col px-6 py-6`}
+      className={`mx-auto flex h-full w-full ${wide ? "max-w-6xl" : "max-w-3xl"} flex-col px-3 py-3 md:px-6 md:py-6`}
     >
       <Card className="flex min-h-0 flex-1 flex-col overflow-hidden" style={{ padding: 0 }}>
         {children}
@@ -731,7 +759,7 @@ function AddLiquidityFullPage({
  *  (NFL | WNBA) instead of stacked. Chat starts from the dock below. */
 function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-6">
+    <div className="mx-auto w-full max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <HomePromptRow
         onPromptSelect={(id) => {
           setRoute(promptToRoute(id));
@@ -762,7 +790,7 @@ function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
 function TradingFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
   const chainId = BASE_CHAIN_ID;
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-6">
+    <div className="mx-auto w-full max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <div className="grid items-stretch gap-5 lg:grid-cols-2">
         <Card className="flex flex-col overflow-hidden" style={{ padding: 0 }}>
           <SwapPanel />
@@ -791,6 +819,56 @@ function TradingFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
       </Card>
     </div>
   );
+}
+
+/** Task 071 (MX-008) — the phone profile: positions, portfolio, agent, account as tabs. */
+function MobileProfileRoute({ setRoute }: { setRoute: (r: Route) => void }) {
+  const { user, logout } = usePrivy();
+  return (
+    <MobileProfile
+      walletAddress={user?.wallet?.address}
+      onViewPositions={() => {
+        setRoute({ kind: "positions" });
+      }}
+      onOpenAgent={() => {
+        setRoute({ kind: "agent" });
+      }}
+      onSelectAsset={(symbol) => {
+        setRoute({ kind: "asset", symbol });
+      }}
+      onSelectPool={(id) => {
+        setRoute({ kind: "pool", id });
+      }}
+      onLogout={() => {
+        void logout();
+        setRoute({ kind: "home" });
+      }}
+      onClose={() => {
+        setRoute({ kind: "home" });
+      }}
+    />
+  );
+}
+
+/** Task 071 — the URL's launch target as a Route (see lib/launch-route.ts). */
+function launchRoute(search: string): Route | null {
+  const target: LaunchTarget | null = parseLaunchParams(search);
+  if (!target) return launchedFromInstalledApp(search) ? { kind: "home" } : null;
+  switch (target.kind) {
+    case "market":
+      return {
+        kind: "market",
+        sport: target.league,
+        ...(target.eventId ? { selectEventId: target.eventId } : {}),
+        ...(target.side !== undefined ? { selectSide: target.side } : {}),
+      };
+    case "discover":
+      return { kind: "discover", filters: { status: "open" } };
+    case "profile":
+    case "agent":
+    case "home":
+      return { kind: target.kind };
+  }
 }
 
 /** Profile panel wrapper — owns the Privy handles the page needs. */

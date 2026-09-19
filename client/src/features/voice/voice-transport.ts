@@ -72,6 +72,9 @@ export const voiceTransport: VoiceTransport = {
     try {
       const context = new AudioContext({ sampleRate: SAMPLE_RATE });
       teardown.push(() => void context.close());
+      // Task 071 (MX-005) — iOS creates the context suspended when the
+      // gesture that started the press has already returned; resume it.
+      if (context.state === "suspended") await context.resume().catch(() => undefined);
       await context.audioWorklet.addModule(WORKLET_URL);
 
       socket = new WebSocket(socketUrl({ token: read.token, modelId: read.modelId }));

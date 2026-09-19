@@ -33,18 +33,18 @@ export function DiscoverPage({
   const data = useDiscover();
   const rows = useMemo(() => applyDiscoverFilters(data.markets, filters), [data.markets, filters]);
   return (
-    <div className="mx-auto w-full max-w-4xl px-6 py-6">
+    <div className="mx-auto w-full max-w-4xl px-3 py-4 md:px-6 md:py-6">
       <div className="flex items-start gap-3">
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to home"
-          className="mt-1.5 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim transition-colors hover:text-text cursor-pointer"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim transition-colors hover:text-text cursor-pointer md:mt-1.5 md:h-8 md:w-8"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div>
-          <h1 className="text-[28px] font-bold tracking-tight">Markets</h1>
+          <h1 className="text-[22px] font-bold tracking-tight md:text-[28px]">Markets</h1>
           <p className="mt-1 text-[13px] text-text-dim">
             <span data-testid="discover-title">{describeDiscoverFilters(filters)}</span>
             {!data.loading &&

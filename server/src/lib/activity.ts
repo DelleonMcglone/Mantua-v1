@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNotNull, lt, or, sql } from "drizzle-orm";
 import type { DB } from "../db/client.ts";
 import { activity, type Activity } from "../db/schema/activity.ts";
 import { logger } from "./logger.ts";
+import { notifyForActivity } from "./push/activity-bridge.ts";
 
 /**
  * Phase 9 / PF-014 … PF-017, PF-020 — the unified Activity system.
@@ -263,7 +264,11 @@ export async function recordActivity(db: DB, input: ActivityInput): Promise<Acti
       })
       .onConflictDoNothing()
       .returning();
-    return rows.at(0) ?? null;
+    const row = rows.at(0) ?? null;
+    // Task 071 (MX-004) — the timeline entry is the push trigger for trade
+    // confirmations, agent actions and settlement. Best-effort, never awaited.
+    if (row) notifyForActivity(db, row);
+    return row;
   } catch (err) {
     logger.warn({ err, kind: input.kind, txHash: input.txHash }, "activity: record failed");
     return null;
