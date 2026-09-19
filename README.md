@@ -14,7 +14,6 @@ From a single natural-language prompt you can:
 - **Provide liquidity** to market pools and to the base pairs, and manage those positions.
 - **Analyze & research** matchups, pool health, peg status, and token prices (free data, with
   optional pay-per-call x402 premium sources).
-- **Swap** USDC, EURC, and cbBTC across the hook pools.
 - **Run an autonomous agent** a Circle-managed wallet that researches, takes positions, manages
   liquidity, and hedges under a spending cap.
 - **Bridge & manage treasury** move USDC cross-chain (Circle CCTP) and hold a unified,
