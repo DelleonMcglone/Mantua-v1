@@ -37,7 +37,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Repo-wide eslint with --max-warnings 0.
+      # Repo-wide eslint with --max-warnings 0. The root script pins a 4 GB
+      # V8 heap: the type-aware rules hold both workspaces' programs at
+      # once (~1.9 GB live after task 072), which exceeds Node's default
+      # heap on the hosted runner.
       - name: Lint
         run: npm run lint
 

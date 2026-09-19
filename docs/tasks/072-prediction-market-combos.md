@@ -218,6 +218,13 @@ The phase, by row:
 - **The public ledger (Phase 13)** reads `market_fills`. Combo tickets
   are their own ledger (`combos`) and are not yet folded into the public
   performance page; recorded as the follow-up in D-119.
+- **CI heap.** The first CI run of this change died in the repo-wide
+  lint with a V8 heap OOM: the type-aware rules hold both workspaces'
+  programs at once and the live heap is ~1.9 GB after this task, past
+  Node's default limit on the hosted runner (2 GB; locally the default
+  scales with RAM, so the same lint passed). The root `lint` script now
+  runs eslint under `node --max-old-space-size=4096`; no rule, file or
+  test was changed for it.
 - **Review round.** The repository's code-review pass (`code-review main
 high`; Gemini and o3 are not reachable from this session) returned ten
   findings. Nine are fixed in this change; one is pre-existing and
