@@ -954,6 +954,37 @@ handle; per-agent OAuth is the recorded next step (D-107).
 
 ---
 
+## 🤝 PHASE 17: Circle Agent Marketplace + Agent-Native Services (task 073, D-012/D-106) — 🟢 P2
+
+> Mantua as an x402 **seller**: six machine services (seven catalog rows —
+> trading is one family with two endpoints; MP-008 does not exist in the
+> owner's phase list) sold to external agents per request in USDC on Base
+> Mainnet. One pricing catalog (`server/src/lib/x402/catalog.ts`), one
+> dual-rail paywall (Gateway nanopayments + vanilla exact in a single 402
+> `accepts` array), thin handlers over the existing libraries, one
+> `agent_x402_sale` audit row per settled payment, and a packaging/ledger
+> track for Circle's Agent Marketplace. **Go-live (env flip + intake form)
+> is counsel-gated (D-012).** Ledger: `073-phase-17-agent-marketplace.md`.
+> Foundation: PR #61 (`3b2c329`); services + OpenAPI PRs land in parallel;
+> docs/ledger PR: `docs/phase-17-marketplace`.
+
+| ID     | Task                                                                                                                                                                                               | Status                                                                                                                                                             |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| MP-001 | Requirements review — enforced by the task doc's verification bar (success criteria, failure conditions)                                                                                           | ✅ done in research                                                                                                                                                |
+| MP-002 | Offerings doc: six families × endpoint × default price × OpenAPI spec URL with listing-ready copy, read from the catalog; the legacy $0.01 analyst brief listed as the first-generation surface    | ✅ `docs/marketplace/offerings.md` (docs PR)                                                                                                                       |
+| MP-003 | Seller runbook (payout-wallet prerequisites, Node 22.6+, facilitator config, intake-form fields, sanctions screening, health checks, `GatewayClient` earnings, counsel gate) + OpenAPI publication | 🟡 runbook ✅ `docs/marketplace/become-a-seller.md` (docs PR); OpenAPI publication + parity test land with the OpenAPI PR; form submission is human, counsel-gated |
+| MP-004 | Dual-rail paywall + pricing catalog + `agent_x402_sale` audit; dark-by-default gates (`X402_SELLER_ADDRESS`, `X402_SELLER_SERVICES`); kill switch covers paid routes                               | ✅ PR #61 — `catalog.ts`, `x402-paywall.ts` (+ tests)                                                                                                              |
+| MP-005 | Market discovery — `GET /api/x402/v1/markets/discover`, $0.001, payment                                                                                                                            | 🟡 parallel services PR                                                                                                                                            |
+| MP-006 | Market intelligence — `GET /api/x402/v1/intelligence/market`, $0.01, payment                                                                                                                       | 🟡 parallel services PR                                                                                                                                            |
+| MP-007 | Trading — advisory + calldata fork: `POST /api/x402/v1/trading/quote` $0.005 and `POST /api/x402/v1/trading/calldata` $0.02; payer-keyed caps (C-019); typed refusals; no execution path           | ✅ PR #61 — `x402-trading.ts` (+ tests)                                                                                                                            |
+| MP-009 | Portfolio & exposure — `GET /api/x402/v1/portfolio/exposure`, $0.005, payment (public chain state only)                                                                                            | 🟡 parallel services PR                                                                                                                                            |
+| MP-010 | Hedging plans — `GET /api/x402/v1/hedging/plan`, $0.01, payment (arms nothing; B9-004 discipline)                                                                                                  | 🟡 parallel services PR                                                                                                                                            |
+| MP-011 | Sports intelligence pilot — `GET /api/x402/v1/sports/context`, $0.01, allowlist + payment (pre-settlement refusal; empty allowlist = dark)                                                         | 🟡 parallel services PR                                                                                                                                            |
+| —      | Env documentation: `X402_SELLER_ADDRESS` / `X402_SELLER_SERVICES` / `X402_GATEWAY_FACILITATOR_URL` / `X402_SPORTS_INTEL_ALLOWLIST` in `server/.env.example` (dark-by-default comments)             | ✅ docs PR                                                                                                                                                         |
+| —      | Go-live: counsel sign-off on the D-012 seller-revenue posture (recorded in D-106) → env flip → intake form per service → post-approval health checks                                               | ⬜ human steps — `docs/marketplace/become-a-seller.md`                                                                                                             |
+
+---
+
 ## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
 
 The owner's master task list is stored verbatim at
@@ -962,14 +993,14 @@ phase numbering and row IDs. Phases 0–12 above reconcile to it (its
 Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 `launch-gate.md`). The phases not yet started:
 
-| Phase                                                       | Tier  | Rows            | Status                                                 |
-| ----------------------------------------------------------- | ----- | --------------- | ------------------------------------------------------ |
-| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ✅                                                     |
-| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜                                                     |
-| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark) |
-| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ✅ (task 072; operator seeds combo pools)              |
-| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜                                                     |
-| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                     |
+| Phase                                                       | Tier  | Rows            | Status                                                                                                      |
+| ----------------------------------------------------------- | ----- | --------------- | ----------------------------------------------------------------------------------------------------------- |
+| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ✅                                                                                                          |
+| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜                                                                                                          |
+| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark)                                                      |
+| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ✅ (task 072; operator seeds combo pools)                                                                   |
+| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | 🟡 (task 073; foundation #61 + docs/ledger landed; services + OpenAPI PRs in flight; go-live counsel-gated) |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                                                                          |
 
 ---
 
