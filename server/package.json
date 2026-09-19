@@ -31,6 +31,7 @@
     "@circle-fin/developer-controlled-wallets": "^10.6.0",
     "@circle-fin/smart-contract-platform": "^10.8.0",
     "@circle-fin/unified-balance-kit": "^1.2.1",
+    "@circle-fin/x402-batching": "^3.5.0",
     "@privy-io/server-auth": "1.32.5",
     "@upstash/redis": "^1.38.4",
     "@vercel/functions": "^3.7.5",
