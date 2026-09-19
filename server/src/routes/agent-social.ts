@@ -9,6 +9,7 @@ import { getRequestContext } from "../lib/request-context.ts";
 import { decidePost } from "../lib/social/post-decision.ts";
 import { listPosts, readPost } from "../lib/social/post-store.ts";
 import {
+  ProfileIncompleteError,
   profilePatchSchema,
   readProfileByUser,
   upsertProfile,
@@ -84,13 +85,15 @@ agentSocialRouter.patch("/api/agent/social", writeRateLimiter, requireAuth, asyn
     res.json({ profile: viewFromRow(row), pageUrl: publicPageUrl(row.handle) });
   } catch (err) {
     const taken = err instanceof Error && /agent_social_profiles_handle_uq/.test(err.message);
+    const incomplete = err instanceof ProfileIncompleteError;
     await logAudit({
       ...ctx,
       action: "social_profile_update",
-      outcome: taken ? "rejected_other" : "failure",
+      outcome: taken || incomplete ? "rejected_other" : "failure",
       reason: err instanceof Error ? err.message : "unknown",
     });
     if (taken) res.status(409).json({ error: "That handle is taken.", code: "HANDLE_TAKEN" });
+    else if (incomplete) res.status(400).json({ error: err.message, code: "PROFILE_INCOMPLETE" });
     else fail(res, err, "update social profile");
   }
 });
@@ -128,7 +131,12 @@ async function decide(req: Request, res: Response, approve: boolean): Promise<vo
         .json({ error: `Post is ${post.status}, not pending review.`, code: "POST_NOT_PENDING" });
       return;
     }
-    res.json(await decidePost(db, profile, post, approve, platformSender()));
+    const decision = await decidePost(db, profile, post, approve, platformSender());
+    if (!decision) {
+      res.status(409).json({ error: "Post was already decided.", code: "POST_NOT_PENDING" });
+      return;
+    }
+    res.json(decision);
   } catch (err) {
     fail(res, err, "update post");
   }

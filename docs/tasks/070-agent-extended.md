@@ -203,6 +203,21 @@ autonomous}` and the totals are broken down by mode. Capital-at-risk
   task document was self-reviewed against the edge-case table and the
   code was reviewed with the repository's code-review pass instead. Both
   external reviews remain open items for the owner.
+- **Review round.** The repository's code-review pass (the stand-in for
+  the Gemini review) found eight defects in this task's code, all fixed:
+  a lint-rejected or failed post is now "covered" for the day instead of
+  being re-recorded every tick; a pending post is claimed atomically
+  (`pending_review → sending`) before it is sent, so two concurrent
+  approvals cannot both post; the support loop ends in a closing call
+  without tools when its tool budget runs out; anonymous support turns
+  sit under a ten-per-day IP quota (`supportQuota`, recognised by the
+  route-guard audit) since every turn spends model tokens; a first-time
+  profile write missing its handle or name is a 400, not a 500; a history
+  that opens with an assistant turn is trimmed to its first user turn;
+  the chat audit lifts `confirmationId` out of `args` so a large-args
+  trade is never mislabelled; and the tick reads candidates once per run
+  and the covered set once per profile. Two further findings are in the
+  pre-existing voice transport and are queued as a separate task.
 - **No new dependency.** OAuth 1.0a is HMAC-SHA1 over a canonical string,
   done with `node:crypto`; the X call is one `fetch`; SSE reuses
   `lib/sse-core.ts`.

@@ -230,6 +230,43 @@ void describe("runSupportChat", () => {
     assert.equal(events.at(-1)?.type, "done");
   });
 
+  void it("drops leading assistant turns so the first message is always the user's", async () => {
+    const model = scriptedModel([{ text: "Hello." }]);
+    await collectSupportReply(
+      {
+        message: "hi",
+        history: [
+          { role: "assistant", text: "Welcome to support!" },
+          { role: "user", text: "earlier question" },
+          { role: "assistant", text: "earlier answer" },
+        ],
+        channel: "api",
+        auth: null,
+      },
+      deps(model),
+    );
+    const messages = model.requests[0]["messages"] as { role: string }[];
+    assert.deepEqual(
+      messages.map((m) => m.role),
+      ["user", "assistant", "user"],
+    );
+  });
+
+  void it("still ends in words when the tool budget runs out: one closing call without tools", async () => {
+    const rounds = Array.from({ length: 5 }, () => ({
+      tool: { name: "search_help", input: { query: "deposit" } },
+    }));
+    const model = scriptedModel([...rounds, { text: "Here is what I found." }]);
+    const reply = await collectSupportReply(
+      { message: "help", channel: "api", auth: null },
+      deps(model),
+    );
+    assert.equal(reply.text, "Here is what I found.");
+    assert.equal(model.requests.length, 6);
+    assert.ok("tools" in model.requests[4]);
+    assert.ok(!("tools" in model.requests[5]), "the closing call offers no tools");
+  });
+
   void it("exposes no money-moving tool", () => {
     for (const t of SUPPORT_TOOLS) assert.ok(!MONEY_TOOLS.has(t.name), t.name);
     assert.deepEqual(

@@ -147,6 +147,7 @@ void describe("agent-chat audit — auditChatToolCall", () => {
       tool: "mantua_execute_trade",
       args,
       mode: "user_testing",
+      confirmationId: "c1",
     });
   });
 

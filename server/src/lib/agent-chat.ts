@@ -1158,6 +1158,10 @@ export async function auditChatToolCall(entry: {
     params: {
       ...capAuditParams(entry.tool, entry.args),
       ...(entry.mode ? { mode: entry.mode } : {}),
+      // Task 070 (AE-013) — lifted out of args so it survives the size cap.
+      ...(typeof entry.args["confirmationId"] === "string"
+        ? { confirmationId: entry.args["confirmationId"] }
+        : {}),
     },
     chainId: entry.chainId,
     txHash,

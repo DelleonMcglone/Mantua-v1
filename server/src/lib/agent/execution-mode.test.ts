@@ -35,7 +35,12 @@ void describe("executionModeOf", () => {
   void it("refuses to guess when neither a confirmation nor the autonomous mode is recorded", () => {
     const params = { tool: "mantua_execute_trade", args: { amount: "5" }, mode: "user_testing" };
     assert.equal(executionModeOf({ action: "agent_market_trade", params }), "unattributed");
-    // Truncated args cannot be read either.
+    // A lifted confirmation id survives the args cap; truncated args alone cannot be read.
+    const lifted = { tool: "mantua_execute_trade", argsTruncated: "{…", confirmationId: "c2" };
+    assert.equal(
+      executionModeOf({ action: "agent_market_trade", params: lifted }),
+      "user_confirmed",
+    );
     const truncated = { tool: "mantua_execute_trade", argsTruncated: "{…", mode: "user_testing" };
     assert.equal(
       executionModeOf({ action: "agent_market_trade", params: truncated }),

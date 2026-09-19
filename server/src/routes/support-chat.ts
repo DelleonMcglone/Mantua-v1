@@ -9,7 +9,7 @@ import {
   runSupportChat,
   type SupportAuth,
 } from "../lib/support/support-chat.ts";
-import { walletRateLimiter } from "../middleware/rate-limit.ts";
+import { supportQuota, walletRateLimiter } from "../middleware/rate-limit.ts";
 
 /**
  * Task 070 / AE-007 … AE-010 — the support agent's two channels.
@@ -19,9 +19,11 @@ import { walletRateLimiter } from "../middleware/rate-limit.ts";
  *   POST /api/support/message  one JSON reply, for channels that cannot
  *                              stream (a bot, an email bridge, a widget)
  *
- * Both work anonymously with general help only; a Privy token upgrades the
- * turn with the caller's own account context. Rate-limited per wallet or
- * IP; 503 when the model is not configured.
+ * Both work anonymously with general help only, under a daily per-IP quota
+ * (`supportQuota`) because every turn spends model tokens; a Privy token
+ * lifts the quota and upgrades the turn with the caller's own account
+ * context. Rate-limited per wallet or IP; 503 when the model is not
+ * configured.
  */
 export const supportChatRouter = Router();
 
@@ -60,6 +62,7 @@ function parse(req: Request, res: Response): z.infer<typeof bodySchema> | null {
 
 supportChatRouter.post(
   "/api/support/chat",
+  supportQuota,
   walletRateLimiter,
   async (req: Request, res: Response) => {
     const body = parse(req, res);
@@ -95,6 +98,7 @@ supportChatRouter.post(
 
 supportChatRouter.post(
   "/api/support/message",
+  supportQuota,
   walletRateLimiter,
   async (req: Request, res: Response) => {
     const body = parse(req, res);

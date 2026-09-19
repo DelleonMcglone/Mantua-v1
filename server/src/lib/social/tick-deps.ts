@@ -2,7 +2,7 @@ import type { DB } from "../../db/client.ts";
 import type { AgentSocialProfile } from "../../db/schema/social.ts";
 import { env } from "../../env.ts";
 import { logAudit } from "../audit.ts";
-import { readCandidateMarkets } from "./candidates.ts";
+import { readCandidateMarkets, type CandidateMarket } from "./candidates.ts";
 import type { PostRunDeps, PostRunProfile } from "./post-run.ts";
 import { listPosts, recordPost } from "./post-store.ts";
 import { policyFromJson } from "./posting-policy.ts";
@@ -19,8 +19,29 @@ import { postToX, xCredentialsFromEnv } from "./x-client.ts";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Statuses that consumed the cadence or hold a slot in the review queue. */
 const CADENCE_STATUSES = ["posted", "pending_review", "dry_run"] as const;
-/** Statuses that make the same market/template pair not worth repeating today. */
-const COVERED_STATUSES = ["posted", "pending_review", "dry_run", "rejected_user"] as const;
+/** Statuses that make the same market/template pair not worth repeating today —
+ *  including a lint rejection (the same text would fail again) and a platform
+ *  failure (one attempt per pair per day). */
+const COVERED_STATUSES = [
+  "posted",
+  "pending_review",
+  "dry_run",
+  "rejected_user",
+  "rejected_lint",
+  "failed",
+] as const;
+
+/** One candidate read per tick, shared by every profile the tick serves. */
+export type CandidateReader = (nowSeconds: number) => Promise<CandidateMarket[]>;
+export function sharedCandidateReader(db: DB): CandidateReader {
+  let cached: { nowSeconds: number; promise: Promise<CandidateMarket[]> } | null = null;
+  return (nowSeconds) => {
+    if (!cached || cached.nowSeconds !== nowSeconds) {
+      cached = { nowSeconds, promise: readCandidateMarkets(db, nowSeconds) };
+    }
+    return cached.promise;
+  };
+}
 
 export function publicPageUrl(handle: string): string {
   return `${env.PUBLIC_APP_URL.replace(/\/$/, "")}/agents/${handle}`;
@@ -46,13 +67,16 @@ export function buildTickDeps(
   db: DB,
   row: AgentSocialProfile,
   now: () => Date = () => new Date(),
+  readCandidates: CandidateReader = (nowSeconds) => readCandidateMarkets(db, nowSeconds),
 ): PostRunDeps {
   const pageUrl = publicPageUrl(row.handle);
+  // The covered set is loaded once per profile per tick, not once per candidate.
+  let covered: Promise<{ marketId: string | null; template: string }[]> | null = null;
   return {
     now,
     candidates: async (profile) => {
       const nowSeconds = Math.floor(now().getTime() / 1000);
-      const candidates = await readCandidateMarkets(db, nowSeconds);
+      const candidates = await readCandidates(nowSeconds);
       return candidates.flatMap((c) =>
         composePosts(
           { ...c.facts, agentName: row.displayName, pageUrl },
@@ -71,12 +95,12 @@ export function buildTickDeps(
       return rows.map((r) => r.createdAt);
     },
     alreadyCovered: async (profileId, marketId, template) => {
-      const rows = await listPosts(db, profileId, {
+      covered ??= listPosts(db, profileId, {
         statuses: COVERED_STATUSES,
         since: new Date(now().getTime() - DAY_MS),
         limit: 200,
       });
-      return rows.some((r) => r.marketId === marketId && r.template === template);
+      return (await covered).some((r) => r.marketId === marketId && r.template === template);
     },
     send: platformSender(),
     record: async (post) => {

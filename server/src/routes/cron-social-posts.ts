@@ -3,7 +3,12 @@ import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
 import { runPostingTick, type PostRunSummary } from "../lib/social/post-run.ts";
 import { listPostingProfiles } from "../lib/social/profile-store.ts";
-import { buildTickDeps, platformSender, tickProfile } from "../lib/social/tick-deps.ts";
+import {
+  buildTickDeps,
+  platformSender,
+  sharedCandidateReader,
+  tickProfile,
+} from "../lib/social/tick-deps.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 
 /**
@@ -35,9 +40,13 @@ cronSocialPostsRouter.get(
       res.status(500).json({ error: "Failed to list profiles", code: "INTERNAL" });
       return;
     }
+    const readCandidates = sharedCandidateReader(db);
+    const now = () => new Date(Math.floor(started / 1000) * 1000);
     for (const row of profiles) {
       try {
-        summaries.push(await runPostingTick(tickProfile(row), buildTickDeps(db, row)));
+        summaries.push(
+          await runPostingTick(tickProfile(row), buildTickDeps(db, row, now, readCandidates)),
+        );
       } catch (err) {
         logger.error({ err, profileId: row.id }, "social-posts: profile tick failed");
         failures.push({

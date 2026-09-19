@@ -1,15 +1,17 @@
 import type { DB } from "../../db/client.ts";
 import type { AgentSocialProfile, SocialPost } from "../../db/schema/social.ts";
 import { logAudit } from "../audit.ts";
-import { setPostStatus } from "./post-store.ts";
+import { claimPendingPost, setPostStatus } from "./post-store.ts";
 import type { PostRunDeps } from "./post-run.ts";
 
 /**
  * Task 070 / AE-006 — the user's decision on a post that waited for
- * approval. Approve sends it through the platform sender (or records a
- * dry run when the deployment has none); reject keeps it in the record
- * marked as the user's decision. Either way the row is updated, never
- * deleted, and the decision is audited.
+ * approval. The row is first claimed atomically (`pending_review` →
+ * `sending`), so two concurrent approvals cannot both reach the platform;
+ * approve then sends through the platform sender (or records a dry run
+ * when the deployment has none); reject keeps it in the record marked as
+ * the user's decision. Either way the row is updated, never deleted, and
+ * the decision is audited.
  */
 
 export type DecisionStatus = "posted" | "dry_run" | "failed" | "rejected_user";
@@ -20,13 +22,15 @@ export interface DecisionResult {
   externalId: string | null;
 }
 
+/** Null when the post was no longer pending (a concurrent decision won). */
 export async function decidePost(
   db: DB,
   profile: AgentSocialProfile,
   post: SocialPost,
   approve: boolean,
   send: PostRunDeps["send"],
-): Promise<DecisionResult> {
+): Promise<DecisionResult | null> {
+  if (!(await claimPendingPost(db, post.id, profile.id))) return null;
   let status: DecisionStatus = "rejected_user";
   let detail: Record<string, unknown> = { decidedAt: new Date().toISOString() };
   let externalId: string | null = null;

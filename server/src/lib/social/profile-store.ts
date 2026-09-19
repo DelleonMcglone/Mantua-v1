@@ -77,6 +77,14 @@ export async function readProfileByHandle(
   return rows.at(0) ?? null;
 }
 
+/** A first write without the fields a profile cannot exist without. */
+export class ProfileIncompleteError extends Error {
+  constructor() {
+    super("A new profile needs a handle and a display name.");
+    this.name = "ProfileIncompleteError";
+  }
+}
+
 /** Create or update the user's profile. A first write needs a handle and a name. */
 export async function upsertProfile(
   db: DB,
@@ -93,7 +101,7 @@ export async function upsertProfile(
   if (!existing) {
     const { handle, displayName } = fields;
     if (!handle || !displayName) {
-      throw new Error("A new profile needs a handle and a display name.");
+      throw new ProfileIncompleteError();
     }
     const [row] = await db
       .insert(agentSocialProfiles)

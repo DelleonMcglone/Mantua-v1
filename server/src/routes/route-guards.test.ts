@@ -20,6 +20,7 @@ const GUARDS = [
   "verifyCircleWebhook",
   "verifyFiatWebhook",
   "freeAnalystQuota",
+  "supportQuota",
 ];
 
 /** Deliberately open registrations, each with its reason. */
@@ -44,18 +45,6 @@ const ALLOWLIST: { file: string; path: string; reason: string }[] = [
     file: "fiat-webhook.ts",
     path: "/api/fiat/webhook",
     reason: "HMAC verified inside the handler over the raw body",
-  },
-  {
-    file: "support-chat.ts",
-    path: "/api/support/chat",
-    reason:
-      "task 070 (AE-007) — support must answer a signed-out user; anonymous turns get general help only (account tools read nothing), the agent has no money-moving tool, and the only write is a bounded escalation ticket; per-wallet/IP rate-limited",
-  },
-  {
-    file: "support-chat.ts",
-    path: "/api/support/message",
-    reason:
-      "the same support turn for channels that cannot stream; same gates as /api/support/chat",
   },
 ];
 

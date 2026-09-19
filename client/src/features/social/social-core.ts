@@ -55,6 +55,7 @@ export type PostStatus =
   | "posted"
   | "dry_run"
   | "pending_review"
+  | "sending"
   | "rejected_lint"
   | "rejected_user"
   | "failed";
@@ -99,6 +100,7 @@ export const STATUS_LABELS: Record<PostStatus, string> = {
   posted: "Posted",
   dry_run: "Dry run (no credentials)",
   pending_review: "Awaiting your approval",
+  sending: "Being sent",
   rejected_lint: "Blocked by the compliance check",
   rejected_user: "Rejected by you",
   failed: "Failed at the platform",

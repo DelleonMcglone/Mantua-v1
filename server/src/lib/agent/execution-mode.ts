@@ -21,11 +21,15 @@ export interface AuditAttribution {
 
 const ENGINE_ACTIONS: ReadonlySet<string> = new Set(["strategy_execute", "strategy_close"]);
 
+const isId = (v: unknown): boolean => typeof v === "string" && v.length > 0;
+
+/** The chat audit lifts `confirmationId` to the top level so it survives
+ *  the args cap; older rows only carry it inside `args`. */
 function confirmationIdIn(params: Record<string, unknown>): boolean {
+  if (isId(params["confirmationId"])) return true;
   const args = params["args"];
   if (!args || typeof args !== "object") return false;
-  const id = (args as Record<string, unknown>)["confirmationId"];
-  return typeof id === "string" && id.length > 0;
+  return isId((args as Record<string, unknown>)["confirmationId"]);
 }
 
 /** Map one audit row (or its absence) to the ledger mode. */

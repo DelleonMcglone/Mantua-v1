@@ -38,23 +38,31 @@ export async function* runSupportChat(
   const io: SupportIo = { ...productionSupportIo, ...ioOverrides };
   const client = (clientFactory ?? getAnthropic)();
   const account = accountReader(params, io);
+  // The API needs a user turn first; a channel that replays its own greeting
+  // as the opening assistant turn is common, so leading assistant turns drop.
+  const history = params.history ?? [];
+  const firstUser = history.findIndex((t) => t.role === "user");
   const messages: Anthropic.MessageParam[] = [
-    ...(params.history ?? []).map(
+    ...(firstUser === -1 ? [] : history.slice(firstUser)).map(
       (t): Anthropic.MessageParam => ({ role: t.role, content: t.text }),
     ),
     { role: "user", content: params.message },
   ];
   const context = `The user is ${params.auth ? "signed in" : "NOT signed in"}; channel: ${params.channel}.`;
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  const system: Anthropic.TextBlockParam[] = [
+    { type: "text", text: SUPPORT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+    { type: "text", text: context },
+  ];
+  // One extra round with no tools: when the tool budget runs out the turn
+  // still ends in words, never in a silent `done`.
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const closing = round === MAX_TOOL_ROUNDS;
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 2048,
-      system: [
-        { type: "text", text: SUPPORT_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        { type: "text", text: context },
-      ],
-      tools: SUPPORT_TOOLS,
+      system,
+      ...(closing ? {} : { tools: SUPPORT_TOOLS }),
       messages,
     });
     for await (const ev of stream) {
@@ -64,7 +72,7 @@ export async function* runSupportChat(
     }
     const final = await stream.finalMessage();
     messages.push({ role: "assistant", content: final.content });
-    if (final.stop_reason !== "tool_use") break;
+    if (final.stop_reason !== "tool_use" || closing) break;
     const results: Anthropic.ToolResultBlockParam[] = [];
     for (const tu of final.content.filter(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",

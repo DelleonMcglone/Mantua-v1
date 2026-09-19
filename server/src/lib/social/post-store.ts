@@ -43,6 +43,30 @@ export async function readPost(
   return rows.at(0) ?? null;
 }
 
+/**
+ * Move a pending post to `sending` if, and only if, it is still pending —
+ * the one atomic step that makes two concurrent decisions on the same post
+ * resolve to one send. Returns false when someone else got there first.
+ */
+export async function claimPendingPost(
+  db: DB,
+  postId: string,
+  profileId: string,
+): Promise<boolean> {
+  const rows = await db
+    .update(socialPosts)
+    .set({ status: "sending" })
+    .where(
+      and(
+        eq(socialPosts.id, postId),
+        eq(socialPosts.profileId, profileId),
+        eq(socialPosts.status, "pending_review"),
+      ),
+    )
+    .returning({ id: socialPosts.id });
+  return rows.length > 0;
+}
+
 export async function setPostStatus(
   db: DB,
   postId: string,
