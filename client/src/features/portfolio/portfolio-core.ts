@@ -81,6 +81,8 @@ export interface HoldingsInput {
   agentWalletUsd: number | null;
   unifiedBalanceUsd: number | null;
   marketPositionsUsd: number | null;
+  /** Task 072 — open combo tickets marked at the combo pool price. */
+  comboPositionsUsd: number | null;
   lpPositionsUsd: number | null;
 }
 
@@ -96,6 +98,7 @@ const LABELS: Record<keyof HoldingsInput, string> = {
   agentWalletUsd: "Agent wallet",
   unifiedBalanceUsd: "Unified balance",
   marketPositionsUsd: "Market positions",
+  comboPositionsUsd: "Combos",
   lpPositionsUsd: "Liquidity",
 };
 

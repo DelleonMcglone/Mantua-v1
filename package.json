@@ -15,7 +15,7 @@
     "build": "npm run build --workspaces --if-present",
     "build:server": "node scripts/build-server.mjs",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "node --max-old-space-size=4096 node_modules/eslint/bin/eslint.js . --max-warnings 0",
     "verify:hooks": "tsx contracts/script/verify-hooks.ts --write",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,css}\"",

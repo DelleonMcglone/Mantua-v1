@@ -26,6 +26,8 @@ export interface PendingTrade {
   tokensRaw: string;
   usdcRaw: string;
   submittedAt: number;
+  /** Task 072 — a combo ticket's legs; the resume loop re-reports to `/api/combos/fills`. */
+  combo?: { legs: { providerEventId: string; outcomeIndex: 0 | 1 }[] };
 }
 
 /** After this long an `unknown` hash is treated as dropped and forgotten. */

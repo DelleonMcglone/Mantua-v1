@@ -449,6 +449,44 @@ export async function buildMarketTrade(
       throw new MarketClosedError(args.providerEventId, "the event's maximum duration has elapsed");
     }
   }
+  return buildMarketSwap({
+    chainId,
+    slippageBps,
+    marketId,
+    marketAddress,
+    yesToken,
+    direction: args.direction,
+    amountRaw: args.amountRaw,
+    subject: `game ${args.providerEventId}`,
+  });
+}
+
+/** What `buildMarketSwap` needs once the market is resolved and its gate passed. */
+export interface MarketSwapArgs {
+  chainId: SupportedChainId;
+  slippageBps: number;
+  marketId: `0x${string}`;
+  marketAddress: `0x${string}`;
+  yesToken: `0x${string}`;
+  direction: "buy" | "sell";
+  amountRaw: bigint;
+  /** For error text: "game 4016…" or "combo 0xab…". */
+  subject: string;
+}
+
+/**
+ * Task 072 — the swap half of `buildMarketTrade`, shared with the combo
+ * builder: pool plan, route guard, quoter, slippage bound, hook fee,
+ * calldata. Every YES/USDC swap on the platform encodes through here.
+ */
+export async function buildMarketSwap(a: MarketSwapArgs): Promise<BuiltMarketTrade> {
+  const { chainId, slippageBps, marketId, marketAddress, yesToken } = a;
+  const markets = MARKETS_BY_CHAIN[chainId];
+  const periphery = MARKETS_PERIPHERY_BY_CHAIN[chainId];
+  const dm = DYNAMIC_MARKET_BY_CHAIN[chainId];
+  if (!markets || !periphery || !dm) throw new MarketsNotDeployedError(chainId);
+  const client = getRpcClient(chainId);
+  const args = { direction: a.direction, amountRaw: a.amountRaw };
   const plan = planMarketPool(yesToken, markets.collateral, dm.hook, 0.5);
 
   const inputIsYes = args.direction === "sell";
@@ -474,9 +512,7 @@ export async function buildMarketTrade(
   // mean an unbounded swap — fail closed instead.
   const slot0 = await readSlot0(plan.key, chainId);
   if (!slot0) {
-    throw new Error(
-      `Market pool for game ${args.providerEventId} has no readable price — cannot bound slippage`,
-    );
+    throw new Error(`Market pool for ${a.subject} has no readable price — cannot bound slippage`);
   }
   const sqrtPriceLimitX96 = marketSwapSqrtPriceLimit({
     spotSqrtPriceX96: slot0.sqrtPriceX96,

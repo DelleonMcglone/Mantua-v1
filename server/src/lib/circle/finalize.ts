@@ -31,7 +31,7 @@ import { isTerminalFailureState, isTerminalSuccessState } from "./execute.ts";
 export type FinalizationSource = "poll" | "webhook";
 
 /** `circle_executions.kind` values. Closed set — extend with the plan builder. */
-export type ExecutionKind = "agent_send" | "strategy_close";
+export type ExecutionKind = "agent_send" | "strategy_close" | "combo_trade";
 
 /** Expected `payload` for `kind: "agent_send"` executions. */
 export const agentSendPayloadSchema = z.object({
@@ -62,11 +62,35 @@ export const strategyClosePayloadSchema = z.object({
   reason: z.string().optional(),
 });
 
+/** Task 072 — expected `payload` for `kind: "combo_trade"` executions (the
+ *  monitor's take-profit sell or hedge on an agent-wallet ticket). */
+export const comboTradePayloadSchema = z.object({
+  comboId: z.string().nullable(),
+  userId: z.string(),
+  marketId: z.string(),
+  direction: z.enum(["buy", "sell"]),
+  amountRaw: z.string(),
+  expectedOutRaw: z.string(),
+  agentAddress: z.string(),
+  legs: z
+    .array(
+      z.object({
+        providerEventId: z.string(),
+        outcomeIndex: z.union([z.literal(0), z.literal(1)]),
+      }),
+    )
+    .optional(),
+  hedge: z.boolean().optional(),
+});
+export type ComboTradePayload = z.infer<typeof comboTradePayloadSchema>;
+
 /** One side effect of a finalization — applied in order by `applyFinalization`. */
 export type FinalizationEffect =
   | { type: "record_spend"; walletAddress: string; usdValue: number }
   | { type: "reverse_spend"; walletAddress: string; usdValue: number }
   | { type: "audit"; entry: AuditEntry }
+  /** Task 072 — the webhook finalizer records a combo ticket or close itself. */
+  | { type: "combo_fill"; payload: ComboTradePayload; txHash: string }
   | { type: "close_position"; strategyId: string; detail: Record<string, unknown>; txHash: string }
   | {
       type: "audit_strategy";
@@ -161,6 +185,26 @@ export function buildFinalizationPlan(input: FinalizationInput): FinalizationPla
       }
       return { outcome: "confirmed", source: input.source, effects };
     }
+    if (input.kind === "combo_trade") {
+      const parsed = comboTradePayloadSchema.safeParse(input.payload);
+      if (!parsed.success) return null;
+      const p = parsed.data;
+      const effects: FinalizationEffect[] = [];
+      // A buy (a ticket or a hedge) spent USDC: the cap ledger is inked at
+      // confirmation, exactly once, by whoever wins the finalization claim.
+      if (p.direction === "buy") {
+        effects.push({
+          type: "record_spend",
+          walletAddress: p.agentAddress,
+          usdValue: Number(p.amountRaw) / 1e6,
+        });
+      }
+      // The ticket (buy) or the close (sell) — idempotent on the tx hash.
+      if (!p.hedge && input.txHash)
+        effects.push({ type: "combo_fill", payload: p, txHash: input.txHash });
+      effects.push(comboAuditEffect(p, input, "success"));
+      return { outcome: "confirmed", source: input.source, effects };
+    }
     if (input.kind === "strategy_close") {
       const parsed = strategyClosePayloadSchema.safeParse(input.payload);
       if (!parsed.success) return null;
@@ -227,6 +271,15 @@ export function buildFinalizationPlan(input: FinalizationInput): FinalizationPla
       });
       return { outcome: "failed", source: input.source, effects };
     }
+    if (input.kind === "combo_trade") {
+      const parsed = comboTradePayloadSchema.safeParse(input.payload);
+      if (!parsed.success) return null;
+      return {
+        outcome: "failed",
+        source: input.source,
+        effects: [comboAuditEffect(parsed.data, input, "failure", reason)],
+      };
+    }
     if (input.kind === "strategy_close") {
       const parsed = strategyClosePayloadSchema.safeParse(input.payload);
       if (!parsed.success) return null;
@@ -256,6 +309,32 @@ export function buildFinalizationPlan(input: FinalizationInput): FinalizationPla
   return null;
 }
 
+/** The one effect a combo execution finalizes with: its audit row (the
+ *  ticket itself is stamped by the monitor from the receipt it awaited). */
+function comboAuditEffect(
+  p: z.infer<typeof comboTradePayloadSchema>,
+  input: FinalizationInput,
+  outcome: "success" | "failure",
+  reason?: string,
+): FinalizationEffect {
+  return {
+    type: "audit",
+    entry: {
+      action: "combo_manage",
+      outcome,
+      txHash: input.txHash ?? undefined,
+      walletAddress: p.agentAddress,
+      ...(reason ? { reason } : {}),
+      params: {
+        ...p,
+        circleTxId: input.circleTxId,
+        finalizeSource: input.source,
+        finalState: input.state,
+      },
+    },
+  };
+}
+
 /** Apply a plan's effects in order. Throws on the first failed write. */
 export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
   for (const effect of plan.effects) {
@@ -269,6 +348,24 @@ export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
       case "audit":
         await logAudit(effect.entry);
         break;
+      case "combo_fill": {
+        const p = effect.payload;
+        const { recordComboFill } = await import("../combos/combo-fill.ts");
+        await recordComboFill(db, {
+          userId: p.userId,
+          walletAddress: p.agentAddress,
+          chainId: BASE_CHAIN_ID,
+          marketId: p.marketId as `0x${string}`,
+          direction: p.direction,
+          tokensRaw: BigInt(p.direction === "buy" ? p.expectedOutRaw : p.amountRaw),
+          usdcRaw: BigInt(p.direction === "buy" ? p.amountRaw : p.expectedOutRaw),
+          txHash: effect.txHash,
+          legs: p.legs ?? [],
+          source: "agent",
+          mode: "autonomous",
+        });
+        break;
+      }
       case "close_position":
         await engineExecuted(db, effect.strategyId, effect.detail, effect.txHash);
         break;

@@ -8,6 +8,7 @@ import { AgentStatusStrip } from "./AgentStatusStrip.tsx";
 import { AssetsCard } from "./AssetsCard.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
+import { ComboPositionsSection } from "@/features/combos/ComboPositionsSection.tsx";
 import { PortfolioCard } from "./PortfolioCard.tsx";
 import { ProfileWalletSection } from "./ProfileWalletSection.tsx";
 import { StrategiesSection } from "./StrategiesSection.tsx";
@@ -78,6 +79,11 @@ export function MobileProfile({
         </TabsList>
         <TabsContent value="positions">
           <MarketPositionsSection />
+          <ComboPositionsSection
+            onOpenBuilder={() => {
+              window.dispatchEvent(new Event("mantua:open-combos"));
+            }}
+          />
           <SettledPositionsSection econ={economics} />
           <StrategiesSection />
         </TabsContent>

@@ -36,10 +36,7 @@
 
 import type { Corroboration, CorroborationPolicy } from "./consensus.ts";
 import type { ProviderEvent } from "./provider.ts";
-import {
-  type ConfidenceState,
-  confidencePermitsResolution,
-} from "./resolution-confidence.ts";
+import { type ConfidenceState, confidencePermitsResolution } from "./resolution-confidence.ts";
 import {
   type StoredEventSnapshot,
   checkFeedFreshness,
@@ -126,9 +123,7 @@ export interface ResolutionEvidence {
   gameWinningOutcomeIndex: number | null;
   policy: CorroborationPolicy;
   sources: EvidenceSource[];
-  consensus:
-    | Corroboration
-    | { kind: "policy-exempt-single-source"; reason: string };
+  consensus: Corroboration | { kind: "policy-exempt-single-source"; reason: string };
   confidenceState: ConfidenceState | null;
   criteria: CriteriaResult[];
   decidedAt: string;
@@ -149,6 +144,22 @@ export interface ManualOverrideEvidence {
   outcome: number | null;
   /** The operator's mandatory justification (also on `resolutions.note`). */
   note: string;
+  decidedAt: string;
+}
+
+/**
+ * Task 072 / CB-007 — the evidence bundle a combo (conjunction) market
+ * resolves on: nothing but its legs' own on-chain outcomes, each already
+ * past the criteria gate and the dispute window when it resolved. Honest
+ * about its inputs: no feed, no scores — the chain said what each leg did.
+ */
+export interface ComboConjunctionEvidence {
+  schema: "resolution-evidence@1";
+  kind: "combo-conjunction";
+  marketId: string;
+  /** 0 = the combo's YES won (every non-void leg won), 1 = NO (a leg lost). */
+  outcome: number;
+  legs: { marketId: string; result: "won" | "lost" | "void" | "pending" }[];
   decidedAt: string;
 }
 
@@ -232,7 +243,7 @@ export function buildEvidence(
 /** Mint function wired up by the class's static block — the only way to
  *  construct an authorization is `assertResolutionCriteria` passing. */
 let mintAuthorization:
-  | (<E extends ResolutionEvidence | ManualOverrideEvidence>(
+  | (<E extends ResolutionEvidence | ManualOverrideEvidence | ComboConjunctionEvidence>(
       marketId: `0x${string}`,
       outcome: number,
       criteria: CriteriaResult[],
@@ -251,7 +262,10 @@ let mintAuthorization:
  * type so each mint's callers see the exact bundle shape they were given.
  */
 export class ResolutionAuthorization<
-  E extends ResolutionEvidence | ManualOverrideEvidence = ResolutionEvidence | ManualOverrideEvidence,
+  E extends ResolutionEvidence | ManualOverrideEvidence | ComboConjunctionEvidence =
+    | ResolutionEvidence
+    | ManualOverrideEvidence
+    | ComboConjunctionEvidence,
 > {
   readonly marketId: `0x${string}`;
   readonly outcome: number;
@@ -306,6 +320,35 @@ export function authorizeManualOverride(input: {
   };
   if (!mintAuthorization) throw new Error("authorization mint not initialised");
   return mintAuthorization(input.marketId, input.outcome, [], evidence);
+}
+
+/**
+ * Task 072 / CB-007 — the combo mint: a conjunction market resolves from
+ * its legs' results and nothing else. Refuses unless the verdict is
+ * decided by the rule (`comboOutcome`): a lost leg, or every non-void leg
+ * won with none pending. Reached only from the combo settlement pass.
+ */
+export function authorizeComboResolution(input: {
+  marketId: `0x${string}`;
+  legs: ComboConjunctionEvidence["legs"];
+  nowSeconds?: number;
+}): ResolutionAuthorization<ComboConjunctionEvidence> {
+  const lost = input.legs.some((l) => l.result === "lost");
+  const pending = input.legs.some((l) => l.result === "pending");
+  const won = input.legs.filter((l) => l.result === "won").length;
+  if (!lost && (pending || won === 0)) {
+    throw new Error("combo resolution requires a lost leg or every non-void leg won (D-119)");
+  }
+  const evidence: ComboConjunctionEvidence = {
+    schema: "resolution-evidence@1",
+    kind: "combo-conjunction",
+    marketId: input.marketId,
+    outcome: lost ? 1 : 0,
+    legs: input.legs,
+    decidedAt: new Date((input.nowSeconds ?? Math.floor(Date.now() / 1000)) * 1000).toISOString(),
+  };
+  if (!mintAuthorization) throw new Error("authorization mint not initialised");
+  return mintAuthorization(input.marketId, evidence.outcome, [], evidence);
 }
 
 export type CriteriaVerdict =
@@ -436,5 +479,9 @@ export function assertResolutionCriteria(input: CriteriaInput): CriteriaVerdict 
 
   const evidence = buildEvidence(input, criteria, gameWinner);
   if (!mintAuthorization) throw new Error("authorization mint not initialised");
-  return { ok: true, auth: mintAuthorization(input.marketId, input.outcome, criteria, evidence), criteria };
+  return {
+    ok: true,
+    auth: mintAuthorization(input.marketId, input.outcome, criteria, evidence),
+    criteria,
+  };
 }

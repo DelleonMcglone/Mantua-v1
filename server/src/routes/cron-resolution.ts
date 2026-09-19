@@ -20,6 +20,7 @@ import {
   syncConfidenceReviews,
 } from "../lib/sports/resolution-store.ts";
 import type { LeagueSlug, ProviderSlate, SportsDataProvider } from "../lib/sports/provider.ts";
+import { runComboSettlement } from "../lib/combos/combo-resolution-run.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { parseDates } from "./sports-slate.ts";
 
@@ -47,7 +48,10 @@ export function resolutionProviderFor(league: LeagueSlug): SportsDataProvider {
  * structural call below is a no-op for adapters that ignore it, and we warn
  * loudly rather than pretend a Sportradar-served league was backfilled.
  */
-async function resolutionSlateFor(league: LeagueSlug, dates: string | null): Promise<ProviderSlate> {
+async function resolutionSlateFor(
+  league: LeagueSlug,
+  dates: string | null,
+): Promise<ProviderSlate> {
   const provider = resolutionProviderFor(league);
   if (dates !== null && provider.name !== "espn") {
     logger.warn(
@@ -244,6 +248,26 @@ cronResolutionRouter.get(
         plans[league] = { error: err instanceof Error ? err.message : String(err) };
       }
     }
+
+    // Task 072 (CB-007) — combo markets settle from their legs' on-chain
+    // outcomes, after the leg pass above; the stamps land even without a
+    // signer, the resolver actions report as the dry-run plan.
+    const combos: Record<string, unknown> = {};
+    for (const chainId of chains) {
+      try {
+        combos[String(chainId)] = await runComboSettlement(
+          db,
+          chainId,
+          Math.floor(Date.now() / 1000),
+          liveResolutionSubmitter(chainId),
+        );
+      } catch (err) {
+        failures += 1;
+        logger.error({ chainId, err }, "resolution: combo pass failed");
+        combos[String(chainId)] = { error: err instanceof Error ? err.message : String(err) };
+      }
+    }
+    plans["combos"] = combos;
 
     // Disabled only when NO chain has an authorised signer.
     if (!chains.some((c) => marketSignerWallet(c) !== null)) {

@@ -96,7 +96,7 @@ Completed:   228   (+20 partial 🟡)
 | Phase 13: Agent Extended (Social + Reputation + Support)   | 🟡 P1 | 14    | 14 ✅      |
 | Phase 14: Base Builder Code                                | 🟡 P1 | 3     | 0          |
 | Phase 15: Mobile Experience (LAST)                         | 🟡 P1 | 9     | 0          |
-| Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 0          |
+| Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 10         |
 | Phase 17: Circle Agent Marketplace + Agent-Native Services | 🟢 P2 | 10    | 0          |
 | Phase 18: Institutional Custody                            | 🟢 P2 | 3     | 0          |
 
@@ -648,16 +648,16 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 
 | ID     | Task                                                                                                                               | Status |
 | ------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| CB-001 | Combo mechanism design: bundle multiple event outcomes into a single trade/transaction                                             | ⬜     |
-| CB-002 | **Combo Builder** UX: select first market → add legs → review each leg → see combined position/payout → see fees clearly → confirm | ⬜     |
-| CB-003 | Combined payout + pricing engine for multi-leg positions                                                                           | ⬜     |
-| CB-004 | Combo fee display: per-leg and total fees, same transparency standard as single trades                                             | ⬜     |
-| CB-005 | Single-transaction combo submission                                                                                                | ⬜     |
-| CB-006 | **Agent-constructed combos**: agent builds combos automatically from the user's strategy or risk profile                           | ⬜     |
-| CB-007 | Combo settlement: all-legs resolution logic, partial-outcome handling                                                              | ⬜     |
-| CB-008 | Portfolio integration: combos as first-class positions                                                                             | ⬜     |
-| CB-009 | Implement agent monitoring of open combo positions and automated management of individual legs where the combo mechanism permits   | ⬜     |
-| CB-010 | Define combo risk limits, maximum combined exposure, correlated-leg controls, and user-configurable restrictions                   | ⬜     |
+| CB-001 | Combo mechanism design: bundle multiple event outcomes into a single trade/transaction                                             | ✅     |
+| CB-002 | **Combo Builder** UX: select first market → add legs → review each leg → see combined position/payout → see fees clearly → confirm | ✅     |
+| CB-003 | Combined payout + pricing engine for multi-leg positions                                                                           | ✅     |
+| CB-004 | Combo fee display: per-leg and total fees, same transparency standard as single trades                                             | ✅     |
+| CB-005 | Single-transaction combo submission                                                                                                | ✅     |
+| CB-006 | **Agent-constructed combos**: agent builds combos automatically from the user's strategy or risk profile                           | ✅     |
+| CB-007 | Combo settlement: all-legs resolution logic, partial-outcome handling                                                              | ✅     |
+| CB-008 | Portfolio integration: combos as first-class positions                                                                             | ✅     |
+| CB-009 | Implement agent monitoring of open combo positions and automated management of individual legs where the combo mechanism permits   | ✅     |
+| CB-010 | Define combo risk limits, maximum combined exposure, correlated-leg controls, and user-configurable restrictions                   | ✅     |
 
 ---
 

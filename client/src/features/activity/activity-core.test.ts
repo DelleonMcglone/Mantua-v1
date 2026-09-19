@@ -46,7 +46,8 @@ void describe("filters", () => {
     assert.equal(kindQueryFor("agent"), "agent_research,agent_simulation,agent_recommendation");
     const all = Object.values(KINDS_BY_CATEGORY).flat();
     assert.equal(new Set(all).size, all.length, "no kind belongs to two categories");
-    assert.equal(all.length, 18);
+    assert.equal(all.length, 21);
+    assert.ok(all.includes("combo_open") && all.includes("combo_settle"), "task 072 kinds");
     const items = [item({ category: "trade" }), item({ id: "b", category: "agent" })];
     assert.equal(filterItems(items, "agent").length, 1);
     assert.equal(filterItems(items, "all").length, 2);

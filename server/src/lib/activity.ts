@@ -39,6 +39,10 @@ export const ACTIVITY_KINDS = [
   "agent_simulation",
   "agent_recommendation",
   "resolution",
+  // Task 072 (Phase 16) — combo tickets
+  "combo_open",
+  "combo_close",
+  "combo_settle",
 ] as const;
 export type ActivityKind = (typeof ACTIVITY_KINDS)[number];
 
@@ -56,6 +60,8 @@ export function categoryOf(kind: ActivityKind): ActivityCategory {
     case "market_sell":
     case "swap":
     case "hedge":
+    case "combo_open":
+    case "combo_close":
       return "trade";
     case "liquidity_add":
     case "liquidity_remove":
@@ -74,6 +80,7 @@ export function categoryOf(kind: ActivityKind): ActivityCategory {
     case "redeem":
     case "settlement":
     case "resolution":
+    case "combo_settle":
       return "settlement";
   }
 }
@@ -168,6 +175,12 @@ export function summarizeActivity(input: ActivityInput): string {
       return `Agent simulated ${asset || "a trade"}${value ? ` (${value})` : ""}`;
     case "agent_recommendation":
       return `Agent recommended${asset ? ` ${asset}` : ""}`;
+    case "combo_open":
+      return `${who}placed a combo${asset ? ` — ${asset}` : ""}${value ? ` for ${value}` : ""}`;
+    case "combo_close":
+      return `${who}sold a combo position${value ? ` for ${value}` : ""}`;
+    case "combo_settle":
+      return `Combo settled${asset ? ` — ${asset}` : ""}${value ? ` (${value})` : ""}`;
   }
 }
 
@@ -202,6 +215,12 @@ export function kindForAction(
     case "strategy_execute":
     case "strategy_close":
       return "hedge";
+    case "combo_open":
+      return "combo_open";
+    case "combo_close":
+      return "combo_close";
+    case "combo_resolve":
+      return "combo_settle";
     case "market_redeem":
       return "redeem";
     case "market_resolution":

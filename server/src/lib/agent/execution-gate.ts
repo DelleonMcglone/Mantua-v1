@@ -1,3 +1,5 @@
+import { materialComboDrift } from "../combos/combo-drift.ts";
+import type { ComboQuoteResult } from "../combos/combo-quote-types.ts";
 import type { AgentMode } from "./agent-mode.ts";
 import { modePolicy } from "./agent-mode.ts";
 import { messageConfirmsAction } from "./confirmation-language.ts";
@@ -35,6 +37,7 @@ import { materialDrift, type TradeSimulation } from "./trade-simulation.ts";
 export const MONEY_TOOLS: ReadonlySet<string> = new Set([
   "mantua_execute_trade",
   "mantua_sell_position",
+  "mantua_execute_combo",
   "swap",
   "send",
   "bridge",
@@ -114,7 +117,7 @@ export function turnContextPrompt(ctx: TurnContext): string {
   if (ctx.confirmation) {
     const p = ctx.confirmation.preview;
     lines.push(
-      `The user has EXPLICITLY CONFIRMED the pending ${p.kind === "market_trade" ? "trade" : "action"} (${p.summary}). Confirmation id: ${ctx.confirmation.confirmationId}. Execute it now by calling ${p.tool} with confirmationId set to exactly that id and the same parameters as the preview. Do not re-ask.`,
+      `The user has EXPLICITLY CONFIRMED the pending ${p.kind === "market_trade" ? "trade" : p.kind === "combo" ? "combo" : "action"} (${p.summary}). Confirmation id: ${ctx.confirmation.confirmationId}. Execute it now by calling ${p.tool} with confirmationId set to exactly that id and the same parameters as the preview. Do not re-ask.`,
     );
   } else if (ctx.pendingPreview) {
     lines.push(
@@ -154,6 +157,8 @@ export async function authorizeExecution(
   ctx: TurnContext,
   call: { tool: string; args: Record<string, unknown> },
   freshSimulation?: () => Promise<TradeSimulation>,
+  /** Task 072 — for combo executions: a fresh quote for the drift check. */
+  freshCombo?: () => Promise<ComboQuoteResult>,
 ): Promise<Confirmation | null> {
   const policy = modePolicy(ctx.mode);
   if (!isMoneyCall(call.tool, call.args)) return null;
@@ -201,6 +206,27 @@ export async function authorizeExecution(
         "The call's parameters differ from the preview the user confirmed. Nothing was executed; preview again.",
       );
     }
+    if (c.preview.kind === "combo") {
+      if (!c.preview.combo || !freshCombo) {
+        throw new ExecutionRefusedError(
+          "CONFIRMATION_MISMATCH",
+          "The confirmation does not carry a combo quote. Nothing was executed.",
+        );
+      }
+      if (c.preview.argsHash !== argsHash(call.tool, call.args)) {
+        throw new ExecutionRefusedError(
+          "CONFIRMATION_MISMATCH",
+          "The call's parameters differ from the combo the user confirmed. Nothing was executed; build it again.",
+        );
+      }
+      const drift = materialComboDrift(c.preview.combo, await freshCombo());
+      if (drift.length > 0) {
+        throw new ExecutionRefusedError(
+          "SIMULATION_DRIFT",
+          `The combo changed since the user confirmed — not executing: ${drift.join("; ")}. Show the user the new numbers and ask again.`,
+        );
+      }
+    }
     if (c.preview.kind === "market_trade") {
       if (!c.preview.simulation || !freshSimulation) {
         throw new ExecutionRefusedError(
@@ -220,7 +246,18 @@ export async function authorizeExecution(
     return c;
   }
   // Autonomous: no confirmation, but a fresh, executable simulation is still
-  // the entry ticket for market trades.
+  // the entry ticket for market trades — and a fresh, gate-passing quote for combos.
+  if (freshCombo) {
+    const fresh = await freshCombo();
+    const blockers = fresh.ok
+      ? fresh.gate.ok
+        ? []
+        : fresh.gate.reasons
+      : fresh.violations.map((v) => v.detail);
+    if (blockers.length > 0) {
+      throw new ExecutionRefusedError("NOT_EXECUTABLE", `Not executable: ${blockers.join("; ")}`);
+    }
+  }
   if (freshSimulation) {
     const fresh = await freshSimulation();
     if (!fresh.executable) {

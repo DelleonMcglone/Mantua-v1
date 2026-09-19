@@ -33,7 +33,8 @@ export const activity = pgTable(
     /** `ActivityKind` (lib/activity.ts) — market_buy | market_sell | redeem |
      *  settlement | swap | liquidity_add | liquidity_remove | send | bridge |
      *  deposit | withdraw | gateway_deposit | gateway_spend | hedge |
-     *  agent_research | agent_simulation | agent_recommendation | resolution. */
+     *  agent_research | agent_simulation | agent_recommendation | resolution |
+     *  combo_open | combo_close | combo_settle (task 072). */
     kind: varchar("kind", { length: 32 }).notNull(),
     /** PF-017 — pending | completed | failed; pending moves exactly once. */
     status: varchar("status", { length: 12 }).notNull().default("completed"),

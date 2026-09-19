@@ -427,10 +427,11 @@ export type NewMarketPrice = typeof marketPrices.$inferInsert;
 // ─── Combos (parlays) ────────────────────────────────────────────────────────
 
 /**
- * A combo (parlay) ticket — several market legs that must all win.
- * SCHEMA ONLY for now: the feature ships later, but the tables land ahead of
- * it (deliberate) so position/fill writers can reference combo ids without a
- * follow-up migration. Nothing writes these tables yet.
+ * A combo (parlay) ticket — several market legs that must all win. Task 072
+ * (D-119): the ticket is one buy of the conjunction market named by its
+ * legs (`computeComboMarketId`), so a row carries that market, the shares
+ * bought, the tx that bought them and the settlement stamps. The tables
+ * landed in 0009 ahead of the feature; 0024 adds the ticket columns.
  */
 export const combos = pgTable(
   "combos",
@@ -442,8 +443,39 @@ export const combos = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
-    /** draft | open | won | lost | void */
+    /** draft | open | dead | closed | won | lost | void */
     status: varchar("status", { length: 8 }).notNull().default("draft"),
+    /** The conjunction market this ticket holds YES in (task 072). */
+    marketId: varchar("market_id", { length: 66 }),
+    chainId: integer("chain_id").notNull().default(8453),
+    marketAddress: varchar("market_address", { length: 42 }),
+    yesToken: varchar("yes_token", { length: 42 }),
+    poolId: varchar("pool_id", { length: 66 }),
+    /** "Cowboys + Chiefs + Raiders" — the on-chain label. */
+    label: varchar("label", { length: 200 }),
+    /** The combo market's startsAt: the latest leg kickoff. */
+    startsAt: timestamp("starts_at", { withTimezone: true }),
+    /** Π leg prices at placement, 0–1. */
+    openingProbability: numeric("opening_probability", { precision: 6, scale: 5 }),
+    /** YES shares bought, raw 6dp; pays $1 each if every leg wins. */
+    sharesRaw: numeric("shares_raw", { precision: 78, scale: 0 }),
+    /** Effective price paid per share, bps. */
+    entryPriceBps: integer("entry_price_bps"),
+    /** The buy — one ticket per verified transaction. */
+    txHash: varchar("tx_hash", { length: 66 }),
+    /** Set when the position was sold back before settlement. */
+    closeTxHash: varchar("close_tx_hash", { length: 66 }),
+    proceedsRaw: numeric("proceeds_raw", { precision: 78, scale: 0 }),
+    /** 1.00000 won · 0.00000 lost · 0.50000 void. */
+    settlementPrice: numeric("settlement_price", { precision: 6, scale: 5 }),
+    redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+    redeemTxHash: varchar("redeem_tx_hash", { length: 66 }),
+    /** user | agent — who built the ticket. */
+    source: varchar("source", { length: 8 }).notNull().default("user"),
+    /** user_confirmed | autonomous | unattributed (AE-013 vocabulary). */
+    mode: varchar("mode", { length: 16 }),
+    /** Stamped the moment a leg lost (the ticket cannot pay). */
+    deadAt: timestamp("dead_at", { withTimezone: true }),
     /** Stake, USDC 6dp raw units. */
     stakeRaw: numeric("stake_raw", { precision: 78, scale: 0 }),
     /** Product of the legs' entry odds at placement, as a decimal multiplier. */
@@ -455,7 +487,12 @@ export const combos = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [index("combos_user_idx").on(t.userId), index("combos_status_idx").on(t.status)],
+  (t) => [
+    index("combos_user_idx").on(t.userId),
+    index("combos_status_idx").on(t.status),
+    index("combos_market_idx").on(t.marketId),
+    unique("combos_tx_hash_uq").on(t.txHash),
+  ],
 );
 
 export type Combo = typeof combos.$inferSelect;
@@ -480,6 +517,16 @@ export const comboLegs = pgTable(
     entryPrice: numeric("entry_price", { precision: 6, scale: 5 }),
     /** pending | won | lost | void */
     result: varchar("result", { length: 8 }).notNull().default("pending"),
+    /** Task 072 — the leg as the ticket shows it, frozen at placement. */
+    providerEventId: varchar("provider_event_id", { length: 128 }),
+    outcomeIndex: smallint("outcome_index"),
+    /** The team whose win this leg pays on. */
+    label: varchar("label", { length: 120 }),
+    opponent: varchar("opponent", { length: 96 }),
+    league: varchar("league", { length: 32 }),
+    kickoffAt: timestamp("kickoff_at", { withTimezone: true }),
+    /** When the result was stamped from the leg market's resolution. */
+    resultAt: timestamp("result_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

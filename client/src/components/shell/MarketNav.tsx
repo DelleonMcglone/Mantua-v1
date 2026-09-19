@@ -5,7 +5,9 @@ import { SPORTS, type SportId } from "@/features/markets/sports.ts";
 export type NavDestination =
   | { kind: "market"; sport: SportId }
   | { kind: "agent" }
-  | { kind: "trading" };
+  | { kind: "trading" }
+  /** Task 072 — the Combo Builder. */
+  | { kind: "combos" };
 
 interface NavItem {
   label: string;
@@ -30,6 +32,7 @@ const NAV_ITEMS: NavItem[] = [
       ...(s.coverage === "soon" ? { comingSoon: true } : {}),
     }),
   ),
+  { label: "Combos", destination: { kind: "combos" }, divider: true },
   { label: "Agent", destination: { kind: "agent" }, divider: true },
   { label: "Trading", destination: { kind: "trading" }, divider: true },
 ];

@@ -1,21 +1,16 @@
 import { useEffect, useState } from "react";
-import { parseAbi } from "viem";
 import { api } from "@/lib/api.ts";
-import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
+import { useChainWalletClient } from "@/lib/privy/wallet-client.ts";
 import { BASE_CHAIN_ID } from "@/lib/chains.ts";
 import type { FeeQuoteWire } from "./market-trade-core.ts";
 import { usePendingTrades } from "./PendingTradesProvider.tsx";
 import { classifyTradeError, type TradeErrorKind } from "./trade-status-core.ts";
-
-const ERC20 = parseAbi([
-  "function allowance(address owner, address spender) view returns (uint256)",
-  "function approve(address spender, uint256 amount) returns (bool)",
-]);
+import { approveIfNeeded, awaitTradeReceipt, sendTrade } from "./wallet-execution.ts";
 
 /** How long the ticket itself waits for the receipt before handing the
  *  trade to the pending register (which keeps asking the server). A Base
  *  block is ~2 s; a minute of silence is an RPC problem, not a slow chain. */
-export const RECEIPT_WAIT_MS = 60_000;
+export { RECEIPT_WAIT_MS } from "./wallet-execution.ts";
 
 /** A hash the chain never mined (R-004 `dropped`) — nothing was traded. */
 const DROPPED_MESSAGE =
@@ -197,34 +192,13 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
         amountRaw: quote.quote.amountIn,
       });
 
-      if (calldata.approvalTarget) {
-        const allowance = await publicClientFor(chainId).readContract({
-          address: calldata.inputToken,
-          abi: ERC20,
-          functionName: "allowance",
-          args: [owner, calldata.approvalTarget],
-        });
-        if (allowance < BigInt(calldata.quote.amountIn)) {
-          setPhase({ kind: "approving", calldata });
-          // Bounded to the trade amount — never MaxUint (the 031/C-022
-          // principle): no standing allowance to the market router
-          // survives the trade.
-          const approveTx = await wallet.writeContract({
-            address: calldata.inputToken,
-            abi: ERC20,
-            functionName: "approve",
-            args: [calldata.approvalTarget, BigInt(calldata.quote.amountIn)],
-          });
-          await publicClientFor(chainId).waitForTransactionReceipt({ hash: approveTx });
-        }
-      }
-
-      setPhase({ kind: "signing", calldata });
-      const txHash = await wallet.sendTransaction({
-        to: calldata.to,
-        data: calldata.data,
-        value: BigInt(calldata.value),
+      // Bounded approval, then the signed send (task 072: shared with the
+      // combo builder — `wallet-execution.ts`).
+      await approveIfNeeded(wallet, calldata, chainId, () => {
+        setPhase({ kind: "approving", calldata });
       });
+      setPhase({ kind: "signing", calldata });
+      const txHash = await sendTrade(wallet, calldata);
 
       // A hash exists: from here on the trade is on the chain's clock, not
       // ours. Register it before waiting so nothing can lose it.
@@ -243,20 +217,14 @@ export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabl
       });
       setPhase({ kind: "confirming", txHash, calldata });
 
-      let receipt: { status: "success" | "reverted" };
-      try {
-        receipt = await publicClientFor(chainId).waitForTransactionReceipt({
-          hash: txHash,
-          timeout: RECEIPT_WAIT_MS,
-          pollingInterval: 2_000,
-        });
-      } catch {
+      const receipt = await awaitTradeReceipt(chainId, txHash);
+      if (receipt === "late") {
         // Not a failure: the receipt is late or the RPC is flaky. The
         // register keeps asking the server; the ticket says "pending".
         setPhase({ kind: "pending", txHash, calldata });
         return;
       }
-      if (receipt.status !== "success") {
+      if (receipt !== "success") {
         register.remove(txHash);
         setPhase({ kind: "failed", txHash, calldata });
         return;

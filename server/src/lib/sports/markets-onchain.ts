@@ -178,8 +178,9 @@ async function seedPoolLiquidity(
   marketAddress: `0x${string}`,
   plan: ReturnType<typeof planMarketPool>,
   chainId: SupportedChainId,
+  seedRaw: bigint = BigInt(env.MARKET_SEED_USDC),
 ): Promise<boolean> {
-  const seed = BigInt(env.MARKET_SEED_USDC);
+  const seed = seedRaw;
   if (seed === 0n) return false;
   const cfg = marketsCfg(chainId);
   const client = getRpcClient(chainId);
@@ -335,6 +336,8 @@ async function bootstrapMarketPool(
 export async function createMarketsOnChain(
   planned: readonly PlannedMarket[],
   chainId: SupportedChainId = BASE_CHAIN_ID,
+  /** Task 072 — combo pools seed from their own budget (COMBO_SEED_USDC). */
+  seedRaw?: bigint,
 ): Promise<MarketCreationSummary | null> {
   const wallet = marketSignerWallet(chainId);
   if (!wallet) return null;
@@ -388,7 +391,7 @@ export async function createMarketsOnChain(
       // half-completed earlier sweep heals on the next tick.
       const boot = await bootstrapMarketPool(wallet, marketAddress, m, chainId);
       if (boot.opened) summary.poolsOpened += 1;
-      if (await seedPoolLiquidity(wallet, marketAddress, boot.plan, chainId)) {
+      if (await seedPoolLiquidity(wallet, marketAddress, boot.plan, chainId, seedRaw)) {
         summary.poolsSeeded += 1;
       }
       summary.details.push({

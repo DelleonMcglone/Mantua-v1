@@ -47,11 +47,11 @@ export const ACTIVITY_FILTERS: { key: ActivityFilter; label: string }[] = [
 
 /** Server kinds per category — the `kind` query the feed sends for a filter. */
 export const KINDS_BY_CATEGORY: Record<ActivityCategory, string[]> = {
-  trade: ["market_buy", "market_sell", "swap", "hedge"],
+  trade: ["market_buy", "market_sell", "swap", "hedge", "combo_open", "combo_close"],
   liquidity: ["liquidity_add", "liquidity_remove"],
   transfer: ["send", "bridge", "deposit", "withdraw", "gateway_deposit", "gateway_spend"],
   agent: ["agent_research", "agent_simulation", "agent_recommendation"],
-  settlement: ["redeem", "settlement", "resolution"],
+  settlement: ["redeem", "settlement", "resolution", "combo_settle"],
 };
 
 export function kindQueryFor(filter: ActivityFilter): string | null {

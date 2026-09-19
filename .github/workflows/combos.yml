@@ -1,0 +1,33 @@
+# Combo monitor cadence (Phase 16 / task 072, CB-009).
+#
+# Vercel Hobby only allows DAILY cron schedules, so the monitor tick runs
+# from here every fifteen minutes: the secret-guarded endpoint stamps each
+# open combo ticket's leg results, marks dead tickets, and either manages
+# an agent-wallet ticket under an autonomous policy (take-profit sale,
+# leg hedge) or records a recommendation for the user. The daily Vercel
+# entry is the safety net.
+#
+# Requires the repo Actions secret CRON_SECRET to equal the production
+# CRON_SECRET in Vercel. Until it is set, runs fail with 401 (harmless).
+name: combos
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: combos
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Combo monitor tick
+        run: |
+          curl -sS -f -m 240 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://test-mantua.vercel.app/api/cron/combos

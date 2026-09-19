@@ -22,11 +22,9 @@ import { type Corroboration, type CorroborationPolicy, corroborate } from "./con
 import { type SettlementAction, decideSettlement } from "./ingest.ts";
 import { MAX_EVENT_DURATION_SECONDS } from "./provider.ts";
 import type { ProviderEvent, ProviderSlate } from "./provider.ts";
+import { type ConfidenceState, inlineConfidence } from "./resolution-confidence.ts";
 import {
-  type ConfidenceState,
-  inlineConfidence,
-} from "./resolution-confidence.ts";
-import {
+  type ComboConjunctionEvidence,
   type CriteriaResult,
   type ManualOverrideEvidence,
   type ResolutionAuthorization,
@@ -336,7 +334,11 @@ export interface ResolutionRecord {
   /** The full S-026 evidence bundle. Always present for resolves (the gate
    *  built it); the manual-override bundle for D-104 overrides; a lighter
    *  source snapshot for voids. */
-  evidence?: ResolutionEvidence | ManualOverrideEvidence | Record<string, unknown>;
+  evidence?:
+    | ResolutionEvidence
+    | ManualOverrideEvidence
+    | ComboConjunctionEvidence
+    | Record<string, unknown>;
   confidenceState?: ConfidenceState | null;
   /** Mandatory for manual overrides (D-104); absent for automated rows. */
   note?: string;
@@ -520,8 +522,7 @@ export async function executeResolution(
           continue;
         }
         confidenceState =
-          opts.confidenceOf?.(s.providerEventId) ??
-          inlineConfidence(ctx.corroboration, ctx.policy);
+          opts.confidenceOf?.(s.providerEventId) ?? inlineConfidence(ctx.corroboration, ctx.policy);
         const verdict = assertResolutionCriteria({
           marketId: s.marketId,
           marketOutcomeIndex: s.marketOutcomeIndex,

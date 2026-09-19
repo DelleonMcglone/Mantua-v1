@@ -19,7 +19,13 @@ export interface AuditAttribution {
   params: Record<string, unknown>;
 }
 
-const ENGINE_ACTIONS: ReadonlySet<string> = new Set(["strategy_execute", "strategy_close"]);
+const ENGINE_ACTIONS: ReadonlySet<string> = new Set([
+  "strategy_execute",
+  "strategy_close",
+  "combo_manage",
+]);
+/** Actions a person may have confirmed (a confirmation id decides). */
+const CONFIRMABLE_ACTIONS: ReadonlySet<string> = new Set(["agent_market_trade", "combo_open"]);
 
 const isId = (v: unknown): boolean => typeof v === "string" && v.length > 0;
 
@@ -36,7 +42,7 @@ function confirmationIdIn(params: Record<string, unknown>): boolean {
 export function executionModeOf(audit: AuditAttribution | undefined): LedgerMode {
   if (!audit) return "unattributed";
   if (ENGINE_ACTIONS.has(audit.action)) return "autonomous";
-  if (audit.action !== "agent_market_trade") return "unattributed";
+  if (!CONFIRMABLE_ACTIONS.has(audit.action)) return "unattributed";
   if (confirmationIdIn(audit.params)) return "user_confirmed";
   if (audit.params["mode"] === "autonomous") return "autonomous";
   return "unattributed";

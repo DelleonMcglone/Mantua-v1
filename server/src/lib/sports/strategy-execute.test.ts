@@ -225,6 +225,7 @@ void describe("task 057 — the user's hedge policy (D-109) gates and clamps the
       dailyBudgetUsd: 100,
       allowedMarketTypes: [],
     },
+    combo: DEFAULT_POLICY.combo,
     updatedAt: null,
     persisted: true,
   };

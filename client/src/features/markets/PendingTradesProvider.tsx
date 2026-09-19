@@ -153,13 +153,14 @@ export function PendingTradesProvider({ children }: { children: ReactNode }) {
               // The server verifies the receipt before believing the report;
               // a failure here just leaves it for the next tick.
               try {
-                await api.post("/api/markets/fills", {
+                await api.post(trade.combo ? "/api/combos/fills" : "/api/markets/fills", {
                   chainId: trade.chainId,
                   txHash: trade.txHash,
                   marketId: trade.marketId,
                   direction: trade.direction,
                   tokensRaw: trade.tokensRaw,
                   usdcRaw: trade.usdcRaw,
+                  ...(trade.combo ? { legs: trade.combo.legs } : {}),
                 });
               } catch {
                 continue;
