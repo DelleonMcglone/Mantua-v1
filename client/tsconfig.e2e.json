@@ -6,5 +6,5 @@
     "noEmit": true,
     "composite": false
   },
-  "include": ["e2e", "playwright.config.ts"]
+  "include": ["e2e", "playwright.config.ts", "playwright.mobile.config.ts"]
 }

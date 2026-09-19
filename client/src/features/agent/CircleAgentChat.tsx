@@ -440,6 +440,7 @@ function ConfirmRow({ label }: { label: string }) {
       </span>
       <Button
         size="sm"
+        className="h-11 shrink-0 px-4 md:h-8"
         disabled={busy}
         onClick={() => {
           send("confirm");
@@ -1045,7 +1046,7 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
             onClick={() => {
               onPick(s.message);
             }}
-            className="flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-border-soft bg-chip px-3 py-1.5 text-[12px] text-text-dim disabled:cursor-default disabled:opacity-50"
+            className="min-h-11 flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full border border-border-soft bg-chip px-4 py-1.5 text-[13px] text-text-dim disabled:cursor-default disabled:opacity-50 md:min-h-0 md:px-3 md:text-[12px]"
           >
             {s.label}
           </button>

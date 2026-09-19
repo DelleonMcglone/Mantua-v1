@@ -113,7 +113,7 @@ export function MarketPositionsSection({
                                 new CustomEvent("mantua:close-position", { detail: close }),
                               );
                             }}
-                            className="rounded-sm border border-border-soft px-2 py-0.5 text-[10px] text-text-dim hover:text-text cursor-pointer"
+                            className="min-h-11 rounded-sm border border-border-soft px-3 py-0.5 text-[12px] text-text-dim hover:text-text cursor-pointer md:min-h-0 md:px-2 md:text-[10px]"
                           >
                             {row.pnlRaw !== null && Number(row.pnlRaw) > 0
                               ? "Lock in profit"

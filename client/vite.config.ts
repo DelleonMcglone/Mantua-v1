@@ -55,7 +55,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         /**
-         * Keep all of node_modules in a single `vendor` chunk. Vite 8's
+         * Keep the wallet stack and viem in a single `vendor` chunk. Vite 8's
          * rolldown bundler otherwise auto-splits viem's error classes across
          * chunks such that a subclass evaluates `class extends BaseError`
          * before the chunk holding BaseError has lazily initialized — a
@@ -64,9 +64,48 @@ export default defineConfig({
          * build (dev is fine — esbuild doesn't split). Co-locating the
          * library keeps its strongly-connected error hierarchy in one module
          * so init order is correct.
+         *
+         * Task 071 (MX-006) — four libraries only a lazy surface needs get
+         * their own leaf chunks, so they leave the critical path with the
+         * surfaces that import them. Explicit `codeSplitting` groups with a
+         * path `test` are used rather than `manualChunks`: rolldown's compat
+         * for the latter is one name-function group, and it dragged viem into
+         * the bridge chunk. Higher priority wins; none of these leaves imports
+         * viem's error hierarchy back out of `vendor`, and the mobile suite
+         * runs the built bundle to prove the app still boots.
          */
-        manualChunks(id) {
-          if (id.includes("node_modules")) return "vendor";
+        codeSplitting: {
+          groups: [
+            // `vendor` first: rolldown gives a module shared between group
+            // chunks to the highest-priority group that needs it, so the
+            // wallet stack and viem must outrank the leaves or they follow
+            // the bridge kit into its chunk.
+            {
+              name: "vendor",
+              test: (id: string) =>
+                /[\\/]node_modules[\\/]/.test(id) &&
+                !/[\\/]node_modules[\\/](@circle-fin|@solana|@solana-program|lightweight-charts|react-plaid-link)[\\/]/.test(
+                  id,
+                ),
+              priority: 20,
+            },
+            { name: "bridge-vendor", test: /[\\/]node_modules[\\/]@circle-fin[\\/]/, priority: 5 },
+            {
+              name: "solana-vendor",
+              test: /[\\/]node_modules[\\/](@solana|@solana-program)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "charts-vendor",
+              test: /[\\/]node_modules[\\/]lightweight-charts[\\/]/,
+              priority: 5,
+            },
+            {
+              name: "funding-vendor",
+              test: /[\\/]node_modules[\\/]react-plaid-link[\\/]/,
+              priority: 5,
+            },
+          ],
         },
       },
     },

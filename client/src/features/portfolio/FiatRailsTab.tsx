@@ -1,8 +1,11 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { fiatStatusClass, fiatStatusLabel } from "./fiat-status.ts";
-import { PlaidLinkLauncher } from "./PlaidLinkLauncher.tsx";
+// Task 071 (MX-006) — the bank-connection SDK loads with the first deposit.
+const PlaidLinkLauncher = lazy(() =>
+  import("./PlaidLinkLauncher.tsx").then((m) => ({ default: m.PlaidLinkLauncher })),
+);
 import { useFiatRails } from "./use-fiat-rails.ts";
 
 function dollar(value: string): string {
@@ -58,13 +61,15 @@ export function FiatRailsTab() {
         </Button>
       )}
       {rails.linkToken && (
-        <PlaidLinkLauncher
-          token={rails.linkToken}
-          onSuccess={(publicToken) => {
-            void rails.completePlaidLink(publicToken);
-          }}
-          onExit={rails.cancelPlaidLink}
-        />
+        <Suspense fallback={null}>
+          <PlaidLinkLauncher
+            token={rails.linkToken}
+            onSuccess={(publicToken) => {
+              void rails.completePlaidLink(publicToken);
+            }}
+            onExit={rails.cancelPlaidLink}
+          />
+        </Suspense>
       )}
 
       {enabled && rails.data?.bankLinked && (

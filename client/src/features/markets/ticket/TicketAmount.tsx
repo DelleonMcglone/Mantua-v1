@@ -32,7 +32,7 @@ export function TicketAmount({
               onTap({ kind: "type", amount: e.target.value });
             }}
             inputMode="decimal"
-            className="w-28 bg-transparent text-right font-mono text-[26px] font-semibold text-text outline-none"
+            className="min-h-11 w-28 bg-transparent text-right font-mono text-[26px] font-semibold text-text outline-none md:min-h-0"
           />
         </div>
       </div>
@@ -47,14 +47,14 @@ export function TicketAmount({
             onClick={() => {
               onTap({ kind: "type", amount: rawToHuman6(contractBalance) });
             }}
-            className="rounded-sm border border-border-soft px-1.5 py-0.5 text-[10px] text-text-dim hover:text-text cursor-pointer"
+            className="min-h-9 rounded-sm border border-border-soft px-2.5 py-0.5 text-[12px] text-text-dim hover:text-text cursor-pointer md:min-h-0 md:px-1.5 md:text-[10px]"
           >
             Max
           </button>
         </div>
       )}
       {direction === "buy" && (
-        <div className="mt-2 flex justify-end gap-1.5">
+        <div className="mt-2 flex gap-1.5 md:justify-end">
           {AMOUNT_PRESETS.map((n) => (
             <button
               key={n}
@@ -64,7 +64,7 @@ export function TicketAmount({
               onClick={() => {
                 onTap({ kind: "preset", amount: n });
               }}
-              className={`rounded-sm border px-2 py-1 text-[11px] cursor-pointer ${
+              className={`min-h-11 flex-1 rounded-sm border px-2 py-1 text-[13px] cursor-pointer md:min-h-0 md:flex-none md:text-[11px] ${
                 amount === String(n)
                   ? "border-accent text-text"
                   : "border-border-soft text-text-dim hover:text-text"

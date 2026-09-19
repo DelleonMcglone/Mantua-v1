@@ -25,6 +25,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset["theme"] = theme;
+    // Task 071 (MX-007) — the browser chrome / installed-app title bar
+    // follows the surface colour (tokens.css `--bg` per theme).
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#000000" : "#f6f5f2");
     try {
       window.localStorage.setItem(STORAGE_KEY, theme);
     } catch {

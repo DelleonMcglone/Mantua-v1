@@ -56,7 +56,7 @@ export function GameRow({
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen();
       }}
-      className={`cursor-pointer rounded-md border bg-panel-solid px-4 py-3 transition-colors hover:border-accent/30 ${selected ? "border-accent/40" : "border-border-soft"}`}
+      className={`cursor-pointer rounded-md border bg-panel-solid px-3 py-3 transition-colors hover:border-accent/30 md:px-4 ${selected ? "border-accent/40" : "border-border-soft"}`}
     >
       <div className="mb-2 flex items-center gap-2 text-[11px] text-text-dim">
         {live ? (
@@ -88,11 +88,11 @@ export function GameRow({
               e.stopPropagation();
               onPick(side);
             }}
-            className={`w-[104px] rounded-md px-3 py-2 text-center font-mono text-[13px] font-semibold transition-colors ${
+            className={`min-h-11 w-[104px] rounded-md px-3 py-2 text-center font-mono text-[13px] font-semibold transition-colors md:min-h-0 ${
               selected && selectedOutcome === side
                 ? "bg-accent text-white"
                 : tradeable
-                  ? "bg-chip text-text hover:bg-accent/25 cursor-pointer"
+                  ? "bg-chip text-text hover:bg-accent/25 active:bg-accent/40 cursor-pointer"
                   : "bg-chip/50 text-text-mute"
             }`}
           >

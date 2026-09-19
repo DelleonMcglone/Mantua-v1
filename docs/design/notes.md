@@ -13,6 +13,7 @@ The prototype hard-locks the viewport to 1400px:
 There is no responsive design — mobile layouts, tablet breakpoints, and resize behavior are **not specified**. Production must cover these (mobile users are real); we treat that as a deviation per PD-007 and design responsive collapse rules ourselves.
 
 **v2 responsive rules** (deviation from prototype):
+
 - ≥1280px: prototype layout (2-column grid, 340px-1fr / 460px-1.3fr).
 - 768–1279px: 2-column collapses to single column; right-panel becomes a slide-in sheet.
 - <768px: full mobile — ~~bottom navigation~~, slide-up panels, stacked Portfolio + Assets.
@@ -27,13 +28,27 @@ There is no responsive design — mobile layouts, tablet breakpoints, and resize
 > reused for the 768–1279px right-panel slide-in above. See
 > `docs/tasks/014-navigation-reconciliation.md`.
 
+> **Phase 15 (task 071, 2026-09-19):** the rules above are now constants
+> (`client/src/lib/mobile.ts`) and measured. Below `lg` (1024 px) the trade
+> ticket is a **bottom sheet** (`ui/sheet.tsx` `side="bottom"`) opened by a
+> price tap — tablets included, because the stacked column put the ticket
+> below the fold of the tap. Below `md` the league page carries a sport-chip
+> row (one-tap league switching), the live glance, and the profile is four
+> tabs. Every trade control, the mic, Send, tabs and Close are ≥ 44 px on
+> phones (`TOUCH_TARGET_PX`); inline chips in a scrolling row may be 36 px.
+> Safe areas: the dock and the bottom sheet pad by `env(safe-area-inset-bottom)`;
+> `viewport-fit=cover`. The mobile suite (`client/e2e/mobile/`) asserts all
+> of it at 360 × 740 and 430 × 932.
+
 ## Theme switching
 
 Driven by an attribute on `<html>`:
 
 ```html
-<html data-theme="dark">  <!-- default -->
-<html data-theme="light">
+<html data-theme="dark">
+  <!-- default -->
+  <html data-theme="light"></html>
+</html>
 ```
 
 The prototype implements both dark and light. **Both ship in v2.** Toggle persists in localStorage. The accent purple (`#8b6cf0`) is the same in both themes.
@@ -53,6 +68,7 @@ A CSS variable `--density: 1 | 0.82` scales paddings and gaps. Comfortable mode 
 Palette extracted to `client/src/styles/tokens.css` as the canonical source. **Every color used in v2 code must reference a token.** No literal hex values in component code (lint rule incoming during Phase 9).
 
 Roles:
+
 - `--bg`, `--bg-elev`, `--panel`, `--panel-solid` — surfaces
 - `--border`, `--border-soft` — strokes
 - `--text`, `--text-dim`, `--text-mute` — text hierarchy
@@ -87,6 +103,7 @@ Outer padding: `calc(20px * var(--density))` vertical, `calc(32px * var(--densit
 ## Accessibility baseline
 
 Prototype does not show focus states explicitly. v2 adds:
+
 - WCAG 2.1 AA contrast across both themes (validate with a CI check).
 - Visible keyboard focus on every interactive element (Tailwind `focus-visible:ring`).
 - All buttons have accessible names; icon-only buttons get `aria-label`.

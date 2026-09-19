@@ -49,3 +49,39 @@ jobs:
           path: client/test-results
           if-no-files-found: ignore
           retention-days: 7
+
+  mobile:
+    name: mobile e2e (chromium, 360 px + 430 px, production build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx --workspace=@mantua/client playwright install --with-deps chromium
+
+      # Task 071 (Phase 15) — builds the client with the auth shim and runs
+      # e2e/mobile against `vite preview`: tap budgets, touch targets, the
+      # live glance, the install surface, and the load and byte budgets.
+      - name: Run the mobile suite
+        env:
+          CI: "1"
+        run: npm run e2e:mobile -w @mantua/client
+
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-mobile-traces
+          path: client/test-results
+          if-no-files-found: ignore
+          retention-days: 7

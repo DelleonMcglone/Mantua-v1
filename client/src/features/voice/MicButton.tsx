@@ -6,10 +6,18 @@
  * both the clearest contract for the user and most of the answer to
  * accidental activation (V-007).
  *
+ * Task 071 (MX-005) tunes the hold for a thumb: the press captures the
+ * pointer so a finger drifting off the button keeps recording, the long-
+ * press context menu and text selection are suppressed, a cancelled
+ * gesture or a hidden page releases, the target is 44 px on phones, and
+ * Android gets a short haptic tick on press (press-events.ts).
+ *
  * Keyboard users hold the space bar or enter while the button has focus,
  * so the control is not a mouse-only feature.
  */
+import { useEffect, useRef } from "react";
 import { Mic } from "lucide-react";
+import { hapticTick, pressEnds } from "./press-events.ts";
 import type { VoicePhase } from "./voice-types.ts";
 
 interface Props {
@@ -29,6 +37,31 @@ const LABEL: Record<VoicePhase, string> = {
 export function MicButton({ phase, onPress, onRelease }: Props) {
   const live = phase === "listening" || phase === "starting";
   const disabled = phase === "unavailable";
+  const captured = useRef(false);
+
+  // A phone call, an app switch, or the screen locking: release.
+  useEffect(() => {
+    if (!live) return;
+    const hidden = () => {
+      if (document.visibilityState === "hidden" && pressEnds("hidden", captured.current))
+        onRelease();
+    };
+    const blur = () => {
+      if (pressEnds("blur", captured.current)) onRelease();
+    };
+    document.addEventListener("visibilitychange", hidden);
+    window.addEventListener("blur", blur);
+    return () => {
+      document.removeEventListener("visibilitychange", hidden);
+      window.removeEventListener("blur", blur);
+    };
+  }, [live, onRelease]);
+
+  const end = (reason: "pointerup" | "pointercancel" | "pointerleave") => {
+    if (!live || !pressEnds(reason, captured.current)) return;
+    captured.current = false;
+    onRelease();
+  };
 
   return (
     <button
@@ -40,11 +73,26 @@ export function MicButton({ phase, onPress, onRelease }: Props) {
       title={LABEL[phase]}
       onPointerDown={(e) => {
         e.preventDefault();
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          captured.current = true;
+        } catch {
+          captured.current = false;
+        }
+        if (e.pointerType === "touch") hapticTick(navigator);
         onPress();
       }}
-      onPointerUp={onRelease}
+      onPointerUp={() => {
+        end("pointerup");
+      }}
+      onPointerCancel={() => {
+        end("pointercancel");
+      }}
       onPointerLeave={() => {
-        if (live) onRelease();
+        end("pointerleave");
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
       }}
       onKeyDown={(e) => {
         if (e.repeat) return;
@@ -54,12 +102,14 @@ export function MicButton({ phase, onPress, onRelease }: Props) {
         if (e.key === " " || e.key === "Enter") onRelease();
       }}
       className={[
-        "bg-transparent border-none cursor-pointer flex p-1 disabled:cursor-not-allowed",
-        live ? "text-accent" : "text-text-dim",
+        "flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-transparent border-none cursor-pointer",
+        "select-none [touch-action:none] [-webkit-touch-callout:none] disabled:cursor-not-allowed",
+        "md:h-auto md:w-auto md:rounded-none md:p-1",
+        live ? "bg-accent/15 text-accent md:bg-transparent" : "text-text-dim",
         disabled ? "opacity-40" : "",
       ].join(" ")}
     >
-      <Mic className={`h-4 w-4 ${live ? "animate-pulse" : ""}`} />
+      <Mic className={`h-5 w-5 md:h-4 md:w-4 ${live ? "animate-pulse" : ""}`} />
     </button>
   );
 }

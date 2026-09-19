@@ -872,6 +872,30 @@ the server refuses to mint a confirmation from a spoken turn, so saying
 
 ---
 
+## 📲 PHASE 15: Mobile Experience (task 071, D-118) — 🟡 P1
+
+> The dedicated mobile pass, scheduled last. One trade flow (the ticket
+> becomes a bottom sheet below `lg`), pushes off the activity spine and the
+> live-sync tick, the installed app as a PWA, budgets enforced against the
+> production build at two phone widths. Ledger: `071-mobile-experience.md`;
+> audit `docs/design/mobile-audit.md`; benchmark
+> `docs/design/mobile-benchmark.md`. Phase 14 is skipped for now at the
+> owner's direction (Base support ticket on the builder-code registration).
+
+| ID     | Task                                                                                                                                                                                                                                                                                                             | Status |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| MX-001 | Audit of every P0/P1 flow against the couple-of-taps standard, each count proven by a spec at 360 px and 430 px; sport switching made one tap                                                                                                                                                                    | ✅     |
+| MX-002 | Bottom-sheet ticket below `lg`: price → preset → Confirm, three taps, Confirm in the thumb zone, 44 px controls                                                                                                                                                                                                  | ✅     |
+| MX-003 | Live glance: score, prices, the held side's price now, value, P&L and a two-tap exit in one card                                                                                                                                                                                                                 | ✅     |
+| MX-004 | Web Push (RFC 8291/8292 on node:crypto, no dependency): trades, positions, games, agent, settlement; idempotent per (user, tag); owner sets keys                                                                                                                                                                 | 🟡     |
+| MX-005 | Hold-to-speak retuned for thumbs: pointer capture, cancel/hide releases, no long-press menu, 44 px, iOS audio resume                                                                                                                                                                                             | ✅     |
+| MX-006 | Budgets as constants with rationale, enforced on the production build at two phone widths; lazy routes + vendor split take the app itself from 1.63 MB to 340 kB gzip. 🟡 **The auth SDK's wallet stack (1.39 MB) stays on the production critical path — an auth-provider decision, recorded in the benchmark** | 🟡     |
+| MX-007 | PWA (D-118): manifest, icons, service worker, earned install offer, launch routes; native deferred                                                                                                                                                                                                               | ✅     |
+| MX-008 | Tabbed phone profile (positions first), agent controls and portfolio one tap across, 44 px Close / Confirm / chips                                                                                                                                                                                               | ✅     |
+| MX-009 | Benchmark vs Polymarket and Kalshi phone flows on taps and speed; Mantua measured by the suite, competitor rows from published flows                                                                                                                                                                             | 🟡     |
+
+---
+
 ## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
 
 The owner's master task list is stored verbatim at
@@ -880,14 +904,14 @@ phase numbering and row IDs. Phases 0–12 above reconcile to it (its
 Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 `launch-gate.md`). The phases not yet started:
 
-| Phase                                                       | Tier  | Rows            | Status |
-| ----------------------------------------------------------- | ----- | --------------- | ------ |
-| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ⬜     |
-| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜     |
-| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | ⬜     |
-| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜     |
-| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜     |
-| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜     |
+| Phase                                                       | Tier  | Rows            | Status                                                 |
+| ----------------------------------------------------------- | ----- | --------------- | ------------------------------------------------------ |
+| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ⬜                                                     |
+| 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜                                                     |
+| 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark) |
+| 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜                                                     |
+| 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜                                                     |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                     |
 
 ---
 
@@ -952,7 +976,8 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
 | Phase 11: Market Depth & Research Layer           | 8       |
 | Phase 12: Voice (ElevenLabs Scribe v2 Realtime)   | 11      |
-| **Grand Total**                                   | **181** |
+| Phase 15: Mobile Experience                       | 9       |
+| **Grand Total**                                   | **190** |
 
 ### Future phases
 
