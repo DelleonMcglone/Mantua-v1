@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { StatusBanner } from "@/features/status/PlatformStatusProvider.tsx";
 import { Header } from "./Header.tsx";
+import { PanelLoading } from "./PanelLoading.tsx";
 import type { NavDestination } from "./MarketNav.tsx";
 import type { HomePromptId } from "./HomeMenu.tsx";
 
@@ -66,7 +67,9 @@ export function AppShell({
           degraded, paused, unreachable or offline. */}
       <StatusBanner className="px-4 pt-3 md:px-8" />
       {full ? (
-        <main className="flex-1 min-h-0 overflow-auto">{full}</main>
+        <main className="flex-1 min-h-0 overflow-auto">
+          <Suspense fallback={<PanelLoading />}>{full}</Suspense>
+        </main>
       ) : (
         <main
           className="grid flex-1 min-h-0 items-stretch"
@@ -93,9 +96,11 @@ export function AppShell({
               }}
             >
               <div className="flex flex-col min-h-0" style={{ gap: "calc(20px * var(--density))" }}>
-                {left}
+                <Suspense fallback={<PanelLoading />}>{left}</Suspense>
               </div>
-              <div className="flex flex-col min-h-0">{right}</div>
+              <div className="flex flex-col min-h-0">
+                <Suspense fallback={<PanelLoading />}>{right}</Suspense>
+              </div>
             </div>
           </div>
         </main>

@@ -25,6 +25,7 @@ import { marketAnalysisRouter } from "./routes/market-analysis.ts";
 import { marketDepthRouter } from "./routes/market-depth.ts";
 import { marketHistoryRouter } from "./routes/market-history.ts";
 import { voiceTokenRouter } from "./routes/voice-token.ts";
+import { pushRouter } from "./routes/push.ts";
 import { marketDiscoverRouter } from "./routes/market-discover.ts";
 import { legalRouter } from "./routes/legal.ts";
 import { marketRedeemRouter } from "./routes/market-redeem.ts";
@@ -149,6 +150,8 @@ app.use(marketAnalysisRouter);
 app.use(marketHistoryRouter);
 // Task 069 (V-001) — the single-use token the browser transcribes with.
 app.use(voiceTokenRouter);
+// Task 071 (MX-004) — Web Push subscriptions.
+app.use(pushRouter);
 // Task 067 (G-014) — recorded Terms acceptance.
 app.use(legalRouter);
 app.use(cspReportRouter);

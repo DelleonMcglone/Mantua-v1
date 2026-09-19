@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTicketInSheet } from "@/hooks/use-media-query.ts";
 import { ComingSoon } from "./ComingSoon.tsx";
 import { defaultSelection, type Selection } from "./default-selection.ts";
 import { GamesList } from "./GamesList.tsx";
 import { LeagueHeader } from "./LeagueHeader.tsx";
+import { LiveGlance } from "./live/LiveGlance.tsx";
 import { MarketDetail } from "./detail/MarketDetail.tsx";
 import { getSport, type SportId } from "./sports.ts";
+import { TradeSheet } from "./ticket/TradeSheet.tsx";
 import { TradeTicket } from "./ticket/TradeTicket.tsx";
 import { buildWeekOptions, type WeekOption } from "./week-options.ts";
 import { useSlate } from "./use-slate.ts";
@@ -30,7 +33,12 @@ interface Props {
   initialAmount?: string | undefined;
 }
 
-/** Full-screen league page: date-grouped game rows with contract prices, the market page in place, and the ticket alongside. */
+/**
+ * Full-screen league page: date-grouped game rows with contract prices, the
+ * market page in place, and the ticket alongside — or, below `lg`, in a
+ * bottom sheet that a price tap opens (task 071, MX-002). Phones also get
+ * the live glance above the list (MX-003).
+ */
 export function LeaguePage({
   sport,
   onSelectSport,
@@ -46,11 +54,15 @@ export function LeaguePage({
   onBrowseHistory,
 }: Props) {
   const active = getSport(sport);
+  const inSheet = useTicketInSheet();
   const weekOptions = useMemo(() => buildWeekOptions(), []);
   const [week, setWeek] = useState<WeekOption>(() => weekOptions[1]);
   const { slates, loading } = useSlate(week.dates);
   const [selection, setSelection] = useState<Selection | null>(null);
   const [detailId, setDetailId] = useState<string | null>(null);
+  // A deep link (a Discover price tap, a Close, a notification) opens the
+  // sheet; the list's default selection never does.
+  const [sheetOpen, setSheetOpen] = useState(() => Boolean(initialEventId ?? initialTeam));
 
   const slate = slates[active.id];
   const events = useMemo(() => slate?.events ?? [], [slate]);
@@ -75,14 +87,42 @@ export function LeaguePage({
   if (active.coverage === "soon")
     return <ComingSoon sport={sport} onSelectSport={onSelectSport} onBack={onBack} />;
 
+  const pick = (event: Selection["event"], outcomeIndex: 0 | 1) => {
+    setSelection({ event, outcomeIndex });
+    setSheetOpen(true);
+  };
+  const open = (eventId: string) => {
+    const event = events.find((e) => e.providerEventId === eventId);
+    if (event) setSelection({ event, outcomeIndex: 0 });
+    setDetailId(eventId);
+  };
+  const ticket = effective ? (
+    <TradeTicket
+      key={`${effective.event.providerEventId}-${String(effective.outcomeIndex)}`}
+      event={effective.event}
+      outcomeIndex={effective.outcomeIndex}
+      initialDirection={initialDirection}
+      initialAmount={effective.event.providerEventId === initialEventId ? initialAmount : undefined}
+      onPick={(outcomeIndex) => {
+        setSelection({ event: effective.event, outcomeIndex });
+      }}
+      onViewPositions={onViewPositions}
+    />
+  ) : (
+    <div className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim">
+      Pick a price on any upcoming game to trade it here.
+    </div>
+  );
+
   return (
-    <div className="mx-auto w-full max-w-6xl px-6 py-6">
+    <div className="mx-auto w-full max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <LeagueHeader
         sport={active}
         slate={slate}
         weekOptions={weekOptions}
         week={week}
         onBack={onBack}
+        onSelectSport={onSelectSport}
         onSelectWeek={(option) => {
           setWeek(option);
           setSelection(null);
@@ -90,8 +130,9 @@ export function LeaguePage({
         }}
       />
 
-      <div className="mt-6 flex flex-col gap-8 lg:flex-row">
+      <div className="mt-4 flex flex-col gap-8 md:mt-6 lg:flex-row">
         <div className="min-w-0 flex-1">
+          {!detailEvent && <LiveGlance events={events} onOpen={open} className="mb-4 md:hidden" />}
           {detailEvent && slate && (
             <MarketDetail
               event={detailEvent}
@@ -112,39 +153,21 @@ export function LeaguePage({
               loading={loading}
               events={events}
               selected={effective}
-              onPick={(event, outcomeIndex) => {
-                setSelection({ event, outcomeIndex });
-              }}
+              onPick={pick}
               onOpen={(event) => {
-                setSelection({ event, outcomeIndex: 0 });
-                setDetailId(event.providerEventId);
+                open(event.providerEventId);
               }}
             />
           )}
         </div>
 
-        <div className="w-full shrink-0 lg:w-[320px]">
-          {effective ? (
-            <TradeTicket
-              key={`${effective.event.providerEventId}-${String(effective.outcomeIndex)}`}
-              event={effective.event}
-              outcomeIndex={effective.outcomeIndex}
-              initialDirection={initialDirection}
-              initialAmount={
-                effective.event.providerEventId === initialEventId ? initialAmount : undefined
-              }
-              onPick={(outcomeIndex) => {
-                setSelection({ event: effective.event, outcomeIndex });
-              }}
-              onViewPositions={onViewPositions}
-            />
-          ) : (
-            <div className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim">
-              Pick a price on any upcoming game to trade it here.
-            </div>
-          )}
-        </div>
+        {!inSheet && <div className="w-full shrink-0 lg:w-[320px]">{ticket}</div>}
       </div>
+      {inSheet && (
+        <TradeSheet open={sheetOpen && effective !== null} onOpenChange={setSheetOpen}>
+          {ticket}
+        </TradeSheet>
+      )}
     </div>
   );
 }

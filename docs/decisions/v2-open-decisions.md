@@ -790,6 +790,50 @@ cap-bound is honest and deterministic). Columns instead of the typed
 the only editor. A paused policy stops unprompted hedges and every agent
 trade; the kill switch remains the platform-wide stop above it.
 
+## D-118 — Mobile packaging: PWA first, native deferred ✅ CLOSED 2026-09-19
+
+**Decision.** Mantua ships to phones as a Progressive Web App (task 071,
+MX-007): a manifest with icons and home-screen shortcuts, a service worker
+that caches the immutable build assets and the shell (never `/api/`), an
+install offer that appears once earned and respects a dismissal, launch
+routes (`?open=…`) that notifications and shortcuts land on, and Web Push
+on the same origin. Native packaging (App Store / Play) is deferred until
+app-store distribution is a growth need rather than a technical one.
+
+**Reasoning.**
+
+1. **Everything the phase needs, the PWA provides.** Installability,
+   a full-screen shell, push notifications (Android; iOS 16.4+ once on the
+   home screen), offline resilience, and a home-screen icon. Nothing in
+   MX-001 … MX-009 requires a native API.
+2. **One codebase, one release.** The trading flow, the ticket, the agent
+   and the legal pages ship once; a native wrapper would add a second
+   review pipeline, a second update cadence, and store policies for
+   real-money prediction markets that are themselves an open legal
+   question (L-004).
+3. **Nothing is wasted later.** A native wrapper (TWA on Android, a thin
+   WebView shell on iOS) wraps exactly this PWA; the manifest, the service
+   worker, the launch routes and the push topics carry over unchanged.
+4. **Speed is a bundle problem, not a packaging problem.** The measured
+   cost on a mid-tier phone is the JavaScript on the critical path
+   (`docs/design/mobile-benchmark.md`); a native shell would download the
+   same bundle. The fix is lazy routes and vendor splits, done here, and
+   an auth-provider decision for the remainder.
+
+**Rejected.** React Native / a second client (duplicates the consumer
+layer and every spec). Capacitor now (adds a build and a store submission
+for no capability the phase needs; revisit when store presence matters).
+Caching API reads in the service worker (a stale price shown as current is
+worse than no price — R-005's banner is the honest offline state).
+
+**Consequence.** `client/public/manifest.webmanifest`, `client/public/sw.js`,
+`client/src/lib/register-sw.ts`, `client/src/features/pwa/`,
+`client/src/lib/launch-route.ts`; the mobile browser suite runs the
+production build and proves the install surface (`e2e/mobile/pwa.spec.ts`).
+iOS users get the two-step "Share → Add to Home Screen" instruction in
+place of the prompt, and push settings say when the home screen is the
+prerequisite.
+
 ## D-107 — Social platform for agent posting ✅ CLOSED 2026-09-18
 
 **Decision.** X (Twitter) is the platform an agent posts to (task 070,

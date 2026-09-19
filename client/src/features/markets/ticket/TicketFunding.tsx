@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { CopyButton } from "@/features/agent/agent-primitives.tsx";
-import { PlaidLinkLauncher } from "@/features/portfolio/PlaidLinkLauncher.tsx";
 import { useFiatRails } from "@/features/portfolio/use-fiat-rails.ts";
+
+// Task 071 (MX-006) — the bank-connection SDK loads with the first deposit.
+const PlaidLinkLauncher = lazy(() =>
+  import("@/features/portfolio/PlaidLinkLauncher.tsx").then((m) => ({
+    default: m.PlaidLinkLauncher,
+  })),
+);
 
 /**
  * T-013 — Add funds, woven into the first trade. Bank connect + deposit
@@ -78,13 +84,15 @@ export function TicketFunding({
             </Button>
           )}
           {rails.linkToken && (
-            <PlaidLinkLauncher
-              token={rails.linkToken}
-              onSuccess={(publicToken) => {
-                void rails.completePlaidLink(publicToken);
-              }}
-              onExit={rails.cancelPlaidLink}
-            />
+            <Suspense fallback={null}>
+              <PlaidLinkLauncher
+                token={rails.linkToken}
+                onSuccess={(publicToken) => {
+                  void rails.completePlaidLink(publicToken);
+                }}
+                onExit={rails.cancelPlaidLink}
+              />
+            </Suspense>
           )}
           {bankEnabled && rails.data?.bankLinked && (
             <div className="flex gap-2">

@@ -35,7 +35,7 @@ export function TicketSides({
             onClick={() => {
               onDirection(d);
             }}
-            className={`pb-2 capitalize cursor-pointer ${
+            className={`min-h-11 px-1 pb-2 capitalize cursor-pointer md:min-h-0 md:px-0 ${
               direction === d
                 ? "border-b-2 border-text font-semibold text-text"
                 : "text-text-dim hover:text-text"
@@ -55,7 +55,7 @@ export function TicketSides({
             onClick={() => {
               onPick(idx);
             }}
-            className={`rounded-md px-3 py-2.5 text-center font-mono text-[13px] font-semibold transition-colors cursor-pointer ${
+            className={`min-h-11 rounded-md px-3 py-2.5 text-center font-mono text-[13px] font-semibold transition-colors cursor-pointer md:min-h-0 ${
               side === idx ? "bg-accent text-white" : "bg-chip text-text hover:bg-accent/25"
             }`}
           >

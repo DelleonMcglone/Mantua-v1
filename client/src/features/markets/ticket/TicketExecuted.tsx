@@ -50,13 +50,18 @@ export function TicketExecuted({
         </p>
       )}
       <div className="mt-3 flex gap-2">
-        <Button variant="primary" size="sm" className="flex-1" onClick={onViewPositions}>
+        <Button
+          variant="primary"
+          size="sm"
+          className="h-11 flex-1 md:h-8"
+          onClick={onViewPositions}
+        >
           View position
         </Button>
         <Button
           variant="ghost"
           size="sm"
-          className="flex-1 border-border-soft"
+          className="h-11 flex-1 border-border-soft md:h-8"
           onClick={onTradeAgain}
         >
           Trade again

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { ArrowLeft } from "lucide-react";
 import { api } from "@/lib/api.ts";
@@ -10,8 +10,10 @@ import { LiveGamePanel } from "./LiveGamePanel.tsx";
 import { MarketDepthSections } from "./MarketDepthSections.tsx";
 import { MarketSummary } from "./MarketSummary.tsx";
 import { MarketTabs } from "./MarketTabs.tsx";
-import { PriceChart } from "./PriceChart.tsx";
 import { useMarketDepth } from "./use-market-depth.ts";
+
+// Task 071 (MX-006) — the charting library loads with the first market page, not the app.
+const PriceChart = lazy(() => import("./PriceChart.tsx").then((m) => ({ default: m.PriceChart })));
 
 interface Props {
   event: SlateEvent;
@@ -57,7 +59,7 @@ export function MarketDetail({ event, slate, league, onBack, onAgent, onBrowseHi
           type="button"
           onClick={onBack}
           aria-label="Back to games"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim transition-colors hover:text-text cursor-pointer"
+          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border-soft bg-transparent text-text-dim transition-colors hover:text-text cursor-pointer md:h-8 md:w-8"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -74,12 +76,14 @@ export function MarketDetail({ event, slate, league, onBack, onAgent, onBrowseHi
         <ClaimWinnings address={user?.wallet?.address} providerEventId={event.providerEventId} />
       </div>
       <div className="mt-4">
-        <PriceChart
-          event={event}
-          detail={detail}
-          failed={failed}
-          annotations={depth.read?.annotations ?? []}
-        />
+        <Suspense fallback={<div className="h-[220px] rounded-md border border-border-soft" />}>
+          <PriceChart
+            event={event}
+            detail={detail}
+            failed={failed}
+            annotations={depth.read?.annotations ?? []}
+          />
+        </Suspense>
       </div>
 
       <MarketDepthSections

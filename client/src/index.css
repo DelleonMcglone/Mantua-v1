@@ -93,6 +93,14 @@
     transform: translateX(0);
   }
 }
+@keyframes sheet-in-bottom {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -101,5 +109,22 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Task 071 (Phase 15) — phone ergonomics. Buttons and links opt out of the
+   double-tap-to-zoom delay; text never auto-inflates in landscape; the
+   installed app does not rubber-band the whole page. */
+button,
+[role="button"],
+a {
+  touch-action: manipulation;
+}
+html {
+  -webkit-text-size-adjust: 100%;
+}
+@media (display-mode: standalone) {
+  body {
+    overscroll-behavior-y: none;
   }
 }

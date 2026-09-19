@@ -878,6 +878,64 @@ edits through the app.
   the `source` field, so the V-009 spoken-confirmation interlock could not
   fire from the app. It is sent now.
 
+## Mobile experience (Phase 15, task 071, D-118)
+
+Everything a phone needs is a couple of taps away, and the same code the
+desktop runs. The breakpoints are constants (`client/src/lib/mobile.ts`):
+below `md` (768 px) the header nav is behind the hamburger and layouts are
+single-column (B-014); below `lg` (1024 px) the trade ticket is a bottom
+sheet. `TOUCH_TARGET_PX` is 44 and the mobile suite measures it.
+
+- **The trade sheet** (`features/markets/ticket/TradeSheet.tsx`,
+  `ui/sheet.tsx` `side="bottom"`). A price tap on the league page opens the
+  sheet with that side set; a Discover tap, a Close, or a notification
+  deep-links into it. It renders the same `TradeTicket` as the sidebar —
+  the tap machine (`trade-ticket-core.ts`) is untouched, so a trade is
+  still three taps and an exit two. Confirm sits in the thumb zone.
+- **The live glance** (`features/markets/live/`). One card per game in
+  progress on the league page: score, both prices, and for a held side the
+  contracts, the price now, the value, the P&L and a Sell / Lock in that
+  opens the sheet on Sell with the full balance. Pure core, node-tested.
+- **Push notifications** (`server/src/lib/push/`, `routes/push.ts`,
+  `client/src/features/notifications/`, `client/public/sw.js`). Web Push
+  on `node:crypto` alone — RFC 8291 `aes128gcm` verified byte-for-byte
+  against the RFC's Appendix A vector, RFC 8292 VAPID. Five topics:
+  trades, positions, games, agent, settlement. Trade confirmations, agent
+  actions and settlement come off `recordActivity` (the D-115 spine, so
+  every money path is covered by one hook); game events and 10¢ position
+  steps come off the live-sync tick. Delivery is idempotent per
+  (user, tag) through `push_deliveries`' unique index, claimed before the
+  send. A push carries a title, a sentence and an in-app path — it can open
+  a page and nothing else. Keys are three env vars; absent, the feature is
+  dark and the client never asks for permission. Ops:
+  `docs/ops/push-notifications.md`.
+- **The installed app** (D-118). `manifest.webmanifest`, icons, a service
+  worker that caches hashed assets and the shell and never `/api/`, an
+  install offer earned by a trade or a visit to the portfolio and
+  remembered when dismissed (`features/pwa/`), and launch routes
+  (`lib/launch-route.ts`: `?open=market|profile|agent|discover|home`) that
+  shortcuts and notification taps land on.
+- **Voice on a phone** (`features/voice/press-events.ts`, `MicButton.tsx`).
+  Pointer capture keeps the hold while a finger drifts; a cancelled gesture,
+  a hidden page or a lost focus releases; the long-press menu is
+  suppressed; iOS's suspended audio context is resumed; the target is 44 px.
+- **The budget** (`lib/mobile-budgets.ts`, `e2e/mobile/perf.spec.ts`,
+  `bundle.spec.ts`). A mid-tier profile (Chrome's Slow 4G, 4× CPU) and the
+  numbers with their reasons, enforced against the production build under
+  `vite preview`. `app-lazy.ts` defers the swap, liquidity, analyze, agent,
+  history, legal and docs surfaces; `vite.config.ts` splits the Circle
+  bridge kit, x402, Solana, the charting library and Plaid into leaf chunks
+  only those surfaces pull. The wallet stack the auth provider needs on
+  every page is what remains on the critical path (benchmark §Next cut).
+- **The phone profile** (`features/portfolio/MobileProfile.tsx`). Positions,
+  Portfolio, Agent, Account as four tabs, positions first; the same sections
+  the desktop page shows, with the wallet card shared
+  (`ProfileWalletSection.tsx`).
+- **Proof.** `client/playwright.mobile.config.ts` runs `e2e/mobile/` at
+  360 × 740 and 430 × 932 (Chromium, touch, mobile UA) on every PR beside
+  the desktop suite; `docs/design/mobile-audit.md` cites a spec for every
+  tap count and `docs/design/mobile-benchmark.md` records the numbers.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.

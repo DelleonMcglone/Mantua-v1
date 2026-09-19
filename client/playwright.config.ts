@@ -14,6 +14,9 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Task 071 — the phone suite has its own config (production build, two
+  // mobile projects): playwright.mobile.config.ts.
+  testIgnore: /e2e[\\/]mobile[\\/]/,
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

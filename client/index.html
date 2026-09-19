@@ -7,7 +7,20 @@
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
     <link rel="icon" type="image/png" sizes="64x64" href="/assets/favicon-64.png" />
     <link rel="apple-touch-icon" href="/assets/apple-touch-icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- Task 071 (Phase 15, MX-007): installable. The manifest names the
+         app, its icons and its home-screen shortcuts; the theme colour
+         follows the theme (hooks/use-theme.tsx keeps it in step). -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Mantua" />
+    <meta
+      name="description"
+      content="Agent-driven sports prediction markets. Find a game, ask your agent, take a position in three taps."
+    />
     <title>Mantua</title>
   </head>
   <body>

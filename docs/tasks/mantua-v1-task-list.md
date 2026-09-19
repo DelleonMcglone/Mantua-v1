@@ -1,7 +1,8 @@
 # Mantua v1 — Agent-Driven Sports Prediction Market Task List
 
 > Owner's master list, stored verbatim as the source of truth for phase
-> numbering and row IDs (received 2026-09-16). The repository roadmap
+> numbering and row IDs (received 2026-09-16; refreshed by the owner
+> 2026-09-19 with Phases 12 and 13 closed). The repository roadmap
 > (`v2-roadmap.md`) and each task document reconcile to this list; when
 > the two disagree, this list wins and the roadmap is corrected.
 >
@@ -72,9 +73,9 @@ Behind it: `USD → USDC → Circle → Base → Mantua smart contracts → sett
 
 ```
 Total Tasks: 294
-Completed:   203   (+20 partial 🟡)
+Completed:   228   (+20 partial 🟡)
 
-[████████████████████████████░░░░░░░░░░░░] 69.0%
+[███████████████████████████████░░░░░░░░░] 77.6%
 ```
 
 | Phase                                                      | Tier  | Tasks | Done       |
@@ -91,8 +92,8 @@ Completed:   203   (+20 partial 🟡)
 | Phase 9: Portfolio Management + Activity                   | 🔴 P0 | 19    | 19 ✅      |
 | Phase 10: Launch Gate (E2E, Security, Legal)               | 🔴 P0 | 18    | 7 (+4 🟡)  |
 | Phase 11: Market Depth & Research Layer                    | 🟡 P1 | 8     | 8 ✅       |
-| Phase 12: Voice — ElevenLabs Scribe v2 Realtime            | 🟡 P1 | 11    | 0          |
-| Phase 13: Agent Extended (Social + Reputation + Support)   | 🟡 P1 | 14    | 0          |
+| Phase 12: Voice — ElevenLabs Scribe v2 Realtime            | 🟡 P1 | 11    | 11 ✅      |
+| Phase 13: Agent Extended (Social + Reputation + Support)   | 🟡 P1 | 14    | 14 ✅      |
 | Phase 14: Base Builder Code                                | 🟡 P1 | 3     | 0          |
 | Phase 15: Mobile Experience (LAST)                         | 🟡 P1 | 9     | 0          |
 | Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 0          |
@@ -552,55 +553,60 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 ## 🎙️ PHASE 12: Voice — ElevenLabs Scribe v2 Realtime 🟡
 
 > [ElevenLabs docs](https://elevenlabs.io/docs/overview/intro). Example experiences: _"Should I buy the Falcons YES contract?"_ / _"Show me the best NFL markets tonight."_
+>
+> **Delivered on PR #57, which also carries the task-list reconciliation. Three files crossed the 150-line cap during the build and were split into modules before commit, so critical rule 15 holds.**
 
-| ID    | Task                                                                                                          | Status |
-| ----- | ------------------------------------------------------------------------------------------------------------- | ------ |
-| V-001 | Integrate **ElevenLabs Scribe v2 Realtime** voice-to-text model; key server-side                              | ⬜     |
-| V-002 | Add voice input to the Mantua command interface — agent chat + trading flows (push-to-talk)                   | ⬜     |
-| V-003 | Realtime streaming transcription UX: live text as the user speaks                                             | ⬜     |
-| V-004 | Convert voice → natural-language agent command through the same parse/confirm pipeline as text                | ⬜     |
-| V-005 | Handle trading commands, research commands, portfolio commands, and market discovery                          | ⬜     |
-| V-006 | Handle corrections                                                                                            | ⬜     |
-| V-007 | Handle accidental activation                                                                                  | ⬜     |
-| V-008 | Ensure voice commands respect agent permissions                                                               | ⬜     |
-| V-009 | Ensure voice cannot bypass confirmation/risk controls — **no voice-triggered execution without confirmation** | ⬜     |
-| V-010 | Fallback to text input when voice fails or is unavailable; "I didn't catch that" retry pattern                | ⬜     |
-| V-011 | E2E: voice-driven analysis request and voice-driven trade (with confirm) both succeed                         | ⬜     |
+| ID    | Task                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Status |
+| ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| V-001 | Integrate **ElevenLabs Scribe v2 Realtime** voice-to-text model; key server-side — **the key never reaches the browser:** the server spends it on a single-use token that expires in fifteen minutes and is consumed on first use; the route answers token, expiry and model id, and a test asserts there is no fourth field. No key configured means the microphone is never offered. **No dependency added** — the SDK was read to pin the wire contract, not installed                                                                                                                                   | ✅     |
+| V-002 | Add voice input to the Mantua command interface — agent chat + trading flows (push-to-talk) — ⚠️ `Permissions-Policy` was blocking the microphone outright; it is now granted on the **SPA document only**, with the API's own responses left closed and pinned by a test                                                                                                                                                                                                                                                                                                                                   | ✅     |
+| V-003 | Realtime streaming transcription UX: live text as the user speaks — over the single outside origin the feature touches, added as one CSP `connect-src` entry                                                                                                                                                                                                                                                                                                                                                                                                                                                | ✅     |
+| V-004 | Convert voice → natural-language agent command through the same parse/confirm pipeline as text — **the decision the phase rests on:** voice is an _input method_, not a command path. The microphone produces text and hands it to the same submit callback the Send button uses — no voice parser, no voice intent type, no voice execution route                                                                                                                                                                                                                                                          | ✅     |
+| V-005 | Handle trading commands, research commands, portfolio commands, and market discovery — all of them, because they ride the text path unchanged                                                                                                                                                                                                                                                                                                                                                                                                                                                               | ✅     |
+| V-006 | Handle corrections — two bugs found and fixed in build: trailing punctuation, and multiple corrections in one utterance; the module now iterates from the first marker                                                                                                                                                                                                                                                                                                                                                                                                                                      | ✅     |
+| V-007 | Handle accidental activation — a sub-threshold press was blocking the control for 900 ms; fixed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | ✅     |
+| V-008 | Ensure voice commands respect agent permissions — **structural rather than remembered:** a test walks the feature and fails if any module imports a parse, confirm, sign or execute path                                                                                                                                                                                                                                                                                                                                                                                                                    | ✅     |
+| V-009 | Ensure voice cannot bypass confirmation/risk controls — **no voice-triggered execution without confirmation** — **speech is deliberately weaker than typing here.** The server refuses to mint a confirmation from a spoken turn and will not execute one autonomously, so the words that confirm when typed confirm nothing when spoken; the client catches a bare “yes” before it is sent and says why. ⚠️ **Defect found during Phase 13 and fixed:** the client was never sending the voice `source` flag, so this interlock could not fire from the app at all; the shared chat transport now sends it | ✅     |
+| V-010 | Fallback to text input when voice fails or is unavailable; "I didn't catch that" retry pattern                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | ✅     |
+| V-011 | E2E: voice-driven analysis request and voice-driven trade (with confirm) both succeed — five voice specs inside the 18-spec browser suite                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | ✅     |
 
 ---
 
 ## 📣 PHASE 13: Agent Extended — Social Posting, Reputation + AI Customer Support 🟡
 
+> **Delivered as task 070 on draft PR #58; decision D-107 recorded. A new migration adds the fills immutability trigger.**
+> ⚠️ **The o3 and Gemini review steps were unreachable again** (as in H-008), so the repository's own code-review pass ran instead: eight defects in the new code, all fixed in a second commit. Two further findings in the pre-existing voice transport are queued as their own task.
+
 ### Capability 3 — Real-Time Social Posting ("sports agent analyst" layer)
 
-| ID     | Task                                                                                                                            | Status |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| AE-001 | Connect an agent to a social account (platform per D-107)                                                                       | ⬜     |
-| AE-002 | Automatic real-time market updates and analysis posts                                                                           | ⬜     |
-| AE-003 | Explain-the-move posts: why prices are moving; changes in probabilities, game conditions, market sentiment                      | ⬜     |
-| AE-004 | Use changing prediction-market prices as a signal for forecasting public information                                            | ⬜     |
-| AE-005 | Per-agent public voice, track record, and reputation (public performance page)                                                  | ⬜     |
-| AE-006 | Posting policy + rate controls: user-approved templates/cadence; compliance-safe wording; no unsubstantiated performance claims | ⬜     |
+| ID     | Task                                                                                                                                                                                                                                                                                                                                                                                                                              | Status |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AE-001 | Connect an agent to a social account (platform per D-107) — **X, recorded as decision D-107** (which was missing from the register until now). OAuth 1.0a signing pinned to X's published reference vector. Credentials are the developer app's key and secret plus the account's access token and secret, as server env vars — **a login password cannot drive the X API**. Without credentials every post is a recorded dry run | ✅     |
+| AE-002 | Automatic real-time market updates and analysis posts — a fifteen-minute posting tick                                                                                                                                                                                                                                                                                                                                             | ✅     |
+| AE-003 | Explain-the-move posts: why prices are moving; changes in probabilities, game conditions, market sentiment                                                                                                                                                                                                                                                                                                                        | ✅     |
+| AE-004 | Use changing prediction-market prices as a signal for forecasting public information — shipped as price-as-signal analysis                                                                                                                                                                                                                                                                                                        | ✅     |
+| AE-005 | Per-agent public voice, track record, and reputation (public performance page) — public page at `/agents/<handle>`                                                                                                                                                                                                                                                                                                                | ✅     |
+| AE-006 | Posting policy + rate controls: user-approved templates/cadence; compliance-safe wording; no unsubstantiated performance claims — a compliance lint over post text, plus a user-approved policy carrying cadence and an approval queue                                                                                                                                                                                            | ✅     |
 
 ### Agent Reputation Architecture
 
 > Reputation is broader than a social feature: public voice + track record + reputation. Especially important once public AI sports analysts exist.
 
-| ID     | Task                                                                                                                              | Status |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| AE-011 | Define canonical agent performance ledger using realized P&L, unrealized P&L, ROI, win/loss, drawdown, exposure, and risk metrics | ⬜     |
-| AE-012 | Build public agent performance page with transparent historical record                                                            | ⬜     |
-| AE-013 | Ensure performance metrics distinguish simulated, user-confirmed, and autonomous trades                                           | ⬜     |
-| AE-014 | Prevent cherry-picking or deletion of historical losing trades from public performance records                                    | ⬜     |
+| ID     | Task                                                                                                                                                                                                                                                                                                                | Status |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AE-011 | Define canonical agent performance ledger using realized P&L, unrealized P&L, ROI, win/loss, drawdown, exposure, and risk metrics — derived on read from chain-verified fills, resolutions and the audit trail; nothing is precomputed or stored                                                                    | ✅     |
+| AE-012 | Build public agent performance page with transparent historical record — `/agents/<handle>`                                                                                                                                                                                                                         | ✅     |
+| AE-013 | Ensure performance metrics distinguish simulated, user-confirmed, and autonomous trades — every entry is labelled simulated, user-confirmed, autonomous or unattributed, and **simulations never enter P&L**                                                                                                        | ✅     |
+| AE-014 | Prevent cherry-picking or deletion of historical losing trades from public performance records — three independent locks: a database trigger refuses any `UPDATE` or `DELETE` on the fills table, the public route has **no outcome filter**, and a digest over every entry lets a reader prove nothing was removed | ✅     |
 
 ### Capability 5 — AI Customer Support
 
-| ID     | Task                                                                                                                     | Status |
-| ------ | ------------------------------------------------------------------------------------------------------------------------ | ------ |
-| AE-007 | Support agent across channels: answer common questions; explain how trading and markets work; help users navigate Mantua | ⬜     |
-| AE-008 | Explain deposits, withdrawals, positions, and transactions with account-aware context                                    | ⬜     |
-| AE-009 | Basic troubleshooting flows                                                                                              | ⬜     |
-| AE-010 | Escalation to human support for complex issues                                                                           | ⬜     |
+| ID     | Task                                                                                                                                                                                                                                     | Status |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| AE-007 | Support agent across channels: answer common questions; explain how trading and markets work; help users navigate Mantua — read-only over SSE, with a JSON endpoint for other channels; **a test asserts it holds no money-moving tool** | ✅     |
+| AE-008 | Explain deposits, withdrawals, positions, and transactions with account-aware context — scoped to the caller's own account context                                                                                                       | ✅     |
+| AE-009 | Basic troubleshooting flows — deterministic, not model-authored                                                                                                                                                                          | ✅     |
+| AE-010 | Escalation to human support for complex issues — escalation opens a ticket                                                                                                                                                               | ✅     |
 
 ---
 

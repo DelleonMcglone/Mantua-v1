@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils.ts";
  * hamburger navigation (design guidance: hidden sidebar + hamburger on
  * narrow viewports) and available for the PD-007 right-panel collapse.
  *
- * Keyframes `sheet-in-left` / `sheet-in-right` live in `index.css`.
+ * Keyframes `sheet-in-left` / `sheet-in-right` / `sheet-in-bottom` live in
+ * `index.css`. `side="bottom"` is the mobile confirm surface (task 071).
  */
 
 export const Sheet = DialogPrimitive.Root;
@@ -33,14 +34,24 @@ export const SheetOverlay = forwardRef<
 SheetOverlay.displayName = "SheetOverlay";
 
 const SIDE_CLASSES = {
-  left: "left-0 border-r data-[state=open]:animate-[sheet-in-left_200ms_ease-out]",
-  right: "right-0 border-l data-[state=open]:animate-[sheet-in-right_200ms_ease-out]",
+  left: "inset-y-0 left-0 h-full w-3/4 max-w-xs border-r p-5 data-[state=open]:animate-[sheet-in-left_200ms_ease-out]",
+  right:
+    "inset-y-0 right-0 h-full w-3/4 max-w-xs border-l p-5 data-[state=open]:animate-[sheet-in-right_200ms_ease-out]",
+  /**
+   * Task 071 (MX-002) — the bottom sheet: full width, capped at 92% of the
+   * dynamic viewport so the page peeks above it, rounded top corners, a
+   * drag-handle affordance, and bottom padding that clears the home
+   * indicator on notched phones (`safe-area-inset-bottom`).
+   */
+  bottom:
+    "inset-x-0 bottom-0 max-h-[92dvh] w-full rounded-t-[var(--radius)] border-t px-4 pt-3 pb-[max(16px,env(safe-area-inset-bottom))] data-[state=open]:animate-[sheet-in-bottom_220ms_ease-out]",
 } as const;
 
-export interface SheetContentProps
-  extends ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+export interface SheetContentProps extends ComponentPropsWithoutRef<
+  typeof DialogPrimitive.Content
+> {
   /** Which edge the panel slides in from. */
-  side?: "left" | "right";
+  side?: "left" | "right" | "bottom";
 }
 
 export const SheetContent = forwardRef<
@@ -51,14 +62,18 @@ export const SheetContent = forwardRef<
     <SheetOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      data-side={side}
       className={cn(
-        "fixed inset-y-0 z-50 flex h-full w-3/4 max-w-xs flex-col overflow-y-auto",
-        "border-border-soft bg-panel-solid p-5 shadow-2xl outline-none",
+        "fixed z-50 flex flex-col overflow-y-auto overscroll-contain",
+        "border-border-soft bg-panel-solid shadow-2xl outline-none",
         SIDE_CLASSES[side],
         className,
       )}
       {...props}
     >
+      {side === "bottom" && (
+        <div aria-hidden="true" className="mx-auto mb-2 h-1 w-10 shrink-0 rounded-full bg-border" />
+      )}
       {children}
       <DialogPrimitive.Close
         className="absolute right-4 top-4 text-text-mute hover:text-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-sm"
