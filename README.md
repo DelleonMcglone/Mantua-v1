@@ -11,14 +11,10 @@ From a single natural-language prompt you can:
 
 - **Take a position** on a scheduled game, priced continuously by the pool rather than by a
   bookmaker.
-- **Provide liquidity** to market pools and to the base pairs, and manage those positions.
 - **Analyze & research** matchups, pool health, peg status, and token prices (free data, with
   optional pay-per-call x402 premium sources).
-- **Swap** USDC, EURC, and cbBTC across the hook pools.
 - **Run an autonomous agent** a Circle-managed wallet that researches, takes positions, manages
   liquidity, and hedges under a spending cap.
-- **Bridge & manage treasury** move USDC cross-chain (Circle CCTP) and hold a unified,
-  multi-chain USDC balance (Circle Gateway).
 - **Give your agent a public record and a voice** a performance page at `/agents/<handle>`
   derived from its chain-verified trades, and template-based market posts to X under a
   posting policy you approve.
