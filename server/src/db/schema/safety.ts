@@ -120,4 +120,8 @@ export type AuditAction =
   | "fiat_deposit"
   | "fiat_withdraw"
   | "fiat_transfer"
-  | "fee_admin_update";
+  | "fee_admin_update"
+  // Task 070 (Phase 13) — social posting and support escalation
+  | "social_profile_update"
+  | "social_post"
+  | "support_escalation";

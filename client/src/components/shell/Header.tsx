@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sun, Moon, Menu } from "lucide-react";
+import { Sun, Moon, Menu, LifeBuoy } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
@@ -77,6 +77,18 @@ export function Header({
         </button>
         <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
         <div className="ml-auto flex shrink-0 items-center gap-2.5 md:ml-0">
+          {/* Task 070 (AE-007) — help is one press from anywhere, signed in
+              or not; the app listens for the event like it does for login. */}
+          <Button
+            variant="icon"
+            size="icon"
+            aria-label="Help & support"
+            onClick={() => {
+              window.dispatchEvent(new Event("mantua:open-support"));
+            }}
+          >
+            <LifeBuoy className="h-[18px] w-[18px]" />
+          </Button>
           <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
             <Icon className="h-[18px] w-[18px]" />
           </Button>

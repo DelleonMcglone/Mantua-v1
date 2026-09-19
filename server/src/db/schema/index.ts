@@ -9,3 +9,4 @@ export * from "./circle.ts";
 export * from "./activity.ts";
 export * from "./fiat.ts";
 export * from "./legal.ts";
+export * from "./social.ts";

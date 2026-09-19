@@ -187,6 +187,15 @@ data is the agent's own pre-capped spend and needs no confirmation.
   yourself" recommendation.
 - **Autonomous de-peg rebalancing.** Opt-in: auto-exits a stablecoin that drifts off peg into
   the on-peg reference signal-gated, capped, audited on a daily cron.
+- **Public track record & voice (Phase 13).** Claim a handle and the agent gets a public
+  performance page derived from its chain-verified trades — realised/unrealised P&L, ROI,
+  drawdown, exposure, risk, every market including the losses, labelled by execution mode —
+  that nobody can edit; and, under a posting policy you approve template by template, it
+  posts market updates, explain-the-move analysis and price-as-signal forecasts through the
+  platform's X account, every post linted for compliance-safe wording.
+- **Support desk (Phase 13).** A read-only support agent, signed in or not: how markets and
+  trading work, your own deposits, withdrawals, positions and transactions, deterministic
+  troubleshooting, and a ticket to a person when it cannot resolve the problem.
 - **x402 agent marketplace.** Access to Circle's full paid-services catalog
   ([agents.circle.com/services](https://agents.circle.com/services)) web search, news,
   weather, sports, prediction markets, social lookups, papers, SMS/communication APIs paid
@@ -409,6 +418,7 @@ docs/        Architecture, specs, decision memos, task lists, legal drafts
 | [`docs/tasks/sports-pivot-scope-reconciliation.md`](docs/tasks/sports-pivot-scope-reconciliation.md) | What survives the pivot, what is superseded, what is deferred      |
 | [`docs/tasks/live-sports-reliability.md`](docs/tasks/live-sports-reliability.md)                     | Phase 7 — real-time stream, status ladder, trade state, load/chaos |
 | [`docs/ops/monitoring.md`](docs/ops/monitoring.md)                                                   | Latency budgets, metrics reads, the alert/paging policy            |
+| [`docs/tasks/070-agent-extended.md`](docs/tasks/070-agent-extended.md)                               | Phase 13 — the performance ledger, social posting, AI support      |
 
 An in-app documentation site covering the same ground for users is reachable from the landing
 footer.
@@ -447,6 +457,25 @@ Set no key and the microphone is simply not offered. Speech can ask for
 anything but can never confirm a trade — the server refuses to mint a
 confirmation from a spoken turn, so Confirm stays a press
 (`client/e2e/voice.spec.ts`).
+
+Agent Extended (Phase 13, task 070) gives an agent a public record, a
+voice, and a support desk. `GET /api/agents/<handle>` serves the canonical
+performance ledger — derived on read from chain-verified fills, market
+resolutions and the audit trail, never stored — with realised and
+unrealised P&L, ROI, drawdown, exposure, a risk block, every market
+including the losses, a breakdown by execution mode (simulated /
+user-confirmed / autonomous), and a digest over all entries; the fills
+table refuses UPDATE and DELETE at the database. The app answers
+`/agents/<handle>` as a public page. A user claims the handle and a posting
+policy at `PATCH /api/agent/social`; the fifteen-minute
+`GET /api/cron/social-posts` tick composes market updates, explain-the-move
+and price-as-signal posts from templates over live data, passes each
+through a compliance lint and the user's cadence gate, and sends through
+the deployment's X account (`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`,
+`X_ACCESS_TOKEN_SECRET`; absent → recorded dry runs). `POST
+/api/support/chat` (SSE) and `POST /api/support/message` (JSON) run a
+read-only support agent with a knowledge base, the caller's own account
+context, deterministic troubleshooting flows and a human-escalation ticket.
 
 The browser suite (`client/e2e/`, task 067) needs no Privy app id,
 database, or chain: it starts Vite with `VITE_E2E_AUTH=shim` and answers

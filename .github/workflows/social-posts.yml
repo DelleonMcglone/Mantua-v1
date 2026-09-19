@@ -1,0 +1,32 @@
+# Agent social posting cadence (Phase 13 / task 070, AE-002 … AE-006).
+#
+# Vercel Hobby only allows DAILY cron schedules, so the posting tick runs
+# from here every fifteen minutes: the secret-guarded endpoint composes a
+# post for each market worth one, lints it, applies each agent's own
+# cadence and approval setting, and sends through the deployment's X
+# account or records a dry run. Read-only for money.
+#
+# Requires the repo Actions secret CRON_SECRET to equal the production
+# CRON_SECRET in Vercel. Until it is set, runs fail with 401 (harmless).
+name: social-posts
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: social-posts
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Social posting tick
+        run: |
+          curl -sS -f -m 240 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://test-mantua.vercel.app/api/cron/social-posts

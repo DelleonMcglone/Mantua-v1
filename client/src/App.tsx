@@ -27,6 +27,11 @@ import { AgentPanel } from "./features/agent/AgentPanel.tsx";
 import { AnalyzePanel } from "./features/analyze/AnalyzePanel.tsx";
 import { PortfolioCard } from "./features/portfolio/PortfolioCard.tsx";
 import { ProfilePage } from "./features/portfolio/ProfilePage.tsx";
+// Task 070 (Phase 13) — the public performance page, the agent's voice, support.
+import { PublicAgentPage } from "./features/reputation/PublicAgentPage.tsx";
+import { agentHandleFromPath, agentPagePath } from "./features/reputation/reputation-core.ts";
+import { SocialPanel } from "./features/social/SocialPanel.tsx";
+import { SupportPanel } from "./features/support/SupportPanel.tsx";
 import { Board } from "./features/markets/Board.tsx";
 import { AssetsCard } from "./features/portfolio/AssetsCard.tsx";
 import { AssetDetailPanel } from "./features/portfolio/AssetDetailPanel.tsx";
@@ -104,7 +109,13 @@ type Route =
       message?: string;
       /** Task 069 (V-009) — the seed message came from speech. */
       spoken?: boolean;
-    };
+    }
+  /** Task 070 — the public performance page at `/agents/<handle>` (no login). */
+  | { kind: "agent-public"; handle: string }
+  /** Task 070 — the agent's voice: handle, posting policy, approval queue. */
+  | { kind: "social" }
+  /** Task 070 — help & support, signed in or not. */
+  | { kind: "support" };
 
 // Intents that the manual Uniswap-v4 panels own when a hook is named.
 const HOOK_ACTION_KINDS = new Set<Intent["kind"]>([
@@ -141,13 +152,22 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "asset",
   "analyze",
   "agent",
+  "social",
+  "support",
 ];
 
-/** What we persist. Never store the public pages — landing and legal —
- *  (clear instead), and never store an agent `message`: restoring it would
- *  auto-resend the command on refresh (potentially re-executing a trade). */
+/** What we persist. Never store the public pages — landing, legal, docs,
+ *  an agent's public page (its URL is the record) — (clear instead), and
+ *  never store an agent `message`: restoring it would auto-resend the
+ *  command on refresh (potentially re-executing a trade). */
 function sanitizeRouteForStorage(route: Route): Route | null {
-  if (route.kind === "landing" || route.kind === "legal" || route.kind === "docs") return null;
+  if (
+    route.kind === "landing" ||
+    route.kind === "legal" ||
+    route.kind === "docs" ||
+    route.kind === "agent-public"
+  )
+    return null;
   if (route.kind === "agent") return { kind: "agent" };
   return route;
 }
@@ -173,7 +193,12 @@ function loadStoredRoute(): Route | null {
 
 export default function App() {
   const { ready, authenticated, logout, user } = usePrivy();
-  const [route, setRoute] = useState<Route>(() => loadStoredRoute() ?? { kind: "landing" });
+  // Task 070 — `/agents/<handle>` is the one URL the app answers directly:
+  // a shared link must open the public record, not the landing page.
+  const [route, setRoute] = useState<Route>(() => {
+    const handle = agentHandleFromPath(window.location.pathname);
+    return handle ? { kind: "agent-public", handle } : (loadStoredRoute() ?? { kind: "landing" });
+  });
   const [showLogin, setShowLogin] = useState(false);
   // The game in view on a league page, for the dock's contextual quick
   // actions (T-016). Reported by LeaguePage; cleared when it unmounts.
@@ -193,6 +218,30 @@ export default function App() {
       window.removeEventListener("mantua:open-login", handler);
     };
   }, []);
+
+  // Task 070 — the header's help button and any surface can open support
+  // without prop-drilling, like the login modal.
+  useEffect(() => {
+    const handler = () => {
+      setRoute({ kind: "support" });
+    };
+    window.addEventListener("mantua:open-support", handler);
+    return () => {
+      window.removeEventListener("mantua:open-support", handler);
+    };
+  }, []);
+
+  // Task 070 — keep the address bar honest for the one shareable route: the
+  // public page carries its handle; leaving it returns to the root.
+  useEffect(() => {
+    const wanted = route.kind === "agent-public" ? agentPagePath(route.handle) : "/";
+    if (
+      window.location.pathname !== wanted &&
+      (route.kind === "agent-public" || agentHandleFromPath(window.location.pathname))
+    ) {
+      window.history.replaceState(null, "", wanted);
+    }
+  }, [route]);
 
   // Close-position deep-link from any positions list (profile, portfolio
   // card, market detail): open the league page with that game selected and
@@ -288,6 +337,21 @@ export default function App() {
         }}
         onOpenDocs={() => {
           setRoute({ kind: "docs" });
+        }}
+      />
+    );
+  }
+
+  // Task 070 — an agent's public record is a public page, like docs.
+  if (route.kind === "agent-public") {
+    return (
+      <PublicAgentPage
+        handle={route.handle}
+        onBack={() => {
+          setRoute({ kind: "landing" });
+        }}
+        onLaunch={() => {
+          setRoute({ kind: "home" });
         }}
       />
     );
@@ -500,6 +564,8 @@ function RouteContent({ route, setRoute }: { route: Route; setRoute: (r: Route) 
     case "market":
     case "discover":
     case "trading":
+    case "social":
+    case "support":
       return null;
     case "profile":
       return <ProfileRoute setRoute={setRoute} />;
@@ -537,6 +603,7 @@ function RouteContent({ route, setRoute }: { route: Route; setRoute: (r: Route) 
         />
       );
     case "agent":
+    case "agent-public":
       return null;
   }
 }
@@ -625,6 +692,23 @@ function fullPage(
             {...(route.spoken ? { initialSpoken: true } : {})}
             onClose={home}
           />
+        </PanelPage>
+      );
+    case "social":
+      return (
+        <PanelPage>
+          <SocialPanel
+            onClose={home}
+            onOpenPublicPage={(handle) => {
+              setRoute({ kind: "agent-public", handle });
+            }}
+          />
+        </PanelPage>
+      );
+    case "support":
+      return (
+        <PanelPage>
+          <SupportPanel onClose={home} />
         </PanelPage>
       );
     case "analyze":
@@ -804,6 +888,9 @@ function ProfileRoute({ setRoute }: { setRoute: (r: Route) => void }) {
       }}
       onOpenAgent={() => {
         setRoute({ kind: "agent" });
+      }}
+      onOpenSocial={() => {
+        setRoute({ kind: "social" });
       }}
       onLogout={() => {
         void logout();

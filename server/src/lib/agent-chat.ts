@@ -1132,6 +1132,9 @@ export async function auditChatToolCall(entry: {
   ok: boolean;
   data?: unknown;
   error?: string | undefined;
+  /** Task 070 / AE-013 — the agent mode the call ran under, so the public
+   *  ledger can tell a confirmed trade from an autonomous one. */
+  mode?: AgentMode | undefined;
 }): Promise<void> {
   const action = auditActionForToolCall(entry.tool, entry.args);
   if (!action) return;
@@ -1152,7 +1155,10 @@ export async function auditChatToolCall(entry: {
     walletAddress: entry.walletAddress,
     action,
     outcome: entry.ok ? (capRaiseRejected ? "rejected_other" : "success") : "failure",
-    params: capAuditParams(entry.tool, entry.args),
+    params: {
+      ...capAuditParams(entry.tool, entry.args),
+      ...(entry.mode ? { mode: entry.mode } : {}),
+    },
     chainId: entry.chainId,
     txHash,
     reason,
@@ -2523,6 +2529,7 @@ export async function* runAgentChat(
             args,
             ok: true,
             data,
+            mode,
           }),
         );
         steps.push({ tool: tu.name, args, ok: true, data });
@@ -2547,6 +2554,7 @@ export async function* runAgentChat(
             args,
             ok: false,
             error: errMsg,
+            mode,
           }),
         );
         steps.push({ tool: tu.name, args, ok: false, error: errMsg });

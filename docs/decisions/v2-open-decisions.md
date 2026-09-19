@@ -28,6 +28,7 @@
 | D-104 | Resolution engine & authority (P-005)                                                                                      | ✅ CLOSED 2026-09-06 — Sportradar finals via the canonical data layer through the S-022…S-026 integrity gates; mandatory dispute window before on-chain submit; audited manual-override path; signer = service key, operator = owner (closes DM-103)                                                                                                                                                                                        | High                                                        | None (window length tunable in ops)                                   |
 | D-105 | Dynamic Market Hook fee model (H-001…H-017)                                                                                | ✅ CLOSED 2026-09-11 — regular season 0%; playoffs dynamic 0.10%–0.70% (immutable ceiling); `Fee = C × r × p × (1 − p)` realised as v4 pip fee `r × (1 − p)` on the gross input; season flag per pool at registration from the league calendar; one on-chain `quoteFee` feeds the UI quote                                                                                                                                                  | Very high (owner spec); deployment pending                  | None — owner spec 2026-09-11; deploy waits on D-112 + funded keystore |
 | D-106 | x402 payments — scope, non-goals, gate                                                                                     | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                                                                                                                                                                                                                                                                                                           | High (facts); open questions undecided                      | Counsel (open question: D-012 posture for seller revenue)             |
+| D-107 | Social platform for agent posting (AE-001)                                                                                 | ✅ CLOSED 2026-09-18 — X (Twitter) via API v2 under an OAuth 1.0a user-context signature; ONE deployment account (four env values: app key/secret, access token/secret) through which every opted-in agent posts under its own handle; missing credentials → recorded dry runs; per-agent OAuth is the recorded next step; the login shared in the task prompt is unused, unstored, and should be rotated                                   | High (shipped, task 070)                                    | Operator provisions the X app and account credentials                 |
 | D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                               | High (process)                                              | Owner decision after 2026-09-17                                       |
 | D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                | High                                                        | None                                                                  |
 | D-111 | Gasless user transactions (C-005/C-006)                                                                                    | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                                                                                                                                                                 | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                       |
@@ -788,6 +789,41 @@ cap-bound is honest and deterministic). Columns instead of the typed
 **Consequence.** `agent_policies` is live. The Portfolio → Agent tab hosts
 the only editor. A paused policy stops unprompted hedges and every agent
 trade; the kill switch remains the platform-wide stop above it.
+
+## D-107 — Social platform for agent posting ✅ CLOSED 2026-09-18
+
+**Decision.** X (Twitter) is the platform an agent posts to (task 070,
+AE-001 … AE-006). The deployment holds **one** X developer app's consumer
+key/secret and **one** account's access token/secret in server env
+(`X_API_KEY`, `X_API_SECRET`, `X_ACCESS_TOKEN`, `X_ACCESS_TOKEN_SECRET`,
+`X_ACCOUNT_HANDLE`); requests are signed with OAuth 1.0a over
+`node:crypto`, pinned to X's published reference vector. An agent
+"connects" by claiming a public handle and enabling posting; its posts go
+out through the deployment's account with the agent's display name and
+its public page in the text. With any credential missing, every post is
+recorded as a dry run and nothing leaves the server.
+
+**Why one account.** Per-agent accounts need an OAuth 2.0 PKCE flow, an
+encrypted token store, revocation handling and a per-account rate
+budget; none of that is required to prove the analyst layer, and a single
+curated account is what an audience actually follows. The record of what
+each agent said is kept per agent regardless (`social_posts`), so moving
+an agent to its own account later changes the sender, not the history.
+
+**What was NOT done.** The X login shared in the task prompt (a username
+and password) was not used: the API cannot be driven by a password, and a
+password pasted into a task tracker is a disclosed one. It is not stored
+anywhere in the repository and should be rotated by the owner.
+
+**Rejected.** A social SDK dependency (the need is one signed POST).
+Posting without a lint (every post passes `compliance.ts` first). Letting
+the model write free text for a post (posts are templates over data; the
+model is not in the posting path at all).
+
+**Consequence.** `GET /api/cron/social-posts` runs every fifteen minutes
+from `.github/workflows/social-posts.yml`; the operator's only work is
+the four credentials and the handle. Per-agent OAuth is the recorded next
+step when an agent earns its own account.
 
 ## D-117 — Launch gate definition and what closes it ✅ CLOSED 2026-09-13
 
