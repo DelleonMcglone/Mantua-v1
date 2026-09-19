@@ -801,6 +801,83 @@ by construction rather than by a check someone has to remember.
   scripted microphone through both journeys of V-011 and asserts that
   saying "confirm" does not fill an order while pressing Confirm does.
 
+## Agent extended — ledger, voice, support (Phase 13, task 070, D-107)
+
+Three capabilities on one rule: **the ledger is derived, not declared.** A
+performance number that could be typed is a number that could be edited,
+so everything the public sees is computed on read from records nobody
+edits through the app.
+
+- **The canonical ledger** (`server/src/lib/agent/ledger.ts`,
+  `ledger-metrics.ts`, `ledger-read.ts`). Entries are the wallet's
+  chain-verified fills (`market_fills`, unique on tx hash) joined to market
+  resolutions and the audit trail; simulations come from the activity
+  timeline in their own block and never enter P&L. Realised P&L reuses the
+  Phase 8 per-market ledger; unrealised P&L reuses the marked positions;
+  ROI is realised over capital deployed; drawdown is peak-to-trough on the
+  cumulative realised series ordered by resolution, expressed against
+  capital deployed; exposure is open cost and its mark; the risk block is
+  largest stake share, largest loss, profit factor, average stake. A
+  SHA-256 digest over every fill hash and simulation id lets two readers
+  prove they saw the same history.
+- **Mode on every entry (AE-013).** `auditChatToolCall` now records the
+  agent mode in the audit params, and `execution-mode.ts` maps an audit
+  row to `user_confirmed` (a confirmation id was presented), `autonomous`
+  (autonomous mode without one, or a hedge-engine fill) or `unattributed`
+  (no row, or nothing to go on — never assumed confirmed). A market whose
+  fills span two modes is counted under neither.
+- **Immutability at the database (AE-014).** Migration 0022 adds a
+  trigger that refuses UPDATE and DELETE on `market_fills`; no server code
+  deleted anything before, and now a direct write cannot either. The
+  public route accepts no parameter that filters by outcome, and the
+  client's row mapping is tested to keep every loss.
+- **The public page** (`routes/agents-public.ts`, `/agents/<handle>`). A
+  user claims a lower-case handle (`agent_social_profiles`, one per user);
+  the page needs no login, is cached for a minute across instances, and
+  answers the same 404 for an unknown and a private handle so the
+  namespace does not leak. The app restores the route from the URL on
+  load and keeps the address bar honest while it is open.
+- **D-107 — one platform account, per-agent voice.** X is the platform.
+  The deployment holds one X app's consumer key/secret and one user
+  token/secret in server env; OAuth 1.0a signing is `node:crypto` over the
+  canonical string, pinned to X's published reference vector
+  (`social/oauth1.ts`). An agent "connects" by claiming its handle and
+  enabling posting; posts go out through that account with the agent
+  named in the text. With any credential missing every post is a recorded
+  dry run. Per-agent OAuth is the recorded next step. Nothing from the
+  login shared in the task prompt is used or stored: a password cannot
+  drive the API, and a password pasted into a tracker is a disclosed one.
+- **Posts are templates over data, linted, then gated.**
+  `candidates.ts` ranks open markets whose game is live or within the day
+  by the size of the hour's move; `explain-move.ts` attributes a notable
+  move to a thin pool, scoring, one-sided flow, or a repricing the score
+  does not explain; `price-signal.ts` turns that repricing into a forecast
+  (news implied, momentum, score-confirmed) graded by move size and pool
+  depth; `templates.ts` renders the three posts with the agent's name,
+  its page and the disclaimer, trimming the body so the footer is never
+  cut. `compliance.ts` refuses guarantees, missing disclaimers, over-length
+  text, directives to bet, and any figure in a performance sentence that
+  the ledger did not produce. `posting-policy.ts` holds the user's
+  approved templates, hourly/daily caps, spacing, quiet hours and the
+  approval rule; `post-run.ts` runs the gate sequence per tick with every
+  dependency injected, and records every attempt whatever happened to it.
+  The tick is `GET /api/cron/social-posts` every fifteen minutes from
+  GitHub Actions, like live-sync.
+- **Support is read-only and channel-agnostic** (`server/src/lib/support/`).
+  One generator answers from a code knowledge base (tested against the
+  constants it describes), the signed-in caller's own activity, transfers,
+  positions and agent standing (read once per turn, never by address),
+  the platform status, deterministic troubleshooting flows, and an
+  escalation that writes a bounded ticket and pages a webhook with the
+  ticket but never the transcript. `POST /api/support/chat` streams it;
+  `POST /api/support/message` returns it whole for other channels. A test
+  asserts none of its tools is a money-moving tool.
+- **One chat transport on the client.** `client/src/lib/chat-stream.ts`
+  is the SSE POST helper the wallet agent, the analyst and support share.
+  The refactor surfaced a real defect: the agent stream client never sent
+  the `source` field, so the V-009 spoken-confirmation interlock could not
+  fire from the app. It is sent now.
+
 ## Mobile experience (Phase 15, task 071, D-118)
 
 Everything a phone needs is a couple of taps away, and the same code the

@@ -220,8 +220,17 @@ export function computePerformance(
   };
 }
 
-/** Production reader: this wallet's fills, their markets, and the latest resolutions. */
-export async function readWalletPerformance(db: DB, address: string): Promise<AgentPerformance> {
+/** The records the ledger is derived from, for one wallet (task 070 reads them too). */
+export interface PerformanceInputs {
+  fills: (FillRow & { txHash: string })[];
+  marketRows: MarketRow[];
+  resolutionRows: ResolutionRow[];
+  /** Audit rows keyed by lower-cased tx hash: action plus its params. */
+  auditByTx: Map<string, { action: string; params: Record<string, unknown> }>;
+}
+
+/** This wallet's fills, their markets, the latest resolutions, and the audit rows. */
+export async function readPerformanceInputs(db: DB, address: string): Promise<PerformanceInputs> {
   const fills = await db
     .select({
       marketId: marketFills.marketId,
@@ -234,7 +243,7 @@ export async function readWalletPerformance(db: DB, address: string): Promise<Ag
     .from(marketFills)
     .where(eq(marketFills.address, address.toLowerCase()));
   const ids = [...new Set(fills.map((f) => f.marketId))];
-  if (ids.length === 0) return computePerformance(address, [], [], []);
+  if (ids.length === 0) return { fills, marketRows: [], resolutionRows: [], auditByTx: new Map() };
   const txHashes = fills.map((f) => f.txHash.toLowerCase());
   const [marketRows, resolutionRows, auditRows] = await Promise.all([
     db
@@ -257,13 +266,36 @@ export async function readWalletPerformance(db: DB, address: string): Promise<Ag
       .where(inArray(resolutions.marketId, ids))
       .orderBy(desc(resolutions.createdAt)),
     db
-      .select({ txHash: mantuaAuditLog.txHash, action: mantuaAuditLog.action })
+      .select({
+        txHash: mantuaAuditLog.txHash,
+        action: mantuaAuditLog.action,
+        params: mantuaAuditLog.params,
+      })
       .from(mantuaAuditLog)
       .where(inArray(mantuaAuditLog.txHash, txHashes)),
   ]);
+  const auditByTx = new Map<string, { action: string; params: Record<string, unknown> }>();
+  for (const r of auditRows) {
+    if (!r.txHash) continue;
+    const params =
+      r.params && typeof r.params === "object" ? (r.params as Record<string, unknown>) : {};
+    auditByTx.set(r.txHash.toLowerCase(), { action: r.action, params });
+  }
+  return { fills, marketRows, resolutionRows, auditByTx };
+}
+
+/** Production reader: the performance computed from `readPerformanceInputs`. */
+export async function readWalletPerformance(db: DB, address: string): Promise<AgentPerformance> {
+  const inputs = await readPerformanceInputs(db, address);
   const actionsByTx = new Map<string, string>();
-  for (const r of auditRows) if (r.txHash) actionsByTx.set(r.txHash.toLowerCase(), r.action);
-  return computePerformance(address, fills, marketRows, resolutionRows, actionsByTx);
+  for (const [tx, a] of inputs.auditByTx) actionsByTx.set(tx, a.action);
+  return computePerformance(
+    address,
+    inputs.fills,
+    inputs.marketRows,
+    inputs.resolutionRows,
+    actionsByTx,
+  );
 }
 
 /** The agent's wallet is a wallet: same computation (kept for the agent tools). */

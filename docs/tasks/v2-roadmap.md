@@ -872,6 +872,41 @@ the server refuses to mint a confirmation from a spoken turn, so saying
 
 ---
 
+## 📣 PHASE 13: Agent Extended — Social Posting, Reputation + AI Support (task 070) — 🟡 P1
+
+One rule carries the phase: **the ledger is derived, not declared.** The
+public performance page reads chain-verified fills, market resolutions
+and the audit trail on every request; nothing about an agent's record is
+stored where it could be edited, the fills table refuses UPDATE and
+DELETE at the database, and a digest over every entry lets two readers
+prove they saw the same history. Every trade is labelled by how it
+happened — simulated, user-confirmed, autonomous — and simulations never
+enter P&L. Posts are templates over live data that pass a compliance lint
+and the user's cadence gate before the platform sees them; support is a
+read-only agent with no path to a money-moving tool.
+
+| ID     | Task                                                                                                     | Status |
+| ------ | -------------------------------------------------------------------------------------------------------- | ------ |
+| AE-001 | Agent connected to the deployment's X account (D-107); handle claimed per agent; dry run without keys    | ✅     |
+| AE-002 | Automatic market-update posts from the fifteen-minute tick over live prices, pools and kickoffs          | ✅     |
+| AE-003 | Explain-the-move posts: thin pool, scoring, one-sided flow, or a repricing the score does not explain    | ✅     |
+| AE-004 | Price as a signal: a repricing the scoreboard cannot explain read as news not yet public, graded         | ✅     |
+| AE-005 | Per-agent public voice, track record and reputation at `/agents/<handle>`                                | ✅     |
+| AE-006 | Posting policy + cadence: approved templates, caps, spacing, quiet hours, approval queue; wording lint   | ✅     |
+| AE-007 | Support agent across channels: SSE for the web, one JSON reply for everything else                       | ✅     |
+| AE-008 | Deposits, withdrawals, positions and transactions explained from the caller's own account context        | ✅     |
+| AE-009 | Deterministic troubleshooting flows keyed on platform status and account state                           | ✅     |
+| AE-010 | Escalation to a human: bounded ticket, webhook page, ticket id told to the user                          | ✅     |
+| AE-011 | Canonical ledger: realised/unrealised P&L, ROI, win/loss, drawdown, exposure, risk — pure and tested     | ✅     |
+| AE-012 | Public performance page with the full historical record, losses included                                 | ✅     |
+| AE-013 | Every entry labelled simulated / user-confirmed / autonomous; totals broken down by mode                 | ✅     |
+| AE-014 | No cherry-picking: derived ledger, database trigger on fills, no outcome filter, digest over all entries | ✅     |
+
+Owner-gated: the X app credentials (four env values) and the account
+handle; per-agent OAuth is the recorded next step (D-107).
+
+---
+
 ## 📲 PHASE 15: Mobile Experience (task 071, D-118) — 🟡 P1
 
 > The dedicated mobile pass, scheduled last. One trade flow (the ticket
@@ -906,7 +941,7 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 
 | Phase                                                       | Tier  | Rows            | Status                                                 |
 | ----------------------------------------------------------- | ----- | --------------- | ------------------------------------------------------ |
-| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ⬜                                                     |
+| 13 — Agent Extended: social posting, reputation, AI support | 🟡 P1 | AE-001 … AE-014 | ✅                                                     |
 | 14 — Base Builder Code                                      | 🟡 P1 | BC-001 … BC-003 | ⬜                                                     |
 | 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark) |
 | 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ⬜                                                     |
@@ -958,26 +993,27 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 
 ## 📊 Task Count Summary
 
-| Phase                                             | Tasks   |
-| ------------------------------------------------- | ------- |
-| Phase 0: Project Bootstrap                        | 8       |
-| Phase D: Design System & UI Shell                 | 8       |
-| Phase 1: Mainnet Safety                           | 8       |
-| Phase 2: Skill, MCP & Wallet Provider Integration | 16      |
-| Phase 3: Swap (Core)                              | 8       |
-| Phase 4: Liquidity                                | 10      |
-| Phase 5: Hook Integration + AI Security Analysis  | 26      |
-| Phase F: LP & Mantua Fee                          | 10      |
-| Phase 6: Agent                                    | 13      |
-| Phase 7: DefiLlama Analytics                      | 6       |
-| Phase 8: Portfolio                                | 7       |
-| Phase N: Natural Language Command Bar             | 11      |
-| Phase 9: E2E & Launch                             | 13      |
-| Phase 10: Launch Gate (ledger G-001 … G-018)      | 18      |
-| Phase 11: Market Depth & Research Layer           | 8       |
-| Phase 12: Voice (ElevenLabs Scribe v2 Realtime)   | 11      |
-| Phase 15: Mobile Experience                       | 9       |
-| **Grand Total**                                   | **190** |
+| Phase                                              | Tasks   |
+| -------------------------------------------------- | ------- |
+| Phase 0: Project Bootstrap                         | 8       |
+| Phase D: Design System & UI Shell                  | 8       |
+| Phase 1: Mainnet Safety                            | 8       |
+| Phase 2: Skill, MCP & Wallet Provider Integration  | 16      |
+| Phase 3: Swap (Core)                               | 8       |
+| Phase 4: Liquidity                                 | 10      |
+| Phase 5: Hook Integration + AI Security Analysis   | 26      |
+| Phase F: LP & Mantua Fee                           | 10      |
+| Phase 6: Agent                                     | 13      |
+| Phase 7: DefiLlama Analytics                       | 6       |
+| Phase 8: Portfolio                                 | 7       |
+| Phase N: Natural Language Command Bar              | 11      |
+| Phase 9: E2E & Launch                              | 13      |
+| Phase 10: Launch Gate (ledger G-001 … G-018)       | 18      |
+| Phase 11: Market Depth & Research Layer            | 8       |
+| Phase 12: Voice (ElevenLabs Scribe v2 Realtime)    | 11      |
+| Phase 13: Agent Extended (social, ledger, support) | 14      |
+| Phase 15: Mobile Experience                        | 9       |
+| **Grand Total**                                    | **204** |
 
 ### Future phases
 

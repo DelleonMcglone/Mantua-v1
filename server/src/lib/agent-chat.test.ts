@@ -83,7 +83,10 @@ void describe("agent-chat audit — action mapping", () => {
     for (const action of ["deposit", "deposit_base", "spend"]) {
       assert.equal(auditActionForToolCall("gateway", { action }), "agent_gateway");
     }
-    assert.equal(auditActionForToolCall("manage_wallet", { action: "set_cap" }), "agent_wallet_cap_update");
+    assert.equal(
+      auditActionForToolCall("manage_wallet", { action: "set_cap" }),
+      "agent_wallet_cap_update",
+    );
   });
 
   void it("maps read-only tools and sub-actions to null", () => {
@@ -125,6 +128,27 @@ void describe("agent-chat audit — auditChatToolCall", () => {
     assert.equal(row.txHash, "0x" + "a".repeat(64));
     assert.equal(row.reason, null);
     assert.deepEqual(row.params, { tool: "swap", args });
+  });
+
+  void it("records the agent mode in the params when the loop supplies it (task 070, AE-013)", async () => {
+    const args = { providerEventId: "e1", outcomeIndex: 0, amount: "5", confirmationId: "c1" };
+    await auditChatToolCall({
+      walletAddress: WALLET,
+      chainId: CHAIN_ID,
+      tool: "mantua_execute_trade",
+      args,
+      ok: true,
+      data: { txHash: "0x" + "b".repeat(64) },
+      mode: "user_testing",
+    });
+    assert.equal(inserted.length, 1);
+    assert.equal(inserted[0].action, "agent_market_trade");
+    assert.deepEqual(inserted[0].params, {
+      tool: "mantua_execute_trade",
+      args,
+      mode: "user_testing",
+      confirmationId: "c1",
+    });
   });
 
   void it("writes a failure row with the error as reason when the tool throws", async () => {

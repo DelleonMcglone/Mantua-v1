@@ -156,6 +156,28 @@ const schema = z.object({
     .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
     .optional(),
 
+  // ── Task 070 (Phase 13) — social posting and support ────────────────
+  /** X (Twitter) API v2 credentials for the deployment's posting account
+   *  (D-107): the developer app's consumer key/secret and the account's
+   *  access token/secret, signed per OAuth 1.0a on the server. With all
+   *  four set, approved posts are sent; with any missing, every post is
+   *  recorded as a dry run and nothing leaves the server. Never a login
+   *  password: the API cannot be driven by one. */
+  X_API_KEY: z.string().min(1).optional(),
+  X_API_SECRET: z.string().min(1).optional(),
+  X_ACCESS_TOKEN: z.string().min(1).optional(),
+  X_ACCESS_TOKEN_SECRET: z.string().min(1).optional(),
+  /** The posting account's handle without the @, for the post footer. */
+  X_ACCOUNT_HANDLE: z
+    .string()
+    .regex(/^[A-Za-z0-9_]{1,15}$/)
+    .optional(),
+  /** The app's public origin, for the performance-page link in posts. */
+  PUBLIC_APP_URL: z.url().default("https://mantua.ai"),
+  /** AE-010 — where an escalation is POSTed (a Slack/Discord/incoming
+   *  webhook). Absent → the ticket row and the log line are the signal. */
+  SUPPORT_ESCALATION_WEBHOOK_URL: z.url().optional(),
+
   /** Task 071 (Phase 15, MX-004) — Web Push application keys (RFC 8292
    *  VAPID), base64url: the raw 65-byte P-256 public point and the 32-byte
    *  private scalar, plus the contact the push services may use about a

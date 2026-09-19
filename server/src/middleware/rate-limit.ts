@@ -163,6 +163,29 @@ export const voiceTokenRateLimiter: RequestHandler = rateLimit(
 );
 
 /**
+ * Task 070 (AE-007) — the anonymous support quota: ten questions per IP per
+ * day, then the login gate. Support must answer a signed-out user, but
+ * every turn spends model tokens, so the unauthenticated surface is
+ * bounded the way the analyst's is; a signed-in user skips it.
+ */
+export const supportQuota: RequestHandler = rateLimit(
+  withSharedStore("mantua:rl:support:", 24 * 60 * 60 * 1000, {
+    windowMs: 24 * 60 * 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skip: (req: Request) => skipInDev() || Boolean(req.privyUserId),
+    keyGenerator: (req: Request) => `support:${ipKeyGenerator(req.ip ?? "")}`,
+    handler: (_req, res) => {
+      res.status(401).json({
+        error: "You've used today's free support questions — log in to keep chatting.",
+        code: "LOGIN_REQUIRED",
+      });
+    },
+  }),
+);
+
+/**
  * The anonymous analyst quota (owner decision 2026-08-18): three free
  * questions per IP per day, then the login gate. Logged-in users skip it
  * entirely (their traffic is governed by walletRateLimiter). Counted

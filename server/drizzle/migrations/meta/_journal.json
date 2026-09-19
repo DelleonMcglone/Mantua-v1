@@ -157,6 +157,13 @@
       "breakpoints": true
     },
     {
+      "idx": 22,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0022_agent_extended",
+      "breakpoints": true
+    },
+    {
       "idx": 23,
       "version": "7",
       "when": 1789700000000,

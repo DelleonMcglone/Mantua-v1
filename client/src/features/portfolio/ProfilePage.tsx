@@ -1,4 +1,4 @@
-import { Bot, Droplet, LogOut } from "lucide-react";
+import { Bot, Droplet, LogOut, Megaphone } from "lucide-react";
 import { StrategiesSection } from "./StrategiesSection.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
@@ -13,6 +13,8 @@ interface Props {
   walletAddress?: string | undefined;
   onViewPositions: () => void;
   onOpenAgent: () => void;
+  /** Task 070 — the agent's public page and posting settings. */
+  onOpenSocial: () => void;
   onLogout: () => void;
   onClose?: () => void;
 }
@@ -32,6 +34,7 @@ export function ProfilePage({
   walletAddress,
   onViewPositions,
   onOpenAgent,
+  onOpenSocial,
   onLogout,
   onClose,
 }: Props) {
@@ -76,6 +79,19 @@ export function ProfilePage({
           </p>
           <Button variant="ghost" size="sm" className="mt-2.5" onClick={onOpenAgent}>
             Open agent
+          </Button>
+        </section>
+
+        <section className="mt-3 rounded-md border border-border-soft px-4 py-3.5">
+          <h3 className="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wider text-text-mute">
+            <Megaphone className="h-3.5 w-3.5" /> Agent voice &amp; public page
+          </h3>
+          <p className="mt-1.5 text-[12.5px] leading-relaxed text-text-dim">
+            Claim a public handle for your agent&apos;s track record — derived from its
+            chain-verified trades, never edited — and choose what it may post.
+          </p>
+          <Button variant="ghost" size="sm" className="mt-2.5" onClick={onOpenSocial}>
+            Manage voice &amp; page
           </Button>
         </section>
 

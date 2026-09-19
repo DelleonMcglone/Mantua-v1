@@ -1,35 +1,19 @@
-import { getAccessToken } from "@privy-io/react-auth";
-import { API_BASE } from "@/lib/api.ts";
-import { readSseBody, sseJson } from "@/lib/sse-core.ts";
+import { ChatStreamError, streamChatEvents, type AgentChatEvent } from "@/lib/chat-stream.ts";
 
 /**
  * Client for the conversational agent's SSE endpoint (`POST /api/agent/chat`).
  *
- * EventSource only does GET, so we POST with fetch and parse the
- * `text/event-stream` body ourselves. Each `data:` frame is one
- * `AgentChatEvent` (mirrors the server union in `server/src/lib/agent-chat.ts`).
+ * Each `data:` frame is one `AgentChatEvent` (mirrors the server union in
+ * `server/src/lib/agent-chat.ts`). The transport — POST, auth header, SSE
+ * parsing — and the event union live in `lib/chat-stream.ts`, shared with
+ * the analyst and support since task 070; both names are re-exported here
+ * for the callers that import them from this module.
  */
 
-export type AgentChatEvent =
-  | { type: "session"; sessionId: string }
-  | { type: "text"; delta: string }
-  | { type: "tool_start"; id: string; tool: string; args: Record<string, unknown> }
-  | { type: "tool_result"; id: string; tool: string; ok: boolean; data?: unknown; error?: string }
-  | { type: "done" }
-  | { type: "error"; message: string };
+export type { AgentChatEvent };
 
-export class AgentStreamError extends Error {
-  public readonly status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "AgentStreamError";
-    this.status = status;
-  }
-}
-
-interface ApiErrorBody {
-  error?: string;
-}
+/** Kept as the name callers check with `instanceof`. */
+export { ChatStreamError as AgentStreamError };
 
 /**
  * Stream one turn. Calls `onEvent` for each event as it arrives. Resolves when
@@ -51,30 +35,15 @@ export async function streamAgentChat(
   onEvent: (event: AgentChatEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const token = await getAccessToken();
-  const headers = new Headers({ "Content-Type": "application/json", Accept: "text/event-stream" });
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-
-  const res = await fetch(`${API_BASE}/api/agent/chat`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
+  await streamChatEvents(
+    "/api/agent/chat",
+    {
       message: params.message,
       ...(params.sessionId ? { sessionId: params.sessionId } : {}),
       ...(params.chainId ? { chainId: params.chainId } : {}),
-    }),
-    ...(signal ? { signal } : {}),
-  });
-
-  if (!res.ok || !res.body) {
-    const body = (await res.json().catch(() => ({}))) as ApiErrorBody;
-    throw new AgentStreamError(res.status, body.error ?? `Request failed (${String(res.status)})`);
-  }
-
-  // Phase 7 — one SSE parser for every stream (lib/sse-core.ts); a
-  // malformed frame yields null and is skipped rather than killing the stream.
-  await readSseBody(res.body, (ev) => {
-    const parsed = sseJson(ev);
-    if (parsed !== null) onEvent(parsed as AgentChatEvent);
-  });
+      ...(params.source ? { source: params.source } : {}),
+    },
+    onEvent,
+    signal,
+  );
 }

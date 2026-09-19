@@ -20,6 +20,7 @@ const GUARDS = [
   "verifyCircleWebhook",
   "verifyFiatWebhook",
   "freeAnalystQuota",
+  "supportQuota",
 ];
 
 /** Deliberately open registrations, each with its reason. */

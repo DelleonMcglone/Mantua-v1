@@ -1,4 +1,4 @@
-import { ArrowLeft, Bot, Droplet, LogOut } from "lucide-react";
+import { ArrowLeft, Bot, Droplet, LogOut, Megaphone } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NotificationSettings } from "@/features/notifications/NotificationSettings.tsx";
@@ -17,6 +17,8 @@ interface Props {
   walletAddress?: string | undefined;
   onViewPositions: () => void;
   onOpenAgent: () => void;
+  /** Task 070 — the agent's public page and posting policy. */
+  onOpenSocial: () => void;
   onSelectAsset: (symbol: TokenSymbol) => void;
   onSelectPool: (id: string) => void;
   onLogout: () => void;
@@ -40,6 +42,7 @@ export function MobileProfile({
   walletAddress,
   onViewPositions,
   onOpenAgent,
+  onOpenSocial,
   onSelectAsset,
   onSelectPool,
   onLogout,
@@ -94,6 +97,9 @@ export function MobileProfile({
             )}
             <Button variant="primary" size="sm" className="mt-3 h-11 w-full" onClick={onOpenAgent}>
               <Bot className="mr-1.5 h-3.5 w-3.5" /> Open agent
+            </Button>
+            <Button variant="ghost" size="sm" className="mt-2 h-11 w-full" onClick={onOpenSocial}>
+              <Megaphone className="mr-1.5 h-3.5 w-3.5" /> Manage voice &amp; public page
             </Button>
           </div>
         </TabsContent>
