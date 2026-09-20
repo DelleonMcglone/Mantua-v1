@@ -73,9 +73,9 @@ Behind it: `USD → USDC → Circle → Base → Mantua smart contracts → sett
 
 ```
 Total Tasks: 294
-Completed:   228   (+20 partial 🟡)
+Completed:   237   (+21 partial 🟡)
 
-[███████████████████████████████░░░░░░░░░] 77.6%
+[█████████████████████████████████░░░░░░░] 80.6%
 ```
 
 | Phase                                                      | Tier  | Tasks | Done       |
@@ -97,7 +97,7 @@ Completed:   228   (+20 partial 🟡)
 | Phase 14: Base Builder Code                                | 🟡 P1 | 3     | 0          |
 | Phase 15: Mobile Experience (LAST)                         | 🟡 P1 | 9     | 0          |
 | Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 10         |
-| Phase 17: Circle Agent Marketplace + Agent-Native Services | 🟢 P2 | 10    | 0          |
+| Phase 17: Circle Agent Marketplace + Agent-Native Services | 🟢 P2 | 10    | 9 (+1 🟡)  |
 | Phase 18: Institutional Custody                            | 🟢 P2 | 3     | 3 ✅       |
 | Phase 19: Home Page Restructure                            | 🔴 P0 | 9     | 9 ✅       |
 
@@ -668,23 +668,23 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 
 ### Marketplace
 
-| ID     | Task                                                                                                                                                                                                                                                                                                                                           | Status |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| MP-001 | Review [Become a Seller](https://developers.circle.com/agent-stack/agent-marketplace/become-a-seller) requirements                                                                                                                                                                                                                             | ⬜     |
-| MP-002 | Package Mantua agent capabilities (market discovery, market intelligence — probability/liquidity/price movement/sports data analysis, prediction-market trading — buy/sell YES/NO, portfolio management — positions/exposure monitoring, hedging — predefined hedge strategies, sports intelligence for other agents) as marketplace offerings | ⬜     |
-| MP-003 | Seller onboarding + listing on the Circle Agent Marketplace                                                                                                                                                                                                                                                                                    | ⬜     |
-| MP-004 | Marketplace monetization wiring (x402 payments per D-106)                                                                                                                                                                                                                                                                                      | ⬜     |
+| ID     | Task                                                                                                                                                                                                                                                                                                                                           | Status                                                                                                              |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| MP-001 | Review [Become a Seller](https://developers.circle.com/agent-stack/agent-marketplace/become-a-seller) requirements                                                                                                                                                                                                                             | ✅                                                                                                                  |
+| MP-002 | Package Mantua agent capabilities (market discovery, market intelligence — probability/liquidity/price movement/sports data analysis, prediction-market trading — buy/sell YES/NO, portfolio management — positions/exposure monitoring, hedging — predefined hedge strategies, sports intelligence for other agents) as marketplace offerings | ✅                                                                                                                  |
+| MP-003 | Seller onboarding + listing on the Circle Agent Marketplace                                                                                                                                                                                                                                                                                    | 🟡 runbook + OpenAPI publication land in code; the listing itself is a human step gated on counsel sign-off (D-012) |
+| MP-004 | Marketplace monetization wiring (x402 payments per D-106)                                                                                                                                                                                                                                                                                      | ✅                                                                                                                  |
 
 ### Agent-Native Services (machine-readable, for external agents)
 
 | ID     | Task                                                                        | Status |
 | ------ | --------------------------------------------------------------------------- | ------ |
-| MP-005 | Define machine-readable Mantua market-discovery service for external agents | ⬜     |
-| MP-006 | Define machine-readable Mantua market-intelligence service                  | ⬜     |
-| MP-007 | Define machine-readable prediction-market trading service                   | ⬜     |
-| MP-009 | Define machine-readable portfolio and exposure service                      | ⬜     |
-| MP-010 | Define machine-readable hedging service                                     | ⬜     |
-| MP-011 | Define sports-intelligence service for authorized external agents           | ⬜     |
+| MP-005 | Define machine-readable Mantua market-discovery service for external agents | ✅     |
+| MP-006 | Define machine-readable Mantua market-intelligence service                  | ✅     |
+| MP-007 | Define machine-readable prediction-market trading service                   | ✅     |
+| MP-009 | Define machine-readable portfolio and exposure service                      | ✅     |
+| MP-010 | Define machine-readable hedging service                                     | ✅     |
+| MP-011 | Define sports-intelligence service for authorized external agents           | ✅     |
 
 ---
 
