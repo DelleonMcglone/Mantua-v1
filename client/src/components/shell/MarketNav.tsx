@@ -118,7 +118,7 @@ export function MarketNav({
 
 /**
  * The league sub-header: every league with its logo, NFL live and the rest
- * selectable but marked coming soon. Scrolls sideways rather than wrapping when the row runs out of
+ * selectable but marked coming soon. Centred when there is room; scrolls sideways rather than wrapping when the row runs out of
  * width. `active` underlines the league page currently open.
  */
 export function LeagueBar({
@@ -135,7 +135,7 @@ export function LeagueBar({
       aria-label="Leagues"
       className={`overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
     >
-      <ul className="flex w-max items-center gap-x-1 text-[13px] font-medium">
+      <ul className="mx-auto flex w-max items-center gap-x-1 text-[13px] font-medium">
         {LEAGUE_ITEMS.map((item) => {
           const isActive = item.sport !== undefined && item.sport.id === active;
           return (

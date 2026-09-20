@@ -51,6 +51,8 @@ export interface Sport {
 
 const LEAGUE_LOGOS = "https://a.espncdn.com/i/teamlogos/leagues/500";
 const SPORT_LOGOS = "https://a.espncdn.com/i/espn/misc_logos/500";
+/** Marks the owner supplied (client/public/assets/leagues). */
+const OWN_LOGOS = "/assets/leagues";
 
 export const SPORTS: Sport[] = [
   {
@@ -108,6 +110,7 @@ export const SPORTS: Sport[] = [
     id: "boxing",
     label: "Boxing",
     blurb: "Coming soon.",
+    logo: `${OWN_LOGOS}/boxing.png`,
     icon: BoxingGlovesIcon,
     coverage: "soon",
   },
@@ -115,6 +118,7 @@ export const SPORTS: Sport[] = [
     id: "karate",
     label: "Karate Combat",
     blurb: "Coming soon.",
+    logo: `${OWN_LOGOS}/karate-combat.png`,
     icon: KarateCombatIcon,
     coverage: "soon",
   },
@@ -122,7 +126,7 @@ export const SPORTS: Sport[] = [
     id: "nascar",
     label: "NASCAR",
     blurb: "Coming soon.",
-    logo: `${SPORT_LOGOS}/nascar.png`,
+    logo: `${OWN_LOGOS}/nascar.png`,
     icon: HockeyIcon,
     coverage: "soon",
   },
