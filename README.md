@@ -26,12 +26,16 @@ From a single natural-language prompt you can:
 > (the hooks, the market factory/resolver, and the agent-commerce escrow) are awaiting their
 > Base Mainnet deployment**; until they are deployed, hook-gated pools and on-chain market
 > minting stay dark and the app degrades gracefully (addresses are env-driven, `null` by
-> default). [`docs/tasks/v2-roadmap.md`](docs/tasks/v2-roadmap.md) tracks the build plan
-> (Phases 0–13 shipped: market protocol, trading UX, live-sports reliability, the agent core,
-> portfolio and activity, the launch gate, market depth, voice, and the agent's public ledger,
-> social posting and AI support; Phases 14–18 are next), and
-> [`docs/security/hook-deployments.md`](docs/security/hook-deployments.md) tracks the
-> deployment checklist.
+> default). [`docs/tasks/v2-roadmap.md`](docs/tasks/v2-roadmap.md) tracks the build plan —
+> Phases 0–13, 15, 16, 18 and 19 are shipped (market protocol, trading UX, live-sports
+> reliability, the agent core, portfolio and activity, the launch gate, market depth, voice,
+> the agent's public ledger/social posting/AI support, the mobile experience, prediction-market
+> combos, and institutional custody); **`/` is now the app's one front door** — there is no
+> standalone landing page, so every visitor lands on the board (Phase 19, D-121). Phase 17
+> (the Circle Agent Marketplace) is code-complete — six machine-readable services sold
+> per-call in USDC — with go-live gated on counsel sign-off (D-012); Phase 14 (Base Builder
+> Code) is next. [`docs/security/hook-deployments.md`](docs/security/hook-deployments.md)
+> tracks the deployment checklist.
 
 ## Network
 
@@ -138,6 +142,16 @@ Programmable money buying programmable intelligence, then acting on it in one au
   Chiefs"), confirm the structured preview, and it arms: evaluated on price and game-state
   ticks, sized under its own USDC cap, armed straight through the game and auto-disarmed when
   the market closes. Kill switches at every level; every transition audited.
+- **Prediction market combos.** Build a parlay-style ticket across two or more games (up to a
+  configured leg cap) and buy it as one trade: a combo is a full-collateral conjunction market
+  minted through the same factory as a single game, priced at the product of its legs' fair
+  probabilities, settled YES only if every leg wins (any loss → NO; a void leg drops out). One
+  swap, one confirmation, one position — not a bundle of separate bets (D-119).
+- **Mobile, installable.** Below `lg` the trade ticket is a bottom sheet reachable from a price
+  tap, a Discover tap, or a push notification; a live-glance card tracks each in-progress game
+  (score, both prices, held-side P&L, Sell / Lock in); Web Push covers trades, positions, games,
+  agent actions and settlement; and the app installs from the browser as a PWA with its own
+  manifest, icons and offline-capable shell (Phase 15, D-118).
 - **State-aware Mantua hooks.** Custom hooks embed pricing, fee logic, and circuit breakers
   directly into pool execution. Stable Protection is **FX-aware**: its circuit breaker anchors
   to the live EUR/USD rate (Pyth) instead of assuming 1:1, so USDC/EURC trades at the true
@@ -199,12 +213,45 @@ data is the agent's own pre-capped spend and needs no confirmation.
 - **Support desk (Phase 13).** A read-only support agent, signed in or not: how markets and
   trading work, your own deposits, withdrawals, positions and transactions, deterministic
   troubleshooting, and a ticket to a person when it cannot resolve the problem.
-- **x402 agent marketplace.** Access to Circle's full paid-services catalog
+- **x402 agent marketplace (buyer).** Access to Circle's full paid-services catalog
   ([agents.circle.com/services](https://agents.circle.com/services)) web search, news,
   weather, sports, prediction markets, social lookups, papers, SMS/communication APIs paid
   per-call in USDC (pre-capped, daily-capped, audited); the agent searches the marketplace
   before declining a request. HTTP-native x402 v2 buyer works in prod, no CLI
   ([setup](docs/x402-setup.md)).
+- **x402 agent marketplace (seller, Phase 17).** Mantua also sells: six machine-readable
+  services for external agents — market discovery, market intelligence, trading (quote +
+  calldata), portfolio exposure, hedging plans, and an allowlisted sports-intelligence pilot —
+  at `/api/x402/v1/*`, priced from one catalog
+  ([`server/src/lib/x402/catalog.ts`](server/src/lib/x402/catalog.ts)) and dark by default
+  behind `X402_SELLER_ADDRESS` / `X402_SELLER_SERVICES`, plus the legacy `GET
+/api/x402/analyst-brief` ($0.01) as the first-generation surface. Listing on Circle's
+  Marketplace and flipping the seller env on are human steps gated on counsel sign-off
+  (D-012); see [`docs/marketplace/offerings.md`](docs/marketplace/offerings.md) and
+  [`docs/marketplace/become-a-seller.md`](docs/marketplace/become-a-seller.md).
+
+## Institutional custody (Phase 18)
+
+An institution is a segregated Circle wallet set, not a new money path. Members sign in with
+Privy like anyone else; every member's agent wallet is created inside the institution's own
+Circle wallet set (`provisionInstitutionWalletSet`, distinct from the retail wallet set), so
+Circle's per-set Gas Station policy, screening, and reported balances scope to the institution
+alone. Enforced at the three places money already passes:
+
+- **Spend** — `checkSpendingCap` adds institution-wide per-trade and daily caps (summed across
+  every member wallet) on top of the per-wallet cap, gated to members whose role may trade.
+- **Send** — the agent's send path admits an institutional wallet only as the execution of an
+  approved custody withdrawal, to its verified destination, for exactly that amount.
+- **Wallet creation** — an institution without a provisioned wallet set refuses to create
+  member wallets rather than silently falling back to the retail set.
+
+**Dual control:** a destination is verified by someone other than whoever added it; a
+withdrawal is approved by someone other than whoever requested it (auto-approved only below a
+configurable threshold). Roles: owner, admin, trader, approver, viewer. Period statements and
+Circle-vs-chain reconciliation are available as JSON or CSV. The institution's custody-grade
+_principal_ stays with its own qualified custodian (Anchorage, BitGo, Coinbase Prime, Fireblocks,
+Copper, …) — recorded, never integrated. Full spec: [D-120](docs/decisions/v2-open-decisions.md)
+and [`docs/tasks/074-institutional-custody.md`](docs/tasks/074-institutional-custody.md).
 
 ---
 
@@ -241,8 +288,11 @@ data is the agent's own pre-capped spend and needs no confirmation.
   on-chain liquidity for best execution.
 - **x402 agent marketplace** (`@x402/fetch` + `@x402/extensions` Bazaar discovery) the full
   paid-services catalog at [agents.circle.com/services](https://agents.circle.com/services),
-  paid per-call in USDC via EIP-3009 authorizations from the agent's buyer EOA (Mantua is also
-  a **seller**: `GET /api/x402/analyst-brief`, $0.01).
+  paid per-call in USDC via EIP-3009 authorizations from the agent's buyer EOA. Mantua is also
+  a **seller** (Phase 17): six machine-readable services — market discovery, market
+  intelligence, trading quote/calldata, portfolio exposure, hedging plans, sports
+  intelligence — through a dual-rail paywall (Gateway nanopayments + vanilla exact), plus the
+  legacy `GET /api/x402/analyst-brief` ($0.01); dark-by-default, go-live counsel-gated (D-012).
 - **USDC + EURC** Circle's stablecoins, native on Base Mainnet.
 
 ### Base
@@ -410,21 +460,27 @@ docs/        Architecture, specs, decision memos, task lists, legal drafts
 
 ## Documentation
 
-| Document                                                                                             | What it covers                                                      |
-| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| [`docs/architecture.md`](docs/architecture.md)                                                       | Living architecture notes and the decision log                      |
-| [`docs/tasks/sports-pivot.md`](docs/tasks/sports-pivot.md)                                           | The build plan phases, priorities, and what is done                 |
-| [`docs/decisions/sports-pivot-decisions.md`](docs/decisions/sports-pivot-decisions.md)               | Each decision, its reasoning, and what it rules out                 |
-| [`docs/specs/market-lifecycle.md`](docs/specs/market-lifecycle.md)                                   | Market states, transitions, failure modes                           |
-| [`docs/specs/market-id.md`](docs/specs/market-id.md)                                                 | Deterministic market ids                                            |
-| [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md)                             | The authoritative hook spec (§1–§46) + implementation record        |
-| [`docs/security/sign-off.md`](docs/security/sign-off.md)                                             | Ship-gate security sign-off — findings, rails, E2E proofs           |
-| [`docs/ops/incident-runbook.md`](docs/ops/incident-runbook.md)                                       | Kill switches, mis-resolution, provider failover, comms             |
-| [`docs/tasks/sports-pivot-scope-reconciliation.md`](docs/tasks/sports-pivot-scope-reconciliation.md) | What survives the pivot, what is superseded, what is deferred       |
-| [`docs/tasks/live-sports-reliability.md`](docs/tasks/live-sports-reliability.md)                     | Phase 7 — real-time stream, status ladder, trade state, load/chaos  |
-| [`docs/ops/monitoring.md`](docs/ops/monitoring.md)                                                   | Latency budgets, metrics reads, the alert/paging policy             |
-| [`docs/tasks/070-agent-extended.md`](docs/tasks/070-agent-extended.md)                               | Phase 13 — the performance ledger, social posting, AI support       |
-| [`docs/tasks/071-mobile-experience.md`](docs/tasks/071-mobile-experience.md)                         | Phase 15 — the phone: sheet ticket, live glance, push, PWA, budgets |
+| Document                                                                                             | What it covers                                                               |
+| ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [`docs/architecture.md`](docs/architecture.md)                                                       | Living architecture notes and the decision log                               |
+| [`docs/tasks/v2-roadmap.md`](docs/tasks/v2-roadmap.md)                                               | The current build plan: every phase, its rows, and what is done              |
+| [`docs/decisions/v2-open-decisions.md`](docs/decisions/v2-open-decisions.md)                         | Every decision (D-xxx), its reasoning, and what it rules out                 |
+| [`docs/specs/market-lifecycle.md`](docs/specs/market-lifecycle.md)                                   | Market states, transitions, failure modes                                    |
+| [`docs/specs/market-id.md`](docs/specs/market-id.md)                                                 | Deterministic market ids                                                     |
+| [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md)                             | The authoritative hook spec (§1–§46) + implementation record                 |
+| [`docs/security/sign-off.md`](docs/security/sign-off.md)                                             | Ship-gate security sign-off — findings, rails, E2E proofs                    |
+| [`docs/ops/incident-runbook.md`](docs/ops/incident-runbook.md)                                       | Kill switches, mis-resolution, provider failover, comms                      |
+| [`docs/tasks/sports-pivot-scope-reconciliation.md`](docs/tasks/sports-pivot-scope-reconciliation.md) | What survives the original pivot, what is superseded, what is deferred       |
+| [`docs/tasks/live-sports-reliability.md`](docs/tasks/live-sports-reliability.md)                     | Phase 7 — real-time stream, status ladder, trade state, load/chaos           |
+| [`docs/ops/monitoring.md`](docs/ops/monitoring.md)                                                   | Latency budgets, metrics reads, the alert/paging policy                      |
+| [`docs/tasks/070-agent-extended.md`](docs/tasks/070-agent-extended.md)                               | Phase 13 — the performance ledger, social posting, AI support                |
+| [`docs/tasks/071-mobile-experience.md`](docs/tasks/071-mobile-experience.md)                         | Phase 15 — the phone: sheet ticket, live glance, push, PWA, budgets          |
+| [`docs/tasks/072-prediction-market-combos.md`](docs/tasks/072-prediction-market-combos.md)           | Phase 16 — combos as conjunction markets                                     |
+| [`docs/tasks/073-phase-17-agent-marketplace.md`](docs/tasks/073-phase-17-agent-marketplace.md)       | Phase 17 — the x402 seller catalog, dual-rail paywall, marketplace packaging |
+| [`docs/marketplace/offerings.md`](docs/marketplace/offerings.md)                                     | The six x402 seller services: endpoint, price, auth, OpenAPI spec URL        |
+| [`docs/marketplace/become-a-seller.md`](docs/marketplace/become-a-seller.md)                         | Circle Marketplace seller runbook — prerequisites, intake form, go-live gate |
+| [`docs/tasks/074-institutional-custody.md`](docs/tasks/074-institutional-custody.md)                 | Phase 18 — segregated wallet sets, dual control, statements, reconciliation  |
+| [`docs/tasks/075-home-page-restructure.md`](docs/tasks/075-home-page-restructure.md)                 | Phase 19 — why the landing page was removed, and where its content went      |
 
 An in-app documentation site covering the same ground for users is reachable from the home page's
 footer.
@@ -447,6 +503,7 @@ npm run lint                 # eslint, zero warnings tolerated
 npm test -w @mantua/server   # node:test via tsx; needs a .env for the chain/provider suites
 npm test -w @mantua/client   # node:test via tsx over the pure *-core modules
 npm run e2e                  # browser suite: the real client in Chromium, auth shimmed, API + chain scripted
+npm run e2e:mobile -w @mantua/client   # mobile suite: 360×740 + 430×932, touch, mobile UA
 ```
 
 The market page's deeper layer (Phase 11, task 068) — depth ladder, live
@@ -487,6 +544,54 @@ The browser suite (`client/e2e/`, task 067) needs no Privy app id,
 database, or chain: it starts Vite with `VITE_E2E_AUTH=shim` and answers
 the API and the RPC from Playwright routes. Set
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to use a preinstalled Chromium.
+
+The mobile experience (Phase 15, task 071, D-118) reuses the desktop code
+at two breakpoints (`client/src/lib/mobile.ts`): below `lg` the trade
+ticket becomes a bottom sheet, below `md` the header nav moves behind a
+hamburger. Web Push (`server/src/lib/push/`) runs on `node:crypto` alone
+(RFC 8291/8292, no external push library) across five topics — trades,
+positions, games, agent, settlement — dark unless its three VAPID env
+vars are set. The install prompt, manifest and service worker live under
+`client/src/features/pwa/`. `client/playwright.mobile.config.ts` runs
+`client/e2e/mobile/` at 360×740 and 430×932 against a production build
+so the mobile budgets in `client/src/lib/mobile-budgets.ts` are enforced
+for real.
+
+Prediction market combos (Phase 16, task 072, D-119) let a user buy a
+parlay-style ticket across two or more games as one trade: a combo is a
+full-collateral conjunction market minted through the existing factory,
+priced at the product of its legs' fair probabilities, and settled YES
+only if every leg wins. `POST /api/combos/prepare`, `/quote`, and
+`/calldata` create, price, and execute it as a single swap; `combo-rules.ts`
+and the user's `combo` policy block gate what can be combined.
+
+The Circle Agent Marketplace (Phase 17, task 073, D-106) makes Mantua a
+paid **seller** as well as a buyer: six machine-readable services under
+`/api/x402/v1/*` (market discovery, market intelligence, trading
+quote/calldata, portfolio exposure, hedging plans, sports intelligence),
+priced from one catalog and served through a dual-rail paywall (Circle
+Gateway nanopayments + vanilla x402 `exact`, both in one 402 response).
+Each service publishes its own unpaid OpenAPI 3.1 document at
+`GET /api/x402/openapi/:serviceId.json` (index: `/api/x402/openapi.json`),
+kept honest by a catalog↔spec parity test. Dark by default behind
+`X402_SELLER_ADDRESS` / `X402_SELLER_SERVICES`; listing on Circle's
+Marketplace and flipping the env on are human steps gated on counsel
+sign-off (D-012) — see
+[`docs/marketplace/become-a-seller.md`](docs/marketplace/become-a-seller.md).
+
+Institutional custody (Phase 18, task 074, D-120) adds an account tier
+where an institution is a segregated Circle wallet set: members' agent
+wallets are created inside it, institution-wide caps sit on top of the
+per-wallet cap, withdrawals go only to verified custodian addresses under
+dual control, and period statements plus Circle-vs-chain reconciliation
+are available as JSON or CSV. Operator surface: `/api/ops/institutions`
+behind `requireOpsAuth` (`MANTUA_OPS_KEY`).
+
+The home page restructure (Phase 19, task 075, D-121) removed the
+standalone marketing page: `/` now resolves directly to the board (the
+`home` route) for every visitor, logged in or not, with the marketing
+page's Documentation link, social channels, and legal links carried over
+into a footer on the home page itself (`client/src/components/shell/Footer.tsx`).
 
 ### Contracts
 
