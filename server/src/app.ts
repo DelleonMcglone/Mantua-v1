@@ -54,6 +54,12 @@ import { x402ServiceRouter } from "./routes/x402-service.ts";
 // Phase 17 (MP-004/007) — the paid /api/x402/v1 services (dual-rail paywall).
 // Mounted among the app routers so the C-020 kill switch covers them.
 import { x402TradingRouter } from "./routes/x402-trading.ts";
+// Phase 17 (MP-005/006) — the paid discovery and intelligence reads.
+import { x402DiscoveryRouter } from "./routes/x402-discovery.ts";
+import { x402IntelligenceRouter } from "./routes/x402-intelligence.ts";
+import { x402PortfolioRouter } from "./routes/x402-portfolio.ts";
+import { x402HedgingRouter } from "./routes/x402-hedging.ts";
+import { x402SportsRouter } from "./routes/x402-sports.ts";
 import { agentQueryRouter } from "./routes/agent-query.ts";
 import { agentSendRouter } from "./routes/agent-send.ts";
 import { agentSwapRouter } from "./routes/agent-swap.ts";
@@ -200,6 +206,14 @@ app.use(x402ServiceRouter);
 // Phase 17 (MP-007) — the paid trading services; kill-switch covered by
 // virtue of running after app.use(killSwitch) above.
 app.use(x402TradingRouter);
+// Phase 17 (MP-009/010) — the paid portfolio-exposure and hedging reads.
+app.use(x402PortfolioRouter);
+app.use(x402HedgingRouter);
+// Phase 17 (MP-011) — the paid sports-context read (allowlist+payment).
+app.use(x402SportsRouter);
+// Phase 17 (MP-005/006) — the paid discovery and intelligence reads.
+app.use(x402DiscoveryRouter);
+app.use(x402IntelligenceRouter);
 app.use(agentChatRouter);
 app.use(agentInstructionRouter);
 app.use(commandParseRouter);
