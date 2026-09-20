@@ -807,6 +807,8 @@ function promptToRoute(id: HomePromptId): Route {
       return { kind: "analyze" };
     case "agent":
       return { kind: "agent" };
+    case "combos":
+      return { kind: "combos" };
   }
 }
 

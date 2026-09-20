@@ -4,7 +4,7 @@ import { useTheme } from "@/hooks/use-theme.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
 import { WalletMenu } from "./WalletMenu.tsx";
-import { LeagueBar, MarketNav, type NavDestination } from "./MarketNav.tsx";
+import { LeagueBar, type NavDestination } from "./MarketNav.tsx";
 import type { SportId } from "@/features/markets/sports.ts";
 import { MobileNavSheet } from "./MobileNavSheet.tsx";
 import type { HomePromptId } from "./HomeMenu.tsx";
@@ -34,8 +34,8 @@ interface HeaderProps {
 }
 
 /**
- * Top bar — logo left, league nav centred, theme toggle + Connect Wallet
- * right. Mirrors `SiteHeader` (docs/legal) so the nav is continuous across
+ * Top bar — logo left, help / theme / account right, the league bar
+ * beneath. Mirrors `SiteHeader` (docs/legal) so the nav is continuous across
  * both surfaces; below `md` the nav hides behind a hamburger that opens the
  * `MobileNavSheet` (B-014 mobile guidance: hidden sidebar + hamburger).
  */
@@ -81,8 +81,7 @@ export function Header({
           <Logo size={30} />
           <span className="hidden text-[17px] font-semibold tracking-tight sm:inline">Mantua</span>
         </button>
-        <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
-        <div className="ml-auto flex shrink-0 items-center gap-1.5 md:ml-0 md:gap-2.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-2.5">
           {/* Task 070 (AE-007) — help is one press from anywhere, signed in
               or not; the app listens for the event like it does for login. */}
           <Button

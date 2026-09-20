@@ -32,7 +32,6 @@ export function MobileNavSheet({ open, onOpenChange, onNavigate, onQuickAction }
           <SheetTitle>Menu</SheetTitle>
         </SheetHeader>
         <MarketNav
-          layout="column"
           className="mt-4"
           onNavigate={(destination) => {
             close();

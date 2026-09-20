@@ -30,84 +30,35 @@ const LEAGUE_ITEMS: NavItem[] = SPORTS.map(
   }),
 );
 
-/** The product sections beside the logo: the Combo Builder and the agent. */
-const SECTION_ITEMS: NavItem[] = [
-  { label: "Combos", destination: { kind: "combos" } },
-  { label: "Agent", destination: { kind: "agent" } },
-];
-
-const ROW_BUTTON =
-  "inline-flex items-center gap-1.5 text-text hover:text-accent transition-colors cursor-pointer whitespace-nowrap";
-
 /**
- * Section nav — Combos · Agent — shared by the in-app header and the
- * docs/legal `SiteHeader`. The leagues live in `LeagueBar` (the sub-header)
- * on wide screens; the hamburger sheet (`layout="column"`) lists both the
- * leagues and the sections in one column (B-014 mobile guidance).
+ * The leagues as a single column, for the hamburger sheet (B-014 mobile
+ * guidance). On wide screens the same list is the `LeagueBar` sub-header.
+ * Combos and the agent are not header items: the home cards open them.
  */
 export function MarketNav({
   onNavigate,
   className,
-  layout = "row",
 }: {
   onNavigate: (destination: NavDestination) => void;
   className: string;
-  layout?: "row" | "column";
 }) {
-  if (layout === "column") {
-    return (
-      <nav aria-label="Markets" className={className}>
-        <ul className="flex flex-col text-[14px] font-medium">
-          {LEAGUE_ITEMS.map((item) => (
-            <li key={item.label}>
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigate(item.destination);
-                }}
-                className={`flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left transition-colors cursor-pointer hover:bg-row-hover hover:text-accent ${item.comingSoon ? "text-text-dim" : "text-text"}`}
-              >
-                {item.sport && <LeagueLogo league={item.sport} />}
-                {item.label}
-                {item.comingSoon && item.sport && (
-                  <span className="ml-auto text-[11px] text-text-mute">Coming soon</span>
-                )}
-              </button>
-            </li>
-          ))}
-          <li>
-            <div className="my-2 h-px bg-border-soft" aria-hidden="true" />
-          </li>
-          {SECTION_ITEMS.map((item) => (
-            <li key={item.label}>
-              <button
-                type="button"
-                onClick={() => {
-                  onNavigate(item.destination);
-                }}
-                className="flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left text-text hover:bg-row-hover hover:text-accent transition-colors cursor-pointer"
-              >
-                {item.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </nav>
-    );
-  }
   return (
-    <nav aria-label="Sections" className={className}>
-      <ul className="flex w-max mx-auto items-center gap-x-4 lg:gap-x-6 text-[13px] font-medium">
-        {SECTION_ITEMS.map((item) => (
+    <nav aria-label="Markets" className={className}>
+      <ul className="flex flex-col text-[14px] font-medium">
+        {LEAGUE_ITEMS.map((item) => (
           <li key={item.label}>
             <button
               type="button"
               onClick={() => {
                 onNavigate(item.destination);
               }}
-              className={ROW_BUTTON}
+              className={`flex w-full items-center gap-2.5 rounded-sm px-2 py-2.5 text-left transition-colors cursor-pointer hover:bg-row-hover hover:text-accent ${item.comingSoon ? "text-text-dim" : "text-text"}`}
             >
+              {item.sport && <LeagueLogo league={item.sport} />}
               {item.label}
+              {item.comingSoon && item.sport && (
+                <span className="ml-auto text-[11px] text-text-mute">Coming soon</span>
+              )}
             </button>
           </li>
         ))}
