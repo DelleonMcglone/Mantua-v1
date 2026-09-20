@@ -1,6 +1,6 @@
 # Mantua.AI
 
-**Mantua is an agent-driven prediction market for sports.** Bettors and market makers open
+**Mantua is an agent-native prediction market for sports.** Bettors and market makers open
 positions, provide liquidity, and execute automated hedging strategies through natural language.
 It combines a custom suite of **Mantua hooks**, autonomous **AI agents** running **Circle
 Developer-Controlled Wallets**, and real-time on-chain execution to turn user intent into
