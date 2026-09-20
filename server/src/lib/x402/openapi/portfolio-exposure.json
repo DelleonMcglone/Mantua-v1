@@ -1,0 +1,226 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua portfolio exposure",
+    "version": "1.0.0",
+    "description": "Positions, portfolio value, and exposure for any Base address — public chain state only. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet).",
+    "x-mantua-service-id": "portfolio-exposure",
+    "x-mantua-price-usd": "0.005"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/portfolio/exposure": {
+      "get": {
+        "operationId": "x402PortfolioExposure",
+        "summary": "Positions, portfolio value, and exposure for any Base address — public chain state only",
+        "description": "Mantua v4 LP positions plus pre-Mantua v4 positions (subgraph) for the queried address — deliberately limited to what is already public on-chain. No user tables, no identity, no wallet keys: the payment is the auth and the address is a query parameter. Amounts are on-chain token amounts (formatted strings); no USD valuation is computed — the calling agent prices positions itself.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{40}$"
+            },
+            "description": "The Base address whose positions to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Positions for the address, split by provenance, with counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string",
+                      "description": "The queried address, lowercased."
+                    },
+                    "network": {
+                      "type": "string",
+                      "const": "eip155:8453",
+                      "description": "CAIP-2 id of the settlement network (Base Mainnet)."
+                    },
+                    "positions": {
+                      "type": "object",
+                      "properties": {
+                        "mantua": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/MantuaPosition"
+                          }
+                        },
+                        "external": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/ExternalPosition"
+                          }
+                        }
+                      },
+                      "required": ["mantua", "external"]
+                    },
+                    "totals": {
+                      "type": "object",
+                      "properties": {
+                        "mantua": {
+                          "type": "number"
+                        },
+                        "external": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["mantua", "external"]
+                    },
+                    "fetchedAt": {
+                      "type": "number",
+                      "description": "ms epoch of the read."
+                    }
+                  },
+                  "required": ["address", "network", "positions", "totals", "fetchedAt"]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid address (BAD_ADDRESS) — not a 20-byte hex address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED) or the on-chain read failed (UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "MantuaPosition": {
+        "type": "object",
+        "description": "A Mantua v4 LP position held by the address (public chain state).",
+        "properties": {
+          "chainId": {
+            "type": "number"
+          },
+          "tokenId": {
+            "type": "string",
+            "description": "PositionManager ERC-721 tokenId."
+          },
+          "positionManager": {
+            "type": "string"
+          },
+          "tokenA": {
+            "type": "string"
+          },
+          "tokenB": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "number"
+          },
+          "hook": {
+            "type": ["string", "null"]
+          },
+          "tickLower": {
+            "type": "number"
+          },
+          "tickUpper": {
+            "type": "number"
+          },
+          "liquidity": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ExternalPosition": {
+        "type": "object",
+        "description": "A pre-Mantua v4 position discovered via subgraph (public chain state).",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "tokenId": {
+            "type": "string"
+          },
+          "tickLower": {
+            "type": "number"
+          },
+          "tickUpper": {
+            "type": "number"
+          },
+          "liquidity": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "token0": {
+            "type": "string"
+          },
+          "token1": {
+            "type": "string"
+          },
+          "fee": {
+            "type": "number"
+          },
+          "tickSpacing": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": true
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}

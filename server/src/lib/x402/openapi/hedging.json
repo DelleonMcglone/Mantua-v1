@@ -1,0 +1,272 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua hedging",
+    "version": "1.0.0",
+    "description": "Predefined hedge-strategy templates as concrete quote-ready legs — arms nothing. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet).",
+    "x-mantua-service-id": "hedging",
+    "x-mantua-price-usd": "0.01"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/hedging/plan": {
+      "get": {
+        "operationId": "x402HedgingPlan",
+        "summary": "Predefined hedge-strategy templates as concrete quote-ready legs — arms nothing",
+        "description": "Renders the predefined hedge-strategy templates as concrete advisory legs for one market, sized from the market's current price. Advisory by construction: Mantua's strategy store and execution engine stay internal — every leg is quotable through the paid trading services, never executable through this one.",
+        "parameters": [
+          {
+            "name": "providerEventId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,32}$"
+            },
+            "description": "Provider event id of the game to hedge."
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["yes", "no"],
+              "default": "yes"
+            },
+            "description": "Which side the caller holds — the plans hedge the held side."
+          },
+          {
+            "name": "exposureUsd",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100000
+            },
+            "description": "The exposure to hedge, in USD — legs are sized against it."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The advisory hedge plans with concrete, quote-ready legs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providerEventId": {
+                      "type": "string"
+                    },
+                    "side": {
+                      "type": "string",
+                      "enum": ["yes", "no"]
+                    },
+                    "exposureUsd": {
+                      "type": "number"
+                    },
+                    "assumedHomePriceBps": {
+                      "type": ["number", "null"],
+                      "description": "The market price the leg sizes assume; null when none was available."
+                    },
+                    "plans": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/HedgePlan"
+                      }
+                    },
+                    "quoteHowTo": {
+                      "type": "object",
+                      "description": "How to turn a leg into a paid quote through the trading services.",
+                      "properties": {
+                        "method": {
+                          "type": "string",
+                          "const": "POST"
+                        },
+                        "path": {
+                          "type": "string",
+                          "const": "/api/x402/v1/trading/quote"
+                        },
+                        "body": {
+                          "type": "object",
+                          "description": "The TradeRequest shape with placeholders filled from a leg.",
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": ["method", "path", "body"]
+                    },
+                    "armsNothing": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "note": {
+                      "type": "string",
+                      "description": "Advisory-only disclosure (B9-004): arms nothing."
+                    }
+                  },
+                  "required": [
+                    "providerEventId",
+                    "side",
+                    "exposureUsd",
+                    "assumedHomePriceBps",
+                    "plans",
+                    "quoteHowTo",
+                    "armsNothing",
+                    "note"
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid hedging request (BAD_REQUEST) — e.g. exposureUsd missing or out of range.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown game — no market context exists for this providerEventId (NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED) or the depth read failed (UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HedgePlan": {
+        "type": "object",
+        "description": "One predefined hedge-strategy template rendered for the query.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "mirrors": {
+            "type": "string",
+            "description": "The internal B9 vocabulary this template mirrors."
+          },
+          "whenToUse": {
+            "type": "string"
+          },
+          "legs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HedgeLeg"
+            }
+          },
+          "quotable": {
+            "type": "boolean",
+            "description": "False when no assumed price was available and legs carry sizes in USDC only."
+          }
+        },
+        "required": ["id", "title", "mirrors", "whenToUse", "legs"]
+      },
+      "HedgeLeg": {
+        "type": "object",
+        "description": "One advisory leg — quotable through the paid trading services.",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "providerEventId": {
+            "type": "string"
+          },
+          "outcomeIndex": {
+            "type": "integer",
+            "enum": [0, 1],
+            "description": "0 = home market, 1 = away market — whose YES the leg trades."
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["buy", "sell"]
+          },
+          "amountUsd": {
+            "type": "number",
+            "description": "Advisory size in USDC — always present."
+          },
+          "amountRaw": {
+            "type": "string",
+            "description": "Input size in raw units (6 dp) at the assumed price; absent when no price was available."
+          },
+          "triggerBps": {
+            "type": ["number", "null"],
+            "description": "Fire when the HOME YES probability reaches this (bps); null = act now."
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "providerEventId",
+          "outcomeIndex",
+          "direction",
+          "amountUsd",
+          "triggerBps",
+          "note"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}

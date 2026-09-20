@@ -1,0 +1,284 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua market intelligence",
+    "version": "1.0.0",
+    "description": "Win probability, liquidity, price movement, and sports context for one market. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet).",
+    "x-mantua-service-id": "market-intelligence",
+    "x-mantua-price-usd": "0.01"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/intelligence/market": {
+      "get": {
+        "operationId": "x402MarketIntelligence",
+        "summary": "Win probability, liquidity, price movement, and sports context for one market",
+        "description": "One read over the market page's deeper layer, the peg/price environment, and recent resolved comparables. Context reads degrade to explicit nulls with a note — a paid answer that names what is missing, never a silent gap.",
+        "parameters": [
+          {
+            "name": "providerEventId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,32}$"
+            },
+            "description": "Provider event id of the game to read."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Win probability, price movement, liquidity, sports context, market environment, and resolved comparables for the market",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "providerEventId": {
+                      "type": "string"
+                    },
+                    "hasMarkets": {
+                      "type": "boolean"
+                    },
+                    "winProbability": {
+                      "type": "object",
+                      "properties": {
+                        "homeProbabilityBps": {
+                          "type": ["number", "null"],
+                          "description": "Home YES price in bps (0–10000); null when no price is known."
+                        },
+                        "homeProbability": {
+                          "type": ["number", "null"]
+                        },
+                        "homeAmericanOdds": {
+                          "type": ["string", "null"],
+                          "description": "American odds string, e.g. \"−150\" or \"+240\"."
+                        },
+                        "source": {
+                          "type": ["string", "null"]
+                        },
+                        "capturedAt": {
+                          "type": ["number", "null"]
+                        }
+                      },
+                      "required": [
+                        "homeProbabilityBps",
+                        "homeProbability",
+                        "homeAmericanOdds",
+                        "source",
+                        "capturedAt"
+                      ]
+                    },
+                    "priceMovement": {
+                      "type": "object",
+                      "properties": {
+                        "change24hBps": {
+                          "type": ["number", "null"]
+                        }
+                      },
+                      "required": ["change24hBps"]
+                    },
+                    "liquidity": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "volume": {
+                          "type": "number"
+                        },
+                        "activity": {
+                          "type": "number"
+                        },
+                        "openInterest": {
+                          "type": "number"
+                        }
+                      },
+                      "required": ["volume", "activity", "openInterest"]
+                    },
+                    "sportsContext": {
+                      "type": "object",
+                      "properties": {
+                        "game": {
+                          "type": "object",
+                          "description": "The honesty-status game record from the depth read.",
+                          "additionalProperties": true
+                        },
+                        "hasMarkets": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": ["game", "hasMarkets"]
+                    },
+                    "marketEnvironment": {
+                      "type": ["object", "null"],
+                      "description": "Peg/price environment; null when that upstream read failed.",
+                      "properties": {
+                        "prices": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "pegs": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "verdict": {
+                          "type": "object",
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": ["prices", "pegs", "verdict"]
+                    },
+                    "marketEnvironmentNote": {
+                      "type": "string",
+                      "description": "Set only when marketEnvironment degraded to null."
+                    },
+                    "resolvedComparable": {
+                      "type": ["array", "null"],
+                      "description": "Recent resolved moneyline markets; null when the history read failed.",
+                      "items": {
+                        "$ref": "#/components/schemas/ResolvedComparable"
+                      }
+                    },
+                    "resolvedComparableNote": {
+                      "type": "string",
+                      "description": "Set only when resolvedComparable degraded to null."
+                    },
+                    "computedAt": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "providerEventId",
+                    "hasMarkets",
+                    "winProbability",
+                    "priceMovement",
+                    "liquidity",
+                    "sportsContext",
+                    "marketEnvironment",
+                    "resolvedComparable",
+                    "computedAt"
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or missing providerEventId.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown game — no market context exists for this providerEventId (NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED) or the depth read failed (UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ResolvedComparable": {
+        "type": "object",
+        "description": "A recently resolved moneyline market — the price path is stripped to keep paid payloads tight.",
+        "properties": {
+          "league": {
+            "type": "string"
+          },
+          "providerEventId": {
+            "type": "string"
+          },
+          "home": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "away": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "startsAt": {
+            "type": "number"
+          },
+          "state": {
+            "type": "string"
+          },
+          "resolvedAt": {
+            "type": ["number", "null"]
+          },
+          "outcome": {
+            "type": ["string", "null"]
+          },
+          "settlementPriceBps": {
+            "type": ["number", "null"]
+          }
+        },
+        "required": [
+          "league",
+          "providerEventId",
+          "home",
+          "away",
+          "startsAt",
+          "state",
+          "resolvedAt",
+          "outcome",
+          "settlementPriceBps"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}

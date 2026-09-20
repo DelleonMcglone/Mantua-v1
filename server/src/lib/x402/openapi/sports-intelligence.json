@@ -1,0 +1,181 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua sports intelligence",
+    "version": "1.0.0",
+    "description": "Honesty-status game context and live odds for allowlisted partners. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet). Auth mode is allowlist+payment (X402_SPORTS_INTEL_ALLOWLIST): the payer is checked against the allowlist BEFORE any settlement — an un-allowlisted payer receives 403 x402_payer_not_authorized and is never charged; an empty allowlist keeps the service dark (503).",
+    "x-mantua-service-id": "sports-intelligence",
+    "x-mantua-price-usd": "0.01"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/sports/context": {
+      "get": {
+        "operationId": "x402SportsIntelligence",
+        "summary": "Honesty-status game context and live odds for allowlisted partners",
+        "description": "Game lookup by team (the honesty-contract entry point), or live state and market overview together for one event. Team queries resolve the game record plus live state when the game resolves to an event id; event queries return live state and the market overview together.",
+        "parameters": [
+          {
+            "name": "providerEventId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,32}$"
+            },
+            "description": "Event query — returns live state and the market overview. Provide this OR team."
+          },
+          {
+            "name": "team",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "description": "Team query — resolves the game record (honesty statuses verbatim). Provide this OR providerEventId."
+          },
+          {
+            "name": "league",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "description": "Optional league scope for a team query."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The sports context — one shape per query mode",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "description": "Event query response (providerEventId given).",
+                      "properties": {
+                        "providerEventId": {
+                          "type": "string"
+                        },
+                        "live": {
+                          "type": "object",
+                          "description": "Live state / odds for the event.",
+                          "additionalProperties": true
+                        },
+                        "market": {
+                          "type": "object",
+                          "description": "Market overview (prices, liquidity).",
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": ["providerEventId", "live", "market"]
+                    },
+                    {
+                      "type": "object",
+                      "description": "Team query response (team given).",
+                      "properties": {
+                        "team": {
+                          "type": "string"
+                        },
+                        "league": {
+                          "type": ["string", "null"]
+                        },
+                        "game": {
+                          "type": "object",
+                          "description": "The game record with honesty statuses verbatim.",
+                          "additionalProperties": true
+                        },
+                        "live": {
+                          "type": "object",
+                          "description": "Live state — present only when the game resolved to an event id.",
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": ["team", "league", "game"]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request — provide team (optionally league) or providerEventId (BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The payer is not on the service allowlist (x402_payer_not_authorized) — refused before any settlement, never charged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED — service disabled or empty allowlist) or the sports tools failed (UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}
