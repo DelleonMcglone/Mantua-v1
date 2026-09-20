@@ -380,7 +380,7 @@ attested in
 ## Architecture
 
 ```
-client/      Vite + React + TypeScript SPA (port 5173) landing, docs, legal, market pages,
+client/      Vite + React + TypeScript SPA (port 5173) the home page, docs, legal, market pages,
              swap/LP/agent panels, the public agent page (/agents/<handle>), the agent's
              voice settings, and the support panel
 server/      Express + TypeScript API (port 3001) calldata builders, quotes, agent, portfolio,
@@ -426,7 +426,7 @@ docs/        Architecture, specs, decision memos, task lists, legal drafts
 | [`docs/tasks/070-agent-extended.md`](docs/tasks/070-agent-extended.md)                               | Phase 13 — the performance ledger, social posting, AI support       |
 | [`docs/tasks/071-mobile-experience.md`](docs/tasks/071-mobile-experience.md)                         | Phase 15 — the phone: sheet ticket, live glance, push, PWA, budgets |
 
-An in-app documentation site covering the same ground for users is reachable from the landing
+An in-app documentation site covering the same ground for users is reachable from the home page's
 footer.
 
 ---

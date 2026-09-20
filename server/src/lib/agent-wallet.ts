@@ -1,26 +1,20 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db/client.ts";
-import { env } from "../env.ts";
 import { agentWallets, type AgentWallet } from "../db/schema/agent.ts";
 import { users } from "../db/schema/users.ts";
 import { deriveAgentAccountName } from "./agent-wallet-name.ts";
-import { getAgentWalletSetId, getCircleClient } from "./circle/client.ts";
+import {
+  circleBlockchainFor,
+  createCircleWallet,
+  type CircleBlockchain,
+} from "./agent-wallet-create.ts";
+import { walletSetForUser } from "./custody/custody-wallet-set.ts";
 import { recordFirstSeen } from "./wallet-age.ts";
 
-export { deriveAgentAccountName };
+export { deriveAgentAccountName, circleBlockchainFor, type CircleBlockchain };
 
 import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { HARD_DAILY_CAP_USD } from "./constants.ts";
-
-/** Circle blockchain ids per supported chain. */
-export type CircleBlockchain = "BASE";
-const CIRCLE_BLOCKCHAIN: Record<SupportedChainId, CircleBlockchain> = {
-  [BASE_CHAIN_ID]: "BASE",
-};
-
-export function circleBlockchainFor(chainId: SupportedChainId): CircleBlockchain {
-  return CIRCLE_BLOCKCHAIN[chainId];
-}
 
 export class UserNotFoundError extends Error {
   constructor(privyUserId: string) {
@@ -106,29 +100,10 @@ export async function getOrCreateAgentWallet(
   const existing = existingRows.at(0);
   if (existing) return existing;
 
-  const walletSetId = await getAgentWalletSetId();
-  const client = await getCircleClient();
-  // Pin the SCA version (CIRCLE_SCA_CORE) so a wallet created on any chain
-  // under this wallet set derives the same address as the existing ones —
-  // the property gateway spends rely on (they default the destination
-  // recipient to the agent's own address). Circle's platform default
-  // changes on 2026-09-14; the installed SDK types predate the field, but
-  // the client spreads every input into the request body, so it reaches
-  // the API. Runbook §11.
-  const input: Parameters<typeof client.createWallets>[0] & {
-    scaConfiguration: { scaCore: string };
-  } = {
-    blockchains: [blockchain],
-    count: 1,
-    walletSetId,
-    accountType: "SCA",
-    scaConfiguration: { scaCore: env.CIRCLE_SCA_CORE },
-  };
-  const created = await client.createWallets(input);
-  const wallet = created.data?.wallets.at(0);
-  if (!wallet?.id || !wallet.address) {
-    throw new Error("Circle createWallets returned no wallet");
-  }
+  // Task 074 — an institution's member gets a wallet in the institution's
+  // own wallet set (D-120); everyone else in the retail set.
+  const walletSetId = await walletSetForUser(db, user.id);
+  const wallet = await createCircleWallet(walletSetId, blockchain);
 
   const insertRows = await db
     .insert(agentWallets)
@@ -136,7 +111,8 @@ export async function getOrCreateAgentWallet(
       userId: user.id,
       blockchain,
       circleWalletId: wallet.id,
-      address: wallet.address.toLowerCase(),
+      address: wallet.address,
+      walletSetId,
     })
     .onConflictDoNothing({ target: [agentWallets.userId, agentWallets.blockchain] })
     .returning();

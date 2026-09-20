@@ -9,6 +9,7 @@ import { AssetsCard } from "./AssetsCard.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { ComboPositionsSection } from "@/features/combos/ComboPositionsSection.tsx";
+import { InstitutionSection } from "@/features/institution/InstitutionSection.tsx";
 import { PortfolioCard } from "./PortfolioCard.tsx";
 import { ProfileWalletSection } from "./ProfileWalletSection.tsx";
 import { StrategiesSection } from "./StrategiesSection.tsx";
@@ -111,6 +112,7 @@ export function MobileProfile({
         </TabsContent>
         <TabsContent value="account" className="mt-3">
           <ProfileWalletSection walletAddress={walletAddress} />
+          <InstitutionSection />
           <NotificationSettings />
           <Button variant="ghost" size="sm" className="mt-4 h-11 w-full" onClick={onLogout}>
             <LogOut className="mr-1.5 h-3.5 w-3.5" /> Log out

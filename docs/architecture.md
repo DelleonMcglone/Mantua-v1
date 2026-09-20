@@ -1014,6 +1014,129 @@ agent-built tickets under `autoManage` in autonomous mode, recommended on
 the timeline otherwise, never repeated for one ticket and action in a day.
 A conjunction token cannot cash out one leg; nothing here pretends it can.
 
+## Institutional custody — an institution is a segregated wallet set (Phase 18, task 074, D-120)
+
+The institutional tier adds nothing to how money moves; it adds rules at
+the three points every money path already passes. Ledger:
+`docs/tasks/074-institutional-custody.md`.
+
+**Who holds which key (unchanged from C-009).** Members sign in with Privy
+like anyone else; their personal wallets are theirs and outside this
+tier. The institution's trading balances live in Circle
+Developer-Controlled Wallets — SCA accounts whose custody root is the
+operator's entity secret, held only in the secrets manager. The
+institution's _principal_ stays with its qualified custodian (Anchorage,
+BitGo, Coinbase Prime, Fireblocks, Copper, …), recorded on the account
+(`institutions.custodian`) and never integrated: Mantua holds no
+custodian credential, and the custodian's deposit addresses are the only
+places funds may leave to.
+
+**Segregation in Circle terms.** Circle groups wallets in _wallet sets_;
+the retail agent wallets share `CIRCLE_WALLET_SET_ID`. An institution
+gets a wallet set of its own, created through the same SDK
+(`provisionInstitutionWalletSet` → `createWalletSet`, pinned on
+`institutions.circle_wallet_set_id`), and every member's agent wallet is
+created in it (`walletSetForUser` inside `getOrCreateAgentWallet`;
+`agent_wallets.wallet_set_id` records the set). A member whose wallet
+predates their membership moves it with `segregateAgentWallet` — only
+when the wallet holds no USDC; funds are never moved by this path. The
+effect is that Circle's per-set controls (the Gas Station policy,
+transaction screening configured in the Console) and the balances Circle
+reports scope to the institution alone, and a wallet outside the set
+cannot spend (`wallet_unsegregated`).
+
+**The three choke points.**
+
+1. `checkSpendingCap` (`server/src/lib/spending-cap.ts`) — every trade,
+   combo, hedge, send and gateway spend. `assertCustodySpend`
+   (`lib/custody/custody-gate.ts`) looks the wallet up; for an
+   institutional wallet the pure `spendGate` requires an active
+   institution, an active member whose role may trade, the wallet in the
+   institution's set, the amount within the institution's per-trade cap,
+   and the institution's aggregate spend today (summed over every member
+   wallet in `daily_wallet_spend`) within its daily cap. Each refusal is a
+   `SafetyError("custody_refused")` naming the rule. Retail wallets are
+   untouched.
+2. `sendFromAgentWallet` (`lib/agent-send.ts`) — the only agent send.
+   `assertCustodySend` admits a send from an institutional wallet only as
+   the execution of a custody withdrawal in its `executing` claim, for
+   that wallet, to its verified destination, of exactly that token and
+   amount (`custody_withdrawal_required` otherwise). The agent's chat send
+   and every other caller are refused.
+3. `getOrCreateAgentWallet` (`lib/agent-wallet.ts`) — the wallet set is
+   the institution's; an institution without a provisioned set refuses to
+   create wallets rather than fall back to the retail set.
+
+**Dual control.** `custody-roles.ts` holds the matrix — owner (all),
+admin (people, destinations, reports; not the limits), trader (trade,
+request withdrawals), approver (approve withdrawals, verify
+destinations), viewer (reports) — and the two rules: a destination is
+verified by someone other than its adder, a withdrawal is approved by
+someone other than its requester. A request below
+`approval_threshold_usd` is approved by the rule and executed at once; at
+or above it a second member decides; `0` means every one. Execution
+claims the row (`approved → executing`, one conditional update) so a
+double click or a webhook race can never send twice; a receipt timeout
+leaves it `executing` with the error and is never retried by this path.
+Requests expire after 24 h.
+
+**Reporting.** `custody-reports.ts` builds the period statement over
+every member wallet — fills, confirmed portfolio transactions, Circle
+executions that did not confirm, custody withdrawals, the daily spend
+ledger — as JSON or CSV (`GET /api/institution/reports/statement`), and
+the audit trail (`/audit`). `custody-reconcile-run.ts` reads, per wallet,
+the USDC balance Circle reports for the wallet id and the chain's
+`balanceOf` for its address and compares them (`/reconciliation`):
+`matched`, `drift`, or `unavailable` when either side could not be read —
+never `matched` by default.
+
+**Surfaces.** Operator: `/api/ops/institutions` (create with the first
+owner, provision, patch status and limits) behind `requireOpsAuth`
+(`MANTUA_OPS_KEY`, 503 when unset). Members: `/api/institution` (the
+account, the caller's role and permissions, wallet segregation state,
+destinations, members for admins), `/members`, `/destinations`,
+`/withdrawals`, `/reports/*`, `/wallet/segregate`. Client: the
+Institution section on the profile and the phone's Account tab, shown to
+members only.
+
+**What the tier does not do.** It does not integrate a custodian's API,
+hold custodian credentials, move funds between the custodian and Circle,
+or constrain a member's personal Privy wallet. Segregation and dual
+control apply to the institution's Circle wallets; the principal at the
+custodian is governed by the custodian.
+
+## Home page as the one front door (Phase 19, task 075, D-121)
+
+There is no standalone marketing page any more. `App.tsx`'s `Route`
+union has no `"landing"` kind; `/` resolves directly to the `home`
+route — the board of today's games, inside the full app shell — for
+every visitor, whether they are logged in, logged out, or arriving
+fresh with no stored route. This holds for the installed-PWA launch
+path too (`?source=pwa`), which already skipped the marketing page
+before this change.
+
+**Logged out is board-first, not gated (D-121).** Browsing has been
+free since B5-007 — the login gate sits at the trade ticket, never in
+front of the board — and that was already true of `home` before this
+change; removing the marketing page's "Launch App" click just makes it
+the first thing a visitor sees, with nothing new to build. The decision
+not to gate `/` behind login is pinned by `errors.spec.ts`'s "logged
+out: / is the board with no interstitial…" test.
+
+**The home-page footer.** `components/shell/Footer.tsx` carries what
+had to survive from the deleted page's own footer: the Documentation
+link, the five social channels, the copyright line, and the Privacy /
+Terms of Use / Market Integrity links the trade ticket's one-time Terms
+acceptance gate depends on (L-004/L-005) — all reachable from `/`
+without authentication. It renders inside `HomeFullPage`, below the
+board, in the same scrollable `main` every full-page route gets. The
+marketing content that had no footer-shaped home — the hero banner, the
+demo video, the feature grid, the FAQ — is dropped; the full
+block-by-block disposition is the content inventory in
+`docs/tasks/075-home-page-restructure.md`. `SiteHeader`, `DocsPage`, and
+the `LegalPage` family are unchanged components shared by more than the
+deleted page — only their "back"/"launch" targets now point at `home`.
+
 ## Decision log
 
 See `docs/decisions/v2-open-decisions.md` for the per-decision reasoning and `docs/tasks/v2-roadmap.md` for the locked task list.

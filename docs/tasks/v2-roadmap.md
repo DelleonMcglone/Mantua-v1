@@ -985,7 +985,52 @@ handle; per-agent OAuth is the recorded next step (D-107).
 
 ---
 
-## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
+## 🏦 PHASE 18: Institutional Custody (task 074, D-120) — 🟢 P2
+
+> **An institution is a segregated Circle wallet set.** Members' agent
+> wallets are created in it, withdrawals go only to verified custodian
+> addresses under dual control, institution-wide caps sit on top of the
+> wallet caps, statements and reconciliation cover every member wallet.
+> Enforced at the three choke points money already passes. Ledger:
+> `074-institutional-custody.md`.
+
+| ID     | Task                                                                                                                                                                     | Status |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| IC-001 | Segregated custody: a Circle wallet set per institution, members' wallets in it, verified custody destinations, dual-control withdrawals, Circle-vs-chain reconciliation | ✅     |
+| IC-002 | Account tier: roles and permission matrix, institution-wide caps in `checkSpendingCap`, period statements and audit export (JSON/CSV), the Institution section           | ✅     |
+| IC-003 | Architecture: the institutional custody section in `docs/architecture.md`                                                                                                | ✅     |
+
+---
+
+## 🏠 PHASE 19: Home Page Restructure (task 075, D-121) — 🔴 P0
+
+> **One front door.** The standalone marketing landing page is deleted;
+> `/` resolves straight to the home board for every visitor, logged in
+> or not — board readable, login deferred to the point of trade
+> (already-tested behavior, now reachable with zero clicks). The
+> landing footer's surviving content (docs link, socials, copyright,
+> the legal links L-004/L-005 depend on) moves into a new home-page
+> footer; the marketing content above it is dropped, recorded
+> block-by-block in the task ledger. Ledger:
+> `075-home-page-restructure.md`. 🔴 P0 despite its position at the end
+> of the owner's list — it gates launch (the Terms acceptance gate's
+> links lived on the deleted page).
+
+| ID     | Task                                                                                                                                          | Status |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| HP-001 | Content inventory: every landing block recorded — into the footer, relocated, or dropped                                                      | ✅     |
+| HP-002 | Standalone landing page and route removed; `/` resolves to `home` for every visitor                                                           | ✅     |
+| HP-003 | Home-page footer built (docs link, social row, copyright, legal links) and wired in                                                           | ✅     |
+| HP-004 | Logged-out decision recorded (D-121): board readable, login deferred to the point of trade — not a gated shell                                | ✅     |
+| HP-005 | Legal reachability preserved from the footer without login (L-004/L-005, the ticket's Terms gate)                                             | ✅     |
+| HP-006 | Router cleanup: no orphaned link, redirect, or import to the removed page                                                                     | ✅     |
+| HP-007 | Both consumer sweeps (PF-018 chain-branding, T-005 gas/ETH/network wording) green over the new footer                                         | ✅     |
+| HP-008 | Mobile budgets held: no horizontal overflow at 360/430 px; critical-JS budget improved (marketing bundle dropped, footer is a fraction of it) | ✅     |
+| HP-009 | Browser E2E updated: `harness.ts`'s `launchApp` simplified, the logged-out spec strengthened to assert no landing page                        | ✅     |
+
+---
+
+## 🗂 Phases 13–19 (owner's master list, 2026-09-16, refreshed 2026-09-19)
 
 The owner's master task list is stored verbatim at
 **`docs/tasks/mantua-v1-task-list.md`** and is the source of truth for
@@ -1000,7 +1045,8 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark)                                                      |
 | 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ✅ (task 072; operator seeds combo pools)                                                                   |
 | 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | 🟡 (task 073; foundation #61 + docs/ledger landed; services + OpenAPI PRs in flight; go-live counsel-gated) |
-| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                                                                          |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ✅ (task 074; operator sets `MANTUA_OPS_KEY`)                                                               |
+| 19 — Home Page Restructure                                  | 🔴 P0 | HP-001 … HP-009 | ✅ (task 075)                                                                                               |
 
 ---
 
@@ -1068,7 +1114,9 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | Phase 13: Agent Extended (social, ledger, support) | 14      |
 | Phase 15: Mobile Experience                        | 9       |
 | Phase 16: Prediction Market Combos                 | 10      |
-| **Grand Total**                                    | **214** |
+| Phase 18: Institutional Custody                    | 3       |
+| Phase 19: Home Page Restructure                    | 9       |
+| **Grand Total**                                    | **226** |
 
 ### Future phases
 

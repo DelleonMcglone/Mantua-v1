@@ -44,6 +44,8 @@ export const agentSendPayloadSchema = z.object({
   agentAddress: z.string(),
   /** Set when spend was already recorded provisionally (reversed on revert). */
   provisionalSpendingUsd: z.number().nonnegative().optional(),
+  /** Task 074 — the custody withdrawal this send executes, stamped at finalization. */
+  custodyWithdrawalId: z.string().optional(),
   auditContext: z
     .object({
       ipAddress: z.string().optional(),
@@ -107,6 +109,13 @@ export type FinalizationEffect =
       txHash: string;
       params: Record<string, unknown>;
       usdValue: number;
+    }
+  | {
+      type: "custody_withdrawal";
+      id: string;
+      status: "executed" | "failed";
+      txHash: string | null;
+      error: string | null;
     };
 
 export interface FinalizationPlan {
@@ -166,6 +175,15 @@ export function buildFinalizationPlan(input: FinalizationInput): FinalizationPla
           },
         },
       });
+      if (p.custodyWithdrawalId) {
+        effects.push({
+          type: "custody_withdrawal",
+          id: p.custodyWithdrawalId,
+          status: "executed",
+          txHash: input.txHash,
+          error: null,
+        });
+      }
       if (input.txHash) {
         effects.push({
           type: "portfolio_tx",
@@ -249,6 +267,15 @@ export function buildFinalizationPlan(input: FinalizationInput): FinalizationPla
           type: "reverse_spend",
           walletAddress: p.agentAddress,
           usdValue: p.provisionalSpendingUsd as number,
+        });
+      }
+      if (p.custodyWithdrawalId) {
+        effects.push({
+          type: "custody_withdrawal",
+          id: p.custodyWithdrawalId,
+          status: "failed",
+          txHash: input.txHash,
+          error: reason,
         });
       }
       effects.push({
@@ -369,6 +396,11 @@ export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
       case "close_position":
         await engineExecuted(db, effect.strategyId, effect.detail, effect.txHash);
         break;
+      case "custody_withdrawal": {
+        const { stampWithdrawalFinal } = await import("../custody/custody-withdrawal-stamp.ts");
+        await stampWithdrawalFinal(db, effect);
+        break;
+      }
       case "audit_strategy":
         // Same raw insert shape strategy-store uses ("executed"/"failure" on
         // strategy_execute are not in the typed AuditOutcome union).

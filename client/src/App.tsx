@@ -30,8 +30,8 @@ import { usePrivy } from "@privy-io/react-auth";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, mentionsHook, type Intent } from "./lib/chat-intent.ts";
 import { agentInputEvent } from "./features/voice/spoken-command.ts";
-import { LandingPage } from "./components/landing/LandingPage.tsx";
 import { LoginModal } from "./components/auth/LoginModal.tsx";
+import { Footer } from "./components/shell/Footer.tsx";
 import { type NavDestination } from "./components/shell/MarketNav.tsx";
 import type { LegalDoc } from "./components/legal/LegalPage.tsx";
 import { LeaguePage } from "./features/markets/LeaguePage.tsx";
@@ -73,7 +73,6 @@ type AnalyzeTopic =
   | "token-price";
 
 type Route =
-  | { kind: "landing" }
   | { kind: "legal"; doc: LegalDoc }
   | { kind: "docs" }
   | { kind: "home" }
@@ -154,9 +153,9 @@ const AGENT_ACTION_KINDS = new Set<Intent["kind"]>([
 ]);
 
 // ─── Route persistence ────────────────────────────────────────────────────────
-// The route lives only in React state, so a refresh used to bounce back to the
-// landing page. Persist the last in-app route to sessionStorage and restore it
-// on load: refresh keeps your place; a fresh tab/visit still starts at landing.
+// The route lives only in React state, so a refresh used to bounce back to
+// home. Persist the last in-app route to sessionStorage and restore it on
+// load: refresh keeps your place; a fresh tab/visit still starts at home.
 const ROUTE_STORAGE_KEY = "mantua:last-route";
 const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "home",
@@ -178,18 +177,12 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
   "combos",
 ];
 
-/** What we persist. Never store the public pages — landing, legal, docs,
+/** What we persist. Never store the standalone public pages — legal, docs,
  *  an agent's public page (its URL is the record) — (clear instead), and
  *  never store an agent `message`: restoring it would auto-resend the
  *  command on refresh (potentially re-executing a trade). */
 function sanitizeRouteForStorage(route: Route): Route | null {
-  if (
-    route.kind === "landing" ||
-    route.kind === "legal" ||
-    route.kind === "docs" ||
-    route.kind === "agent-public"
-  )
-    return null;
+  if (route.kind === "legal" || route.kind === "docs" || route.kind === "agent-public") return null;
   if (route.kind === "agent") return { kind: "agent" };
   return route;
 }
@@ -208,7 +201,7 @@ function loadStoredRoute(): Route | null {
       return parsed as Route;
     }
   } catch {
-    // Corrupt / unavailable storage → start fresh at landing.
+    // Corrupt / unavailable storage → start fresh at home.
   }
   return null;
 }
@@ -216,13 +209,15 @@ function loadStoredRoute(): Route | null {
 export default function App() {
   const { ready, authenticated, logout, user } = usePrivy();
   // Task 070 — `/agents/<handle>` is the one URL the app answers directly:
-  // a shared link must open the public record, not the landing page.
+  // a shared link must open the public record, not the home page.
   // Task 071 (MX-004 / MX-007) — a notification tap or a home-screen
-  // shortcut names its surface in the query; the installed app skips landing.
+  // shortcut names its surface in the query.
+  // Task 075 (Phase 19) — `/` is the one front door: no landing page, no
+  // stored/launch route falls back to anything but `home`.
   const [route, setRoute] = useState<Route>(() => {
     const handle = agentHandleFromPath(window.location.pathname);
     if (handle) return { kind: "agent-public", handle };
-    return launchRoute(window.location.search) ?? loadStoredRoute() ?? { kind: "landing" };
+    return launchRoute(window.location.search) ?? loadStoredRoute() ?? { kind: "home" };
   });
   const isMobile = useIsMobile();
   useEffect(() => {
@@ -344,7 +339,7 @@ export default function App() {
       if (sanitized) sessionStorage.setItem(ROUTE_STORAGE_KEY, JSON.stringify(sanitized));
       else sessionStorage.removeItem(ROUTE_STORAGE_KEY);
     } catch {
-      // Storage unavailable (private mode etc.) — refresh just returns to landing.
+      // Storage unavailable (private mode etc.) — refresh just returns to home.
     }
   }, [route]);
 
@@ -369,35 +364,13 @@ export default function App() {
     );
   }
 
-  // Landing page is the default surface — public marketing copy with
-  // no Privy auth attached. "Launch App" buttons hand off to the
-  // existing in-app shell by flipping the route to `home`.
-  if (route.kind === "landing") {
-    return (
-      <LandingPage
-        onLaunch={() => {
-          setRoute({ kind: "home" });
-        }}
-        onNavigate={(destination) => {
-          setRoute(navDestinationToRoute(destination));
-        }}
-        onOpenLegal={(doc) => {
-          setRoute({ kind: "legal", doc });
-        }}
-        onOpenDocs={() => {
-          setRoute({ kind: "docs" });
-        }}
-      />
-    );
-  }
-
   // Task 070 — an agent's public record is a public page, like docs.
   if (route.kind === "agent-public") {
     return (
       <PublicAgentPage
         handle={route.handle}
         onBack={() => {
-          setRoute({ kind: "landing" });
+          setRoute({ kind: "home" });
         }}
         onLaunch={() => {
           setRoute({ kind: "home" });
@@ -410,7 +383,7 @@ export default function App() {
     return (
       <DocsPage
         onBack={() => {
-          setRoute({ kind: "landing" });
+          setRoute({ kind: "home" });
         }}
         onLaunch={() => {
           setRoute({ kind: "home" });
@@ -419,10 +392,10 @@ export default function App() {
     );
   }
 
-  // Legal pages are public too — same standalone treatment as landing.
+  // Legal pages are public, standalone — reached from the home footer now.
   if (route.kind === "legal") {
     const back = () => {
-      setRoute({ kind: "landing" });
+      setRoute({ kind: "home" });
     };
     const launch = () => {
       setRoute({ kind: "home" });
@@ -510,7 +483,7 @@ export default function App() {
           setRoute({ kind: "agent" });
         }}
         onLogoClick={() => {
-          setRoute({ kind: "landing" });
+          setRoute({ kind: "home" });
         }}
         onNavigate={(destination) => {
           setRoute(navDestinationToRoute(destination));
@@ -881,7 +854,9 @@ function AddLiquidityFullPage({
 
 /** Home page — the four prompt cards in a row across the top (agent →
  *  analyze → swap → liquidity), then today's boards split side by side
- *  (NFL | WNBA) instead of stacked. Chat starts from the dock below. */
+ *  (NFL | WNBA) instead of stacked, then the footer (task 075 — the one
+ *  front door: no login required to reach any of it, incl. the legal
+ *  links the Terms gate depends on). Chat starts from the dock below. */
 function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
   return (
     <div className="mx-auto w-full max-w-6xl px-3 py-4 md:px-6 md:py-6">
@@ -906,6 +881,14 @@ function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
           }}
         />
       </div>
+      <Footer
+        onOpenDocs={() => {
+          setRoute({ kind: "docs" });
+        }}
+        onOpenLegal={(doc) => {
+          setRoute({ kind: "legal", doc });
+        }}
+      />
     </div>
   );
 }
@@ -1025,7 +1008,7 @@ function ProfileRoute({ setRoute }: { setRoute: (r: Route) => void }) {
   );
 }
 
-/** Where each landing-header nav item lands in the app shell. */
+/** Where each header nav item lands in the app shell. */
 function navDestinationToRoute(destination: NavDestination): Route {
   switch (destination.kind) {
     case "market":

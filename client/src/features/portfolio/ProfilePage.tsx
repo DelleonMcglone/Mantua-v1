@@ -2,6 +2,7 @@ import { Bot, Droplet, LogOut, Megaphone } from "lucide-react";
 import { StrategiesSection } from "./StrategiesSection.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { ComboPositionsSection } from "@/features/combos/ComboPositionsSection.tsx";
+import { InstitutionSection } from "@/features/institution/InstitutionSection.tsx";
 import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
 import { ProfileWalletSection } from "./ProfileWalletSection.tsx";
 import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
@@ -52,6 +53,7 @@ export function ProfilePage({
       />
       <div className="flex-1 overflow-auto px-5 pb-6">
         <ProfileWalletSection walletAddress={walletAddress} />
+        <InstitutionSection />
 
         <MarketPositionsSection />
         <ComboPositionsSection

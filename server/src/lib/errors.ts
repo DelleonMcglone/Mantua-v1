@@ -4,7 +4,10 @@ export type SafetyErrorCode =
   | "slippage_too_high"
   | "kill_switch_active"
   | "wrong_chain"
-  | "wallet_unknown";
+  | "wallet_unknown"
+  // Task 074 — the institutional custody gate (details.reason names the rule)
+  | "custody_refused"
+  | "custody_withdrawal_required";
 
 export class SafetyError extends Error {
   public readonly code: SafetyErrorCode;

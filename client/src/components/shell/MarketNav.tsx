@@ -38,9 +38,9 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * League + section nav. Shared by the landing header, the in-app shell
- * header, and the mobile nav sheet so all stay in step — a league added
- * to `SPORTS` shows up everywhere without a second edit.
+ * League + section nav. Shared by `SiteHeader` (docs/legal), the in-app
+ * shell header, and the mobile nav sheet so all stay in step — a league
+ * added to `SPORTS` shows up everywhere without a second edit.
  *
  * `layout="row"` (default) scrolls sideways rather than wrapping once
  * the row runs out of width. Where a header renders it twice (inline at

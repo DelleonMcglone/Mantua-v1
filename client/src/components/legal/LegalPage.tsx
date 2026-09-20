@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 import { SiteHeader } from "@/components/shell/SiteHeader.tsx";
 
-/** The legal documents reachable from the landing footer. */
+/** The legal documents reachable from the home-page footer. */
 export type LegalDoc = "privacy" | "terms" | "integrity";
 
 /** Shown at the top of each policy. Bump when the text changes
@@ -24,17 +24,16 @@ interface Props {
   /** Lead paragraph under the title. */
   intro: ReactNode;
   children: ReactNode;
-  /** Back to the marketing page. */
+  /** Back to the home page. */
   onBack: () => void;
-  /** Opens the app shell, same as the landing header's CTA. */
+  /** Opens the app shell, same as `SiteHeader`'s CTA. */
   onLaunch: () => void;
 }
 
 /**
  * Shared shell for the public legal pages — privacy, terms, market
- * integrity. Each renders outside the app shell, the same way the
- * landing page does, with its own header, back affordance, and a
- * minimal footer.
+ * integrity. Each renders outside the app shell, standalone, with its
+ * own header, back affordance, and a minimal footer.
  *
  * The documents these pages carry are plain-language drafts written for
  * this product. None has been reviewed by counsel — treat the copy as a

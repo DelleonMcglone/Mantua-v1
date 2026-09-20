@@ -11,3 +11,4 @@ export * from "./fiat.ts";
 export * from "./legal.ts";
 export * from "./social.ts";
 export * from "./push.ts";
+export * from "./institutions.ts";

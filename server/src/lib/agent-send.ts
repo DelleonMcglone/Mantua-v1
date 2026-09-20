@@ -13,6 +13,7 @@ import {
   recordPendingExecution,
   recordSendPortfolioTx,
 } from "./circle/finalize.ts";
+import { assertCustodySend } from "./custody/custody-gate.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken, type TokenSymbol } from "./tokens.ts";
 import { tokenAmountUsdStrict } from "./usd-pricing.ts";
@@ -49,6 +50,9 @@ export interface AgentSendArgs {
   chainId?: SupportedChainId;
   /** Request context for the durable audit trail (optional). */
   auditContext?: { ipAddress?: string; userAgent?: string };
+  /** Task 074 — the approved custody withdrawal this send executes (required
+   *  for an institutional wallet; ignored for a retail one). */
+  custodyWithdrawalId?: string;
 }
 
 export interface AgentSendResult {
@@ -76,6 +80,7 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
 
   const wallet = await getAgentWallet(privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(privyUserId);
+  await assertCustodySend(wallet, { to, symbol, amount, withdrawalId: args.custodyWithdrawalId });
 
   const token = getToken(symbol, chainId);
   const amountAtomic = parseUnits(amount, token.decimals);
@@ -118,6 +123,7 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
       usdValue,
       network: agentNetworkName(chainId),
       agentAddress: wallet.address,
+      ...(args.custodyWithdrawalId ? { custodyWithdrawalId: args.custodyWithdrawalId } : {}),
       ...(args.auditContext?.ipAddress ? { ipAddress: args.auditContext.ipAddress } : {}),
       ...(args.auditContext?.userAgent ? { userAgent: args.auditContext.userAgent } : {}),
     },

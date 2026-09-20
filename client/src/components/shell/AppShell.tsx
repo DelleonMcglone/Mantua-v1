@@ -13,7 +13,7 @@ interface AppShellProps {
   onOpenProfile?: (() => void) | undefined;
   onOpenAgent?: (() => void) | undefined;
   /** Optional click handler for the logo / wordmark — used to send
-   *  the user back to the landing page from inside the app shell. */
+   *  the user back to the home page from anywhere in the app shell. */
   onLogoClick?: (() => void) | undefined;
   /** League / section nav handler, forwarded to the header. */
   onNavigate: (destination: NavDestination) => void;

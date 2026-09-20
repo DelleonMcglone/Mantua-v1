@@ -128,6 +128,11 @@ export type AuditAction =
   | "social_profile_update"
   | "social_post"
   | "support_escalation"
+  // Task 074 (Phase 18) — the institutional tier
+  | "institution_update"
+  | "institution_member"
+  | "custody_destination"
+  | "custody_withdrawal"
   // Task 072 (Phase 16) — combo tickets, settlement and the monitor
   | "combo_open"
   | "combo_close"

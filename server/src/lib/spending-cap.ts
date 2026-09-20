@@ -5,6 +5,7 @@ import { dailyWalletSpend } from "../db/schema/safety.ts";
 import { userPreferences } from "../db/schema/users.ts";
 import { users } from "../db/schema/users.ts";
 import { DEFAULT_DAILY_CAP_USD, HARD_DAILY_CAP_USD } from "./constants.ts";
+import { assertCustodySpend } from "./custody/custody-gate.ts";
 import { SafetyError } from "./errors.ts";
 
 /**
@@ -113,6 +114,9 @@ export async function checkSpendingCap(address: string, usdAmount: number): Prom
       { usdAmount, hardCeiling: HARD_DAILY_CAP_USD },
     );
   }
+  // Task 074 — an institutional wallet also answers to its institution's
+  // standing, segregation, per-trade cap and aggregate daily cap.
+  await assertCustodySpend(address, usdAmount);
   const group = await capAddressGroup(address.toLowerCase());
   const [cap, ...spends] = await Promise.all([
     getDailyCap(address),

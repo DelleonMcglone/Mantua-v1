@@ -32,7 +32,8 @@ interface ApiResponseError {
   details?: unknown;
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+/** The authenticated fetch every helper shares; a non-2xx is an `ApiError`. */
+async function send(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getAccessToken();
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
@@ -48,7 +49,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       body.details,
     );
   }
-  return (await res.json()) as T;
+  return res;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  return (await (await send(path, init)).json()) as T;
 }
 
 export const api = {
@@ -63,5 +68,9 @@ export const api = {
   },
   delete<T>(path: string, body: unknown): Promise<T> {
     return request<T>(path, { method: "DELETE", body: JSON.stringify(body) });
+  },
+  /** Task 074 — a file the API serves (CSV exports), authenticated like the rest. */
+  async getBlob(path: string): Promise<Blob> {
+    return (await send(path, { method: "GET" })).blob();
   },
 };

@@ -118,13 +118,13 @@ export async function signIn(page: Page): Promise<void> {
   });
 }
 
-/** From the landing page into the app shell's home. */
+/** Into the app shell's home — `/` resolves there directly (task 075:
+ *  the standalone landing page is gone; there is no "Launch App" step
+ *  to click through any more). Kept as a named helper since every spec
+ *  calls it, and because a future gate in front of `/` should only need
+ *  to change here. */
 export async function launchApp(page: Page): Promise<void> {
   await page.goto("/");
-  await page
-    .getByRole("button", { name: /launch app/i })
-    .first()
-    .click();
 }
 
 declare global {
