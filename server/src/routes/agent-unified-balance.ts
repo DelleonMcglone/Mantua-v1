@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { logger } from "../lib/logger.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
+import { CustodyUnprovisionedError } from "../lib/custody/custody-wallet-set.ts";
 import {
   getUnifiedBalances,
   depositToUnifiedBalance,
@@ -82,6 +83,10 @@ agentUnifiedBalanceRouter.post(
     } catch (err) {
       if (err instanceof CircleUnavailableError || err instanceof UnifiedBalanceUnavailableError) {
         res.status(503).json({ error: err.message, code: "UNIFIED_BALANCE_UNAVAILABLE" });
+        return;
+      }
+      if (err instanceof CustodyUnprovisionedError) {
+        res.status(409).json({ error: err.message, code: "CUSTODY_UNPROVISIONED" });
         return;
       }
       logger.error({ err }, "unified-balance deposit failed");

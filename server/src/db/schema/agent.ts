@@ -29,6 +29,11 @@ export const agentWallets = pgTable(
     blockchain: varchar("blockchain", { length: 32 }).notNull().default("BASE"),
     // Circle Developer-Controlled Wallets wallet id (chain-specific).
     circleWalletId: varchar("circle_wallet_id", { length: 128 }).notNull().unique(),
+    /** Task 073 — the Circle wallet set the wallet was created in. Null for
+     *  wallets created before the column (the retail set); an institution's
+     *  members carry the institution's set, and the custody gate refuses a
+     *  spend from any other. */
+    walletSetId: varchar("wallet_set_id", { length: 64 }),
     address: varchar("address", { length: 42 }).notNull(),
     label: varchar("label", { length: 64 }),
     dailyCapUsd: numeric("daily_cap_usd", { precision: 20, scale: 2 }).notNull().default("100"),

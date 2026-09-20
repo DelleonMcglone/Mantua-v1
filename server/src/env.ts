@@ -243,6 +243,9 @@ const schema = z.object({
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
   MANTUA_FEE_ADMIN_KEY: z.string().min(1).optional(),
+  /** Task 073 — the operator key behind `/api/ops/*` (institution onboarding).
+   *  Sent as `Authorization: Bearer <key>`; absent → those routes are 503. */
+  MANTUA_OPS_KEY: z.string().min(16).optional(),
 
   /** Shared secret guarding the auto-rebalance cron endpoint. Vercel Cron sends
    *  it as `Authorization: Bearer <CRON_SECRET>`; an external scheduler can use

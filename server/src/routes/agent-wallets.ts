@@ -11,6 +11,7 @@ import {
 import { logAudit } from "../lib/audit.ts";
 import { setAutoRebalance } from "../lib/agent-rebalance.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
+import { CustodyUnprovisionedError } from "../lib/custody/custody-wallet-set.ts";
 import { HARD_DAILY_CAP_USD } from "../lib/constants.ts";
 import { DEFAULT_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
 import { logger } from "../lib/logger.ts";
@@ -74,6 +75,10 @@ agentWalletsRouter.post(
       }
       if (err instanceof CircleUnavailableError) {
         res.status(503).json({ error: err.message, code: "CIRCLE_UNAVAILABLE" });
+        return;
+      }
+      if (err instanceof CustodyUnprovisionedError) {
+        res.status(409).json({ error: err.message, code: "CUSTODY_UNPROVISIONED" });
         return;
       }
       logger.error({ err }, "agent wallet provision failed");

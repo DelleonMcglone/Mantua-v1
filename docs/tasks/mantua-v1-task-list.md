@@ -98,7 +98,7 @@ Completed:   228   (+20 partial 🟡)
 | Phase 15: Mobile Experience (LAST)                         | 🟡 P1 | 9     | 0          |
 | Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 10         |
 | Phase 17: Circle Agent Marketplace + Agent-Native Services | 🟢 P2 | 10    | 0          |
-| Phase 18: Institutional Custody                            | 🟢 P2 | 3     | 0          |
+| Phase 18: Institutional Custody                            | 🟢 P2 | 3     | 3 ✅       |
 
 ---
 
@@ -691,9 +691,9 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 
 | ID     | Task                                                                                                   | Status |
 | ------ | ------------------------------------------------------------------------------------------------------ | ------ |
-| IC-001 | Circle + institutional custody ecosystem integration: segregated, institutional-grade asset protection | ⬜     |
-| IC-002 | Institutional account tier: custody, reporting, permissions                                            | ⬜     |
-| IC-003 | Document institutional custody architecture in `docs/architecture.md`                                  | ⬜     |
+| IC-001 | Circle + institutional custody ecosystem integration: segregated, institutional-grade asset protection | ✅     |
+| IC-002 | Institutional account tier: custody, reporting, permissions                                            | ✅     |
+| IC-003 | Document institutional custody architecture in `docs/architecture.md`                                  | ✅     |
 
 ---
 

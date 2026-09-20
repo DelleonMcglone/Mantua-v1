@@ -954,6 +954,23 @@ handle; per-agent OAuth is the recorded next step (D-107).
 
 ---
 
+## 🏦 PHASE 18: Institutional Custody (task 073, D-120) — 🟢 P2
+
+> **An institution is a segregated Circle wallet set.** Members' agent
+> wallets are created in it, withdrawals go only to verified custodian
+> addresses under dual control, institution-wide caps sit on top of the
+> wallet caps, statements and reconciliation cover every member wallet.
+> Enforced at the three choke points money already passes. Ledger:
+> `073-institutional-custody.md`. Phase 17 not started, at the owner's direction.
+
+| ID     | Task                                                                                                                                                                     | Status |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
+| IC-001 | Segregated custody: a Circle wallet set per institution, members' wallets in it, verified custody destinations, dual-control withdrawals, Circle-vs-chain reconciliation | ✅     |
+| IC-002 | Account tier: roles and permission matrix, institution-wide caps in `checkSpendingCap`, period statements and audit export (JSON/CSV), the Institution section           | ✅     |
+| IC-003 | Architecture: the institutional custody section in `docs/architecture.md`                                                                                                | ✅     |
+
+---
+
 ## 🗂 Phases 13–18 (owner's master list, 2026-09-16)
 
 The owner's master task list is stored verbatim at
@@ -969,7 +986,7 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | 15 — Mobile Experience (last)                               | 🟡 P1 | MX-001 … MX-009 | 🟡 (task 071; owner sets VAPID keys, device benchmark) |
 | 16 — Prediction Market Combos                               | 🟢 P2 | CB-001 … CB-010 | ✅ (task 072; operator seeds combo pools)              |
 | 17 — Circle Agent Marketplace + Agent-Native Services       | 🟢 P2 | MP-001 … MP-011 | ⬜                                                     |
-| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ⬜                                                     |
+| 18 — Institutional Custody                                  | 🟢 P2 | IC-001 … IC-003 | ✅ (task 073; operator sets `MANTUA_OPS_KEY`)          |
 
 ---
 
@@ -1037,7 +1054,8 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 | Phase 13: Agent Extended (social, ledger, support) | 14      |
 | Phase 15: Mobile Experience                        | 9       |
 | Phase 16: Prediction Market Combos                 | 10      |
-| **Grand Total**                                    | **214** |
+| Phase 18: Institutional Custody                    | 3       |
+| **Grand Total**                                    | **217** |
 
 ### Future phases
 
