@@ -8,7 +8,9 @@
 //      as a node_module.
 //   2. api/_server.mjs — the Express app, with the heavy/native deps
 //      (express, pg, pino, viem, …) kept external (tsx/Vercel resolve them from
-//      node_modules; bundling pino/pg breaks on their dynamic requires), and
+//      the ROOT node_modules; bundling pino/pg breaks on their dynamic
+//      requires) — but only the packages actually hoisted to the root are
+//      external; an un-hoisted workspace dep is bundled (see rootPackages) — and
 //      @circle-fin aliased to the self-contained bundle from pass 1 so it gets
 //      inlined here. The result needs no @circle-fin/axios at runtime.
 //
@@ -19,10 +21,35 @@
 // pure ESM (its only CJS — the SDK — is inlined from pass 1 and carries that
 // banner with it), so adding the banner there too would re-declare __cr.
 import { build } from "esbuild";
+import { readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Packages the function may leave external: exactly the ones installed in
+ * the ROOT node_modules, which is where Vercel's file tracer (and Node at
+ * runtime) resolves a bare import from `api/`. A workspace dependency npm
+ * did not hoist — it lives in `server/node_modules` (express-rate-limit
+ * today) — is invisible there and would fail the function at boot with
+ * "Cannot find package", so anything not on this list is bundled instead.
+ */
+function rootPackages() {
+  const dir = join(root, "node_modules");
+  const names = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    if (entry.name.startsWith("@")) {
+      for (const scoped of readdirSync(join(dir, entry.name), { withFileTypes: true })) {
+        if (scoped.isDirectory()) names.push(`${entry.name}/${scoped.name}`);
+      }
+    } else {
+      names.push(entry.name);
+    }
+  }
+  return names;
+}
 const banner = {
   js: "import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);",
 };
@@ -52,12 +79,26 @@ await build({
   banner,
 });
 
+// The aliased Circle packages are bundled from the passes above, so they
+// must not be external even though some are hoisted to the root.
+const ALWAYS_BUNDLE = new Set([
+  "@circle-fin/developer-controlled-wallets",
+  "@circle-fin/smart-contract-platform",
+  "@circle-fin/unified-balance-kit",
+  "@circle-fin/adapter-circle-wallets",
+  "@circle-fin/bridge-kit",
+  "@circle-fin/adapter-viem-v2",
+]);
+const external = rootPackages()
+  .filter((name) => !ALWAYS_BUNDLE.has(name))
+  .flatMap((name) => [name, `${name}/*`]);
+
 await build({
   entryPoints: [join(root, "server/src/app.ts")],
   bundle: true,
   platform: "node",
   format: "esm",
-  packages: "external",
+  external,
   alias: {
     "@circle-fin/developer-controlled-wallets": dcwOut,
     "@circle-fin/smart-contract-platform": dcwOut,
