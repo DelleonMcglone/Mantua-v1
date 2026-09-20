@@ -8,9 +8,9 @@ import { type PublicAgent } from "./reputation-core.ts";
 
 interface Props {
   handle: string;
-  /** Back to the marketing page. */
+  /** Back to the home page. */
   onBack: () => void;
-  /** Opens the app shell, same as the landing header's CTA. */
+  /** Opens the app shell, same as `SiteHeader`'s CTA. */
   onLaunch: () => void;
 }
 

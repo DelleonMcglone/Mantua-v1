@@ -9,8 +9,8 @@ import {
 
 /**
  * The leagues Mantua runs prediction markets for. One catalog feeds both
- * the landing header nav and the per-sport market pages, so a league
- * added here shows up in both places with the same label and glyph.
+ * the header nav and the per-sport market pages, so a league added here
+ * shows up in both places with the same label and glyph.
  */
 export type SportId = "nba" | "wnba" | "nfl" | "mlb" | "nhl" | "soccer";
 

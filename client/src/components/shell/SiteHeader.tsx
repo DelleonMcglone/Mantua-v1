@@ -7,7 +7,7 @@ import { MarketNav, type NavDestination } from "./MarketNav.tsx";
 interface Props {
   /** Rendered before the logo — the docs page's sidebar toggle. */
   leading?: ReactNode;
-  /** When set, the logo group is a button (back to the landing page);
+  /** When set, the logo group is a button (back to the home page);
    *  otherwise it renders as a plain, non-interactive group. */
   onLogoClick?: (() => void) | undefined;
   /** Accessible name for the logo button. */
@@ -25,8 +25,8 @@ interface Props {
 }
 
 /**
- * B-014 — the one header shell for the standalone public pages
- * (landing, docs, legal). Border-b + logo group + optional league nav +
+ * B-014 — the one header shell for the standalone public pages (docs,
+ * legal). Border-b + logo group + optional league nav +
  * theme toggle + Launch App CTA, previously three copy-pasted
  * implementations drifting apart. The in-app shell header
  * (`shell/Header.tsx`) stays separate: it carries auth state
@@ -74,9 +74,7 @@ export function SiteHeader({
         {onNavigate && (
           <MarketNav onNavigate={onNavigate} className="hidden min-w-0 flex-1 md:block" />
         )}
-        <div
-          className={`ml-auto flex shrink-0 items-center gap-2${onNavigate ? " md:ml-0" : ""}`}
-        >
+        <div className={`ml-auto flex shrink-0 items-center gap-2${onNavigate ? " md:ml-0" : ""}`}>
           <button
             type="button"
             onClick={toggle}

@@ -13,6 +13,13 @@ test("switching sport is one tap on the league page, and every chip is a touch t
 }) => {
   await mockMobileApi(page);
   await launchApp(page);
+  // Task 075 (HP-008) — the home page's new footer holds the phone width
+  // (360/430 px) with no horizontal overflow.
+  await expect(
+    page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    ),
+  ).resolves.toBeLessThanOrEqual(0);
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("button", { name: "NFL", exact: true }).click();
   await expect(page.getByRole("heading", { name: "NFL" })).toBeVisible();

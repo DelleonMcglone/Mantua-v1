@@ -3,6 +3,9 @@
  * with the bundle and inherit `currentColor` from the link they sit in
  * — no remote requests and no per-theme asset swap. Each is a 24×24
  * viewBox, filled (Instagram is stroked, which is its usual form).
+ *
+ * Task 075 — moved from `components/landing/` (deleted) to `shell/`:
+ * the home-page footer is the only caller now.
  */
 
 interface IconProps {

@@ -99,6 +99,7 @@ Completed:   228   (+20 partial 🟡)
 | Phase 16: Prediction Market Combos                         | 🟢 P2 | 10    | 10         |
 | Phase 17: Circle Agent Marketplace + Agent-Native Services | 🟢 P2 | 10    | 0          |
 | Phase 18: Institutional Custody                            | 🟢 P2 | 3     | 3 ✅       |
+| Phase 19: Home Page Restructure                            | 🔴 P0 | 9     | 9 ✅       |
 
 ---
 
@@ -694,6 +695,26 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 | IC-001 | Circle + institutional custody ecosystem integration: segregated, institutional-grade asset protection | ✅     |
 | IC-002 | Institutional account tier: custody, reporting, permissions                                            | ✅     |
 | IC-003 | Document institutional custody architecture in `docs/architecture.md`                                  | ✅     |
+
+---
+
+## 🏠 PHASE 19: Home Page Restructure 🔴
+
+> Added 2026-09-19 by owner request. Tiered 🔴 P0 despite its position — it sits at the end of the document so phase numbering stays sequential, but it gates launch: / is the front door, and the legal links the Terms gate depends on live on the landing page today.
+>
+> Intent: delete the standalone landing page, let / resolve to the home page for every visitor, and relocate the landing content into a footer on that home page.
+
+| ID     | Task                                                                                                                                                                                                                                                | Status |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| HP-001 | Content inventory before deletion — record every block on the landing page and its disposition: into the home-page footer, relocated to an existing surface, or dropped. Nothing leaves the product without a recorded decision                     | ✅     |
+| HP-002 | Remove the standalone landing page and its route; / resolves to the home page (the Discover board) for every visitor                                                                                                                                | ✅     |
+| HP-003 | Build the home-page footer and move the surviving landing content into it                                                                                                                                                                           | ✅     |
+| HP-004 | Decide and record what a logged-out visitor sees at / — board readable with the login prompt deferred to the point of trade, or a gated shell. The browser suite's logged-out spec asserts today's behaviour, so this decision has a test to update | ✅     |
+| HP-005 | Preserve legal reachability: Terms and Privacy stay linked from the footer — L-004 requires them live before mainnet and the one-time acceptance gate links to them                                                                                 | ✅     |
+| HP-006 | Router cleanup: no orphaned link, stale redirect, or dead import to the removed page anywhere in the client                                                                                                                                         | ✅     |
+| HP-007 | Keep both consumer sweeps green over the new footer — the chain-branding sweep (PF-018) and the gas / ETH / network / explorer wording sweep (T-005)                                                                                                | ✅     |
+| HP-008 | Hold the mobile budgets: the 360 px and 430 px specs pass with no horizontal overflow, and the footer does not regress the critical-JS budget (MX-006)                                                                                              | ✅     |
+| HP-009 | Update the browser E2E specs that enter through the landing page, plus the logged-out spec                                                                                                                                                          | ✅     |
 
 ---
 

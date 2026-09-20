@@ -6,7 +6,7 @@ import { DOCS_GROUPS, DOCS_PAGES } from "./docs-content.tsx";
 interface Props {
   /** Back to the marketing page. */
   onBack: () => void;
-  /** Opens the app shell, same as the landing header's CTA. */
+  /** Opens the app shell, same as `SiteHeader`'s CTA. */
   onLaunch: () => void;
 }
 

@@ -20,10 +20,10 @@ interface HeaderProps {
   /** Agent panel target, for the spending-cap menu item (B6-012). */
   onOpenAgent?: (() => void) | undefined;
   /** Click handler for the logo / wordmark group. Used to send the
-   *  user back to the landing page from the in-app shell. */
+   *  user back to the home page from anywhere in the in-app shell. */
   onLogoClick?: (() => void) | undefined;
-  /** League / section nav handler. The same nav the landing header
-   *  shows, so a league is one click away from anywhere in the app. */
+  /** League / section nav handler. The same nav the docs/legal pages'
+   *  header shows, so a league is one click away from anywhere in the app. */
   onNavigate: (destination: NavDestination) => void;
   /** Quick-action handler for the mobile nav sheet (the home prompt
    *  cards). Optional so the header works without it. */
@@ -32,8 +32,8 @@ interface HeaderProps {
 
 /**
  * Top bar — logo left, league nav centred, theme toggle + Connect Wallet
- * right. Mirrors the landing header so the nav is continuous across both
- * surfaces; below `md` the nav hides behind a hamburger that opens the
+ * right. Mirrors `SiteHeader` (docs/legal) so the nav is continuous across
+ * both surfaces; below `md` the nav hides behind a hamburger that opens the
  * `MobileNavSheet` (B-014 mobile guidance: hidden sidebar + hamburger).
  */
 export function Header({
@@ -71,7 +71,7 @@ export function Header({
           type="button"
           onClick={onLogoClick}
           disabled={!onLogoClick}
-          aria-label={onLogoClick ? "Back to landing page" : "Mantua"}
+          aria-label={onLogoClick ? "Back to home" : "Mantua"}
           className="flex shrink-0 items-center gap-3 bg-transparent border-none p-0 cursor-pointer disabled:cursor-default"
         >
           <Logo size={30} />

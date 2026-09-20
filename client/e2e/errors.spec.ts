@@ -46,9 +46,16 @@ test("a platform pause disables Confirm and says so", async ({ page }) => {
   await expect(page.getByTestId("confirm")).toBeDisabled();
 });
 
-test("logged out: browsing works and the ticket asks to log in", async ({ page }) => {
+test("logged out: / is the board with no interstitial, browsing works, and the ticket asks to log in", async ({
+  page,
+}) => {
+  // Task 075 (D-121) — the decision this test pins down: `/` is the one
+  // front door, board readable, login deferred to the point of trade —
+  // not a gated shell and not a marketing page in front of it.
   await mockApi(page);
-  await launchApp(page);
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /launch app/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "NFL", exact: true }).first()).toBeVisible();
   await page.getByRole("button", { name: "NFL", exact: true }).first().click();
   await page.getByRole("button", { name: "Trade Kansas City Chiefs", exact: true }).click();
   await expect(page.getByRole("button", { name: "Log in to trade" })).toBeVisible();

@@ -15,6 +15,8 @@ const ROOTS = [
   join(import.meta.dirname, "..", "..", "components", "shell", "QuickActions.tsx"),
   join(import.meta.dirname, "..", "..", "components", "shell", "HomeMenu.tsx"),
   join(import.meta.dirname, "..", "..", "components", "shell", "InputBar.tsx"),
+  // Task 075 — the home page's footer (moved off the deleted landing page).
+  join(import.meta.dirname, "..", "..", "components", "shell", "Footer.tsx"),
 ];
 
 const FORBIDDEN = [
