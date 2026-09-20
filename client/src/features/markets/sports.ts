@@ -110,7 +110,7 @@ export const SPORTS: Sport[] = [
     id: "boxing",
     label: "Boxing",
     blurb: "Coming soon.",
-    logo: `${OWN_LOGOS}/boxing.png`,
+    logo: `${OWN_LOGOS}/boxing-glove.png`,
     icon: BoxingGlovesIcon,
     coverage: "soon",
   },
