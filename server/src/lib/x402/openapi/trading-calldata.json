@@ -1,0 +1,230 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua trading calldata",
+    "version": "1.0.0",
+    "description": "Execution-ready market trade calldata; the caller signs with its own wallet. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet). Typed refusals after payment (cap_blocked, BETTING_CLOSED, TRADING_HALTED, NO_MARKET) are definitive answers — the request was purchased.",
+    "x-mantua-service-id": "trading-calldata",
+    "x-mantua-price-usd": "0.02"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/trading/calldata": {
+      "post": {
+        "operationId": "x402TradingCalldata",
+        "summary": "Execution-ready market trade calldata; the caller signs with its own wallet",
+        "description": "Issues calldata for one trade on Base under the paying wallet's daily cap (check → build → record). The calldata is signed and submitted by the caller's own wallet — the server holds no keys, moves no funds, executes nothing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TradeRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Execution-ready calldata plus the quote it was built from and the payer's remaining cap headroom",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "calldata": {
+                      "type": "string",
+                      "description": "The ABI-encoded calldata to submit with the caller's wallet."
+                    },
+                    "target": {
+                      "type": "string",
+                      "description": "The contract address the calldata is for."
+                    },
+                    "value": {
+                      "type": "string",
+                      "description": "The native value to send with the call."
+                    },
+                    "quote": {
+                      "type": "object",
+                      "description": "The v4 quoter's quote the calldata was built from.",
+                      "additionalProperties": true
+                    },
+                    "fee": {
+                      "type": "object",
+                      "description": "The hook fee applied to the trade.",
+                      "additionalProperties": true
+                    },
+                    "capRemainingUsd": {
+                      "type": "number",
+                      "description": "The paying wallet's remaining daily spending-cap headroom in USD, after this issuance was recorded."
+                    }
+                  },
+                  "required": ["calldata", "target", "value", "quote", "fee", "capRemainingUsd"]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid trade request (BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The trade is refused by the paying wallet's daily spending cap (cap_blocked) — no ledger ink, the body carries the cap, spend, and requested amounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapBlockedBody"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No market exists for this game yet (NO_MARKET).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Betting on this game is closed (BETTING_CLOSED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Couldn't quote this trade — the pool may lack liquidity at this size (QUOTE_FAILED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED), the in-play feed is down and new buys are halted (TRADING_HALTED), or the market stack is not deployed on this chain (MARKETS_NOT_DEPLOYED).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TradeRequest": {
+        "type": "object",
+        "description": "The browser trade shape minus chainId — trading happens on Base, the settlement network.",
+        "properties": {
+          "providerEventId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "Provider event id of the game to trade."
+          },
+          "outcomeIndex": {
+            "type": "integer",
+            "enum": [0, 1],
+            "description": "0 = home market, 1 = away market — whose YES the caller is trading."
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["buy", "sell"],
+            "default": "buy",
+            "description": "\"buy\" spends USDC for YES; \"sell\" spends YES for USDC."
+          },
+          "amountRaw": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Exact input in raw units (6 dp): USDC for buys, YES tokens for sells. Must be > 0 and ≤ 100000000000."
+          },
+          "slippageBps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 500,
+            "description": "Execution price bound in bps — becomes the on-chain slippage guard. Defaults to the house default; hard-capped at 500 (5.0%)."
+          }
+        },
+        "required": ["providerEventId", "outcomeIndex", "amountRaw"]
+      },
+      "CapBlockedBody": {
+        "type": "object",
+        "description": "A trade refused by the paying wallet's daily spending cap (C-019, keyed to the settling payer).",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "const": "cap_blocked"
+          },
+          "dailyCapUsd": {
+            "type": "number"
+          },
+          "spentUsd": {
+            "type": "number"
+          },
+          "requestedUsd": {
+            "type": "number"
+          }
+        },
+        "required": ["error", "code"]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}

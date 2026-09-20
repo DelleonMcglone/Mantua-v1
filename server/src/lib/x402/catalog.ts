@@ -27,6 +27,15 @@ export type X402ServiceId =
 
 export type X402ServiceAuth = "payment" | "allowlist+payment";
 
+/** Coarse grouping for the machine-readable services index (services.json). */
+export type X402ServiceFamily =
+  | "market-discovery"
+  | "market-intelligence"
+  | "trading"
+  | "portfolio-exposure"
+  | "hedging"
+  | "sports-intelligence";
+
 export interface X402ServiceDef {
   id: X402ServiceId;
   method: "GET" | "POST";
@@ -35,6 +44,8 @@ export interface X402ServiceDef {
   /** Default price in USD; the Gateway rail exists so sub-cent prices work. */
   priceUsd: string;
   auth: X402ServiceAuth;
+  /** Coarse service family for the machine-readable services index. */
+  family: X402ServiceFamily;
   /** 402 metadata, OpenAPI description, marketplace listing copy. */
   summary: string;
   /** Unpaid public OpenAPI document for this service (listing prerequisite). */
@@ -51,6 +62,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/markets/discover",
     priceUsd: "0.001",
     auth: "payment",
+    family: "market-discovery",
     summary: "Filterable upcoming sports market slate with liquidity and popularity",
     specRef: "/api/x402/openapi/market-discovery.json",
   },
@@ -60,6 +72,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/intelligence/market",
     priceUsd: "0.01",
     auth: "payment",
+    family: "market-intelligence",
     summary: "Win probability, liquidity, price movement, and sports context for one market",
     specRef: "/api/x402/openapi/market-intelligence.json",
   },
@@ -69,6 +82,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/trading/quote",
     priceUsd: "0.005",
     auth: "payment",
+    family: "trading",
     summary: "Pre-trade quote for one outcome-token market trade, with remaining daily cap",
     specRef: "/api/x402/openapi/trading-quote.json",
   },
@@ -78,6 +92,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/trading/calldata",
     priceUsd: "0.02",
     auth: "payment",
+    family: "trading",
     summary: "Execution-ready market trade calldata; the caller signs with its own wallet",
     specRef: "/api/x402/openapi/trading-calldata.json",
   },
@@ -87,6 +102,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/portfolio/exposure",
     priceUsd: "0.005",
     auth: "payment",
+    family: "portfolio-exposure",
     summary:
       "Positions, portfolio value, and exposure for any Base address — public chain state only",
     specRef: "/api/x402/openapi/portfolio-exposure.json",
@@ -97,6 +113,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/hedging/plan",
     priceUsd: "0.01",
     auth: "payment",
+    family: "hedging",
     summary: "Predefined hedge-strategy templates as concrete quote-ready legs — arms nothing",
     specRef: "/api/x402/openapi/hedging.json",
   },
@@ -106,6 +123,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     path: "/api/x402/v1/sports/context",
     priceUsd: "0.01",
     auth: "allowlist+payment",
+    family: "sports-intelligence",
     summary: "Honesty-status game context and live odds for allowlisted partners",
     specRef: "/api/x402/openapi/sports-intelligence.json",
   },
@@ -132,4 +150,31 @@ export function parseCommaList(raw: string | undefined): string[] | undefined {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
   return items;
+}
+
+/** One row of the machine-readable services index (GET /api/x402/v1/services.json). */
+export interface X402ServicesIndexEntry {
+  id: X402ServiceId;
+  family: X402ServiceFamily;
+  method: X402ServiceDef["method"];
+  path: string;
+  priceUsd: string;
+  auth: X402ServiceAuth;
+  specRef: string;
+}
+
+/**
+ * The free machine-readable services index, generated from X402_SERVICES —
+ * never hand-duplicated: adding a catalog row adds it here for free.
+ */
+export function buildX402ServicesIndex(): X402ServicesIndexEntry[] {
+  return X402_SERVICES.map((def) => ({
+    id: def.id,
+    family: def.family,
+    method: def.method,
+    path: def.path,
+    priceUsd: def.priceUsd,
+    auth: def.auth,
+    specRef: def.specRef,
+  }));
 }

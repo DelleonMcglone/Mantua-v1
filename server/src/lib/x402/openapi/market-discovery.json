@@ -1,0 +1,237 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mantua market discovery",
+    "version": "1.0.0",
+    "description": "Filterable upcoming sports market slate with liquidity and popularity. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet).",
+    "x-mantua-service-id": "market-discovery",
+    "x-mantua-price-usd": "0.001"
+  },
+  "servers": [
+    {
+      "url": "/",
+      "description": "Mantua API root — prepend the deployment origin."
+    }
+  ],
+  "paths": {
+    "/api/x402/v1/markets/discover": {
+      "get": {
+        "operationId": "x402MarketDiscovery",
+        "summary": "Filterable upcoming sports market slate with liquidity and popularity",
+        "description": "The composed public slate across the covered leagues with per-market liquidity and popularity aggregates. Filters narrow the board; an unfiltered read returns the full slate.",
+        "parameters": [
+          {
+            "name": "league",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["nfl", "wnba"]
+            },
+            "description": "Covered league slug; omit for the full board across the covered leagues."
+          },
+          {
+            "name": "sport",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["nfl", "wnba"]
+            },
+            "description": "Alias for league; when both are set they must agree."
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["scheduled", "in_progress", "final"]
+            },
+            "description": "Filter the slate by market status."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Market slate with liquidity and popularity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "markets": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/DiscoverMarket"
+                      }
+                    },
+                    "fetchedAt": {
+                      "type": "number",
+                      "description": "ms epoch of the slate read."
+                    },
+                    "dataAsOf": {
+                      "type": "number",
+                      "description": "ms epoch of the last-good ingest when the slate came from the degraded canonical path."
+                    },
+                    "delayed": {
+                      "type": "boolean",
+                      "description": "True when served from a degraded path — show it as delayed, never as live."
+                    },
+                    "unavailable": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Covered leagues whose canonical read failed."
+                    }
+                  },
+                  "required": ["markets", "fetchedAt", "delayed", "unavailable"]
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "headers": {
+              "PAYMENT-REQUIRED": {
+                "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid filter — e.g. league and sport disagree, or an uncovered league slug.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service dark by configuration (X402_SERVICE_DISABLED) or the markets read failed (UNAVAILABLE).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PublicTeam": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "abbreviation": {
+            "type": "string"
+          },
+          "logo": {
+            "type": "string"
+          },
+          "record": {
+            "type": "string",
+            "description": "Season win–loss record (\"31-7\") from the provider, when published."
+          }
+        },
+        "required": ["key", "name", "abbreviation"]
+      },
+      "DiscoverMarket": {
+        "type": "object",
+        "description": "One market on the discover board — public event wire plus liquidity and popularity aggregates.",
+        "properties": {
+          "providerEventId": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "number",
+            "description": "ms epoch of the game start."
+          },
+          "status": {
+            "type": "string"
+          },
+          "home": {
+            "$ref": "#/components/schemas/PublicTeam"
+          },
+          "away": {
+            "$ref": "#/components/schemas/PublicTeam"
+          },
+          "homeScore": {
+            "type": "number"
+          },
+          "awayScore": {
+            "type": "number"
+          },
+          "homeWinProbabilityBps": {
+            "type": "number"
+          },
+          "liveOdds": {
+            "type": "boolean",
+            "description": "True when homeWinProbabilityBps is the on-chain pool price, not the provider's line."
+          },
+          "league": {
+            "type": "string"
+          },
+          "tradeable": {
+            "type": "boolean"
+          },
+          "liquidityUsdc": {
+            "type": "number"
+          },
+          "volume24hUsdc": {
+            "type": "number"
+          },
+          "fills24h": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "providerEventId",
+          "startsAt",
+          "status",
+          "home",
+          "away",
+          "league",
+          "tradeable",
+          "liquidityUsdc",
+          "volume24hUsdc",
+          "fills24h"
+        ]
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Human-readable message."
+          },
+          "code": {
+            "type": "string",
+            "description": "Machine-readable refusal code."
+          },
+          "details": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            },
+            "description": "Validation issue list (BAD_REQUEST only)."
+          }
+        },
+        "required": ["error", "code"]
+      }
+    }
+  }
+}
