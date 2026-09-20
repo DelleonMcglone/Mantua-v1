@@ -209,7 +209,7 @@ void describe("paid market-discovery service (MP-005)", () => {
       ["101", "102"],
     );
     assert.deepEqual(body.unavailable, []);
-    assert.deepEqual(h.readCalls, [["nfl", "wnba"]], "no filter reads the whole board");
+    assert.deepEqual(h.readCalls, [["nfl"]], "no filter reads the whole board");
   });
 
   void it("narrows the read to the league filter", async () => {
@@ -229,7 +229,7 @@ void describe("paid market-discovery service (MP-005)", () => {
       ["final"],
       "the status filter applies to the composed board, not the read",
     );
-    assert.deepEqual(h.readCalls, [["nfl", "wnba"]]);
+    assert.deepEqual(h.readCalls, [["nfl"]]);
   });
 
   void it("400s when league and sport disagree", async () => {

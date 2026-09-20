@@ -4,7 +4,8 @@ import { useTheme } from "@/hooks/use-theme.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
 import { WalletMenu } from "./WalletMenu.tsx";
-import { MarketNav, type NavDestination } from "./MarketNav.tsx";
+import { LeagueBar, MarketNav, type NavDestination } from "./MarketNav.tsx";
+import type { SportId } from "@/features/markets/sports.ts";
 import { MobileNavSheet } from "./MobileNavSheet.tsx";
 import type { HomePromptId } from "./HomeMenu.tsx";
 
@@ -28,6 +29,8 @@ interface HeaderProps {
   /** Quick-action handler for the mobile nav sheet (the home prompt
    *  cards). Optional so the header works without it. */
   onQuickAction?: ((id: HomePromptId) => void) | undefined;
+  /** The league page currently open, highlighted in the league bar. */
+  activeSport?: SportId | null | undefined;
 }
 
 /**
@@ -46,6 +49,7 @@ export function Header({
   onLogoClick,
   onNavigate,
   onQuickAction,
+  activeSport = null,
 }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const Icon = theme === "dark" ? Sun : Moon;
@@ -113,6 +117,14 @@ export function Header({
           )}
         </div>
       </div>
+      {/* The league sub-header: every league with its logo, NFL live, the
+          rest coming soon. Below `md` the leagues live in the hamburger
+          sheet and the league page's chips instead (B-014). */}
+      <LeagueBar
+        onNavigate={onNavigate}
+        active={activeSport}
+        className="hidden border-t border-border-soft px-3 py-1.5 md:block md:px-8"
+      />
       {/* Below `md` the nav lives behind the hamburger, per the mobile
           design guidance — no more double-rendered strip. */}
       <MobileNavSheet

@@ -94,9 +94,10 @@ Full specification: [`docs/specs/market-lifecycle.md`](docs/specs/market-lifecyc
 
 ## Coverage
 
-**NFL** is the covered league to start. NBA, WNBA, MLB, NHL, and Soccer appear in the nav and
-report as coming soon; promoting one is a single field in
-[`client/src/features/markets/sports.ts`](client/src/features/markets/sports.ts).
+**NFL** is the only covered league. The catalog lives in
+[`client/src/features/markets/sports.ts`](client/src/features/markets/sports.ts); a league added
+there shows up in the nav, the board and the market pages, and the server's covered-league
+lists gate ingestion, the slate, the live stream and the agent.
 
 ## The autonomous loop
 
@@ -173,8 +174,7 @@ confirmation.
   USDC from your own wallet.
 - **Positions**: take and close YES/NO positions and combos on covered games, every one
   cap-checked, simulated immediately before execution, and recorded to the activity spine.
-- **Move funds**: send USDC, and bridge it in from any CCTP chain to fund the wallet (funds
-  land at _your_ wallet on the destination).
+- **Move funds**: send USDC from the agent wallet.
 - **On-chain analysis (BaseScan).** Inspect any Base address (balance, activity, whale
   signals: accumulating/selling, stables-to-tokens rotation), any token (holders, top-10
   concentration, safety red flags), and any transaction (decoded token movements).
@@ -256,10 +256,6 @@ Fireblocks, Copper, and others): recorded, never integrated. Full spec:
   signing key is never touched by the agent path.
 - **Gas Station and Paymaster**: every agent transaction is sponsored by Circle Gas Station and
   user transactions by Circle Paymaster, so no wallet on the platform holds ETH.
-- **CCTP via Bridge Kit** (`@circle-fin/bridge-kit`): native cross-chain USDC burn-and-mint
-  from the CCTP-V2 mainnet chains (Ethereum, Arbitrum One, OP Mainnet, Polygon, Avalanche),
-  used server-side by the agent's Circle wallet to bring funds onto Base (Circle-Wallets
-  adapter plus Forwarding Service).
 - **x402 agent marketplace** (`@x402/fetch` plus `@x402/extensions` Bazaar discovery): the full
   paid-services catalog at [agents.circle.com/services](https://agents.circle.com/services),
   paid per-call in USDC via EIP-3009 authorizations from the agent's buyer EOA. Mantua is also

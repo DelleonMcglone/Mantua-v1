@@ -70,18 +70,16 @@ void describe("holdings aggregate", () => {
   void it("adds every readable source, lists what could not be read, and drops zero parts", () => {
     const s = aggregateHoldings({
       userWalletUsd: 120.5,
-      agentWalletUsd: 30,
-      unifiedBalanceUsd: null,
+      agentWalletUsd: null,
       marketPositionsUsd: 11.92,
-      comboPositionsUsd: 4,
-      lpPositionsUsd: 0,
+      comboPositionsUsd: 0,
     });
-    assert.equal(s.totalUsd, 166.42);
+    assert.equal(s.totalUsd, 132.42);
     assert.deepEqual(
       s.parts.map((p) => p.label),
-      ["Wallet", "Agent wallet", "Market positions", "Combos"],
+      ["Wallet", "Market positions"],
     );
-    assert.deepEqual(s.missing, ["Unified balance"]);
+    assert.deepEqual(s.missing, ["Agent wallet"]);
   });
 
   void it("sums usdValue fields whether numbers or strings", () => {

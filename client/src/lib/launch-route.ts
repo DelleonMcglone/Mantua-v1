@@ -12,14 +12,7 @@ import type { SportId } from "../features/markets/sports.ts";
 
 // Type-only import above: `sports.ts` carries icon components, and this
 // module runs under node:test. The list is checked against the union.
-const LEAGUES = [
-  "nba",
-  "wnba",
-  "nfl",
-  "mlb",
-  "nhl",
-  "soccer",
-] as const satisfies readonly SportId[];
+const LEAGUES = ["nfl"] as const satisfies readonly SportId[];
 const isSportId = (v: string | null): v is SportId =>
   v !== null && (LEAGUES as readonly string[]).includes(v);
 

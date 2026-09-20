@@ -1,7 +1,6 @@
 import { strict as assert } from "node:assert";
 import { test } from "node:test";
 import { detectIntent } from "../../lib/chat-intent.ts";
-import { quickActionsFor } from "../../lib/quick-actions.ts";
 import { applyDiscoverFilters, type DiscoverMarket } from "./discovery.ts";
 import { freshness } from "./freshness.ts";
 import { groupClaims, totalClaimableUsd } from "./market-redeem-core.ts";
@@ -88,15 +87,11 @@ test("the full consumer loop composes end to end (T-014)", () => {
   assert.equal(probabilitySource(market).kind, "market", "its price is the market's own (T-021)");
   assert.equal(freshness({ fetchedAt: NOW * 1000 - 20_000 }, NOW * 1000).label, "Updated just now");
 
-  // ── Analyze: the contextual chip on that game re-detects as analysis.
-  const chips = quickActionsFor({
-    kind: "market",
-    sport: "nfl",
-    game: { away: market.away.name, home: market.home.name },
-  });
-  const analyze = chips.find((c) => c.id === "analyze");
-  assert.ok(analyze);
-  assert.equal(detectIntent(analyze.command)?.kind, "analyze");
+  // ── Analyze: a matchup question re-detects as analysis.
+  const analyze = detectIntent(
+    `Analyze the ${market.away.name} at ${market.home.name} matchup and what a prediction-market trader should watch`,
+  );
+  assert.equal(analyze?.kind, "analyze");
 
   // ── Trade: "bet on the Chiefs" lands on the Chiefs' side, then three taps.
   const position = detectIntent("bet on the Chiefs");

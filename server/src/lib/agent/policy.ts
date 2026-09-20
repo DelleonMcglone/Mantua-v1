@@ -22,7 +22,7 @@ import type { UserPolicyRead } from "./trade-simulation.ts";
  * executor (`hedgePolicyGate`, A-038/A-041 — code, not the model).
  */
 
-export const LAUNCH_LEAGUES = ["nfl", "wnba"] as const;
+export const LAUNCH_LEAGUES = ["nfl"] as const;
 export const RISK_LEVELS = ["conservative", "balanced", "aggressive"] as const;
 export type RiskLevel = (typeof RISK_LEVELS)[number];
 

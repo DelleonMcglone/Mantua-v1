@@ -75,14 +75,18 @@ export function sanitizeProviderString(input: string): string {
   return out.replaceAll(/\s+/g, " ").trim().slice(0, MAX_STRING);
 }
 
+/** Only https URLs pass; anything else (javascript:, data:, http:) drops. */
+function publicLogo(logo: string | null | undefined): string | null {
+  return typeof logo === "string" && logo.startsWith("https://") ? logo.slice(0, 300) : null;
+}
+
 function publicTeam(team: ProviderTeam): PublicTeam {
-  const logo = typeof team.logo === "string" && team.logo.startsWith("https://") ? team.logo : null;
+  const logo = publicLogo(team.logo);
   return {
     key: sanitizeProviderString(team.key),
     name: sanitizeProviderString(team.name),
     abbreviation: sanitizeProviderString(team.abbreviation),
-    // Only https URLs pass; anything else (javascript:, data:, http:) drops.
-    ...(logo ? { logo: logo.slice(0, 300) } : {}),
+    ...(logo ? { logo } : {}),
     ...(typeof team.record === "string" && /^\d{1,3}-\d{1,3}$/.test(team.record)
       ? { record: team.record }
       : {}),
@@ -132,8 +136,9 @@ export const CANONICAL_FRESH_MS = 5 * 60_000;
  * surfaced so the UI can say how old. Without `opts` the original outage
  * semantics hold — always `delayed: true`.
  *
- * Fields the canonical row does not keep (logos, provider record strings)
- * are simply absent; the board renders without them. The home-market
+ * Team logos come from the canonical `teams` rows joined on read (https
+ * only, like every provider logo); fields the row does not keep (provider
+ * record strings) are simply absent, and the board renders without them. The home-market
  * opening line (when a market was minted) fills `homeWinProbabilityBps`
  * until `withLiveOdds` overlays the live pool price.
  */
@@ -156,7 +161,8 @@ export function canonicalToPublicSlate(
     fetchedAt: canonical.dataAsOf ?? now,
     ...(canonical.dataAsOf !== null ? { dataAsOf: canonical.dataAsOf } : {}),
     events: canonical.events.map((row) => {
-      const opening = row.homeOpeningProbability === null ? NaN : Number(row.homeOpeningProbability);
+      const opening =
+        row.homeOpeningProbability === null ? NaN : Number(row.homeOpeningProbability);
       const openingBps =
         Number.isFinite(opening) && opening > 0 && opening < 1
           ? Math.round(opening * 10_000)
@@ -165,6 +171,8 @@ export function canonicalToPublicSlate(
       // the suffix recovers the abbreviation for display.
       const homeAbbr = row.homeTeamKey?.split(":").at(1) ?? "";
       const awayAbbr = row.awayTeamKey?.split(":").at(1) ?? "";
+      const homeLogo = publicLogo(row.homeLogo);
+      const awayLogo = publicLogo(row.awayLogo);
       return {
         providerEventId: sanitizeProviderString(row.providerEventId),
         startsAt: Math.floor(row.startsAt.getTime() / 1000),
@@ -173,11 +181,13 @@ export function canonicalToPublicSlate(
           key: sanitizeProviderString(row.homeTeamKey ?? ""),
           name: sanitizeProviderString(row.homeTeam),
           abbreviation: sanitizeProviderString(homeAbbr),
+          ...(homeLogo ? { logo: homeLogo } : {}),
         },
         away: {
           key: sanitizeProviderString(row.awayTeamKey ?? ""),
           name: sanitizeProviderString(row.awayTeam),
           abbreviation: sanitizeProviderString(awayAbbr),
+          ...(awayLogo ? { logo: awayLogo } : {}),
         },
         ...(row.homeScore !== null ? { homeScore: row.homeScore } : {}),
         ...(row.awayScore !== null ? { awayScore: row.awayScore } : {}),

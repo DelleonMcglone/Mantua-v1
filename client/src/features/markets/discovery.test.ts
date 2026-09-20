@@ -124,8 +124,8 @@ test("the owner's three discovery phrases parse to filters (T-019)", () => {
 });
 
 test("more discovery phrasings: popular, live, this week, a team", () => {
-  assert.deepEqual(parseDiscoverQuery("most popular WNBA games this week"), {
-    league: "wnba",
+  assert.deepEqual(parseDiscoverQuery("most popular NFL games this week"), {
+    league: "nfl",
     sort: "popularity",
     startsWithin: "week",
   });

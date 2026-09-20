@@ -39,7 +39,7 @@ const AgentActionsContext = createContext<{ send: (text: string) => void; busy: 
 });
 
 /**
- * "Your Circle Agent" — a free-form conversational agent.
+ * "Your Sports Agent" — a free-form conversational agent on a Circle wallet.
  *
  * The user types in the global "Ask Mantua" bar (App.tsx forwards it via the
  * `mantua:agent-input` event). Each turn streams from `POST /api/agent/chat`:
@@ -89,29 +89,30 @@ type Msg = UserMsg | AssistantMsg;
 
 /**
  * Empty-state chips. `message` is what actually gets sent when the chip is
- * clicked (defaults to the label). Daily Brief sends the full autonomous
- * routine script: the "force … accept the risk" wording is required — the
- * swap guard override is code-attested against the user's message on the
- * server (force-attestation.ts), and the small LP sizes keep the whole run
- * under the default $100 daily spending cap.
+ * clicked. Every chip is something the agent does for an NFL prediction
+ * market: the wallet, the brief, today's markets, a recommendation, the
+ * user's positions, and a hedge review. Nothing here moves money without
+ * the preview → "confirm" protocol on the server.
  */
 const SUGGESTIONS: { label: string; message: string }[] = [
   { label: "Create / Manage Agent", message: "Create and manage agent wallet" },
   {
     label: "Daily Brief",
     message:
-      "Give me my daily briefing: market pulse, peg check, my portfolio and agent wallet, " +
-      "and today's sports slate with anything worth trading. Keep it tight — " +
-      "headline numbers and takeaways, not a play-by-play.",
+      "Give me my daily briefing: my agent wallet, open positions and P&L, and today's NFL " +
+      "slate with anything worth trading. Keep it tight — headline numbers and takeaways, " +
+      "not a play-by-play.",
   },
+  { label: "Today's NFL markets", message: "Show me today's NFL markets with live prices." },
   {
-    label: "Trade",
-    message:
-      "Show me today's sports markets with live prices, evaluate the matchups, and recommend a bet.",
+    label: "Recommend a bet",
+    message: "Evaluate today's NFL matchups and recommend a bet, with the evidence and risks.",
   },
-  { label: "Swap Tokens", message: "Swap Tokens" },
-  { label: "Add Liquidity", message: "Add liquidity to a USDC/EURC pool — preview it first" },
-  { label: "Send Tokens", message: "Send Tokens" },
+  { label: "My positions", message: "Show my open positions and P&L." },
+  {
+    label: "Hedge my exposure",
+    message: "Review my open positions and suggest a hedge — preview it first.",
+  },
 ];
 
 const TOOL_VERB: Record<string, string> = {
@@ -293,7 +294,7 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
               </Button>
             )}
             <div className="flex items-center gap-2 text-[13px] font-semibold">
-              <Bot className="h-4 w-4" aria-hidden /> Your Circle Agent
+              <Bot className="h-4 w-4" aria-hidden /> Your Sports Agent
             </div>
           </div>
           <Button
@@ -1032,10 +1033,11 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
   return (
     <div className="flex flex-col gap-3.5">
       <div className="text-[13px] leading-[1.6] text-text-dim">
-        Hi — I'm your Circle agent. Tell me what to do in plain language and I'll handle it: check
-        balances, swap or send tokens, evaluate sports markets and place bets, or look up market
-        &amp; on-chain data. Reads happen as we go; anything that moves money is previewed first and
-        runs only after you reply &quot;confirm&quot;, within your daily spending cap.
+        Hi, I'm your Mantua sport agent (Circle Wallet). Tell me what to do in plain language and
+        I'll handle it: check your agent wallet and balances, evaluate today's NFL matchups, place
+        or exit a bet, or review your positions and P&amp;L. Reads happen as we go; anything that
+        moves money is previewed first and runs only after you reply &quot;confirm&quot;, within
+        your daily spending cap.
       </div>
       <div className="flex flex-nowrap gap-2 overflow-x-auto pb-0.5">
         {SUGGESTIONS.map((s) => (

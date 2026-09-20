@@ -35,7 +35,7 @@ import { LIVE_TTL_MS, PREGAME_TTL_MS, ResilientJson } from "./resilience.ts";
  */
 export class SecondaryProvider implements SportsDataProvider {
   readonly name: string;
-  readonly leagues = ["nfl", "wnba"] as const;
+  readonly leagues = ["nfl"] as const;
 
   private readonly http: ResilientJson;
 

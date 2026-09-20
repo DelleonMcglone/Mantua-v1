@@ -1,4 +1,5 @@
 import { ArrowLeft } from "lucide-react";
+import { LeagueLogo } from "@/components/shell/LeagueLogo.tsx";
 import { Freshness } from "./Freshness.tsx";
 import { SportChips } from "./SportChips.tsx";
 import type { Sport, SportId } from "./sports.ts";
@@ -41,7 +42,10 @@ export function LeagueHeader({
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0">
-            <h1 className="text-[22px] font-bold tracking-tight md:text-[28px]">{sport.label}</h1>
+            <h1 className="flex items-center gap-2 text-[22px] font-bold tracking-tight md:text-[28px]">
+              <LeagueLogo league={sport} className="h-7 w-7 md:h-8 md:w-8" />
+              {sport.label}
+            </h1>
             <p className="mt-1 hidden text-[13px] text-text-dim md:block">{sport.blurb}</p>
             {slate && <Freshness source={slate} className="mt-1" />}
           </div>

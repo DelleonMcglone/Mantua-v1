@@ -241,7 +241,7 @@ const ESPN_HOSTS = ["https://site.api.espn.com", "https://site.web.api.espn.com"
 
 export class EspnProvider implements SportsDataProvider {
   readonly name = "espn";
-  readonly leagues = ["nfl", "wnba"] as const;
+  readonly leagues = ["nfl"] as const;
 
   private readonly http: ResilientJson;
 

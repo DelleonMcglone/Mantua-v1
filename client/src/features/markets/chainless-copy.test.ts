@@ -12,7 +12,6 @@ import { test } from "node:test";
  */
 const ROOTS = [
   join(import.meta.dirname, "."),
-  join(import.meta.dirname, "..", "..", "components", "shell", "QuickActions.tsx"),
   join(import.meta.dirname, "..", "..", "components", "shell", "HomeMenu.tsx"),
   join(import.meta.dirname, "..", "..", "components", "shell", "InputBar.tsx"),
   // Task 075 — the home page's footer (moved off the deleted landing page).

@@ -6,7 +6,7 @@
  * action. Never throws, never leaks chain vocabulary. Pure — no React, no
  * `@/` imports — so it runs under node:test.
  */
-import { extractRawReason } from "../liquidity/error-mapping.ts";
+import { extractRawReason } from "./error-mapping.ts";
 import { BY_CODE, LOGIN, RATE_LIMITED, RETRY } from "./trade-error-copy.ts";
 
 export type TradeErrorKind =

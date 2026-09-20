@@ -5,7 +5,7 @@ import { HomePromptRow, type HomePromptId } from "./HomeMenu.tsx";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Same handler the header nav uses — league pages, agent, trading. */
+  /** Same handler the header nav uses — league pages, combos, agent. */
   onNavigate: (destination: NavDestination) => void;
   /** Quick actions (the home prompt cards). Omitted when the caller has
    *  no route for them — the section simply doesn't render. */

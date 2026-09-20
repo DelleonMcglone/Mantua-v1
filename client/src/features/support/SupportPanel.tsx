@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
-import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
 import { ChatStreamError } from "@/lib/chat-stream.ts";
 import { streamSupportChat, type SupportHistoryTurn } from "./support-stream.ts";
 import { SupportTurn, type SupportTurnData } from "./SupportTurn.tsx";
@@ -11,8 +9,10 @@ import { SupportTurn, type SupportTurnData } from "./SupportTurn.tsx";
  * Task 070 / AE-007 … AE-010 — the help surface. A conversation with the
  * read-only support agent: general help signed out, account-aware help
  * signed in, deterministic troubleshooting, and a ticket id when the
- * agent hands off to a person. Owns its own input so it works from any
- * route without the command bar.
+ * agent hands off to a person. There is one chatbot: the dock at the
+ * bottom of the page is the input, and `App` forwards what the user types
+ * here as a `mantua:support-input` event while this panel is open. The
+ * suggestion cards seed a first question in one tap.
  */
 
 type Turn = SupportTurnData;
@@ -26,7 +26,6 @@ const SUGGESTIONS = [
 
 export function SupportPanel({ onClose }: { onClose?: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const idRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -55,7 +54,6 @@ export function SupportPanel({ onClose }: { onClose?: () => void }) {
         { id: userId, role: "user", text },
         { id: replyId, role: "assistant", text: "", streaming: true },
       ]);
-      setDraft("");
       const ac = new AbortController();
       abortRef.current = ac;
       try {
@@ -87,6 +85,21 @@ export function SupportPanel({ onClose }: { onClose?: () => void }) {
     },
     [busy, patch, turns],
   );
+
+  // The dock's input, forwarded by App while this panel is open.
+  const askRef = useRef(ask);
+  useEffect(() => {
+    askRef.current = ask;
+  }, [ask]);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      void askRef.current((e as CustomEvent<string>).detail);
+    };
+    window.addEventListener("mantua:support-input", handler);
+    return () => {
+      window.removeEventListener("mantua:support-input", handler);
+    };
+  }, []);
 
   return (
     <>
@@ -122,26 +135,6 @@ export function SupportPanel({ onClose }: { onClose?: () => void }) {
         ))}
         <div ref={endRef} />
       </div>
-      <form
-        className="flex gap-2 border-t border-border-soft px-5 py-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(draft);
-        }}
-      >
-        <Input
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-          }}
-          placeholder="Ask a question or describe the problem"
-          aria-label="Support message"
-          maxLength={2000}
-        />
-        <Button type="submit" size="sm" disabled={busy || draft.trim().length === 0}>
-          Send
-        </Button>
-      </form>
     </>
   );
 }

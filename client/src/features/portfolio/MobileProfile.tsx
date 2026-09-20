@@ -1,4 +1,4 @@
-import { ArrowLeft, Bot, Droplet, LogOut, Megaphone } from "lucide-react";
+import { ArrowLeft, Bot, LogOut, Megaphone } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { NotificationSettings } from "@/features/notifications/NotificationSettings.tsx";
@@ -6,7 +6,7 @@ import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 import { AgentStatusStrip } from "./AgentStatusStrip.tsx";
 import { AssetsCard } from "./AssetsCard.tsx";
-import { LpEconomicsSection, SettledPositionsSection } from "./EconomicsSections.tsx";
+import { SettledPositionsSection } from "./EconomicsSections.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { ComboPositionsSection } from "@/features/combos/ComboPositionsSection.tsx";
 import { InstitutionSection } from "@/features/institution/InstitutionSection.tsx";
@@ -17,12 +17,10 @@ import { usePortfolioEconomics } from "./use-portfolio-economics.ts";
 
 interface Props {
   walletAddress?: string | undefined;
-  onViewPositions: () => void;
   onOpenAgent: () => void;
   /** Task 070 — the agent's public page and posting policy. */
   onOpenSocial: () => void;
   onSelectAsset: (symbol: TokenSymbol) => void;
-  onSelectPool: (id: string) => void;
   onLogout: () => void;
   onClose: () => void;
 }
@@ -42,11 +40,9 @@ const TABS = [
  */
 export function MobileProfile({
   walletAddress,
-  onViewPositions,
   onOpenAgent,
   onOpenSocial,
   onSelectAsset,
-  onSelectPool,
   onLogout,
   onClose,
 }: Props) {
@@ -90,11 +86,7 @@ export function MobileProfile({
         </TabsContent>
         <TabsContent value="portfolio" className="mt-3 flex flex-col gap-3">
           <PortfolioCard />
-          <AssetsCard onSelectPool={onSelectPool} onSelectAsset={onSelectAsset} />
-          <LpEconomicsSection econ={economics} />
-          <Button variant="ghost" size="sm" className="h-11 w-full" onClick={onViewPositions}>
-            <Droplet className="mr-1.5 h-3.5 w-3.5" /> View LP positions
-          </Button>
+          <AssetsCard onSelectAsset={onSelectAsset} />
         </TabsContent>
         <TabsContent value="agent" className="mt-3 rounded-md border border-border-soft">
           <AgentStatusStrip />

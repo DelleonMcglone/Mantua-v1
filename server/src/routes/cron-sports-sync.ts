@@ -26,7 +26,7 @@ import { requireCronSecret } from "../middleware/cron-auth.ts";
 export const cronSportsSyncRouter = Router();
 
 /** The covered leagues, per DM-105. Promotion is a data change elsewhere. */
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 /** Chains markets mint on — Base Mainnet. */
 function marketChains(): SupportedChainId[] {

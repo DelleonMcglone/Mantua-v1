@@ -1,73 +1,137 @@
 import type { ComponentType } from "react";
 import {
   BasketballIcon,
-  FootballIcon,
   BaseballIcon,
+  BoxingGlovesIcon,
+  FootballIcon,
   HockeyIcon,
-  SoccerIcon,
+  KarateCombatIcon,
 } from "@/components/shell/sport-icons.tsx";
 
 /**
- * The leagues Mantua runs prediction markets for. One catalog feeds both
- * the header nav and the per-sport market pages, so a league added here
- * shows up in both places with the same label and glyph.
+ * The sports Mantua lists. One catalog feeds the header's league bar, the
+ * sport chips, the board and the per-sport market pages, so a sport added
+ * here shows up everywhere with the same label and mark.
+ *
+ * NFL is the only covered league (owner decision, 2026-09-20). The others
+ * are listed and selectable, and open a "coming soon" page — never a live
+ * market. Promoting one is flipping its `coverage` to `launch`, plus the
+ * server's covered-league lists.
  */
-export type SportId = "nba" | "wnba" | "nfl" | "mlb" | "nhl" | "soccer";
+export type SportId =
+  | "nfl"
+  | "nba"
+  | "wnba"
+  | "mlb"
+  | "nhl"
+  | "ncaaf"
+  | "ncaab"
+  | "ufc"
+  | "boxing"
+  | "karate"
+  | "nascar"
+  | "golf";
 
 export interface Sport {
   id: SportId;
   /** Nav label and page title. */
   label: string;
-  /** One-line description of what trades on this league's markets. */
+  /** One-line description of what trades on this sport's markets. */
   blurb: string;
+  /** The real league logo (ESPN CDN, the same host the team logos come
+   *  from), when one exists; otherwise the sport's glyph (`icon`) is the
+   *  mark. `icon` is also the fallback if the image fails to load. */
+  logo?: string;
   icon: ComponentType<{ className?: string }>;
   /** `launch` leagues are the covered set — their slates are ingested and
-   *  their markets open as the Dynamic Market Hook lands. `soon` leagues
-   *  are in the nav but not yet in coverage. Per DM-105. */
+   *  their markets open. `soon` sports are listed, selectable, and land on
+   *  the coming-soon page. */
   coverage: "launch" | "soon";
 }
+
+const LEAGUE_LOGOS = "https://a.espncdn.com/i/teamlogos/leagues/500";
+const SPORT_LOGOS = "https://a.espncdn.com/i/espn/misc_logos/500";
 
 export const SPORTS: Sport[] = [
   {
     id: "nfl",
     label: "NFL",
     blurb: "Moneylines on every NFL game.",
+    logo: `${LEAGUE_LOGOS}/nfl.png`,
     icon: FootballIcon,
-    coverage: "launch",
-  },
-  {
-    id: "wnba",
-    label: "WNBA",
-    blurb: "Moneylines on every WNBA game.",
-    icon: BasketballIcon,
     coverage: "launch",
   },
   {
     id: "nba",
     label: "NBA",
-    blurb: "Moneylines, spreads, and totals on every NBA game.",
+    blurb: "Coming soon.",
+    logo: `${LEAGUE_LOGOS}/nba.png`,
+    icon: BasketballIcon,
+    coverage: "soon",
+  },
+  {
+    id: "wnba",
+    label: "WNBA",
+    blurb: "Coming soon.",
+    logo: `${LEAGUE_LOGOS}/wnba.png`,
     icon: BasketballIcon,
     coverage: "soon",
   },
   {
     id: "mlb",
     label: "MLB",
-    blurb: "Moneylines, run lines, and totals on every MLB game.",
+    blurb: "Coming soon.",
+    logo: `${LEAGUE_LOGOS}/mlb.png`,
     icon: BaseballIcon,
     coverage: "soon",
   },
   {
     id: "nhl",
     label: "NHL",
-    blurb: "Moneylines, puck lines, and totals on every NHL game.",
+    blurb: "Coming soon.",
+    logo: `${LEAGUE_LOGOS}/nhl.png`,
+    icon: HockeyIcon,
+    coverage: "soon",
+  },
+  // College: the football and the basketball are the marks.
+  { id: "ncaaf", label: "NCAAF", blurb: "Coming soon.", icon: FootballIcon, coverage: "soon" },
+  { id: "ncaab", label: "NCAAB", blurb: "Coming soon.", icon: BasketballIcon, coverage: "soon" },
+  {
+    id: "ufc",
+    label: "UFC",
+    blurb: "Coming soon.",
+    logo: `${LEAGUE_LOGOS}/ufc.png`,
+    icon: BoxingGlovesIcon,
+    coverage: "soon",
+  },
+  {
+    id: "boxing",
+    label: "Boxing",
+    blurb: "Coming soon.",
+    icon: BoxingGlovesIcon,
+    coverage: "soon",
+  },
+  {
+    id: "karate",
+    label: "Karate Combat",
+    blurb: "Coming soon.",
+    icon: KarateCombatIcon,
+    coverage: "soon",
+  },
+  {
+    id: "nascar",
+    label: "NASCAR",
+    blurb: "Coming soon.",
+    logo: `${SPORT_LOGOS}/nascar.png`,
     icon: HockeyIcon,
     coverage: "soon",
   },
   {
-    id: "soccer",
-    label: "Soccer",
-    blurb: "Match result, both-teams-to-score, and totals across major leagues.",
-    icon: SoccerIcon,
+    id: "golf",
+    label: "Golf",
+    blurb: "Coming soon.",
+    logo: `${SPORT_LOGOS}/golf.png`,
+    icon: BaseballIcon,
     coverage: "soon",
   },
 ];

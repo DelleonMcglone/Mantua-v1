@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Sun, Moon } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme.tsx";
 import { Logo } from "./Logo.tsx";
-import { MarketNav, type NavDestination } from "./MarketNav.tsx";
+import { LeagueBar, MarketNav, type NavDestination } from "./MarketNav.tsx";
 
 interface Props {
   /** Rendered before the logo — the docs page's sidebar toggle. */
@@ -94,6 +94,12 @@ export function SiteHeader({
       </div>
       {/* Too narrow to share the row — the nav gets its own strip. */}
       {onNavigate && <MarketNav onNavigate={onNavigate} className="px-5 pb-3 md:hidden" />}
+      {onNavigate && (
+        <LeagueBar
+          onNavigate={onNavigate}
+          className="border-t border-border-soft px-3 py-1.5 sm:px-5 md:px-8"
+        />
+      )}
     </header>
   );
 }

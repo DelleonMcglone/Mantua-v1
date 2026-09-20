@@ -219,9 +219,9 @@ void describe("parseSlate", () => {
 });
 
 void describe("EspnProvider", () => {
-  void it("serves both DM-105 leagues", () => {
+  void it("serves the covered league (NFL)", () => {
     const p = new EspnProvider();
-    assert.deepEqual([...p.leagues], ["nfl", "wnba"]);
+    assert.deepEqual([...p.leagues], ["nfl"]);
   });
 
   void it("requests the right league path", async () => {

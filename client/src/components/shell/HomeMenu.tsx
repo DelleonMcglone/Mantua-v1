@@ -1,37 +1,32 @@
-import { ArrowUpDown, BarChart3, Bot, Droplet } from "lucide-react";
+import { BarChart3, Bot } from "lucide-react";
 
-export type HomePromptId = "pool" | "swap" | "analyze" | "agent";
+export type HomePromptId = "analyze" | "agent";
 
-const PROMPTS: { id: HomePromptId; title: string; icon: typeof Droplet }[] = [
-  { id: "agent", title: "Create / Manage Circle Agent", icon: Bot },
+const PROMPTS: { id: HomePromptId; title: string; icon: typeof Bot }[] = [
+  { id: "agent", title: "Create / Manage Sports Agent", icon: Bot },
   {
     id: "analyze",
-    title: "Analyze today's games, matchups, and markets",
+    title: "Analyze today's NFL games, matchups, and markets",
     icon: BarChart3,
   },
-  { id: "swap", title: "Swap stablecoins or move USDC between accounts", icon: ArrowUpDown },
-  { id: "pool", title: "Create / Add Liquidity with Stable protection", icon: Droplet },
 ];
 
 interface Props {
   onPromptSelect: (id: HomePromptId) => void;
-  /** `responsive` (default): 1 column below `md`, 2 to `lg`, 4 above —
-   *  the single-column mobile layout per the design guidance (B-014).
+  /** `responsive` (default): 1 column below `md`, 2 above — the
+   *  single-column mobile layout per the design guidance (B-014).
    *  `single`: always one column, for the hamburger nav sheet where the
    *  container is narrow regardless of viewport width. */
   columns?: "responsive" | "single";
 }
 
 /**
- * The home page's prompt cards — a single row across the top (collapsing
- * to two columns on small screens and one column on mobile), ordered
- * agent → analyze → swap → liquidity. Replaces the old 2x2 grid that
- * lived inside the right-column "Ask Mantua" panel. Also reused as the
- * quick-actions block inside the mobile nav sheet.
+ * The home page's prompt cards — the agent and the analyst, side by side
+ * across the top (one column on mobile). Also reused as the quick-actions
+ * block inside the mobile nav sheet.
  */
 export function HomePromptRow({ onPromptSelect, columns = "responsive" }: Props) {
-  const gridCols =
-    columns === "single" ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-4";
+  const gridCols = columns === "single" ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2";
   return (
     <div className={`grid ${gridCols} gap-3`}>
       {PROMPTS.map((p) => {

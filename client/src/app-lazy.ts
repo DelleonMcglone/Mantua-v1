@@ -4,31 +4,12 @@
  * one-line placeholder while the chunk arrives (AppShell's Suspense). The
  * first paint pays for the board, the league page and the ticket only.
  *
- * The heavy vendor libraries these pull (bridge kit, Circle adapters,
- * charts, Plaid) are split into their own chunks in vite.config.ts, so
- * they leave the critical path with the surfaces that need them.
+ * The heavy vendor libraries these pull (charts, Plaid) are split into
+ * their own chunks in vite.config.ts, so they leave the critical path with
+ * the surfaces that need them.
  */
 import { lazy } from "react";
 
-export const SwapPanel = lazy(() =>
-  import("./features/swap/SwapPanel.tsx").then((m) => ({ default: m.SwapPanel })),
-);
-export const AddLiquidityForm = lazy(() =>
-  import("./features/liquidity/AddLiquidityForm.tsx").then((m) => ({
-    default: m.AddLiquidityForm,
-  })),
-);
-export const LiquidityListPage = lazy(() =>
-  import("./features/liquidity/LiquidityListPage.tsx").then((m) => ({
-    default: m.LiquidityListPage,
-  })),
-);
-export const PoolDetailPage = lazy(() =>
-  import("./features/liquidity/PoolDetailPage.tsx").then((m) => ({ default: m.PoolDetailPage })),
-);
-export const PositionsList = lazy(() =>
-  import("./features/liquidity/PositionsList.tsx").then((m) => ({ default: m.PositionsList })),
-);
 export const AssetDetailPanel = lazy(() =>
   import("./features/portfolio/AssetDetailPanel.tsx").then((m) => ({
     default: m.AssetDetailPanel,

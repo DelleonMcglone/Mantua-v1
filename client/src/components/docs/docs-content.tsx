@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
-import { P, H, UL, OL, B, Code, A, Note, Table } from "./docs-primitives.tsx";
+import { P, H, UL, OL, B, A, Note, Table } from "./docs-primitives.tsx";
 
 /**
  * Documentation content, one entry per sidebar page. Kept as data so the
  * page shell stays dumb and adding a topic is a single array entry.
  *
- * Everything factual here is drawn from the deployed system: hook
- * addresses from `features/liquidity/hook-recommendations.ts`, fee tiers
- * from `features/liquidity/fee-tiers.ts`, chain and token details from
- * `docs/architecture.md`. Update this file when those change.
+ * Everything factual here is drawn from the deployed system: the fee model
+ * from `docs/fee-model.md`, the market lifecycle from `docs/architecture.md`,
+ * token details from `lib/tokens.ts`. Update this file when those change.
+ * Scope (owner decision 2026-09-20): Mantua is an NFL prediction market with
+ * an agent — there is no swap, liquidity or bridge surface to document.
  */
 
 export interface DocsPage {
@@ -37,17 +38,18 @@ export const DOCS_GROUPS: DocsGroup[] = [
         body: (
           <>
             <P>
-              Mantua is an agent-driven prediction market for sports. Bettors and market makers open
-              positions, provide liquidity, and run automated strategies, expressed in natural
-              language and executed on-chain through Uniswap v4 pools with custom Mantua hooks.
+              Mantua is an agent-driven prediction market for the NFL. Every game has a market on
+              each side; you take a position in three taps, or tell your agent what you think in
+              plain language and let it evaluate the matchup, size the bet under your cap, and place
+              it, before or during the game.
             </P>
             <P>
-              Three parts do the work. <B>Hooks</B> put logic inside the pool itself: pricing, fees,
-              and risk controls that vanilla AMMs can&apos;t express. <B>Agents</B> turn intent into
-              action, buying the intelligence they need per call in USDC and executing on the
-              result. The <B>interface</B> ties them together with a portfolio, analytics, and a
-              chatbot that routes plain-language instructions to the right surface. Every command,
-              including placing bets, can be run from the chatbot.
+              Three parts do the work. The <B>Dynamic Market Hook</B> puts pricing, fees and circuit
+              breakers inside the market&apos;s own pool. <B>Agents</B> turn intent into action,
+              buying the sports intelligence they need per call in USDC and executing on the result.
+              The <B>interface</B> ties them together with a board of today&apos;s games, a
+              portfolio, an analyst, and a chatbot that routes plain-language instructions to the
+              right surface. Every command, including placing bets, can be run from the chatbot.
             </P>
 
             <H>Non-custodial by design</H>
@@ -60,15 +62,15 @@ export const DOCS_GROUPS: DocsGroup[] = [
             <H>Where to start</H>
             <UL>
               <li>
-                New here? <B>Getting started</B> covers connecting a wallet and funding it on
-                Base.
+                New here? <B>Getting started</B> covers signing in and funding your wallet.
               </li>
               <li>
-                Want the mechanics? <B>Hooks</B> explains what each hook does to a swap.
+                Want the mechanics? <B>The Dynamic Market Hook</B> explains how a market prices and
+                what it charges.
               </li>
               <li>
-                Building or automating? <B>Agents</B> and <B>Networks &amp; contracts</B> have the
-                addresses and behavior you need.
+                Ready to bet? <B>Placing a bet</B> walks through the ticket, and <B>Agents</B>{" "}
+                through letting your agent do it for you.
               </li>
             </UL>
           </>
@@ -77,46 +79,45 @@ export const DOCS_GROUPS: DocsGroup[] = [
       {
         id: "getting-started",
         title: "Getting started",
-        summary: "Connect a wallet, fund it, place your first action.",
+        summary: "Sign in, fund a wallet, take your first position.",
         body: (
           <>
-            <H>1. Open the app</H>
+            <H>1. Browse</H>
             <P>
-              Select <B>Launch App</B> from anywhere on the site. Browsing markets, pools, and
-              analytics is open to everyone. No wallet required.
+              The home page is the board: today&apos;s NFL games with their live prices. Browsing
+              markets, prices and analysis is open to everyone. No wallet required.
             </P>
 
             <H>2. Sign in</H>
             <P>
-              Any on-chain transaction needs a logged-in wallet. Sign in with email, a social
-              account, a passkey, or an external wallet; a wallet address is created or connected
-              for you. Keep your recovery method safe. We can never restore it, and we will never
-              ask you for a seed phrase or private key.
+              Any transaction needs a logged-in wallet. Sign in with email, a social account, a
+              passkey, or an external wallet; a wallet address is created or connected for you. Keep
+              your recovery method safe. We can never restore it, and we will never ask you for a
+              seed phrase or private key.
             </P>
 
             <H>3. Fund the wallet</H>
             <P>
-              Send USDC (or EURC / cbBTC) to your wallet address — from an exchange (choose the
-              Base network when withdrawing so the funds arrive in your wallet), or via the
-              app&apos;s built-in bridge.
+              Send USDC to your wallet address from an exchange or another wallet. Positions are
+              priced and settled in USDC.
             </P>
             <Note>
-              <B>ETH is the gas token</B>. Keep a small amount of ETH in your wallet to pay for
-              transactions; your USDC covers the trades themselves.
+              <B>Transactions are sponsored.</B> You never need to hold ETH for gas: every trade is
+              paid for by the platform, and your USDC covers only the position itself.
             </Note>
 
             <H>4. Do something</H>
             <OL>
               <li>
-                Pick a league from the header nav to browse its markets, or open <B>Trading</B> to
-                swap and provide liquidity. Every command works from the chatbot too, including
-                placing bets, so you never have to start from the header.
+                Pick a game from the board, choose a side, choose an amount, confirm. Or open{" "}
+                <B>Agent</B> and ask it to evaluate the matchup and recommend a bet.
               </li>
               <li>
-                Type an instruction into the chatbot, like &ldquo;swap 10 USDC for EURC with Stable
-                Protection&rdquo;, and it routes to the right panel, pre-filled.
+                Type an instruction into the chatbot, like &ldquo;bet on the Chiefs&rdquo; or
+                &ldquo;what can I trade right now?&rdquo;, and it routes to the right surface,
+                pre-filled.
               </li>
-              <li>Review the quote, confirm, and sign in your wallet.</li>
+              <li>Review the ticket, confirm, and sign in your wallet.</li>
             </OL>
           </>
         ),
@@ -128,56 +129,47 @@ export const DOCS_GROUPS: DocsGroup[] = [
     pages: [
       {
         id: "hooks",
-        title: "Hooks",
-        summary: "The three Mantua hooks and what each one changes about a swap.",
+        title: "The Dynamic Market Hook",
+        summary: "One hook, inside every market's pool: pricing, fees, and the circuit breaker.",
         body: (
           <>
             <P>
               A Uniswap v4 hook is a contract the pool calls at defined points in its lifecycle:
-              before and after a swap, or a liquidity change. Mantua ships three, each attaching
-              behavior a plain pool has no way to express.
+              before and after a trade, or a liquidity change. Mantua ships one. Every market&apos;s
+              pool is created with it, so its rules are the market&apos;s rules.
             </P>
 
-            <H>Dynamic Market Hook</H>
+            <H>How a market is built</H>
             <P>
-              Powers the prediction markets. It adapts pricing, fees, liquidity, and risk parameters
-              in real time from market conditions, volatility, and trading activity, so quoted odds
-              track the state of the event rather than sitting still between trades.
+              Each game mints two markets, one per side. A market issues a YES and a NO outcome
+              token, collateralised 1:1 by USDC, and the YES token trades against USDC in its own
+              pool. The price of YES is the market&apos;s probability that the side wins.
             </P>
-            <Note>
-              Each day&apos;s games mint their markets automatically; their pools open at the
-              implied odds and trade under this hook before and during the game, closing when the
-              game goes final. The production
-              deployment is pending — addresses will be published here once live.
-            </Note>
 
-            <H>Stable Protection Hook</H>
-            <P>
-              For stablecoin and dollar-pegged pools. It measures how far the pool has drifted from
-              its reference rate on every swap and sorts that deviation into five zones, raising the
-              LP fee as the depeg gets worse and halting swaps entirely past 5%.
-            </P>
+            <H>Fees</H>
             <Table
-              head={["Zone", "Deviation", "Base fee"]}
+              head={["When", "Fee", "What sets it"]}
               rows={[
-                ["Healthy", "at peg", "none"],
-                ["Minor", "small drift", "5 bps"],
-                ["Moderate", "growing", "15 bps"],
-                ["Severe", "up to 5.00%", "50 bps"],
-                ["Critical", "over 5.00%", "swaps blocked (circuit breaker)"],
+                ["Regular season", "0%", "Fixed"],
+                [
+                  "Playoffs",
+                  "0.10% to 0.70%",
+                  "Liquidity, volatility and trading activity, adjusted on every trade",
+                ],
               ]}
             />
             <P>
-              Fees are also directional: a trade pushing the pool back toward its peg pays half the
-              zone&apos;s base fee, while one pushing it further away pays more. Traders who help
-              restore the peg are subsidised by those who strain it.
+              The fee is set by the hook at execution, so the ticket shows the exact rate for that
+              trade rather than a fixed tier.
             </P>
 
-            <H>Dynamic Fee Hook</H>
+            <H>Halts</H>
             <P>
-              For volatile pairs. It reads Chainlink price feeds and applies Nezlobin directional
-              fees across five deviation zones, charging the toxic side of a trade more, so the
-              spread accrues to liquidity providers instead of arbitrageurs.
+              The hook can stop accepting new buys under conditions defined in advance. The clearest
+              case is a stale live feed: if the score data behind an in-play game stops updating,
+              new buys on that game pause until it recovers. Selling an existing position is never
+              paused. These halts are enforced by the contract and the platform status, not by an
+              operator decision.
             </P>
           </>
         ),
@@ -185,27 +177,36 @@ export const DOCS_GROUPS: DocsGroup[] = [
       {
         id: "agents",
         title: "Agents",
-        summary: "How autonomous agents research, decide, and execute.",
+        summary: "How your agent researches, decides, and executes.",
         body: (
           <>
             <P>
-              An agent turns an instruction into on-chain action. Give it a goal in plain language
-              and it researches, decides, and executes, including while you are away.
+              An agent turns an instruction into a position. Give it a goal in plain language and it
+              researches, decides, and executes, including while you are away, always within the
+              daily cap and the policy you set for it.
             </P>
 
             <H>Buying intelligence</H>
             <P>
-              When an agent hits a question it can&apos;t answer from what it already has, it
-              searches the x402 marketplace and pays per call in USDC. No API keys to provision, no
-              accounts to create, no subscriptions to prefund. Every purchase is capped and written
-              to an audit log.
+              When an agent hits a question it can&apos;t answer from Mantua&apos;s own sports data,
+              it searches the x402 marketplace and pays per call in USDC. No API keys to provision,
+              no accounts to create, no subscriptions to prefund. Every purchase is capped and
+              written to an audit log.
             </P>
 
             <H>Acting on it</H>
             <P>
-              The agent combines what it bought with live on-chain signals (pool health, peg status,
-              flow) and executes: take a position, swap, provide liquidity, bridge, or exit on a
-              signal-gated schedule.
+              The agent combines the matchup evidence (records, form, injuries, head to head) with
+              the market&apos;s price, shows you the discrepancy and the risks, then simulates the
+              trade. Anything that moves money is previewed first and runs only after you reply
+              &ldquo;confirm&rdquo;. It can take a position, exit one, hedge an exposure, or build a
+              combo across games.
+            </P>
+
+            <H>Your policy over it</H>
+            <P>
+              The daily spending cap, the per-trade stake limit, the risk level and the hedging
+              rules live in your profile. The agent can read them and can never change them.
             </P>
 
             <Note tone="warn">
@@ -218,23 +219,22 @@ export const DOCS_GROUPS: DocsGroup[] = [
       {
         id: "markets",
         title: "Markets and settlement",
-        summary: "How a market prices, halts, and resolves.",
+        summary: "How a market prices, trades in play, and resolves.",
         body: (
           <>
             <H>Pricing</H>
             <P>
-              Prices come from the pool, not from a bookmaker. Each outcome trades against
-              liquidity, and the Dynamic Market Hook adjusts fees and parameters as conditions
-              change. A quoted price is the market&apos;s current forecast. It moves when
-              participants disagree with it.
+              Prices come from the pool, not from a bookmaker. Each side trades against liquidity,
+              and the Dynamic Market Hook adjusts fees and parameters as conditions change. A quoted
+              price is the market&apos;s current forecast. It moves when participants disagree with
+              it.
             </P>
 
-            <H>Halts</H>
+            <H>In play</H>
             <P>
-              Pools can stop accepting swaps under conditions defined in advance. The Stable
-              Protection Hook&apos;s circuit breaker is the clearest case: past 5% deviation, swaps
-              are blocked until the pool recovers. This is deliberate: it protects LPs from
-              absorbing a depeg, and it is enforced by the contract, not by an operator decision.
+              Markets trade before and during the game. Trading closes when the game goes final (or
+              is postponed or cancelled), and a permissionless backstop closes any market twelve
+              hours after kickoff if the final never arrived.
             </P>
 
             <H>Resolution</H>
@@ -270,85 +270,46 @@ export const DOCS_GROUPS: DocsGroup[] = [
     label: "Guides",
     pages: [
       {
-        id: "trading",
-        title: "Trading",
-        summary: "Swapping assets through hook-powered pools.",
+        id: "betting",
+        title: "Placing a bet",
+        summary: "From the board to a position in three taps.",
         body: (
           <>
             <OL>
               <li>
-                Open <B>Trading</B> from the header, or just ask the chatbot. Any command, including
-                placing bets, can be typed there directly.
+                Pick a game from the board, or open <B>NFL</B> from the header. Any command,
+                including placing bets, can also be typed into the chatbot directly.
               </li>
-              <li>Choose the pair and the amount you want to sell.</li>
+              <li>Choose the side and the amount you want to stake.</li>
               <li>
-                Pick a venue: a hook-powered pool, a plain pool with no hook, or the bridge for
-                moving USDC across chains.
+                Review the ticket. It shows the tokens you receive, the price impact, the fee the
+                hook will charge, and the payout if your side wins. A winning YES token redeems for
+                1 USDC after resolution.
               </li>
-              <li>
-                Review the quote. Hook pools price the fee at execution, so what you see reflects
-                current conditions, not a fixed tier.
-              </li>
-              <li>Confirm and sign. The transaction hash appears when it lands.</li>
+              <li>Confirm and sign. The transaction appears in your activity when it lands.</li>
             </OL>
 
-            <H>If a quote fails</H>
+            <H>Closing a position</H>
+            <P>
+              Open your profile, find the position, and choose Close. The ticket opens on Sell,
+              pre-filled with your full balance; adjust the amount if you only want to trim.
+            </P>
+
+            <H>If the ticket refuses</H>
             <UL>
               <li>
-                <B>Insufficient liquidity</B>: the pool returned almost nothing for that size. Try a
-                smaller amount, a different fee tier, or the no-hook venue.
+                <B>Market closed</B>: the game is final, postponed or cancelled, or the twelve-hour
+                backstop has closed it. Wait for resolution, then claim.
               </li>
               <li>
-                <B>Hook unavailable for this pair</B>: that hook doesn&apos;t serve those tokens.
-                Stable Protection is for stable pairs; Dynamic Fee is for volatile ones.
+                <B>Buys paused</B>: the live feed behind an in-play game is stale. Selling still
+                works; buying resumes when the feed recovers.
               </li>
               <li>
-                <B>Swaps blocked</B>: Stable Protection&apos;s circuit breaker has tripped on a real
-                depeg. This clears when the pool returns inside the threshold.
+                <B>Over your cap</B>: the amount exceeds the daily cap or the per-trade limit set in
+                your profile. Lower the stake or raise the limit yourself; the agent cannot.
               </li>
             </UL>
-          </>
-        ),
-      },
-      {
-        id: "liquidity",
-        title: "Providing liquidity",
-        summary: "Creating a pool or adding to one.",
-        body: (
-          <>
-            <OL>
-              <li>Sign in and open the Liquidity surface from the home menu or the command bar.</li>
-              <li>
-                Select an existing pool, or create one by choosing a pair, fee tier, and hook.
-              </li>
-              <li>Enter amounts for both sides and review the position.</li>
-              <li>
-                Approve the tokens if prompted, then confirm. Creating a pool initialises it and
-                adds liquidity in the same flow.
-              </li>
-            </OL>
-
-            <H>Fee tiers</H>
-            <Table
-              head={["Tier", "Fee", "Typical use"]}
-              rows={[
-                [<Code key="a">100</Code>, "0.01%", "Stable pairs"],
-                [<Code key="b">500</Code>, "0.05%", "cbBTC / stable"],
-                [<Code key="c">3000</Code>, "0.30%", "cbBTC pairs"],
-                [<Code key="d">10000</Code>, "1.00%", "Wide range"],
-              ]}
-            />
-            <Note>
-              On a hook-powered pool the tier is a starting point: the hook sets the fee actually
-              charged at execution, which is the point of using one.
-            </Note>
-
-            <H>Risk</H>
-            <P>
-              Providing liquidity exposes you to impermanent loss, to the assets in the pair, and to
-              the contracts involved. Fees earned may not offset price divergence. Manage positions
-              from the Positions view, where you can also remove liquidity.
-            </P>
           </>
         ),
       },
@@ -360,17 +321,16 @@ export const DOCS_GROUPS: DocsGroup[] = [
       {
         id: "contracts",
         title: "Contracts",
-        summary: "Deployed hooks and token addresses.",
+        summary: "The hook and the settlement token.",
         body: (
           <>
-            <H>Deployed hooks</H>
+            <H>Deployed contracts</H>
             <P>
-              The Mantua hooks (Stable Protection, Dynamic Fee, Dynamic Market) are pending
-              production deployment. Their addresses will be published here once live; until
-              then, hook venues degrade gracefully to the no-hook path.
+              The Dynamic Market Hook, the market factory and the settlement contracts are pending
+              production deployment. Their addresses will be published here once live.
             </P>
 
-            <H>Tokens</H>
+            <H>Settlement token</H>
             <Table
               head={["Token", "Decimals", "Address"]}
               rows={[
@@ -381,25 +341,11 @@ export const DOCS_GROUPS: DocsGroup[] = [
                     0x833589…2913
                   </A>,
                 ],
-                [
-                  "EURC",
-                  "6",
-                  <A key="e" href={`${BASE_EXPLORER}/0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42`}>
-                    0x60a3E3…db42
-                  </A>,
-                ],
-                [
-                  "cbBTC",
-                  "8",
-                  <A key="c" href={`${BASE_EXPLORER}/0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf`}>
-                    0xcbB7C0…33Bf
-                  </A>,
-                ],
               ]}
             />
             <Note tone="warn">
-              Addresses change between environments. Always read them from configuration rather
-              than hardcoding, and re-verify against the token issuer before moving funds.
+              Addresses change between environments. Always read them from configuration rather than
+              hardcoding, and re-verify against the token issuer before moving funds.
             </Note>
           </>
         ),

@@ -16,6 +16,7 @@
  */
 
 import { eq, and, isNull, or, asc, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { DB } from "../../db/client.ts";
 import {
   events,
@@ -132,6 +133,12 @@ export async function upsertEvents(
     const existing = await db.query.events.findFirst({
       where: and(eq(events.provider, provider), eq(events.providerEventId, e.providerEventId)),
     });
+    // The two teams ride along with every slate row (name, abbreviation,
+    // logo) so the board can show real marks: the slate feed is the only
+    // team source an ESPN-only deployment has. Idempotent on (league, key).
+    const teamIds = await upsertTeams(db, provider, league, [e.home, e.away]);
+    const homeTeamId = teamIds.get(e.home.key) ?? null;
+    const awayTeamId = teamIds.get(e.away.key) ?? null;
 
     if (!existing) {
       await db
@@ -144,6 +151,8 @@ export async function upsertEvents(
           awayTeam: e.away.name,
           homeTeamKey: e.home.key,
           awayTeamKey: e.away.key,
+          homeTeamId,
+          awayTeamId,
           startsAt: new Date(e.startsAt * 1000),
           status: e.status === "unknown" ? "scheduled" : e.status,
           homeScore: e.homeScore ?? null,
@@ -179,6 +188,10 @@ export async function upsertEvents(
         homeScore: e.homeScore ?? existing.homeScore,
         awayScore: e.awayScore ?? existing.awayScore,
         startsAt: new Date(e.startsAt * 1000),
+        // Backfill the relational links on rows ingested before teams
+        // were persisted from the slate.
+        ...(homeTeamId && !existing.homeTeamId ? { homeTeamId } : {}),
+        ...(awayTeamId && !existing.awayTeamId ? { awayTeamId } : {}),
         lastPolledAt: new Date(),
         updatedAt: sql`now()`,
       })
@@ -719,6 +732,10 @@ export interface CanonicalEventRow {
   homeScore: number | null;
   awayScore: number | null;
   lastPolledAt: Date | null;
+  /** The teams' logos from the canonical `teams` rows (persisted at slate
+   *  ingest), when known. Absent on rows read without the team join. */
+  homeLogo?: string | null;
+  awayLogo?: string | null;
   /** Mantua's own opening line for the HOME moneyline market (0–1 decimal
    *  string), when one was minted — the pre-pool probability the board
    *  shows until `withLiveOdds` overlays the live pool price. Null when no
@@ -782,6 +799,8 @@ export async function readCanonicalSlateRange(
   const leagueId = await ensureLeague(db, league);
   const from = new Date(fromMs);
   const to = new Date(toMs);
+  const homeTeams = alias(teams, "home_teams");
+  const awayTeams = alias(teams, "away_teams");
   const rows = await db
     .select({
       providerEventId: events.providerEventId,
@@ -794,9 +813,13 @@ export async function readCanonicalSlateRange(
       homeScore: events.homeScore,
       awayScore: events.awayScore,
       lastPolledAt: events.lastPolledAt,
+      homeLogo: homeTeams.logoUrl,
+      awayLogo: awayTeams.logoUrl,
       homeOpeningProbability: markets.openingProbability,
     })
     .from(events)
+    .leftJoin(homeTeams, eq(homeTeams.id, events.homeTeamId))
+    .leftJoin(awayTeams, eq(awayTeams.id, events.awayTeamId))
     .leftJoin(
       markets,
       and(
