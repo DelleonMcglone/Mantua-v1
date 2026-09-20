@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { Request, Response } from "express";
 import { opsAuthGuard } from "./ops-auth-core.ts";
 
-/** Task 073 — the operator guard: disabled when unset, bearer-key otherwise. */
+/** Task 074 — the operator guard: disabled when unset, bearer-key otherwise. */
 
 function run(key: string | undefined, authorization: string | undefined) {
   const out: { status: number | null; body: unknown; next: boolean; rejected: number } = {

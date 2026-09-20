@@ -6,7 +6,7 @@ import { logger } from "../lib/logger.ts";
 import { getRequestContext } from "../lib/request-context.ts";
 
 /**
- * Task 073 — one status per withdrawal outcome, shared by the request and
+ * Task 074 — one status per withdrawal outcome, shared by the request and
  * the decision routes. Every outcome that is not a plain success is a
  * 4xx/5xx whose `code` the client shows verbatim.
  */

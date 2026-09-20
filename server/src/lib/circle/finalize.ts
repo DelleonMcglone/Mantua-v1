@@ -44,7 +44,7 @@ export const agentSendPayloadSchema = z.object({
   agentAddress: z.string(),
   /** Set when spend was already recorded provisionally (reversed on revert). */
   provisionalSpendingUsd: z.number().nonnegative().optional(),
-  /** Task 073 — the custody withdrawal this send executes, stamped at finalization. */
+  /** Task 074 — the custody withdrawal this send executes, stamped at finalization. */
   custodyWithdrawalId: z.string().optional(),
   auditContext: z
     .object({

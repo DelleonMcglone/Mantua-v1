@@ -15,7 +15,7 @@ import { allow, memberContext } from "./institution-context.ts";
 import { parsePeriod } from "./institution-period.ts";
 
 /**
- * Task 073 / IC-002 — reporting for members with `view_reports`: the
+ * Task 074 / IC-002 — reporting for members with `view_reports`: the
  * period statement and the audit trail as JSON or CSV, and the
  * reconciliation of Circle's balances against the chain.
  */

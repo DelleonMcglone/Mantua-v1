@@ -12,7 +12,7 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { allow, memberContext } from "./institution-context.ts";
 
 /**
- * Task 073 / IC-002 — adding a member: an admin names a user (by wallet
+ * Task 074 / IC-002 — adding a member: an admin names a user (by wallet
  * or email) and a role. A removed member of this institution is
  * re-activated; a member of another institution is refused (one
  * institution per user). Role changes and removals live in

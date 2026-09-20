@@ -50,7 +50,7 @@ export interface AgentSendArgs {
   chainId?: SupportedChainId;
   /** Request context for the durable audit trail (optional). */
   auditContext?: { ipAddress?: string; userAgent?: string };
-  /** Task 073 — the approved custody withdrawal this send executes (required
+  /** Task 074 — the approved custody withdrawal this send executes (required
    *  for an institutional wallet; ignored for a retail one). */
   custodyWithdrawalId?: string;
 }

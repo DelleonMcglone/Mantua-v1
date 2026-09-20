@@ -16,7 +16,7 @@ import {
 } from "./institution-withdrawal-respond.ts";
 
 /**
- * Task 073 / IC-001 — withdrawals: the institution's list and a member's
+ * Task 074 / IC-001 — withdrawals: the institution's list and a member's
  * request. Decisions and cancellation live in
  * `institution-withdrawals-decide.ts`; the library owns the rules.
  */

@@ -16,7 +16,7 @@ import {
 } from "./custody-withdrawal-exec.ts";
 
 /**
- * Task 073 / IC-001, IC-002 — the second pair of eyes. A pending request
+ * Task 074 / IC-001, IC-002 — the second pair of eyes. A pending request
  * is approved or rejected by a member with `approve_withdrawal` who is
  * not the requester; an expired request is stamped on sight; an approval
  * re-checks that the requester is still active and the destination still

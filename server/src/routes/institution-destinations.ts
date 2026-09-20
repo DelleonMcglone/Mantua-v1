@@ -11,7 +11,7 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { allow, memberContext, type MemberContext } from "./institution-context.ts";
 
 /**
- * Task 073 / IC-001 — the withdrawal allowlist. An admin adds the
+ * Task 074 / IC-001 — the withdrawal allowlist. An admin adds the
  * custodian's deposit address as `pending` and can revoke it; a
  * different member verifies it (`institution-destinations-verify.ts`).
  * Only a verified destination can receive a withdrawal.

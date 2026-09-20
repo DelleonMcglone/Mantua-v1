@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { circleUsdcRaw, reconcileWallet } from "./custody-reconcile.ts";
 
-/** Task 073 / IC-001 — the custodian's number against the chain's. */
+/** Task 074 / IC-001 — the custodian's number against the chain's. */
 
 const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
 

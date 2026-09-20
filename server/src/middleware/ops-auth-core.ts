@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import type { RequestHandler } from "express";
 
 /**
- * Task 073 — the operator guard, pure of configuration: `Authorization:
+ * Task 074 — the operator guard, pure of configuration: `Authorization:
  * Bearer <key>` against the key the caller reads (env in production, a
  * literal in tests), disabled (503) rather than open when no key is
  * configured, compared in constant time.

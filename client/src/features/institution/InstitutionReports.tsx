@@ -25,7 +25,7 @@ function usdc(raw: string | null): string {
 }
 
 /**
- * Task 073 / IC-002 — reports for members with `view_reports`: the period
+ * Task 074 / IC-002 — reports for members with `view_reports`: the period
  * statement and the audit trail as CSV downloads, and reconciliation of
  * the balance Circle reports against the chain for every member wallet.
  */

@@ -22,7 +22,7 @@ import {
 } from "./custody-withdrawal-exec.ts";
 
 /**
- * Task 073 / IC-001 — requesting a withdrawal. The request is gated
+ * Task 074 / IC-001 — requesting a withdrawal. The request is gated
  * (standing, segregation, caps, a verified destination on the right
  * chain); below the threshold it is approved by the rule and executed at
  * once, at or above it it waits for a second member (`custody-withdrawals.ts`).

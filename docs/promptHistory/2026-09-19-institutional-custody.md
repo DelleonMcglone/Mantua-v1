@@ -1,8 +1,8 @@
-# Prompt History — Institutional Custody (Phase 18, task 073)
+# Prompt History — Institutional Custody (Phase 18, task 074)
 
 **Date:** 2026-09-19
 **Branch:** `claude/agent-extended-social-reputation-dzi0fj` (restarted from `main` at `54b8a2b`)
-**Task:** 073 — Phase 18 IC-001 … IC-003, on the owner's master list refreshed 2026-09-19.
+**Task:** 074 — Phase 18 IC-001 … IC-003, on the owner's master list refreshed 2026-09-19.
 
 ## Original prompt (owner)
 
@@ -17,7 +17,7 @@
 
 ## Refined prompt
 
-Build Phase 18 as task 073 on the existing Circle custody posture (C-009:
+Build Phase 18 as task 074 on the existing Circle custody posture (C-009:
 Privy for users, Circle Developer-Controlled Wallets for agents, the
 entity secret only in the operator's secrets manager) with these
 resolutions of the open questions:
@@ -49,7 +49,7 @@ resolutions of the open questions:
 5. **Deployment gating.** Circle absent → provisioning and reconciliation
    503; the tier's database side works regardless.
 
-Success: the criteria in `docs/tasks/073-institutional-custody.md`. Files
+Success: the criteria in `docs/tasks/074-institutional-custody.md`. Files
 ≤ 150 lines, TDD on every pure module, no hardcoded secrets, every
 mutating route guarded.
 

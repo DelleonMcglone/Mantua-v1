@@ -1014,11 +1014,11 @@ agent-built tickets under `autoManage` in autonomous mode, recommended on
 the timeline otherwise, never repeated for one ticket and action in a day.
 A conjunction token cannot cash out one leg; nothing here pretends it can.
 
-## Institutional custody — an institution is a segregated wallet set (Phase 18, task 073, D-120)
+## Institutional custody — an institution is a segregated wallet set (Phase 18, task 074, D-120)
 
 The institutional tier adds nothing to how money moves; it adds rules at
 the three points every money path already passes. Ledger:
-`docs/tasks/073-institutional-custody.md`.
+`docs/tasks/074-institutional-custody.md`.
 
 **Who holds which key (unchanged from C-009).** Members sign in with Privy
 like anyone else; their personal wallets are theirs and outside this

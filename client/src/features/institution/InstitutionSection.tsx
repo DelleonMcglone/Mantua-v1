@@ -9,7 +9,7 @@ import { custodianLabel, limitsLine, shortAddress } from "./institution-core.ts"
 import { post, useInstitution } from "./use-institution.ts";
 
 /**
- * Task 073 / IC-002 — the Institution section of the profile, shown only
+ * Task 074 / IC-002 — the Institution section of the profile, shown only
  * to members: the account, its custodian and limits, the caller's role,
  * whether their agent wallet sits in the institution's custody wallet set
  * (with the one-tap move when it does not), then destinations,

@@ -5,7 +5,7 @@ import { readMarketPositions } from "../sports/market-positions.ts";
 import { getToken, getTokens } from "../tokens.ts";
 
 /**
- * Task 073 — the chain's own answers about a wallet: its USDC (for
+ * Task 074 — the chain's own answers about a wallet: its USDC (for
  * reconciliation) and everything it holds (for the segregation move,
  * which may only replace a wallet that has nothing left in it — every app
  * token and every open market position, not just USDC).

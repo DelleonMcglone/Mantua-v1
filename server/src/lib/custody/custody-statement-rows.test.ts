@@ -8,7 +8,7 @@ import {
   withdrawalRow,
 } from "./custody-statement-rows.ts";
 
-/** Task 073 / IC-002 — ledger rows become statement lines with USD amounts. */
+/** Task 074 / IC-002 — ledger rows become statement lines with USD amounts. */
 
 const at = new Date("2026-09-02T10:00:00.000Z");
 

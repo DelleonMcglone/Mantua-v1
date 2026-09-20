@@ -12,7 +12,7 @@ import {
 } from "./custody-store.ts";
 
 /**
- * Task 073 / IC-001 — the custody rules at the two choke points that
+ * Task 074 / IC-001 — the custody rules at the two choke points that
  * already carry every money path. `assertCustodySpend` runs inside
  * `checkSpendingCap` (trades, combos, hedges, sends, gateway); `assertCustodySend`
  * runs inside `sendFromAgentWallet`, the only agent send. Both are no-ops

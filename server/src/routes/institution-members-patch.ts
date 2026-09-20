@@ -12,7 +12,7 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { allow, memberContext } from "./institution-context.ts";
 
 /**
- * Task 073 / IC-002 — changing a member's role or removing them. The
+ * Task 074 / IC-002 — changing a member's role or removing them. The
  * owner role is the owner's alone to give or take, and an institution
  * keeps at least one active owner.
  */

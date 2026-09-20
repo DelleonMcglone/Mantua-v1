@@ -27,10 +27,10 @@
 | D-103 | Market mechanism (P-001)                                                                                                   | ✅ CLOSED 2026-09-06 — full-collateral YES/NO vs USDC, single YES/USDC dynamic-fee v4 pool, price = implied probability; **in-play trading: buy/sell any time before or during the event** (owner call, supersedes the kickoff-freeze deferral); trading closes on final, permissionless time backstop                                                                                                                                                                                                             | Very high (mechanism shipped); in-play is a contract change | None — owner decided 2026-09-06                                                                          |
 | D-104 | Resolution engine & authority (P-005)                                                                                      | ✅ CLOSED 2026-09-06 — Sportradar finals via the canonical data layer through the S-022…S-026 integrity gates; mandatory dispute window before on-chain submit; audited manual-override path; signer = service key, operator = owner (closes DM-103)                                                                                                                                                                                                                                                               | High                                                        | None (window length tunable in ops)                                                                      |
 | D-105 | Dynamic Market Hook fee model (H-001…H-017)                                                                                | ✅ CLOSED 2026-09-11 — regular season 0%; playoffs dynamic 0.10%–0.70% (immutable ceiling); `Fee = C × r × p × (1 − p)` realised as v4 pip fee `r × (1 − p)` on the gross input; season flag per pool at registration from the league calendar; one on-chain `quoteFee` feeds the UI quote                                                                                                                                                                                                                         | Very high (owner spec); deployment pending                  | None — owner spec 2026-09-11; deploy waits on D-112 + funded keystore                                    |
-| D-106 | x402 payments — scope, non-goals, gate                                                                                     | Build gate locked (hardening first); shipped buyer+seller surfaces documented; forward scope and open questions marked for review                                                                                                                                                                                                                                                                                                                                                                                  | High (facts); open questions undecided                      | Counsel (open question: D-012 posture for seller revenue)                                                |
+| D-106 | x402 payments — scope, non-goals, gate                                                                                     | Build gate satisfied (C-wave landed); Phase 17 built the six-service seller catalog + dual-rail paywall with tests and roadmap rows (PR #61 + parallel PRs); open questions (b)/(c) resolved 2026-09-19 — go-live counsel-gated (D-012)                                                                                                                                                                                                                                                                            | High (facts)                                                | Counsel (D-012 seller-revenue posture gates go-live)                                                     |
 | D-107 | Social platform for agent posting (AE-001)                                                                                 | ✅ CLOSED 2026-09-18 — X (Twitter) via API v2 under an OAuth 1.0a user-context signature; ONE deployment account (four env values: app key/secret, access token/secret) through which every opted-in agent posts under its own handle; missing credentials → recorded dry runs; per-agent OAuth is the recorded next step; the login shared in the task prompt is unused, unstored, and should be rotated                                                                                                          | High (shipped, task 070)                                    | Operator provisions the X app and account credentials                                                    |
 | D-119 | Combo (parlay) mechanism (CB-001)                                                                                          | ✅ CLOSED 2026-09-19 — **a combo is a market**: a conjunction market created through the existing factory (id = keccak over the sorted leg ids), priced by its own YES/USDC pool with the Dynamic Market Hook fee, bought with the same single swap, settled by the resolver from the legs' on-chain outcomes (any lost → NO; every non-void won → YES; all void → INVALID; a void leg drops out). No new contract, no batching, no counterparty desk; legs priced as independent, correlated legs refused in code | High (shipped, task 072)                                    | Operator seeds combo pools (`COMBO_SEED_USDC`, `COMBO_MAX_OPEN_MARKETS`)                                 |
-| D-120 | Institutional custody model (IC-001)                                                                                       | ✅ CLOSED 2026-09-20 — **an institution is a segregated Circle wallet set**: members' agent wallets created in it, withdrawals only to verified custodian addresses under dual control (second person verifies destinations and approves withdrawals at or above the threshold), institution-wide per-trade and daily caps, enforced at `checkSpendingCap`, `sendFromAgentWallet` and the wallet provisioner; the custodian of the principal is recorded, not integrated                                           | High (shipped, task 073)                                    | Operator sets `MANTUA_OPS_KEY`; Gas Station policy + screening per institution set in the Circle Console |
+| D-120 | Institutional custody model (IC-001)                                                                                       | ✅ CLOSED 2026-09-20 — **an institution is a segregated Circle wallet set**: members' agent wallets created in it, withdrawals only to verified custodian addresses under dual control (second person verifies destinations and approves withdrawals at or above the threshold), institution-wide per-trade and daily caps, enforced at `checkSpendingCap`, `sendFromAgentWallet` and the wallet provisioner; the custodian of the principal is recorded, not integrated                                           | High (shipped, task 074)                                    | Operator sets `MANTUA_OPS_KEY`; Gas Station policy + screening per institution set in the Circle Console |
 | D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                                                                                                      | High (process)                                              | Owner decision after 2026-09-17                                                                          |
 | D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                                                                                       | High                                                        | None                                                                                                     |
 | D-111 | Gasless user transactions (C-005/C-006)                                                                                    | Privy smart wallets (ERC-4337 over the embedded signer) + a dashboard-configured sponsoring paymaster; shipped env-gated OFF pending paymaster provisioning                                                                                                                                                                                                                                                                                                                                                        | High (architecture); live path unverified                   | None (operator provisions the paymaster policy)                                                          |
@@ -571,17 +571,36 @@ money rails x402 pays through.
 - This wave does not build x402 — it authors this record (C-007's missing source
   of truth) and reconciles the ledger.
 
-**Genuinely open (⬜ — not decided here):**
+**Resolved by Phase 17 (2026-09-19 — were genuinely open ⬜ when recorded):**
+
+- **(b) List more services beyond the analyst brief? — YES.** Six services
+  (seven catalog rows; trading-quote and trading-calldata are one family,
+  MP-007; MP-008 does not exist in the owner's phase list) are packaged for
+  Circle's Agent Marketplace: `docs/marketplace/offerings.md` reads every
+  endpoint, price, and spec URL from the shipped catalog
+  (`server/src/lib/x402/catalog.ts`), with the legacy $0.01 analyst brief
+  listed as the first-generation surface. Foundation shipped in PR #61
+  (catalog, dual-rail paywall, trading routes, +24 tests); the remaining
+  service routes and the OpenAPI publication land in parallel PRs.
+- **(c) Does the D-012 legal-review posture extend to x402 seller revenue? —
+  BUILD NOW, GO-LIVE GATED.** Every seller surface ships env-gated dark;
+  flipping the seller env on and submitting Circle's intake form are human
+  steps gated on counsel sign-off of the D-012 posture. Runbook:
+  `docs/marketplace/become-a-seller.md`; fork recorded in the Phase 17 task
+  doc (`docs/tasks/073-phase-17-agent-marketplace.md`), roadmap rows in
+  `v2-roadmap.md` Phase 17 (the D-106 precondition — a row per new surface,
+  with tests).
+
+**Still genuinely open (⬜ — not decided here):**
 
 - Dedicated buyer key vs. the `MANTUA_ADMIN_PRIVATE_KEY` default (operational;
   the env already supports `X402_BUYER_PRIVATE_KEY`).
-- Whether Mantua lists more of its own services on the Bazaar marketplace beyond
-  the analyst brief (product).
-- Whether the D-012 legal-review posture extends to x402 seller revenue (counsel
-  input; not assumed either way).
-- Production cap defaults ($0.10 / $1.00 are dev-era values), and whether the
-  shipped surfaces get roadmap rows + tests or stay acknowledged-and-deferred
-  under TD-005.
+- Production cap defaults ($0.10 / $1.00 are dev-era values).
+- ~~Whether the shipped surfaces get roadmap rows + tests or stay
+  acknowledged-and-deferred under TD-005~~ — **resolved 2026-09-19:** every
+  Phase 17 surface ships with roadmap rows (the `v2-roadmap.md` Phase 17
+  section) and tests (PR #61's suite; the catalog↔spec parity test lands
+  with the OpenAPI PR).
 
 **Blocks:** C-007 (x402 integration) — and is itself gated by the C-wave
 hardening items (owner lock, 2026-09-04).
@@ -856,7 +875,7 @@ the public performance ledger (Phase 13 reads `market_fills`).
 
 ## D-120 — Institutional custody: an institution is a segregated Circle wallet set ✅ CLOSED 2026-09-20
 
-**Decision.** An institution (task 073, IC-001) is a Circle wallet set of
+**Decision.** An institution (task 074, IC-001) is a Circle wallet set of
 its own, created through the installed Developer-Controlled Wallets SDK
 and pinned on the institution row. Every member's agent wallet is
 created in that set, never in the retail set; a wallet outside it cannot

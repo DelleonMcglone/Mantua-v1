@@ -13,7 +13,7 @@ import {
 import { users } from "./users.ts";
 
 /**
- * Task 073 (Phase 18) — the institutional tier. An institution is a
+ * Task 074 (Phase 18) — the institutional tier. An institution is a
  * segregated Circle wallet set (D-120): `circle_wallet_set_id` names it,
  * members' agent wallets are created in it, and the custody rules key on
  * it. Limits are the institution's own (on top of each wallet's cap).

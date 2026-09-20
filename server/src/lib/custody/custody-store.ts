@@ -12,7 +12,7 @@ import type { InstitutionLimits, MemberView } from "./custody-policy.ts";
 import { isInstitutionRole, type InstitutionRole } from "./custody-roles.ts";
 
 /**
- * Task 073 — the institutional tier's reads: who belongs where, which
+ * Task 074 — the institutional tier's reads: who belongs where, which
  * wallets are the institution's, and how much they spent today. Every
  * gate and route starts here so the joins live once.
  */

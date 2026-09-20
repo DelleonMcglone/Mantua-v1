@@ -9,7 +9,7 @@ import {
   permissionsOf,
 } from "./custody-roles.ts";
 
-/** Task 073 / IC-002 — the permission matrix and the dual-control rules. */
+/** Task 074 / IC-002 — the permission matrix and the dual-control rules. */
 
 const member = (userId: string, role: (typeof INSTITUTION_ROLES)[number], status = "active") =>
   ({ userId, role, status }) as const;

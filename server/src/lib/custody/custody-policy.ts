@@ -1,7 +1,7 @@
 import { can, type InstitutionRole } from "./custody-roles.ts";
 
 /**
- * Task 073 / IC-001, IC-002 — the institution-level gates. Pure: the
+ * Task 074 / IC-001, IC-002 — the institution-level gates. Pure: the
  * callers (`custody-gate.ts` inside `checkSpendingCap`, the withdrawal
  * request path) load the rows and pass the numbers.
  *

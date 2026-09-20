@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input.tsx";
 import type { InstitutionView } from "./institution-core.ts";
 
 /**
- * Task 073 / IC-001 — a trader's withdrawal request: USDC from their
+ * Task 074 / IC-001 — a trader's withdrawal request: USDC from their
  * institutional wallet to one of the verified custody destinations. The
  * threshold line says whether a second member will have to approve.
  */

@@ -5,7 +5,7 @@ import { getCircleClient } from "./circle/client.ts";
 /**
  * The one place a Circle Developer-Controlled Wallet is minted. Shared by
  * the retail provisioner (`agent-wallet.ts`) and the institutional
- * segregation path (task 073, `custody/custody-wallet-set.ts`): the wallet
+ * segregation path (task 074, `custody/custody-wallet-set.ts`): the wallet
  * set is the caller's choice, everything else — SCA account, the pinned
  * SCA core — is the same for every wallet Mantua creates.
  */

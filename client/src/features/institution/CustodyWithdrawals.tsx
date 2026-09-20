@@ -10,7 +10,7 @@ import { post, useWithdrawals } from "./use-institution.ts";
 import { WithdrawalRequestForm } from "./WithdrawalRequestForm.tsx";
 
 /**
- * Task 073 / IC-001 — withdrawals under dual control: a trader asks for
+ * Task 074 / IC-001 — withdrawals under dual control: a trader asks for
  * USDC to go to a verified destination; a second member approves or
  * rejects when the amount reaches the threshold; the requester can cancel
  * their own pending request.

@@ -69,7 +69,7 @@ export const api = {
   delete<T>(path: string, body: unknown): Promise<T> {
     return request<T>(path, { method: "DELETE", body: JSON.stringify(body) });
   },
-  /** Task 073 — a file the API serves (CSV exports), authenticated like the rest. */
+  /** Task 074 — a file the API serves (CSV exports), authenticated like the rest. */
   async getBlob(path: string): Promise<Blob> {
     return (await send(path, { method: "GET" })).blob();
   },

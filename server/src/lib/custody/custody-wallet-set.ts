@@ -10,7 +10,7 @@ import { holdingsEmpty, walletHoldings, type WalletHoldings } from "./custody-ch
 import { membershipForUser } from "./custody-store.ts";
 
 /**
- * Task 073 / IC-001 — segregation in Circle terms (D-120). An institution
+ * Task 074 / IC-001 — segregation in Circle terms (D-120). An institution
  * owns a Circle wallet set of its own; its members' agent wallets are
  * created there, never in the retail set, so Circle's per-set controls
  * and balances scope to the institution alone.

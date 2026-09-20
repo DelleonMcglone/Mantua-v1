@@ -9,7 +9,7 @@ import { requireOpsAuth } from "../middleware/ops-auth.ts";
 import { createInstitutionSchema, money } from "./ops-institutions-schema.ts";
 
 /**
- * Task 073 / IC-002 — operator onboarding of an institution: list them,
+ * Task 074 / IC-002 — operator onboarding of an institution: list them,
  * create one with its first owner. Provisioning and limits live in
  * `ops-institutions-manage.ts`. Behind `MANTUA_OPS_KEY`.
  */

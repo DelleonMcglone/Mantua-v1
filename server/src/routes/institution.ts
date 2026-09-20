@@ -16,7 +16,7 @@ import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { allow, memberContext } from "./institution-context.ts";
 
 /**
- * Task 073 / IC-002 — the member's view of their institution and the one
+ * Task 074 / IC-002 — the member's view of their institution and the one
  * self-service write: moving their agent wallet into the institution's
  * custody wallet set (IC-001).
  */

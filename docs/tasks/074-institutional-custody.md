@@ -1,4 +1,4 @@
-# Task 073 — Institutional Custody (Phase 18, IC-001 … IC-003)
+# Task 074 — Institutional Custody (Phase 18, IC-001 … IC-003)
 
 > Numbering follows the owner's master list of 2026-09-16, refreshed
 > 2026-09-19 (`docs/tasks/mantua-v1-task-list.md`), where Phase 18 is the

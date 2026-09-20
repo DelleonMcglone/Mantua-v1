@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { spendGate, withdrawalGate, type InstitutionLimits } from "./custody-policy.ts";
 
-/** Task 073 / IC-001, IC-002 — the institution-level gates behind every money path. */
+/** Task 074 / IC-001, IC-002 — the institution-level gates behind every money path. */
 
 const INST: InstitutionLimits = {
   status: "active",

@@ -11,7 +11,7 @@ import { requireOpsAuth } from "../middleware/ops-auth.ts";
 import { money, patchInstitutionSchema } from "./ops-institutions-schema.ts";
 
 /**
- * Task 073 / IC-001, IC-002 — the operator provisions an institution's
+ * Task 074 / IC-001, IC-002 — the operator provisions an institution's
  * Circle wallet set (which activates a pending institution) and adjusts
  * its status, name and limits. Behind `MANTUA_OPS_KEY`.
  */

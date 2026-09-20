@@ -13,7 +13,7 @@ import { CircleReceiptTimeoutError } from "../circle/execute.ts";
 import { isTokenSymbol } from "../tokens.ts";
 
 /**
- * Task 073 / IC-001 — executing an approved withdrawal. One conditional
+ * Task 074 / IC-001 — executing an approved withdrawal. One conditional
  * claim (approved → executing) so a double click or a webhook race can
  * never send twice; then the same `sendFromAgentWallet` every agent send
  * uses, which the custody gate admits only for this exact claim. A

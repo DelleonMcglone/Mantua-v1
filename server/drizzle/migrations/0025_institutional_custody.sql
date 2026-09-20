@@ -1,4 +1,4 @@
--- Task 073 (Phase 18, IC-001 / IC-002) — the institutional tier. An
+-- Task 074 (Phase 18, IC-001 / IC-002) — the institutional tier. An
 -- institution is a segregated Circle wallet set (D-120); members' agent
 -- wallets are created in it, withdrawals go only to verified custody
 -- destinations under dual control, and the institution carries its own

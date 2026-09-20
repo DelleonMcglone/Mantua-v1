@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { buildStatement, csvCell, statementCsv, type StatementRow } from "./custody-statement.ts";
 
-/** Task 073 / IC-002 — the period statement's totals and its CSV. */
+/** Task 074 / IC-002 — the period statement's totals and its CSV. */
 
 const rows: StatementRow[] = [
   {

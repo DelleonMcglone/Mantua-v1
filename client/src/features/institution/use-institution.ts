@@ -3,7 +3,7 @@ import { api, ApiError } from "@/lib/api.ts";
 import type { InstitutionView, Withdrawal } from "./institution-core.ts";
 
 /**
- * Task 073 — the signed-in user's institution (`GET /api/institution`).
+ * Task 074 — the signed-in user's institution (`GET /api/institution`).
  * `"none"` when they belong to no institution (404), null while loading;
  * reloads on demand and on the app-wide refresh event.
  */

@@ -10,7 +10,7 @@ import {
 import { post } from "./use-institution.ts";
 
 /**
- * Task 073 / IC-001 — the withdrawal allowlist: the custodian's deposit
+ * Task 074 / IC-001 — the withdrawal allowlist: the custodian's deposit
  * addresses. An admin adds one (pending); a different member with the
  * right verifies it; only verified destinations can receive funds.
  */

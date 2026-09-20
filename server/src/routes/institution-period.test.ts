@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { Response } from "express";
 import { MAX_PERIOD_DAYS, parsePeriod } from "./institution-period.ts";
 
-/** Task 073 / IC-002 — the statement period is bounded and defaults sensibly. */
+/** Task 074 / IC-002 — the statement period is bounded and defaults sensibly. */
 
 function fakeRes() {
   const out: { status: number | null; body: unknown } = { status: null, body: null };

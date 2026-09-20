@@ -243,7 +243,7 @@ const schema = z.object({
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
   MANTUA_FEE_ADMIN_KEY: z.string().min(1).optional(),
-  /** Task 073 — the operator key behind `/api/ops/*` (institution onboarding).
+  /** Task 074 — the operator key behind `/api/ops/*` (institution onboarding).
    *  Sent as `Authorization: Bearer <key>`; absent → those routes are 503. */
   MANTUA_OPS_KEY: z.string().min(16).optional(),
 
@@ -317,6 +317,23 @@ const schema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
+
+  /**
+   * Phase 17 (MP-004) — comma-separated ids of the enabled paid services
+   * (see lib/x402/catalog.ts). Unset → ALL catalog services dark; set →
+   * only the listed ids serve (still behind X402_SELLER_ADDRESS).
+   */
+  X402_SELLER_SERVICES: z.string().optional(),
+
+  /** Circle Gateway facilitator URL — testnet vs mainnet (dual-rail paywall). */
+  X402_GATEWAY_FACILITATOR_URL: z.url().default("https://gateway-api.circle.com"),
+
+  /**
+   * Payer addresses allowed on the "allowlist+payment" services (the
+   * sports-intelligence pilot). Comma-separated; empty/absent keeps those
+   * services dark — fail-closed.
+   */
+  X402_SPORTS_INTEL_ALLOWLIST: z.string().optional(),
 
   /** ERC-8183 AgenticCommerce job/escrow contract. Agent-to-agent commerce
    *  tools (create/fund/settle jobs with USDC escrow) execute against it

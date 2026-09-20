@@ -3,7 +3,7 @@ import type { DB } from "../../db/client.ts";
 import { custodyWithdrawals } from "../../db/schema/institutions.ts";
 
 /**
- * Task 073 — the finalizer's stamp on a custody withdrawal. The send that
+ * Task 074 — the finalizer's stamp on a custody withdrawal. The send that
  * executes a withdrawal is a Circle `agent_send` execution; whichever
  * path finalizes it (the poll in `custody-withdrawal-exec.ts` or the
  * webhook finalizer in `circle/finalize.ts`) writes the same terminal

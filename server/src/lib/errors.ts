@@ -5,7 +5,7 @@ export type SafetyErrorCode =
   | "kill_switch_active"
   | "wrong_chain"
   | "wallet_unknown"
-  // Task 073 — the institutional custody gate (details.reason names the rule)
+  // Task 074 — the institutional custody gate (details.reason names the rule)
   | "custody_refused"
   | "custody_withdrawal_required";
 

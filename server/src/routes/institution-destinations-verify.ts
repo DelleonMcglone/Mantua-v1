@@ -10,7 +10,7 @@ import { memberContext } from "./institution-context.ts";
 import { auditDestination, destinationFor } from "./institution-destinations.ts";
 
 /**
- * Task 073 / IC-001 — the second pair of eyes on a destination: a member
+ * Task 074 / IC-001 — the second pair of eyes on a destination: a member
  * with `verify_destination` who is not the adder turns `pending` into
  * `verified`. Until then no withdrawal can go there.
  */

@@ -100,7 +100,7 @@ export async function getOrCreateAgentWallet(
   const existing = existingRows.at(0);
   if (existing) return existing;
 
-  // Task 073 — an institution's member gets a wallet in the institution's
+  // Task 074 — an institution's member gets a wallet in the institution's
   // own wallet set (D-120); everyone else in the retail set.
   const walletSetId = await walletSetForUser(db, user.id);
   const wallet = await createCircleWallet(walletSetId, blockchain);

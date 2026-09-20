@@ -2,7 +2,7 @@ import { formatUnits } from "viem";
 import type { StatementRow } from "./custody-statement.ts";
 
 /**
- * Task 073 / IC-002 — one mapper per ledger the statement draws on. Pure;
+ * Task 074 / IC-002 — one mapper per ledger the statement draws on. Pure;
  * the shapes are the minimal slices of the Drizzle rows so the tests need
  * no database. Dollars are numbers rounded to cents; USDC raw is 6 dp.
  */

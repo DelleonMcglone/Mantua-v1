@@ -10,7 +10,7 @@ import { membershipForUser, roleOf, type Membership } from "../lib/custody/custo
 import { resolveUserId } from "../lib/sports/strategy-store.ts";
 
 /**
- * Task 073 — the member context every `/api/institution/*` handler starts
+ * Task 074 — the member context every `/api/institution/*` handler starts
  * from: the caller's user id, their membership and role, and one place the
  * permission check answers 403. A retail user gets 404 `NOT_MEMBER`; a
  * removed member 403 `MEMBER_INACTIVE`.

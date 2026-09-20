@@ -13,7 +13,7 @@ import {
 import { institutionWallets } from "./custody-store.ts";
 
 /**
- * Task 073 / IC-001 — reconciliation, the IO half: for every member
+ * Task 074 / IC-001 — reconciliation, the IO half: for every member
  * wallet, the USDC balance Circle reports for the wallet id against the
  * chain's `balanceOf` for its address. A failed read on either side is
  * `unavailable` for that wallet; a Circle client that cannot be built at

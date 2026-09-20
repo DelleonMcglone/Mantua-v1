@@ -16,7 +16,7 @@ import {
 } from "./institution-withdrawal-respond.ts";
 
 /**
- * Task 073 / IC-001 — the decision on a pending withdrawal (approve or
+ * Task 074 / IC-001 — the decision on a pending withdrawal (approve or
  * reject, by a second member) and the requester's own cancellation.
  */
 
