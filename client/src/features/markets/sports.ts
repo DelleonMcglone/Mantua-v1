@@ -42,6 +42,10 @@ export interface Sport {
    *  from), when one exists; otherwise the sport's glyph (`icon`) is the
    *  mark. `icon` is also the fallback if the image fails to load. */
   logo?: string;
+  /** Variant for the dark theme, for marks that are mostly black and would
+   *  otherwise disappear against it (the NASCAR wordmark, the Karate Combat
+   *  square). Omitted when `logo` reads on both surfaces. */
+  logoDark?: string;
   icon: ComponentType<{ className?: string }>;
   /** `launch` leagues are the covered set — their slates are ingested and
    *  their markets open. `soon` sports are listed, selectable, and land on
@@ -119,6 +123,7 @@ export const SPORTS: Sport[] = [
     label: "Karate Combat",
     blurb: "Coming soon.",
     logo: `${OWN_LOGOS}/karate-combat.png`,
+    logoDark: `${OWN_LOGOS}/karate-combat-dark.png`,
     icon: KarateCombatIcon,
     coverage: "soon",
   },
@@ -127,6 +132,7 @@ export const SPORTS: Sport[] = [
     label: "NASCAR",
     blurb: "Coming soon.",
     logo: `${OWN_LOGOS}/nascar.png`,
+    logoDark: `${OWN_LOGOS}/nascar-dark.png`,
     icon: HockeyIcon,
     coverage: "soon",
   },
