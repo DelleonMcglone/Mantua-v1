@@ -99,9 +99,23 @@ export const SPORTS: Sport[] = [
     icon: HockeyIcon,
     coverage: "soon",
   },
-  // College: the football and the basketball are the marks.
-  { id: "ncaaf", label: "NCAAF", blurb: "Coming soon.", icon: FootballIcon, coverage: "soon" },
-  { id: "ncaab", label: "NCAAB", blurb: "Coming soon.", icon: BasketballIcon, coverage: "soon" },
+  // College: the owner supplied a football and a basketball as the marks.
+  {
+    id: "ncaaf",
+    label: "NCAAF",
+    blurb: "Coming soon.",
+    logo: `${OWN_LOGOS}/ncaaf.png`,
+    icon: FootballIcon,
+    coverage: "soon",
+  },
+  {
+    id: "ncaab",
+    label: "NCAAB",
+    blurb: "Coming soon.",
+    logo: `${OWN_LOGOS}/ncaab.png`,
+    icon: BasketballIcon,
+    coverage: "soon",
+  },
   {
     id: "ufc",
     label: "UFC",
