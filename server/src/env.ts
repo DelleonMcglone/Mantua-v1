@@ -115,9 +115,10 @@ const schema = z.object({
    *  ACTIVE and default for the chain — the DCW transaction API has no
    *  sponsorship argument — so consuming this id means: stamping it onto
    *  every transaction as Circle's refId (sponsorship.ts), refusing an
-   *  unsponsored create in production, and asserting here (UUID shape; the
-   *  issue list below) that sponsorship was configured deliberately rather
-   *  than discovering an unsponsored wallet as a mystery timeout. */
+   *  unsponsored create in production, and asserting here (UUID shape) that
+   *  a configured value is well-formed. Its ABSENCE only warns at boot
+   *  (circleDegradations) — the agent is refused at transaction time, which
+   *  is the guard that matters, and the read surface stays up. */
   CIRCLE_GAS_STATION_POLICY_ID: z.uuid().optional(),
 
   /** Local-testing only: point the Circle SDK at a stub server (for
@@ -433,17 +434,34 @@ export function circleCredentialIssues(e: Env): string[] {
       "CIRCLE_WALLET_SET_ID is unset: each cold start would mint a NEW wallet set, scattering user wallets outside the Gas Station policy bound to the intended set. Create one, then pin its id.",
     );
   }
-  if (!e.CIRCLE_GAS_STATION_POLICY_ID) {
-    issues.push(
-      "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored, so they fail on an SCA wallet holding no ETH — and surface as an opaque timeout. In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base (transactions use only the network's default policy) — then record its id.",
-    );
-  }
   if (/^TEST_API_KEY:/i.test(e.CIRCLE_API_KEY ?? "")) {
     issues.push(
       "CIRCLE_API_KEY is a TEST key — the agent would be operating on testnet while the rest of the app is on Base Mainnet. Use a LIVE key.",
     );
   }
   return issues;
+}
+
+/**
+ * Circle settings whose absence DEGRADES the agent without endangering the
+ * rest of the platform, so they warn at boot in every environment instead
+ * of failing it.
+ *
+ * Gas Station is the only one today. Without a policy id the agent cannot
+ * transact — but that is already enforced where it matters: `sponsorship.ts`
+ * throws `SponsorshipNotConfiguredError` in production rather than creating
+ * an unsponsored transaction that would die as an opaque timeout. Failing
+ * the boot as well took the ENTIRE API down (markets, prices, the analyst,
+ * support, the whole read surface) over a setting only the agent needs.
+ * Owner decision 2026-09-20, with Circle's console gating Gas Station behind
+ * an account-verification step; the runtime refusal is the real guard.
+ */
+export function circleDegradations(e: Env): string[] {
+  if (!e.CIRCLE_API_KEY || !e.CIRCLE_ENTITY_SECRET) return [];
+  if (e.CIRCLE_GAS_STATION_POLICY_ID) return [];
+  return [
+    "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored and are REFUSED in production (sponsorship.ts) rather than failing as an opaque timeout. Every other surface — markets, prices, research, support — runs normally. In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base (transactions use only the network's default policy), then record its id.",
+  ];
 }
 
 /**
@@ -479,6 +497,11 @@ export function loadEnv(): Env {
     console.error("Invalid environment configuration:");
     console.error(z.treeifyError(parsed.error));
     process.exit(1);
+  }
+  const degradations = circleDegradations(parsed.data);
+  if (degradations.length > 0) {
+    console.warn("Configuration warnings:");
+    for (const issue of degradations) console.warn(`  - ${issue}`);
   }
   const issues = [
     ...circleCredentialIssues(parsed.data),
