@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
-import { TokenIcon } from "@/features/swap/TokenIcon.tsx";
+import { TokenIcon } from "@/features/portfolio/TokenIcon.tsx";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 
 /**

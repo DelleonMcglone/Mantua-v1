@@ -9,7 +9,7 @@
  *
  * Exit code 0 = usable, 1 = something needs fixing.
  */
-import { env, circleCredentialIssues } from "../env.ts";
+import { env, circleCredentialIssues, circleDegradations } from "../env.ts";
 import {
   getCircleClient,
   getAgentWalletSetId,
@@ -28,6 +28,9 @@ const ok = (m: string) => {
 };
 const bad = (m: string) => {
   console.log(`  ✗ ${m}`);
+};
+const warn = (m: string) => {
+  console.log(`  ! ${m}`);
 };
 
 async function main(): Promise<number> {
@@ -63,6 +66,9 @@ async function main(): Promise<number> {
     bad(issue);
     failed = true;
   }
+  // Degradations are real gaps, but they don't fail the boot or this check:
+  // the agent is refused at transaction time, everything else keeps working.
+  for (const issue of circleDegradations(env)) warn(issue);
 
   console.log("\nLive checks");
   // C-017 — captured for the Gas Station section: a policy can only sponsor

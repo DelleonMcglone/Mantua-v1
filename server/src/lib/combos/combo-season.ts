@@ -11,7 +11,7 @@ import type { LeagueSlug } from "../sports/provider.ts";
  */
 
 export const SEASON_CACHE_MS = 5 * 60_000;
-export const LAUNCH_LEAGUE_SLUGS: readonly LeagueSlug[] = ["nfl", "wnba"];
+export const LAUNCH_LEAGUE_SLUGS: readonly LeagueSlug[] = ["nfl"];
 
 async function postseasonIds(league: LeagueSlug): Promise<string[]> {
   return sharedCache.getOrCompute(`combo-season:${league}`, SEASON_CACHE_MS, async () => {

@@ -17,8 +17,6 @@ import { join, relative } from "node:path";
 const ROOT = join(import.meta.dirname, "..", "..");
 const SCAN_DIRS = ["features", "components/shell", "components/ui"];
 const ALLOWLIST = new Set([
-  // Bridge destinations are other chains by definition; their explorers are named.
-  "features/bridge/bridge-chains.ts",
   // The deposit surface names the network the user must send on (sanctioned carve-out, DepositCard).
   "features/portfolio/DepositCard.tsx",
 ]);

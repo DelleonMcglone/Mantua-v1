@@ -17,9 +17,11 @@ export interface AnalyzeQuery {
  * those fall through to `null` and get answered conversationally too.
  */
 export function resolveAnalyzeQuestion(text: string): AnalyzeQuery | null {
-  const intent = detectIntent(text);
-  if (intent && intent.kind === "analyze" && intent.topic) {
-    return { topic: intent.topic, ...(intent.symbol ? { symbol: intent.symbol } : {}) };
-  }
+  // The deterministic topics were the crypto-market runners (token prices,
+  // pegs, stablecoin leaderboards) — out of scope since 2026-09-16. Every
+  // typed question is a sports research question now, so the thread always
+  // answers conversationally. `detectIntent` is kept in the seam so a typed
+  // topic can be routed again without touching the panel.
+  void detectIntent(text);
   return null;
 }

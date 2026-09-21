@@ -56,7 +56,7 @@ export const MAX_CONNECTIONS = 200;
  *  always sees data at most one tick old. */
 const READ_CACHE_MS = 2_000;
 
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 function isLeague(value: unknown): value is LeagueSlug {
   return typeof value === "string" && (LEAGUES as readonly string[]).includes(value);

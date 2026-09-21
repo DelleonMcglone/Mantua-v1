@@ -1,4 +1,5 @@
 import { Card } from "@/components/shell/Card.tsx";
+import { LeagueLogo } from "@/components/shell/LeagueLogo.tsx";
 import { Freshness } from "./Freshness.tsx";
 import { SPORTS, type Sport } from "./sports.ts";
 import { SlateList } from "./SlateList.tsx";
@@ -29,19 +30,17 @@ function todayRange(): string {
 }
 
 /**
- * B5-001 — the home board: today's games across the covered leagues, as
- * matchup cards. Each league is fetched with an explicit today-only window
- * rather than the provider default, because ESPN's default NFL scoreboard
- * is the current schedule week — midweek that is mostly finished games.
- * Scoped to `coverage: "launch"` leagues only; the rest sit in the nav as
- * Coming Soon. Browsing is open to everyone — the login gate guards
+ * B5-001 — the home board: today's games in the covered league (NFL), as
+ * matchup cards. Fetched with an explicit today-only window rather than
+ * the provider default, because the default NFL scoreboard is the current
+ * schedule week — midweek that is mostly finished games. Scoped to
+ * `coverage: "launch"` leagues only. Browsing is open to everyone — the login gate guards
  * transactions, not this view (B5-007).
  */
 export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardProps) {
   // Phase 7 / R-001 — one live stream (one connection) carries every
   // launch league; each card reads its league out of the shared state.
-  const today = useSlate(todayRange());
-  const states: Partial<Record<string, SlateState>> = { wnba: today, nfl: today };
+  const today: SlateState = useSlate(todayRange());
   const launchSports = SPORTS.filter((s) => s.coverage === "launch");
 
   const handleAnalyze = (event: SlateEvent, sport: Sport) => {
@@ -54,9 +53,8 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
   return (
     <>
       {launchSports.map((sport) => {
-        const Icon = sport.icon;
-        const state = states[sport.id];
-        const slate = state?.slates[sport.id];
+        const state = today;
+        const slate = state.slates[sport.id];
         return (
           <Card key={sport.id}>
             <button
@@ -67,7 +65,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
               className="mb-3 flex w-full items-center gap-2 bg-transparent p-0 text-left cursor-pointer group"
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-accent/15 text-accent">
-                <Icon className="h-4 w-4" />
+                <LeagueLogo league={sport} className="h-5 w-5" />
               </span>
               <span className="text-[14px] font-semibold group-hover:text-accent transition-colors">
                 {sport.label}
@@ -77,7 +75,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
               </span>
             </button>
             {slate && <Freshness source={slate} className="mb-2" />}
-            {state?.error && !slate ? (
+            {state.error && !slate ? (
               <div className="rounded-md border border-border-soft px-4 py-6 text-center text-[12.5px] text-text-dim">
                 Couldn&apos;t reach the scores service. Retrying automatically.
               </div>
@@ -85,7 +83,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
               <SlateList
                 sport={sport}
                 slate={slate}
-                loading={state?.loading ?? true}
+                loading={state.loading}
                 onAnalyze={handleAnalyze}
                 onTrade={(event, s) => {
                   onTrade(s, event.providerEventId);
@@ -99,7 +97,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
         <button
           type="button"
           onClick={onDiscover}
-          className="md:col-span-2 rounded-md border border-dashed border-border-soft px-4 py-2.5 text-[13px] font-medium text-text-dim transition-colors hover:border-accent hover:text-text cursor-pointer"
+          className="rounded-md border border-dashed border-border-soft px-4 py-2.5 text-[13px] font-medium text-text-dim transition-colors hover:border-accent hover:text-text cursor-pointer"
         >
           Browse all markets — filter by league, team, time, liquidity →
         </button>

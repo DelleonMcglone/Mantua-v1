@@ -15,7 +15,7 @@ export const sportsSlateRouter = Router();
 // no page load reaches a provider. Freshness is explicit: `dataAsOf` is the
 // last ingest time and `delayed` flips when it is stale, so old data renders
 // labeled as old instead of masquerading as live (or blanking the board).
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 /** Shorter than the ingest cadence by an order of magnitude; the stream's
  *  own 2 s L1 sits in front of this for connected clients. */

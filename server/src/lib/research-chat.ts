@@ -41,14 +41,14 @@ const TOOLS: Anthropic.Tool[] = [
   {
     name: "get_sports_slate",
     description:
-      "Games for Mantua's covered leagues (NFL, WNBA) from the canonical database: matchup, start time, live/final status, scores, and implied home-win probability in bps (liveOdds true = on-chain pool price). delayed:true with dataAsOf means the copy is stale — say how old. Free and read-only. Use for any question about a game, team, matchup, or sports market.",
+      "Games for Mantua's covered league (NFL) from the canonical database: matchup, start time, live/final status, scores, and implied home-win probability in bps (liveOdds true = on-chain pool price). delayed:true with dataAsOf means the copy is stale — say how old. Free and read-only. Use for any question about a game, team, matchup, or sports market.",
     input_schema: {
       type: "object",
       properties: {
         league: {
           type: "string",
-          enum: ["nfl", "wnba"],
-          description: "Restrict to one league; omit for both.",
+          enum: ["nfl"],
+          description: "The covered league (NFL).",
         },
       },
     },
@@ -146,8 +146,7 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
       // canonical DB → agent), never a provider per-request. `dataAsOf` and
       // `delayed` surface ingest staleness; live pool odds overlay on top.
       const requested = input["league"];
-      const leagues: LeagueSlug[] =
-        requested === "nfl" || requested === "wnba" ? [requested] : ["nfl", "wnba"];
+      const leagues: LeagueSlug[] = requested === "nfl" ? [requested] : ["nfl"];
       const slates = await Promise.all(
         leagues.map(async (league) => withLiveOdds(await readCanonicalPublicSlate(db, league))),
       );

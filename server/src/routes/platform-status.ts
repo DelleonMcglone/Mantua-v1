@@ -8,6 +8,7 @@ import {
 } from "../lib/platform-status.ts";
 import { activeBreakerState } from "../lib/sports/active-provider.ts";
 import { readLeagueFeedInputs } from "../lib/sports/store.ts";
+import type { LeagueSlug } from "../lib/sports/provider.ts";
 import { killSwitchEngaged } from "../middleware/kill-switch.ts";
 import { rpcHealthSnapshot } from "../lib/rpc-client.ts";
 
@@ -18,9 +19,17 @@ import { rpcHealthSnapshot } from "../lib/rpc-client.ts";
  *  game-time fan-out of clients. */
 export const STATUS_CACHE_MS = 5_000;
 
+/** The covered leagues (NFL only). A league still in the canonical tables
+ *  but no longer covered must not degrade the platform status — its feed
+ *  is not ingested any more, so it is stale by design. */
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
+
 export function defaultPlatformStatusDeps(): PlatformStatusDeps {
   return {
-    readFeeds: () => readLeagueFeedInputs(db),
+    readFeeds: async () =>
+      (await readLeagueFeedInputs(db)).filter((f) =>
+        (LEAGUES as readonly string[]).includes(f.league),
+      ),
     readKillSwitch: killSwitchEngaged,
     readBreakers: activeBreakerState,
     readRpcHealth: () => {

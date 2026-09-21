@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { launchApp } from "../harness.ts";
 import { mockMobileApi } from "./fixtures-mobile.ts";
-import { INLINE_TARGET_PX, TOUCH_TARGET_PX } from "../../src/lib/mobile.ts";
+import { TOUCH_TARGET_PX } from "../../src/lib/mobile.ts";
 
 /**
  * MX-001 — sport switching and market discovery on a phone: a league is
@@ -30,10 +30,11 @@ test("switching sport is one tap on the league page, and every chip is a touch t
   for (const chip of await chips.getByRole("button").all()) {
     expect((await chip.boundingBox())?.height).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
   }
-  await chips.locator("[data-sport-chip='wnba']").click();
-  await expect(page.getByRole("heading", { name: "WNBA" })).toBeVisible();
-  await expect(chips.locator("[data-sport-chip='wnba']")).toHaveAttribute("aria-current", "page");
-  await expect(chips.locator("[data-sport-chip='mlb']")).toBeDisabled();
+  // Every listed league is a chip; NFL is live, the rest open the
+  // coming-soon page rather than a market.
+  await expect(chips.getByRole("button")).toHaveCount(12);
+  await chips.locator("[data-sport-chip='nba']").click();
+  await expect(page.getByRole("heading", { name: "NBA — coming soon" })).toBeVisible();
 });
 
 test("all markets are one tap from home, and the dock's mic and send are 44 px", async ({
@@ -54,9 +55,6 @@ test("all markets are one tap from home, and the dock's mic and send are 44 px",
     const box = await page.getByRole("button", { name }).boundingBox();
     expect(box?.width, name).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
     expect(box?.height, name).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
-  }
-  for (const chip of await page.getByLabel("Quick actions").getByRole("button").all()) {
-    expect((await chip.boundingBox())?.height).toBeGreaterThanOrEqual(INLINE_TARGET_PX - 8);
   }
   // No horizontal overflow at any phone width.
   const overflow = await page.evaluate(

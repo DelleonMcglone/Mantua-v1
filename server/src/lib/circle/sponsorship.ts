@@ -13,8 +13,10 @@
  * So consuming the operator's CIRCLE_GAS_STATION_POLICY_ID means three
  * things, mirroring the C-016 pattern for CIRCLE_WALLET_SET_ID:
  *
- *   1. Boot — env.ts requires the id to be a UUID and production exits
- *      when it is unset (circleCredentialIssues); non-production warns.
+ *   1. Boot — env.ts requires a configured id to be a UUID, and WARNS in
+ *      every environment when it is unset (circleDegradations). It does not
+ *      fail the boot: the whole read surface would go down for a setting
+ *      only the agent needs, and step 2 already refuses the transaction.
  *   2. Runtime — the executors stamp the policy id onto every transaction
  *      via `refId` (the audit link from a Circle transaction back to the
  *      policy that sponsored it), and production refuses to create a

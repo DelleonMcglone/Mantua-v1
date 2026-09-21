@@ -19,7 +19,7 @@ import {
 export const strategiesRouter = Router();
 
 const espn = new EspnProvider();
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 interface MarketCandidate {
   marketId: `0x${string}`;

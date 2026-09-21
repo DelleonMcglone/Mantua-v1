@@ -73,3 +73,37 @@ export function SoccerIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** Boxing — a pair of gloves, the requested mark (no league logo on the CDN). */
+export function BoxingGlovesIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      {/* left glove */}
+      <path d="M3.2 6.2A3 3 0 0 1 6.2 3.2h2.3a3.5 3.5 0 0 1 3.4 2.7l.6 2.8a3.6 3.6 0 0 1-1.1 3.5l-.3.3v2.1H5.6a2.4 2.4 0 0 1-2.4-2.4V6.2Zm1.6 0v6a.8.8 0 0 0 .8.8h4V11a2 2 0 0 0 .5-1.4l-.5-2.4a1.9 1.9 0 0 0-1.9-1.6H6.2a1.4 1.4 0 0 0-1.4 1.4Z" />
+      <path d="M5.4 15.3h5.7v2.3a1.2 1.2 0 0 1-1.2 1.2H6.6a1.2 1.2 0 0 1-1.2-1.2v-2.3Z" />
+      {/* right glove */}
+      <path d="M20.8 8.6a3 3 0 0 0-3-3h-2.3a3.5 3.5 0 0 0-3.4 2.7l-.6 2.8a3.6 3.6 0 0 0 1.1 3.5l.3.3v2.1h5.5a2.4 2.4 0 0 0 2.4-2.4V8.6Zm-1.6 0v6a.8.8 0 0 1-.8.8h-4v-2a2 2 0 0 1-.5-1.4l.5-2.4a1.9 1.9 0 0 1 1.9-1.6h1.5a1.4 1.4 0 0 1 1.4 1.4Z" />
+      <path d="M12.9 17.7h5.7V20a1.2 1.2 0 0 1-1.2 1.2h-3.3a1.2 1.2 0 0 1-1.2-1.2v-2.3Z" />
+    </svg>
+  );
+}
+
+/** Karate Combat — a "KC" roundel: the promotion has no mark on the CDN. */
+export function KarateCombatIcon({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8" />
+      <text
+        x="12"
+        y="15.6"
+        textAnchor="middle"
+        fontSize="9.5"
+        fontWeight="800"
+        fontFamily="Inter, system-ui, sans-serif"
+        fill="currentColor"
+      >
+        KC
+      </text>
+    </svg>
+  );
+}

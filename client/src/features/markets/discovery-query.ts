@@ -5,7 +5,7 @@
  */
 import type { DiscoverFilters, DiscoverSort, DiscoverStatus, DiscoverWindow } from "./discovery.ts";
 
-const LEAGUES = ["wnba", "nba", "nfl", "mlb", "nhl", "soccer"] as const;
+const LEAGUES = ["nfl"] as const;
 
 /**
  * Natural-language discovery → filters. Recognises league names, "today" /

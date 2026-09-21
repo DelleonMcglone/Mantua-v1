@@ -17,7 +17,7 @@ import { runGameEventAlerts, runPositionAlerts } from "../lib/push/live-alerts-r
 
 export const cronLiveSyncRouter = Router();
 
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 /**
  * GET /api/cron/live-sync — Phase 7 / R-005: the game-time ingest tick.

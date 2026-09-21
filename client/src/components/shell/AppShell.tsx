@@ -4,6 +4,7 @@ import { Header } from "./Header.tsx";
 import { PanelLoading } from "./PanelLoading.tsx";
 import type { NavDestination } from "./MarketNav.tsx";
 import type { HomePromptId } from "./HomeMenu.tsx";
+import type { SportId } from "@/features/markets/sports.ts";
 
 interface AppShellProps {
   walletAddress?: string | undefined;
@@ -20,6 +21,8 @@ interface AppShellProps {
   /** Quick-action handler for the mobile nav sheet, forwarded to the
    *  header (B-014). */
   onQuickAction?: ((id: HomePromptId) => void) | undefined;
+  /** The league page currently open (highlighted in the league bar). */
+  activeSport?: SportId | null | undefined;
   left: ReactNode;
   right: ReactNode;
   /** When set, replaces the two-column grid with a full-width page
@@ -27,6 +30,11 @@ interface AppShellProps {
   full?: ReactNode | undefined;
   /** Persistent chat dock, rendered at the bottom of every page. */
   dock?: ReactNode | undefined;
+  /** Page footer (the home page only). Rendered BELOW the dock: the page
+   *  scrolls as a whole, the dock sticks to the bottom of the viewport
+   *  while the content is in view, and the footer follows once the user
+   *  scrolls past the end of the page. */
+  footer?: ReactNode | undefined;
 }
 
 /**
@@ -45,10 +53,12 @@ export function AppShell({
   onLogoClick,
   onNavigate,
   onQuickAction,
+  activeSport,
   left,
   right,
   full,
   dock,
+  footer,
 }: AppShellProps) {
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text">
@@ -62,12 +72,15 @@ export function AppShell({
         onLogoClick={onLogoClick}
         onNavigate={onNavigate}
         onQuickAction={onQuickAction}
+        activeSport={activeSport}
       />
       {/* Phase 7 / R-005 — the platform status banner: rendered only while
           degraded, paused, unreachable or offline. */}
       <StatusBanner className="px-4 pt-3 md:px-8" />
       {full ? (
-        <main className="flex-1 min-h-0 overflow-auto">
+        // With a footer the document scrolls (so the footer can sit under
+        // the sticky dock); otherwise the page owns its scroll region.
+        <main className={footer ? "flex-1" : "flex-1 min-h-0 overflow-auto"}>
           <Suspense fallback={<PanelLoading />}>{full}</Suspense>
         </main>
       ) : (
@@ -105,7 +118,12 @@ export function AppShell({
           </div>
         </main>
       )}
-      {dock && <div className="shrink-0 bg-bg">{dock}</div>}
+      {dock && (
+        <div className={footer ? "sticky bottom-0 z-20 shrink-0 bg-bg" : "shrink-0 bg-bg"}>
+          {dock}
+        </div>
+      )}
+      {footer}
     </div>
   );
 }

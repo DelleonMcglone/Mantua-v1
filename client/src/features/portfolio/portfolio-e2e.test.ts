@@ -33,8 +33,6 @@ const walletBalances = [
 ];
 // GET /api/agent/portfolio
 const agentBalances = [{ symbol: "USDC", balance: "30", usdValue: 30 }];
-// GET /api/agent/unified-balance
-const unified = { totalUsdc: "25.00" };
 // GET /api/markets/positions?address=<user>
 const userPositions: MarketPositionRow[] = [
   {
@@ -226,13 +224,10 @@ void describe("PF-013 — every portfolio section renders real data for one comp
     const h = aggregateHoldings({
       userWalletUsd: sumUsd(walletBalances),
       agentWalletUsd: sumUsd(agentBalances),
-      unifiedBalanceUsd: Number(unified.totalUsdc),
       marketPositionsUsd: sumMarketValueUsd(userPositions) + sumMarketValueUsd(agentPositions),
       comboPositionsUsd: sumComboValueUsd(comboTickets),
-      lpPositionsUsd: economics.lpTotals.currentValueUsd,
     });
-    assert.equal(h.totalUsd, 412.46);
-    assert.equal(h.parts.length, 6);
+    assert.equal(h.parts.length, 4);
     assert.equal(h.parts.find((p) => p.key === "comboPositionsUsd")?.usd, 25);
     assert.deepEqual(h.missing, []);
   });

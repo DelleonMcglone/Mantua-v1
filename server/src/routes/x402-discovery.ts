@@ -28,7 +28,7 @@ import {
  */
 
 /** The covered leagues — the same allowlist the free discover read serves. */
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 const leagueSchema = z.custom<LeagueSlug>((v) =>
   (LEAGUES as readonly string[]).includes(v as string),

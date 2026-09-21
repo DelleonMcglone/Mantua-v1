@@ -26,7 +26,7 @@ import { parseDates } from "./sports-slate.ts";
 
 export const cronResolutionRouter = Router();
 
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 /**
  * D-104 — settlement reads the SAME canonical provider routing as every

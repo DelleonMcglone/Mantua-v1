@@ -12,7 +12,7 @@ import { datesToRangeMs, parseDates } from "./sports-slate.ts";
 export const marketDiscoverRouter = Router();
 
 /** The covered leagues — the same allowlist the slate route serves. */
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 function isLeague(value: unknown): value is LeagueSlug {
   return typeof value === "string" && (LEAGUES as readonly string[]).includes(value);

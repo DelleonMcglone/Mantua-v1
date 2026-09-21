@@ -16,7 +16,7 @@ import { requireCronSecret } from "../middleware/cron-auth.ts";
 export const cronStrategiesRouter = Router();
 
 const espn = new EspnProvider();
-const LEAGUES: readonly LeagueSlug[] = ["nfl", "wnba"];
+const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
 /**
  * GET /api/cron/strategies — B9-005's evaluation + execution tick.

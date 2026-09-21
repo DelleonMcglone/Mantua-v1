@@ -167,7 +167,7 @@ void describe("GET /api/stream/live (R-001 wire protocol)", () => {
     assert.ok(snapshot, "first data frame is the snapshot");
     assert.equal(snapshot.id, "1");
     const snap = snapshot.data as { leagues: Record<string, PublicSlate>; status: PlatformStatus };
-    assert.deepEqual(Object.keys(snap.leagues).sort(), ["nfl", "wnba"]);
+    assert.deepEqual(Object.keys(snap.leagues).sort(), ["nfl"]);
     assert.equal(snap.leagues["nfl"].events[0]?.homeScore, 7);
     assert.equal(snap.status.mode, "live");
 
