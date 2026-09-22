@@ -36,10 +36,16 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
 process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
+// R-008's sanctioned per-IP bypass: every journey below drives the write
+// routes from 127.0.0.1, which the 20/min writeRateLimiter would refuse.
+// Unset in production there is no bypass at all (see middleware/rate-limit).
+process.env.LOAD_TEST_SECRET ??= "market-trade-e2e";
 
 const { createMarketTradeRouter } = await import("./market-trade.ts");
 const { createMarketFillsRouter } = await import("./market-fills.ts");
 const { SafetyError } = await import("../lib/errors.ts");
+const { POOL_SWAP_TEST_ABI } = await import("../lib/v4-contracts.ts");
+const { encodeFunctionData } = await import("viem");
 
 type SpendGuardIo = import("../lib/spending-cap.ts").SpendGuardIo;
 type BuiltMarketTrade = import("../lib/sports/market-trade-build.ts").BuiltMarketTrade;
@@ -50,9 +56,38 @@ const WALLET = "0x00000000000000000000000000000000000000aa";
 const SWAP_ROUTER = "0x00000000000000000000000000000000000000f1";
 const MARKET_ID: `0x${string}` = `0x${"11".repeat(32)}`;
 const TX = `0x${"c".repeat(64)}`;
+const REVERTED_TX = `0x${"d".repeat(64)}`;
+/** The pool this market trades in: YES sorts below USDC, so YES is currency0. */
+const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+const YES = "0x00000000000000000000000000000000000000e2" as const;
+const HOOK = "0x00000000000000000000000000000000000000e3" as const;
+
+/**
+ * C-024 — the bytes a wallet actually signs for one of our swaps, encoded
+ * through the SAME ABI the builder uses. `side: "buy"` spends USDC (the
+ * collateral, currency1, so not zeroForOne); `side: "sell"` spends YES.
+ * Exact-input is the negative `amountSpecified` v4-core expects.
+ */
+function signedSwapCalldata(side: "buy" | "sell", amountInRaw: bigint): `0x${string}` {
+  return encodeFunctionData({
+    abi: POOL_SWAP_TEST_ABI,
+    functionName: "swap",
+    args: [
+      { currency0: YES, currency1: USDC, fee: 0, tickSpacing: 60, hooks: HOOK },
+      {
+        zeroForOne: side === "sell",
+        amountSpecified: -amountInRaw,
+        sqrtPriceLimitX96: 79_228_162_514_264_337_593_543_950_336n,
+      },
+      { takeClaims: false, settleUsingBurn: false },
+      "0x",
+    ],
+  });
+}
 
 const servers: Server[] = [];
 const activityEntries: import("../lib/activity.ts").ActivityInput[] = [];
+const activityKeys = new Set<string>();
 after(() => {
   for (const s of servers) s.close();
 });
@@ -60,7 +95,12 @@ after(() => {
 // ─── Seam fakes ─────────────────────────────────────────────────────────────
 
 /** Running daily ledger: check enforces against what record accumulated. */
-function makeLedger(capUsd: number): { io: SpendGuardIo; calls: string[]; spent: () => number } {
+function makeLedger(capUsd: number): {
+  io: SpendGuardIo;
+  release: MarketFillsDeps["releaseIntent"];
+  calls: string[];
+  spent: () => number;
+} {
   const calls: string[] = [];
   let spent = 0;
   const io: SpendGuardIo = {
@@ -83,7 +123,13 @@ function makeLedger(capUsd: number): { io: SpendGuardIo; calls: string[]; spent:
       return Promise.resolve();
     },
   };
-  return { io, calls, spent: () => spent };
+  // C-015/C-024 — the reversal side of the same ledger, floored at zero.
+  const release: MarketFillsDeps["releaseIntent"] = (_address, usd) => {
+    calls.push(`release:${String(usd)}`);
+    spent = Math.max(0, spent - usd);
+    return Promise.resolve();
+  };
+  return { io, release, calls, spent: () => spent };
 }
 
 /** The builder: 1 YES per 0.5 USDC, calldata targeting our swap router. */
@@ -130,15 +176,20 @@ const build: BuildMarketTrade = (args) => {
 };
 
 /** The chain after the wallet signed: one mined tx per hash we "sent". */
+interface MinedTx {
+  to: `0x${string}`;
+  from: `0x${string}`;
+  status: "success" | "reverted";
+  /** The calldata the wallet signed — what C-024 prices a release from. */
+  input?: `0x${string}`;
+}
+
 function makeChain(): {
-  mined: Map<string, { to: `0x${string}`; from: `0x${string}`; status: "success" | "reverted" }>;
+  mined: Map<string, MinedTx>;
   rpc: MarketFillsDeps["rpc"];
   reads: () => number;
 } {
-  const mined = new Map<
-    string,
-    { to: `0x${string}`; from: `0x${string}`; status: "success" | "reverted" }
-  >();
+  const mined = new Map<string, MinedTx>();
   let reads = 0;
   const rpc: MarketFillsDeps["rpc"] = () => ({
     getTransactionReceipt: ({ hash }) => {
@@ -150,7 +201,7 @@ function makeChain(): {
     getTransaction: ({ hash }) => {
       const tx = mined.get(hash.toLowerCase());
       if (!tx) return Promise.reject(new Error("tx not found"));
-      return Promise.resolve({ to: tx.to, from: tx.from });
+      return Promise.resolve({ to: tx.to, from: tx.from, input: tx.input ?? "0x" });
     },
   });
   return { mined, rpc, reads: () => reads };
@@ -200,10 +251,21 @@ function serve(capUsd: number) {
       insertFill: fills.insertFill,
       recordArtifacts: fills.recordArtifacts,
       // Task 062 / PF-021 — "execute user trade → activity appears".
+      // C-024 leans on this table's UNIQUE (tx_hash, kind): the real
+      // `recordActivity` returns the row on first insert and null on a
+      // conflict, which is what makes a release exactly-once. The fake
+      // reproduces that, or the replay assertion would prove nothing.
       recordActivity: (_db, input) => {
         activityEntries.push(input);
-        return Promise.resolve(null);
+        const key = `${input.txHash ?? ""}:${input.kind}`;
+        if (activityKeys.has(key)) return Promise.resolve(null);
+        activityKeys.add(key);
+        return Promise.resolve({
+          id: key,
+        } as unknown as import("../db/schema/activity.ts").Activity);
       },
+      collateralFor: () => USDC,
+      releaseIntent: ledger.release,
     }),
   );
   const origin = new Promise<string>((resolve) => {
@@ -224,7 +286,10 @@ async function postJson(
 ): Promise<{ status: number; body: Record<string, unknown> }> {
   const res = await fetch(`${origin}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-mantua-load-test": process.env.LOAD_TEST_SECRET ?? "",
+    },
     body: JSON.stringify(body),
   });
   return { status: res.status, body: (await res.json()) as Record<string, unknown> };
@@ -426,5 +491,125 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
       assert.equal(buys[0]?.actor, "user");
       assert.equal(buys[0]?.status ?? "completed", "completed");
     });
+  });
+
+  /**
+   * C-024 — the same journey, but the chain REVERTS the trade.
+   *
+   * The intent was inked at calldata issuance and no money moved, so the
+   * headroom has to come back. Two things are load-bearing and both are
+   * asserted here: the released amount is decoded from the bytes the wallet
+   * signed (the client's inflated `usdcRaw` is ignored), and the release
+   * happens exactly once however many times the failure is reported.
+   */
+  void it("a reverted buy releases its intent once, priced from the signed calldata not the report", async () => {
+    const { origin: originP, ledger, chain, fills } = serve(100);
+    const origin = await originP;
+
+    // Commit at 60 USDC — the only ink in this journey.
+    const cd = await postJson(origin, "/api/markets/trade/calldata", tradeBody("buy", "60000000"));
+    assert.equal(cd.status, 200);
+    const calldata = cd.body as { marketId: string };
+    assert.equal(ledger.spent(), 60, "the intent is held while the tx is in flight");
+
+    // The wallet signs our calldata; the chain mines it REVERTED.
+    chain.mined.set(REVERTED_TX, {
+      to: SWAP_ROUTER,
+      from: WALLET,
+      status: "reverted",
+      input: signedSwapCalldata("buy", 60_000_000n),
+    });
+
+    // The client reports the failure and claims ten times the size.
+    const failure = {
+      chainId: 8453,
+      txHash: REVERTED_TX,
+      marketId: calldata.marketId,
+      direction: "buy",
+      tokensRaw: "120000000",
+      usdcRaw: "600000000",
+    };
+    const first = await postJson(origin, "/api/markets/fills", failure);
+    assert.equal(first.status, 422);
+    assert.equal(first.body["code"], "TX_FAILED");
+    assert.equal(first.body["intentReleased"], true);
+    assert.equal(
+      ledger.calls.at(-1),
+      "release:60",
+      "released what the signed calldata says, not the 600 the report claimed",
+    );
+    assert.equal(ledger.spent(), 0, "the headroom is back");
+    assert.equal(fills.rows.length, 0, "a reverted trade is not a fill");
+
+    // Replay the same failure: the activity spine's unique key blocks it.
+    const replay = await postJson(origin, "/api/markets/fills", failure);
+    assert.equal(replay.status, 422);
+    assert.equal(replay.body["intentReleased"], false, "a replay releases nothing");
+    assert.equal(ledger.spent(), 0, "and cannot drive the ledger negative");
+    assert.equal(
+      ledger.calls.filter((c) => c.startsWith("release:")).length,
+      1,
+      "exactly one release for one reverted trade",
+    );
+  });
+
+  /** A reverted SELL reserved no cap, so there is nothing to give back —
+   *  releasing one would mint headroom out of thin air. */
+  void it("a reverted sell releases nothing", async () => {
+    const { origin: originP, ledger, chain } = serve(100);
+    const origin = await originP;
+
+    const cd = await postJson(origin, "/api/markets/trade/calldata", tradeBody("buy", "40000000"));
+    assert.equal(cd.status, 200);
+    assert.equal(ledger.spent(), 40);
+
+    const sellTx = `0x${"e".repeat(64)}`;
+    chain.mined.set(sellTx, {
+      to: SWAP_ROUTER,
+      from: WALLET,
+      status: "reverted",
+      input: signedSwapCalldata("sell", 80_000_000n),
+    });
+    const res = await postJson(origin, "/api/markets/fills", {
+      chainId: 8453,
+      txHash: sellTx,
+      marketId: MARKET_ID,
+      direction: "sell",
+      tokensRaw: "80000000",
+      usdcRaw: "40000000",
+    });
+    assert.equal(res.status, 422);
+    assert.equal(res.body["intentReleased"], false);
+    assert.equal(ledger.spent(), 40, "the buy's intent is untouched by a reverted sell");
+  });
+
+  /** A reverted transaction to somebody else's contract must never reach the
+   *  release path, whatever it claims to be. */
+  void it("a reverted transaction to another contract is rejected before any release", async () => {
+    const { origin: originP, ledger, chain } = serve(100);
+    const origin = await originP;
+
+    const cd = await postJson(origin, "/api/markets/trade/calldata", tradeBody("buy", "30000000"));
+    assert.equal(cd.status, 200);
+    assert.equal(ledger.spent(), 30);
+
+    const foreignTx = `0x${"f".repeat(64)}`;
+    chain.mined.set(foreignTx, {
+      to: "0x00000000000000000000000000000000000000bb",
+      from: WALLET,
+      status: "reverted",
+      input: signedSwapCalldata("buy", 30_000_000n),
+    });
+    const res = await postJson(origin, "/api/markets/fills", {
+      chainId: 8453,
+      txHash: foreignTx,
+      marketId: MARKET_ID,
+      direction: "buy",
+      tokensRaw: "60000000",
+      usdcRaw: "30000000",
+    });
+    assert.equal(res.status, 422);
+    assert.equal(res.body["code"], "WRONG_TARGET", "target is checked before the receipt status");
+    assert.equal(ledger.spent(), 30, "no release for a transaction that is not ours");
   });
 });

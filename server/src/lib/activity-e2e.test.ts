@@ -104,7 +104,7 @@ after(() => {
 function serveFills(): Promise<string> {
   const rpc: MarketFillsDeps["rpc"] = () => ({
     getTransactionReceipt: () => Promise.resolve({ status: "success", logs: [] }),
-    getTransaction: () => Promise.resolve({ to: ROUTER, from: USER_WALLET }),
+    getTransaction: () => Promise.resolve({ to: ROUTER, from: USER_WALLET, input: "0x" as const }),
   });
   const app = express();
   app.use(express.json());
