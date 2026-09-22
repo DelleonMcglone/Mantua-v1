@@ -6,6 +6,7 @@ import { GamesList } from "./GamesList.tsx";
 import { LeagueHeader } from "./LeagueHeader.tsx";
 import { LiveGlance } from "./live/LiveGlance.tsx";
 import { MarketDetail } from "./detail/MarketDetail.tsx";
+import { isWithinLocalWindow } from "./local-window.ts";
 import { getSport, type SportId } from "./sports.ts";
 import { TradeSheet } from "./ticket/TradeSheet.tsx";
 import { TradeTicket } from "./ticket/TradeTicket.tsx";
@@ -65,7 +66,15 @@ export function LeaguePage({
   const [sheetOpen, setSheetOpen] = useState(() => Boolean(initialEventId ?? initialTeam));
 
   const slate = slates[active.id];
-  const events = useMemo(() => slate?.events ?? [], [slate]);
+  // week.dates over-fetches (a UTC-day-padded superset — local-window.ts);
+  // filter back down to the real local week the picker shows.
+  const events = useMemo(
+    () =>
+      (slate?.events ?? []).filter((e) =>
+        isWithinLocalWindow(e.startsAt, week.start, week.endExclusive),
+      ),
+    [slate, week],
+  );
 
   const effective = useMemo<Selection | null>(
     () => selection ?? defaultSelection(events, { initialEventId, initialSide, initialTeam }),

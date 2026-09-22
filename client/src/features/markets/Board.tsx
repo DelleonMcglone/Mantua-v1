@@ -1,5 +1,6 @@
 import { Card } from "@/components/shell/Card.tsx";
 import { LeagueLogo } from "@/components/shell/LeagueLogo.tsx";
+import { isWithinLocalWindow, localDayWindow, paddedDatesRange } from "./local-window.ts";
 import { Freshness } from "./Freshness.tsx";
 import { SPORTS, type Sport } from "./sports.ts";
 import { SlateList } from "./SlateList.tsx";
@@ -17,18 +18,6 @@ interface BoardProps {
   onDiscover?: (() => void) | undefined;
 }
 
-function ymd(d: Date): string {
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${String(d.getFullYear())}${m}${day}`;
-}
-
-/** Today as a single-day slate window. */
-function todayRange(): string {
-  const t = ymd(new Date());
-  return `${t}-${t}`;
-}
-
 /**
  * B5-001 — the home board: today's games in the covered league (NFL), as
  * matchup cards. Fetched with an explicit today-only window rather than
@@ -36,11 +25,19 @@ function todayRange(): string {
  * schedule week — midweek that is mostly finished games. Scoped to
  * `coverage: "launch"` leagues only. Browsing is open to everyone — the login gate guards
  * transactions, not this view (B5-007).
+ *
+ * The server's `?dates=` window is UTC calendar days (parseYmd); "today"
+ * has to mean the VIEWER's local day. The request is padded a day on
+ * each side (a superset in any timezone — see local-window.ts) and the
+ * response is filtered back down to the real local day before it renders,
+ * so an evening game never falls off the board and a late game from
+ * yesterday never leaks onto it.
  */
 export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardProps) {
+  const { start, endExclusive } = localDayWindow();
   // Phase 7 / R-001 — one live stream (one connection) carries every
   // launch league; each card reads its league out of the shared state.
-  const today: SlateState = useSlate(todayRange());
+  const today: SlateState = useSlate(paddedDatesRange(start, endExclusive));
   const launchSports = SPORTS.filter((s) => s.coverage === "launch");
 
   const handleAnalyze = (event: SlateEvent, sport: Sport) => {
@@ -54,7 +51,15 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
     <>
       {launchSports.map((sport) => {
         const state = today;
-        const slate = state.slates[sport.id];
+        const rawSlate = state.slates[sport.id];
+        const slate = rawSlate
+          ? {
+              ...rawSlate,
+              events: rawSlate.events.filter((e) =>
+                isWithinLocalWindow(e.startsAt, start, endExclusive),
+              ),
+            }
+          : undefined;
         return (
           <Card key={sport.id}>
             <button
