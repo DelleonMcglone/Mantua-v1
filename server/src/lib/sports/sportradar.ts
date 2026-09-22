@@ -309,30 +309,37 @@ export function parseSportradarGame(
 }
 
 /**
- * A current-week/current-season schedule payload → events.
+ * The `games/current_week/schedule.json` payload → events.
  *
- * Shape (nfl-current-week-schedule): root `{ id, year, type, name, weeks[] }`,
- * each week `{ id, sequence, title, games[] }`. One malformed game is
- * skipped, not fatal — same slate-survival rule as ESPN's parser.
+ * Shape, VERIFIED against a live call (2026-09-22, trial key): root
+ * `{ id, year, type, name, week: { id, sequence, title, games[] } }` — a
+ * single `week` OBJECT, not a `weeks` array. The reference docs this was
+ * originally built from (nfl-current-week-schedule, cited in this file's
+ * header) read as if the endpoint returns a `weeks[]` array; the endpoint
+ * itself does not, at least not for "current week" — that plural shape may
+ * describe a different (full-season) endpoint this adapter doesn't call.
+ * The bug this correction fixes shipped for weeks undetected because the
+ * unit tests' fixture was built from the same misreading, so it validated
+ * the code against its own wrong assumption rather than the real API.
+ *
+ * One malformed game is skipped, not fatal — same slate-survival rule as
+ * ESPN's parser.
  */
 export function parseSportradarSchedule(payload: unknown, league: LeagueSlug): ProviderEvent[] {
   const root = asRecord(payload);
-  const weeks = root?.["weeks"];
-  if (!Array.isArray(weeks)) throw new ProviderShapeError("payload has no weeks array");
+  const week = asRecord(root?.["week"]);
+  const games = week?.["games"];
+  if (!Array.isArray(games)) throw new ProviderShapeError("payload has no week.games array");
   // The schedule root names the season phase (PRE | REG | PST) once for every
   // game it carries — that is the D-105 season switch's source of truth.
   const seasonType = mapSeasonType(root?.["type"]);
 
   const out: ProviderEvent[] = [];
-  for (const weekRaw of weeks) {
-    const games = asRecord(weekRaw)?.["games"];
-    if (!Array.isArray(games)) continue;
-    for (const raw of games) {
-      try {
-        out.push(parseSportradarGame(raw, league, seasonType));
-      } catch {
-        // Skip the one bad game; keep the slate.
-      }
+  for (const raw of games) {
+    try {
+      out.push(parseSportradarGame(raw, league, seasonType));
+    } catch {
+      // Skip the one bad game; keep the slate.
     }
   }
   return out;
@@ -350,9 +357,10 @@ export function parseSeasonPointer(payload: unknown): SeasonPointer | null {
   const root = asRecord(payload);
   const year = asNumber(root?.["year"]);
   const type = asString(root?.["type"]);
-  const weeks = root?.["weeks"];
-  const firstWeek = Array.isArray(weeks) ? asRecord(weeks[0]) : null;
-  const week = asNumber(firstWeek?.["sequence"]);
+  // See parseSportradarSchedule's doc comment: `week` is a single object on
+  // the real payload, not `weeks[0]`.
+  const weekObj = asRecord(root?.["week"]);
+  const week = asNumber(weekObj?.["sequence"]);
   if (year === undefined || !type || week === undefined) return null;
   return { year, type, week };
 }
@@ -580,7 +588,9 @@ export function mapSeasonType(raw: unknown): SeasonType | null {
 
 /** "5-2" / "5-2-1" from documented numeric wins/losses/ties. */
 function recordString(wins: number, losses: number, ties: number): string {
-  return ties > 0 ? `${String(wins)}-${String(losses)}-${String(ties)}` : `${String(wins)}-${String(losses)}`;
+  return ties > 0
+    ? `${String(wins)}-${String(losses)}-${String(ties)}`
+    : `${String(wins)}-${String(losses)}`;
 }
 
 /**
