@@ -14,8 +14,11 @@ import { sharedCache } from "../lib/shared-cache.ts";
 import { counters } from "../lib/metrics.ts";
 import { positionsCacheKey } from "./market-positions.ts";
 import { DEFAULT_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
-import { MARKETS_PERIPHERY_BY_CHAIN } from "../lib/markets-contracts.ts";
+import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN } from "../lib/markets-contracts.ts";
 import { DYNAMIC_MARKET_BY_CHAIN } from "../lib/v4-contracts.ts";
+import { decodeRevertedBuyAmountIn } from "../lib/sports/market-trade-revert.ts";
+import { marketTradeSpendUsd } from "../lib/sports/market-trade-build.ts";
+import { reverseSpending } from "../lib/spending-cap.ts";
 import { fillImpliedProbability } from "../lib/sports/market-metrics.ts";
 import {
   NO_FEE_TELEMETRY,
@@ -30,7 +33,7 @@ export interface FillReceiptReader {
   }): Promise<{ status: "success" | "reverted"; logs: readonly Log[] }>;
   getTransaction(args: {
     hash: `0x${string}`;
-  }): Promise<{ to: `0x${string}` | null; from: `0x${string}` }>;
+  }): Promise<{ to: `0x${string}` | null; from: `0x${string}`; input: `0x${string}` }>;
 }
 
 type NewMarketFill = typeof marketFills.$inferInsert;
@@ -57,6 +60,11 @@ export interface MarketFillsDeps {
   recordArtifacts: typeof recordFillArtifacts;
   /** Drop the wallet's cached positions after a verified fill (R-007). */
   invalidatePositions: (address: string) => Promise<void>;
+  /** C-024 — the collateral (USDC) on this chain, for proving a reverted
+   *  swap was a BUY from its calldata. Null when markets aren't deployed. */
+  collateralFor: (chainId: SupportedChainId) => `0x${string}` | null;
+  /** C-024 — give a reverted buy's intent back to the daily ledger. */
+  releaseIntent: typeof reverseSpending;
 }
 
 async function fillRowExists(txHash: string): Promise<boolean> {
@@ -122,6 +130,9 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
       overrides.invalidatePositions ??
       ((address) => sharedCache.invalidate(positionsCacheKey(address))),
     recordActivity: overrides.recordActivity ?? recordActivity,
+    collateralFor:
+      overrides.collateralFor ?? ((chainId) => MARKETS_BY_CHAIN[chainId]?.collateral ?? null),
+    releaseIntent: overrides.releaseIntent ?? reverseSpending,
   };
   const router = Router();
 
@@ -204,14 +215,29 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
           client.getTransactionReceipt({ hash: txHash as `0x${string}` }),
           client.getTransaction({ hash: txHash as `0x${string}` }),
         ]);
-        if (receipt.status !== "success") {
-          counters.inc("fill.tx_failed");
-          res.status(422).json({ error: "Transaction did not succeed", code: "TX_FAILED" });
-          return;
-        }
+        // C-024 — the target check runs BEFORE anything acts on the receipt.
+        // A release is only safe once the transaction is proven to be one of
+        // ours; checking the status first would let any reverted transaction
+        // to any contract reach the release path.
         if (tx.to?.toLowerCase() !== swapRouter.toLowerCase()) {
           counters.inc("fill.wrong_target");
           res.status(422).json({ error: "Not a market trade", code: "WRONG_TARGET" });
+          return;
+        }
+        if (receipt.status !== "success") {
+          counters.inc("fill.tx_failed");
+          // C-024 — the chain reverted it, so no money moved: give the
+          // intent back instead of holding the headroom to the UTC reset.
+          const intentReleased = await releaseRevertedIntent(deps, {
+            chainId,
+            txHash,
+            marketId,
+            tx,
+            userId: await activityUserId(db, resolveUserId, req.privyUserId),
+          });
+          res
+            .status(422)
+            .json({ error: "Transaction did not succeed", code: "TX_FAILED", intentReleased });
           return;
         }
 
@@ -289,6 +315,67 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
 }
 
 export const marketFillsRouter = createMarketFillsRouter();
+
+/**
+ * C-024 — hand back the daily-cap intent behind a market buy the chain
+ * reverted. Returns whether headroom was actually released.
+ *
+ * Two properties make this safe to expose to a caller-driven endpoint:
+ *
+ *  - **the amount is the user's own signed bytes.** `decodeRevertedBuyAmountIn`
+ *    reads it out of the transaction input and refuses anything that is not
+ *    a collateral-funded exact-input swap, so the reported `usdcRaw` — which
+ *    a caller controls — never reaches the ledger.
+ *  - **exactly once per transaction.** The activity spine carries a unique
+ *    index on (tx_hash, kind), so `recordActivity` returns a row the first
+ *    time this failure is reported and null on every replay. Claiming the
+ *    entry BEFORE releasing means a crash between the two leaves the intent
+ *    held rather than released twice: over-counting spend is safe, and
+ *    under-counting is the bug the cap exists to prevent.
+ */
+async function releaseRevertedIntent(
+  deps: MarketFillsDeps,
+  args: {
+    chainId: SupportedChainId;
+    txHash: string;
+    marketId: string;
+    tx: { from: `0x${string}`; input: `0x${string}` };
+    userId: string | null;
+  },
+): Promise<boolean> {
+  const collateral = deps.collateralFor(args.chainId);
+  if (!collateral) return false;
+  const amountIn = decodeRevertedBuyAmountIn(args.tx.input, collateral);
+  if (amountIn === null) return false;
+  const usd = marketTradeSpendUsd("buy", amountIn);
+  if (usd === null || usd <= 0) return false;
+
+  const address = args.tx.from.toLowerCase();
+  const entry = await deps.recordActivity(db, {
+    kind: "market_buy",
+    actor: "user",
+    status: "failed",
+    userId: args.userId,
+    walletAddress: address,
+    txHash: args.txHash.toLowerCase(),
+    chainId: args.chainId,
+    marketId: args.marketId,
+    asset: "YES",
+    amountRaw: amountIn.toString(),
+    valueUsd: usd,
+    data: { direction: "buy", reverted: true, releasedUsd: usd },
+  });
+  if (!entry) return false;
+
+  try {
+    await deps.releaseIntent(address, usd);
+  } catch (err) {
+    logger.warn({ err, txHash: args.txHash }, "market-fills: cap release failed");
+    return false;
+  }
+  counters.inc("fill.intent_released");
+  return true;
+}
 
 /** users.id for the authenticated caller, inserting the row on first sight
  *  (the fiat-store ensureUser pattern). */

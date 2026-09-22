@@ -39,7 +39,8 @@ function serve(recorded: Set<string>): Promise<string> {
     },
     getTransaction: ({ hash }) => {
       if (hash === UNKNOWN) return Promise.reject(new Error("TransactionNotFoundError"));
-      return Promise.resolve({ to: ROUTER, from: WALLET });
+      // The status read never decodes the input; "0x" keeps the fake honest.
+      return Promise.resolve({ to: ROUTER, from: WALLET, input: "0x" as const });
     },
   });
   const app = express();
