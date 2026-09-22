@@ -32,12 +32,15 @@ const GAME = {
   scoring: { home_points: 27, away_points: 20, periods: [] },
 };
 
+// Shape verified against a live call (2026-09-22): `week` is a single
+// object, not a `weeks` array — see parseSportradarSchedule's doc comment
+// in sportradar.ts for why the original (wrong) fixture shipped undetected.
 const SCHEDULE = {
   id: "cc4f66f4-491b-4c36-9d4d-5c5f2d7d0cd1",
   year: 2026,
   type: "REG",
   name: "REG",
-  weeks: [{ id: "w-1", sequence: 2, title: "2", games: [GAME] }],
+  week: { id: "w-1", sequence: 2, title: "2", games: [GAME] },
 };
 
 const HIERARCHY = {
@@ -328,10 +331,10 @@ void describe("parseSportradarGame / parseSportradarSchedule", () => {
     assert.equal(e.home.key, "nfl:KC");
   });
 
-  void it("walks weeks[].games[] and skips a malformed game without losing the slate", () => {
+  void it("walks week.games[] and skips a malformed game without losing the slate", () => {
     const withBad = {
       ...SCHEDULE,
-      weeks: [{ ...SCHEDULE.weeks[0], games: [GAME, { id: "no-date" }, 17] }],
+      week: { ...SCHEDULE.week, games: [GAME, { id: "no-date" }, 17] },
     };
     const events = parseSportradarSchedule(withBad, "nfl");
     assert.equal(events.length, 1);
@@ -410,7 +413,10 @@ void describe("parseSportradarPlays (041 / S-005)", () => {
   void it("keeps the epoch-ms-scale sequence verbatim — it is the append cursor", () => {
     const plays = parseSportradarPlays(PBP, "nfl");
     assert.equal(plays[1].sequence, 1698611137531);
-    assert.ok(plays[1].sequence > 2 ** 31, "sequence exceeds int4 — the 0015 bigint migration exists for this");
+    assert.ok(
+      plays[1].sequence > 2 ** 31,
+      "sequence exceeds int4 — the 0015 bigint migration exists for this",
+    );
   });
 
   void it("marks scoring plays and derives possession keys from the documented aliases", () => {
