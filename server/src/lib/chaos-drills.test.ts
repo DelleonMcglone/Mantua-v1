@@ -25,6 +25,7 @@ const { assessPlatformStatus } = await import("./platform-status.ts");
 const { evaluateAlerts } = await import("./alerts.ts");
 const { assessMarketTradability, IN_PLAY_FEED_MAX_AGE_MS } =
   await import("./sports/market-trade-build.ts");
+const { CANONICAL_FRESH_MS } = await import("./sports/public-slate.ts");
 const { RpcHealthRegistry, RPC_HOST_FAILURE_THRESHOLD } = await import("./rpc-config.ts");
 const { createKillSwitchGate } = await import("../middleware/kill-switch.ts");
 const { ResilientJson, BREAKER_THRESHOLD } = await import("./sports/resilience.ts");
@@ -101,11 +102,25 @@ void describe("R-009 chaos drills", () => {
     assert.equal(status.message, null);
     assert.deepEqual(alertIds(statusInput({ dataAsOf: lastIngest }), now), []);
 
-    // The ingest loop stops. Half-way to the threshold: still open, but the
-    // operator is warned (one more missed tick halts).
+    // The ingest loop stops. Half-way to the halt threshold: the OPERATOR
+    // is warned (one more missed tick halts) — but the feed is not yet
+    // stale enough to say so to users. CANONICAL_FRESH_MS sits ABOVE this
+    // point deliberately (see its own doc comment): the in-play cron fires
+    // every 5 minutes and drifts under load, so a public "delayed" label
+    // this early would flap on ordinary jitter, not a real outage.
     now = T0 + IN_PLAY_FEED_MAX_AGE_MS / 2 + 1_000;
     assert.equal(assessMarketTradability(gate(lastIngest), "buy", now).kind, "open");
     assert.deepEqual(alertIds(statusInput({ dataAsOf: lastIngest }), now), ["warn:feed_lag:nfl"]);
+    status = assessPlatformStatus(statusInput({ dataAsOf: lastIngest }), now);
+    assert.equal(status.mode, "live", "ops is warned privately before users see anything");
+    assert.equal(status.message, null);
+
+    // Past CANONICAL_FRESH_MS, still short of the halt: NOW users are told.
+    // Buys are still open — the public warning lands before the halt does,
+    // giving a trader real notice rather than a trade that just stops
+    // working with no explanation.
+    now = T0 + CANONICAL_FRESH_MS + 1_000;
+    assert.equal(assessMarketTradability(gate(lastIngest), "buy", now).kind, "open");
     status = assessPlatformStatus(statusInput({ dataAsOf: lastIngest }), now);
     assert.equal(status.mode, "degraded", "delayed data during play is announced before the halt");
     assert.equal(status.trading, "open");

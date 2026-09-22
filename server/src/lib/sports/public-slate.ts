@@ -123,8 +123,21 @@ export function toPublicSlate(slate: ProviderSlate): PublicSlate {
  * `delayed` (task 041). Live scores move minute-to-minute; anything the
  * ingest workers last touched more than this long ago is honestly labeled
  * delayed, with `dataAsOf` saying exactly how old it is.
+ *
+ * Deliberately MORE than one ingest interval: the in-play cron
+ * (`.github/workflows/live-sync.yml`) fires every 5 minutes, but by its
+ * own documented behavior "actual firing drifts by a few minutes under
+ * load" — GitHub Actions' scheduler has no fixed-cadence guarantee. A
+ * threshold equal to the interval means the label flips to "delayed" on
+ * ordinary drift even when ingest never missed a beat, which is exactly
+ * what was happening: the banner read "delayed" almost continuously while
+ * the feed was, in fact, current. One interval of slack (2x cadence)
+ * absorbs that drift while staying well inside `IN_PLAY_FEED_MAX_AGE_MS`
+ * (15 min, three intervals — market-trade-build.ts's P-012 buy halt), so
+ * there is still real warning room between "labeled delayed" and "buys
+ * actually halted".
  */
-export const CANONICAL_FRESH_MS = 5 * 60_000;
+export const CANONICAL_FRESH_MS = 10 * 60_000;
 
 /**
  * The canonical `events` rows as a public slate.
