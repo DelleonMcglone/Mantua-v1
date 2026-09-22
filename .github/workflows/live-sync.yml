@@ -1,20 +1,29 @@
 # Game-time ingest cadence (Phase 7 / R-005).
 #
 # Vercel Hobby only allows DAILY cron schedules, so the in-play data feed —
-# the thing the P-012 buy halt judges freshness on — is refreshed from here:
-# every 5 minutes (GitHub's minimum; actual firing drifts by a few minutes
-# under load, which is why IN_PLAY_FEED_MAX_AGE_MS is sized for two missed
-# ticks, not one). Hits the secret-guarded, read-only live-sync endpoint;
-# the heavy daily sports-sync (reclaim, reband, creation, settlement) stays
-# on the Vercel cron.
+# the thing the P-012 buy halt judges freshness on — needs an outside
+# trigger for anything finer. This used to be GitHub Actions' own
+# `schedule:` (every 5 minutes, GitHub's minimum), but that trigger proved
+# unreliable on this repo: measured against 28 scheduled runs from
+# 2026-09-18 on, actual gaps between firings ran 98–398 minutes (~3h
+# typical) against the 5-minute config — not the "drifts a few minutes
+# under load" GitHub documents, an outage in practice. GitHub's own
+# scheduler does not guarantee sub-hourly cadence; it is best-effort and,
+# on this repo, the effort was not close to enough.
+#
+# cron-job.org (or an equivalent external scheduler) is now the primary
+# trigger for this endpoint, hitting it every 5 minutes for real. `schedule:`
+# is deliberately NOT set here any more — a second, unreliable scheduler
+# racing the real one adds nothing but confusing, out-of-cadence hits.
+# `workflow_dispatch` stays so a manual run is one click away for testing
+# after a secret rotation or a deploy.
 #
 # Requires the repo Actions secret CRON_SECRET to equal the production
-# CRON_SECRET in Vercel. Until it is set, runs fail with 401 (harmless).
+# CRON_SECRET in Vercel AND the header cron-job.org sends. Until it is set,
+# runs fail with 401 (harmless).
 name: live-sync
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions: {}
