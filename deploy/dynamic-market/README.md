@@ -6,10 +6,10 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 **Spec:** [`docs/specs/dynamic-market-hook.md`](../../docs/specs/dynamic-market-hook.md)
 §37–§42.
 **Task:** B2-005.
-**Status: Base Mainnet (8453) deployment pending** — see
-`docs/tasks/v2-roadmap.md`. The runbook below is what you follow for
-that deploy; record the addresses under
-[Deployment record](#deployment-record) once it lands.
+**Status: hook stack and periphery deployed and BaseScan-verified on Base
+Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Next: wire the
+addresses into `server/src/lib/v4-contracts.ts`, then register the first
+market.
 
 **Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the
@@ -153,37 +153,49 @@ than at the first pool initialize.
 
 ## Deployment record
 
-_No Base Mainnet deployment yet._ When the deploy lands, fill in this
-table from the script logs and on-chain probes (`hook.poolManager()`,
+Deployed 2026-09-23 18:40 UTC, blocks 51699745–51699746, total gas
+6,170,342 (0.0000349 ETH at 0.00566 gwei). Periphery 20:22 UTC, block
+51702795, gas 13,539,743 (0.0000756 ETH). Filled in from the script logs and on-chain probes (`hook.poolManager()`,
 `hook.registry()`, code sizes) — trust the script's own logs over
 Foundry's receipt banner, whose contract labels have been observed
 scrambled.
 
-| Field                | Value                                |
-| -------------------- | ------------------------------------ |
-| Chain                | Base Mainnet                         |
-| Chain ID             | `8453`                               |
-| RPC                  | `https://mainnet.base.org`           |
-| Explorer             | <https://basescan.org>               |
-| PoolManager          | _pending_                            |
-| PositionManager      | _pending_                            |
-| StateView            | _pending_                            |
-| V4Quoter             | _pending_                            |
-| PoolSwapTest         | _pending_                            |
-| MarketStateRegistry  | _pending_                            |
-| DynamicMarketHook    | _pending_                            |
-| Deployment salt      | _pending_                            |
-| Hook permission bits | must equal `0x28C0` (asserted in-tx) |
-| Operator             | _pending_                            |
-| Keeper               | _pending_                            |
-| Verification status  | _pending_                            |
+| Field                   | Value                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain                   | Base Mainnet                                                                                                                                                                                                   |
+| Chain ID                | `8453`                                                                                                                                                                                                         |
+| RPC                     | `https://mainnet.base.org`                                                                                                                                                                                     |
+| Explorer                | <https://basescan.org>                                                                                                                                                                                         |
+| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                   |
+| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                   |
+| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                   |
+| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                   |
+| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                   |
+| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                   |
+| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                   |
+| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                   |
+| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                   |
+| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                               |
+| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                 |
+| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                         |
+| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                   |
+| Verification status     | All 10 verified on BaseScan (2026-09-23): periphery except PositionManager by the deploy's `--verify`; PoolManager, registry, hook, and PositionManager via `deploy/dynamic-market/verify.sh` (see note below) |
 
-> **Periphery is a second step.** This script deploys the `PoolManager` only.
-> `PositionManager`, `StateView`, `V4Quoter`, and `PoolSwapTest` follow via
-> `contracts/script/DeployMarketPeriphery.s.sol` against this stack's
-> PoolManager (pass its address as `POOL_MANAGER`). Until they exist,
-> `getV4StackForHook` will throw for this hook rather than route to a
-> half-built stack.
+> **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
+> `PoolManager` only; the periphery above came from
+> `contracts/script/DeployMarketPeriphery.s.sol` against it (`POOL_MANAGER`).
+> Every periphery contract's `poolManager()` / `manager()` was checked
+> on-chain to return this stack's PoolManager.
+
+> **Verification.** `forge --verify` fails for any contract that imports
+> solmate through v4-core/v4-periphery: forge resolves the import with the
+> global `solmate/=lib/solmate/src/` remapping instead of the
+> `lib/v4-*/:solmate/=lib/solmate/` context one, drops the file from the
+> submitted sources, and BaseScan reports `Source "lib/solmate/..." not found`.
+> `verify.sh` works around it: it completes forge's standard-JSON input with
+> `fix_std_json.py` and submits to the Etherscan V2 API directly. The completed
+> inputs were compiled locally with solc 0.8.26 and match the on-chain
+> bytecode byte for byte, metadata hash included.
 
 ---
 
