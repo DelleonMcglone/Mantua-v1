@@ -6,8 +6,8 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 **Spec:** [`docs/specs/dynamic-market-hook.md`](../../docs/specs/dynamic-market-hook.md)
 §37–§42.
 **Task:** B2-005.
-**Status: hook stack and periphery deployed to Base Mainnet (8453) on
-2026-09-23** — see [Deployment record](#deployment-record). Next: wire the
+**Status: hook stack and periphery deployed and BaseScan-verified on Base
+Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Next: wire the
 addresses into `server/src/lib/v4-contracts.ts`, then register the first
 market.
 
@@ -160,26 +160,26 @@ Deployed 2026-09-23 18:40 UTC, blocks 51699745–51699746, total gas
 Foundry's receipt banner, whose contract labels have been observed
 scrambled.
 
-| Field                   | Value                                                                                                                                                                                                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chain                   | Base Mainnet                                                                                                                                                                                                                                                           |
-| Chain ID                | `8453`                                                                                                                                                                                                                                                                 |
-| RPC                     | `https://mainnet.base.org`                                                                                                                                                                                                                                             |
-| Explorer                | <https://basescan.org>                                                                                                                                                                                                                                                 |
-| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                                                           |
-| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                                                           |
-| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                                                           |
-| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                                                           |
-| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                                                           |
-| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                                                           |
-| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                                                           |
-| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                                                           |
-| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                                                                           |
-| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                                                       |
-| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                                                         |
-| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                                                 |
-| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                                                           |
-| Verification status     | Periphery except PositionManager: verified by the deploy's `--verify`. PoolManager, registry, PositionManager: verified via `deploy/dynamic-market/verify.sh` (see note below). **Hook: pending** — its submission hit BaseScan's 3 calls/sec limit; rerun `verify.sh` |
+| Field                   | Value                                                                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain                   | Base Mainnet                                                                                                                                                                                                   |
+| Chain ID                | `8453`                                                                                                                                                                                                         |
+| RPC                     | `https://mainnet.base.org`                                                                                                                                                                                     |
+| Explorer                | <https://basescan.org>                                                                                                                                                                                         |
+| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                   |
+| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                   |
+| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                   |
+| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                   |
+| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                   |
+| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                   |
+| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                   |
+| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                   |
+| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                   |
+| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                               |
+| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                 |
+| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                         |
+| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                   |
+| Verification status     | All 10 verified on BaseScan (2026-09-23): periphery except PositionManager by the deploy's `--verify`; PoolManager, registry, hook, and PositionManager via `deploy/dynamic-market/verify.sh` (see note below) |
 
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
