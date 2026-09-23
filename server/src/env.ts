@@ -326,6 +326,15 @@ const schema = z.object({
    */
   X402_SELLER_SERVICES: z.string().optional(),
 
+  /** Vanilla x402 facilitator (verifies + settles classic `exact` EIP-3009
+   *  payments) for the seller routes. Unset → the public x402.org
+   *  facilitator, which serves TESTNETS ONLY (Base Sepolia, eip155:84532) —
+   *  it rejects "exact" on Base Mainnet, so the analyst brief stays 503 dark
+   *  and the Phase 17 vanilla rail cannot settle. Set this to a facilitator
+   *  that serves eip155:8453 (no-auth HTTP facilitators only; CDP's needs
+   *  signed auth headers, which this client does not send). */
+  X402_FACILITATOR_URL: z.url().optional(),
+
   /** Circle Gateway facilitator URL — testnet vs mainnet (dual-rail paywall). */
   X402_GATEWAY_FACILITATOR_URL: z.url().default("https://gateway-api.circle.com"),
 
