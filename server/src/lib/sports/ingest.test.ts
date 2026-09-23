@@ -5,6 +5,8 @@ import {
   planCanonicalMarkets,
   planMarkets,
   planSlate,
+  NEXT_WEEK_PLAN_HORIZON_SECONDS,
+  refreshNextSlate,
   refreshSlate,
   type CanonicalPlannableEvent,
 } from "./ingest.ts";
@@ -27,9 +29,12 @@ function event(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
 
 void describe("planMarkets season switch (D-105 / H-004)", () => {
   void it("flags only postseason games for the dynamic fee", () => {
-    for (const m of planMarkets(event({ seasonType: "postseason" }), NOW)) assert.equal(m.playoffs, true);
-    for (const m of planMarkets(event({ seasonType: "regular" }), NOW)) assert.equal(m.playoffs, false);
-    for (const m of planMarkets(event({ seasonType: "preseason" }), NOW)) assert.equal(m.playoffs, false);
+    for (const m of planMarkets(event({ seasonType: "postseason" }), NOW))
+      assert.equal(m.playoffs, true);
+    for (const m of planMarkets(event({ seasonType: "regular" }), NOW))
+      assert.equal(m.playoffs, false);
+    for (const m of planMarkets(event({ seasonType: "preseason" }), NOW))
+      assert.equal(m.playoffs, false);
   });
 
   void it("defaults to the fee-free regular season when the feed says nothing", () => {
@@ -188,6 +193,54 @@ void describe("refreshSlate (B3-005)", () => {
     const result = await refreshSlate(stubProvider({ delayed: true }), "nfl", NOW);
     assert.equal(result.delayed, true);
     assert.equal(result.marketsPlanned.length, 2);
+  });
+});
+
+void describe("refreshNextSlate", () => {
+  const base: SportsDataProvider = {
+    name: "stub",
+    leagues: ["nfl"],
+    getSlate: () => Promise.reject(new Error("unused")),
+    getEvent: () => Promise.resolve(null),
+  };
+  const soon = event({ providerEventId: "thu", startsAt: NOW + 36 * 3600 });
+  const later = event({
+    providerEventId: "sun",
+    startsAt: NOW + NEXT_WEEK_PLAN_HORIZON_SECONDS + 1,
+  });
+  const nextSlate = (events: ProviderEvent[]) => ({
+    ...base,
+    getNextSlate: (league: LeagueSlug) =>
+      Promise.resolve({ provider: "stub", league, events, delayed: false, fetchedAt: 0 }),
+  });
+
+  void it("persists every next-week game but plans only those inside the horizon", async () => {
+    const r = await refreshNextSlate(nextSlate([soon, later]), "nfl", NOW);
+    assert.ok(r);
+    assert.deepEqual(
+      r.events.map((e) => e.providerEventId),
+      ["thu", "sun"],
+    );
+    assert.deepEqual(
+      r.plannable.map((e) => e.providerEventId),
+      ["thu"],
+    );
+  });
+
+  void it("is null without the capability, off-season, or on failure — never throws", async () => {
+    assert.equal(await refreshNextSlate(base, "nfl", NOW), null);
+    assert.equal(
+      await refreshNextSlate({ ...base, getNextSlate: () => Promise.resolve(null) }, "nfl", NOW),
+      null,
+    );
+    assert.equal(
+      await refreshNextSlate(
+        { ...base, getNextSlate: () => Promise.reject(new Error("503")) },
+        "nfl",
+        NOW,
+      ),
+      null,
+    );
   });
 });
 
@@ -438,9 +491,7 @@ void describe("planTeamRecordRows (041)", () => {
 });
 
 void describe("planCanonicalMarkets (task 046 / P-002 — plan from the persisted rows)", () => {
-  function canonicalRow(
-    overrides: Partial<CanonicalPlannableEvent> = {},
-  ): CanonicalPlannableEvent {
+  function canonicalRow(overrides: Partial<CanonicalPlannableEvent> = {}): CanonicalPlannableEvent {
     return {
       providerEventId: "401671789",
       status: "scheduled",
