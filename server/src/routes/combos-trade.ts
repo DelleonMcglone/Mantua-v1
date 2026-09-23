@@ -24,6 +24,10 @@ import { openExposureUsd } from "../lib/combos/combo-store.ts";
 import { ComboDeadError, buildComboTrade, legResults } from "../lib/combos/combo-trade.ts";
 import { MAX_SLIPPAGE_BPS } from "../lib/constants.ts";
 import { SafetyError } from "../lib/errors.ts";
+import {
+  MarketHookRevertError,
+  marketHookRevertResponse,
+} from "../lib/sports/market-hook-errors.ts";
 import { logger } from "../lib/logger.ts";
 import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN } from "../lib/markets-contracts.ts";
 import { counters } from "../lib/metrics.ts";
@@ -158,7 +162,10 @@ function respondTradeError(err: unknown, res: Response): void {
     res.status(409).json({ error: err.message, code: "COMBO_DEAD" });
   else if (err instanceof MarketDataOutageError)
     res.status(503).json({ error: err.message, code: "TRADING_HALTED" });
-  else {
+  else if (err instanceof MarketHookRevertError) {
+    const { status, body } = marketHookRevertResponse(err);
+    res.status(status).json(body);
+  } else {
     logger.warn({ err }, "combos: trade failed");
     res.status(502).json({ error: "Couldn't build this combo trade", code: "QUOTE_FAILED" });
   }
