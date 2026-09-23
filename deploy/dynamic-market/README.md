@@ -7,9 +7,10 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 §37–§42.
 **Task:** B2-005.
 **Status: hook stack and periphery deployed and BaseScan-verified on Base
-Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Next: wire the
-addresses into `server/src/lib/v4-contracts.ts`, then register the first
-market.
+Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Wired into
+`server/src/lib/v4-contracts.ts` / `markets-contracts.ts` (PR #79). Next:
+deploy the settlement layer (`DeployMarkets.s.sol`), then register the
+first market.
 
 **Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the

@@ -13,10 +13,10 @@
  *    Market hook to the DM PoolManager + market periphery, never the
  *    canonical stack.
  *
- * DM/periphery config is empty on Base until the deployment lands, so the
- * hook-resolution cases inject a synthetic deployment and remove it again
- * (try/finally) — the graceful-gating case asserts the empty-config
- * behavior first.
+ * Base now carries the real DM/periphery deployment (H-009). The
+ * hook-resolution cases swap in a synthetic deployment, and the
+ * graceful-gating case removes the entry, each restoring the real config
+ * afterwards (try/finally) so test order never matters.
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -63,15 +63,31 @@ const SYNTHETIC_PERIPHERY: MarketsPeriphery = {
   positionManager: "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
 };
 
-function withSyntheticDm(run: () => void): void {
-  DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID] = SYNTHETIC_DM;
-  MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID] = SYNTHETIC_PERIPHERY;
+/** Run with Base's DM/periphery entries replaced (undefined = absent),
+ *  restoring whatever was configured before. */
+function withDmConfig(
+  dm: DynamicMarketDeployment | undefined,
+  periphery: MarketsPeriphery | undefined,
+  run: () => void,
+): void {
+  const prevDm = DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
+  const prevPeriphery = MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID];
+  const set = <T>(map: Partial<Record<number, T>>, v: T | undefined) => {
+    if (v === undefined) Reflect.deleteProperty(map, BASE_CHAIN_ID);
+    else map[BASE_CHAIN_ID] = v;
+  };
+  set(DYNAMIC_MARKET_BY_CHAIN, dm);
+  set(MARKETS_PERIPHERY_BY_CHAIN, periphery);
   try {
     run();
   } finally {
-    Reflect.deleteProperty(DYNAMIC_MARKET_BY_CHAIN, BASE_CHAIN_ID);
-    Reflect.deleteProperty(MARKETS_PERIPHERY_BY_CHAIN, BASE_CHAIN_ID);
+    set(DYNAMIC_MARKET_BY_CHAIN, prevDm);
+    set(MARKETS_PERIPHERY_BY_CHAIN, prevPeriphery);
   }
+}
+
+function withSyntheticDm(run: () => void): void {
+  withDmConfig(SYNTHETIC_DM, SYNTHETIC_PERIPHERY, run);
 }
 
 describe("resolveSwapRoute (DM-112 split)", () => {
@@ -117,29 +133,31 @@ describe("resolveSwapRoute (DM-112 split)", () => {
     assert.doesNotThrow(() => {
       assertSwapRoute("universal-router", USDC, EURC, BASE_CHAIN_ID);
     });
-    assert.throws(
-      () => {
-        assertSwapRoute("universal-router", YES_TOKEN, USDC, BASE_CHAIN_ID);
-      },
-      SwapRouteMismatchError,
-    );
-    assert.throws(
-      () => {
-        assertSwapRoute("market-pool", USDC, EURC, BASE_CHAIN_ID);
-      },
-      SwapRouteMismatchError,
-    );
+    assert.throws(() => {
+      assertSwapRoute("universal-router", YES_TOKEN, USDC, BASE_CHAIN_ID);
+    }, SwapRouteMismatchError);
+    assert.throws(() => {
+      assertSwapRoute("market-pool", USDC, EURC, BASE_CHAIN_ID);
+    }, SwapRouteMismatchError);
   });
 });
 
 describe("isMarketPoolHook", () => {
   it("is false for everything while the DM deployment is absent (graceful gating)", () => {
-    assert.equal(DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID], undefined);
+    withDmConfig(undefined, undefined, () => {
+      assert.equal(isMarketPoolHook(DM_HOOK, BASE_CHAIN_ID), false);
+      assert.equal(
+        isMarketPoolHook("0x0000000000000000000000000000000000000000", BASE_CHAIN_ID),
+        false,
+      );
+    });
+  });
+
+  it("recognizes the deployed Base Mainnet DM hook", () => {
+    const dm = DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
+    assert.ok(dm);
+    assert.equal(isMarketPoolHook(dm.hook, BASE_CHAIN_ID), true);
     assert.equal(isMarketPoolHook(DM_HOOK, BASE_CHAIN_ID), false);
-    assert.equal(
-      isMarketPoolHook("0x0000000000000000000000000000000000000000", BASE_CHAIN_ID),
-      false,
-    );
   });
 
   it("recognizes the DM hook (case-insensitively) once deployed, and nothing else", () => {

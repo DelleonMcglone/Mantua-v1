@@ -1,14 +1,15 @@
 import { parseAbi } from "viem";
-import { type SupportedChainId } from "./chains.ts";
+import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 
 /**
  * Sports-market settlement layer (MarketFactory + Resolver) and the
  * market-pool v4 periphery, per chain.
  *
- * Base Mainnet deployment pending — see docs/tasks/v2-roadmap.md. Until
- * the contracts are deployed on 8453 the per-chain maps below are empty
- * and every consumer degrades gracefully (market creation/resolution and
- * on-chain market reads are skipped when the deployment is absent).
+ * Base Mainnet: the market-pool periphery is deployed (2026-09-23, H-009);
+ * the settlement layer (MarketFactory + Resolver) is not yet, so
+ * MARKETS_BY_CHAIN stays empty and every consumer degrades gracefully
+ * (market creation/resolution and on-chain market reads are skipped while
+ * the settlement deployment is absent).
  */
 
 export interface MarketsDeployment {
@@ -26,14 +27,26 @@ export interface MarketsPeriphery {
   positionManager: `0x${string}`;
 }
 
-/** Per-chain markets settlement layer. Base Mainnet deployment pending. */
+/** Per-chain markets settlement layer. Base Mainnet deployment pending
+ *  (contracts/script/DeployMarkets.s.sol). */
 export const MARKETS_BY_CHAIN: Partial<Record<SupportedChainId, MarketsDeployment>> = {};
 
 /**
  * Per-chain market-pool periphery (the Dynamic Market PoolManager's
- * routers/lens). Base Mainnet deployment pending.
+ * routers/lens). Base Mainnet: DeployMarketPeriphery.s.sol against the DM
+ * PoolManager, 2026-09-23 — each contract's poolManager()/manager() was
+ * checked on-chain to return it.
  */
-export const MARKETS_PERIPHERY_BY_CHAIN: Partial<Record<SupportedChainId, MarketsPeriphery>> = {};
+export const MARKETS_PERIPHERY_BY_CHAIN: Partial<Record<SupportedChainId, MarketsPeriphery>> = {
+  [BASE_CHAIN_ID]: {
+    poolSwapTest: "0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF",
+    poolModifyLiquidityTest: "0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6",
+    stateView: "0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF",
+    quoter: "0x1791972C76a8Bcb9da83E50B9435612590a0102f",
+    positionDescriptor: "0x6A8Ce701aB14a2909F22a18063426fEE016A36da",
+    positionManager: "0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da",
+  },
+};
 
 export const MARKET_FACTORY_ABI = parseAbi([
   "function createMarketIfAbsent(bytes32 marketId, uint64 startsAt, string label) returns (address market, bool created)",

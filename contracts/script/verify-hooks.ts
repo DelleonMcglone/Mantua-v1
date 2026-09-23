@@ -7,8 +7,9 @@
  * lower 14 bits of the hook's CREATE2 address (per Uniswap v4
  * Hooks.sol).
  *
- * Mantua's hooks are not yet deployed on Base Mainnet (8453), so the
- * expected addresses come from env vars rather than being hard-coded:
+ * DynamicMarketHook is deployed on Base Mainnet (8453) and its address is
+ * the default below; the other hooks are not yet, so their expected
+ * addresses come from env vars (which also override the default):
  *
  *   STABLE_PROTECTION_HOOK_ADDRESS
  *   DYNAMIC_FEE_HOOK_ADDRESS
@@ -79,10 +80,12 @@ const HOOKS: HookConfig[] = [
   },
   {
     name: "DynamicMarketHook",
-    repo: "DelleonMcglone/Mantua-Intelligence",
-    pinnedCommit: "07f6f169fb79172c01f4a7d1dd68e9850a132ace",
+    repo: "DelleonMcglone/Mantua-v1",
+    pinnedCommit: "49fbc602569010c34c53505dd9eb427887f67ee9",
     addressEnvVar: "DYNAMIC_MARKET_HOOK_ADDRESS",
-    address: envAddress("DYNAMIC_MARKET_HOOK_ADDRESS"),
+    // Deployed 2026-09-23 (H-009); the env var still overrides.
+    address:
+      envAddress("DYNAMIC_MARKET_HOOK_ADDRESS") ?? "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
     chainId: BASE_CHAIN_ID,
     chainName: "Base",
     rpcUrl: BASE_RPC,
@@ -267,7 +270,9 @@ async function main(): Promise<void> {
 
   // Only a *configured* hook that is missing bytecode or has wrong
   // permission bits fails the run. Unconfigured (pending) hooks do not.
-  const failed = results.filter((r) => r.configured && (!r.deployed || r.permissionsMatch === false));
+  const failed = results.filter(
+    (r) => r.configured && (!r.deployed || r.permissionsMatch === false),
+  );
   if (failed.length > 0) {
     process.exitCode = 1;
   }
