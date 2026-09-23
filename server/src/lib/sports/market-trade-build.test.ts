@@ -14,7 +14,7 @@ import {
 } from "./market-trade-build.ts";
 import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { MIN_SQRT_PRICE_LIMIT, MAX_SQRT_PRICE_LIMIT } from "../v4-onchain-swap.ts";
-import { DYNAMIC_MARKET_BY_CHAIN } from "../v4-contracts.ts";
+import { MARKETS_BY_CHAIN } from "../markets-contracts.ts";
 import { BASE_CHAIN_ID } from "../chains.ts";
 
 describe("marketTradeSpendUsd (C-019 market-trade cap leg)", () => {
@@ -42,12 +42,9 @@ describe("assertUsdcCollateral (C-004 platform-currency guard)", () => {
 
   it("rejects any other collateral token", () => {
     // EURC on Base — 6dp stablecoin, but not the platform currency.
-    assert.throws(
-      () => {
-        assertUsdcCollateral(8453, "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42");
-      },
-      /canonical USDC/,
-    );
+    assert.throws(() => {
+      assertUsdcCollateral(8453, "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42");
+    }, /canonical USDC/);
   });
 });
 
@@ -178,8 +175,10 @@ describe("marketSwapSqrtPriceLimit (B7-003 — protection in the calldata)", () 
 
 describe("buildMarketTrade gating (MARKETS_BY_CHAIN empty)", () => {
   it("throws MarketsNotDeployedError — a typed gated state, not an opaque error", async () => {
-    // Precondition: no DM deployment is configured on Base in this repo state.
-    assert.equal(DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID], undefined);
+    // Precondition: the settlement layer (MarketFactory + Resolver) is not
+    // deployed on Base in this repo state — the DM hook stack alone is not
+    // enough to trade.
+    assert.equal(MARKETS_BY_CHAIN[BASE_CHAIN_ID], undefined);
     await assert.rejects(
       buildMarketTrade({
         providerEventId: "401547401",

@@ -141,8 +141,7 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
  * On Base Mainnet every Mantua hook targets the canonical PoolManager,
  * so hook pools and no-hook pools all resolve to the canonical stack.
  * The one exception is the Dynamic Market hook (sports markets), whose
- * pools route to the market periphery (DM-112) once that deployment
- * lands on mainnet.
+ * pools route to the market periphery on the DM PoolManager (DM-112).
  */
 export function getV4StackForHook(
   hookAddress: string,
@@ -595,10 +594,19 @@ export interface DynamicMarketDeployment {
 }
 
 /**
- * Per-chain Dynamic Market deployments. Base Mainnet deployment pending —
- * see docs/tasks/v2-roadmap.md; consumers degrade gracefully while the
- * entry is absent.
+ * Per-chain Dynamic Market deployments. Base Mainnet: deployed and
+ * BaseScan-verified 2026-09-23 (H-009) — record and on-chain checks in
+ * deploy/dynamic-market/README.md. Consumers still degrade gracefully on
+ * a chain with no entry.
  */
-export const DYNAMIC_MARKET_BY_CHAIN: Partial<
-  Record<SupportedChainId, DynamicMarketDeployment>
-> = {};
+export const DYNAMIC_MARKET_BY_CHAIN: Partial<Record<SupportedChainId, DynamicMarketDeployment>> = {
+  [BASE_CHAIN_ID]: {
+    poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
+    registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
+    // Low 14 bits 0x28C0 = BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY |
+    // BEFORE_SWAP | AFTER_SWAP (asserted in the deploy tx).
+    hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
+    operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+    keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+  },
+};
