@@ -8,9 +8,11 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 **Task:** B2-005.
 **Status: hook stack and periphery deployed and BaseScan-verified on Base
 Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Wired into
-`server/src/lib/v4-contracts.ts` / `markets-contracts.ts` (PR #79). Next:
-deploy the settlement layer (`DeployMarkets.s.sol`), then register the
-first market.
+`server/src/lib/v4-contracts.ts` / `markets-contracts.ts` (PR #79). The
+settlement layer is deployed and registered too (see
+[Settlement layer](#settlement-layer)). **Markets are held closed** until
+launch sign-off (G-018 audit, G-017 rehearsal): production has no
+`MARKET_SIGNER_PRIVATE_KEY`, so the sync plans markets but sends nothing.
 
 **Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the
@@ -197,6 +199,28 @@ scrambled.
 > `fix_std_json.py` and submits to the Etherscan V2 API directly. The completed
 > inputs were compiled locally with solc 0.8.26 and match the on-chain
 > bytecode byte for byte, metadata hash included.
+
+### Settlement layer
+
+`contracts/script/DeployMarkets.s.sol`, broadcast 2026-09-23 21:15 UTC,
+block 51704405 (Resolver, MarketFactory, `resolver.setFactory` in one
+broadcast; 0.0000186 ETH). Compiled with solc 0.8.35.
+
+| Field         | Value                                                             |
+| ------------- | ----------------------------------------------------------------- |
+| Resolver      | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                      |
+| MarketFactory | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                      |
+| Collateral    | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`                 |
+| Operator      | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                      |
+| Signer        | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                      |
+| On-chain      | `resolver.factory()` ↔ `factory.resolver()`, roles and collateral |
+| Verification  | MarketFactory ✅; Resolver retried by hand (BaseScan lag)         |
+
+**Opening markets** is a config change, not a deploy: set
+`MARKET_SIGNER_PRIVATE_KEY` in production to the operator's key
+(`0x4EF8…12C3` — `marketSignerWallet` refuses any other) and fund it with
+USDC for seeding (`MARKET_SEED_USDC` per market, default 10 USDC) plus ETH
+for gas. The next sync-cron run creates, registers, initializes, and seeds.
 
 ---
 

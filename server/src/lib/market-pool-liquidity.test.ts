@@ -15,7 +15,7 @@
  *     canonical stack. Pinned by injecting a fake deployment into the
  *     per-chain registries (restored in finally).
  */
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 process.env.NODE_ENV = "test";
@@ -24,18 +24,11 @@ process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
 
 const { BASE_CHAIN_ID } = await import("./chains.ts");
-const {
-  MarketLiquidityGatedError,
-  assertMarketPoolsDeployed,
-  resolveMarketPoolLiquidity,
-} = await import("./market-pool-liquidity.ts");
-const { MARKETS_PERIPHERY_BY_CHAIN } = await import("./markets-contracts.ts");
-const {
-  DYNAMIC_MARKET_BY_CHAIN,
-  DYNAMIC_FEE_FLAG,
-  getV4PositionManager,
-  getV4StackForHook,
-} = await import("./v4-contracts.ts");
+const { MarketLiquidityGatedError, assertMarketPoolsDeployed, resolveMarketPoolLiquidity } =
+  await import("./market-pool-liquidity.ts");
+const { UNDEPLOYED, overrideMarketsRegistry } = await import("./testing/markets-registry.ts");
+const { DYNAMIC_FEE_FLAG, getV4PositionManager, getV4StackForHook } =
+  await import("./v4-contracts.ts");
 const { buildAddLiquidityCalldataForKey } = await import("./v4-add-liquidity.ts");
 
 const DM_HOOK = "0x00000000000000000000000000000000000ac0de" as const;
@@ -46,34 +39,40 @@ const DM_POSITION_MANAGER = "0x2222222222222222222222222222222222222222" as cons
 const SQRT_PRICE_1_1 = 2n ** 96n;
 
 function withFakeDmDeployment<T>(fn: () => T): T {
-  DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID] = {
-    poolManager: DM_POOL_MANAGER,
-    registry: "0x3333333333333333333333333333333333333333",
-    hook: DM_HOOK,
-    operator: "0x4444444444444444444444444444444444444444",
-    keeper: "0x5555555555555555555555555555555555555555",
-  };
-  MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID] = {
-    poolSwapTest: null,
-    poolModifyLiquidityTest: null,
-    stateView: "0x6666666666666666666666666666666666666666",
-    quoter: "0x7777777777777777777777777777777777777777",
-    positionDescriptor: null,
-    positionManager: DM_POSITION_MANAGER,
-  };
+  const restore = overrideMarketsRegistry({
+    dm: {
+      poolManager: DM_POOL_MANAGER,
+      registry: "0x3333333333333333333333333333333333333333",
+      hook: DM_HOOK,
+      operator: "0x4444444444444444444444444444444444444444",
+      keeper: "0x5555555555555555555555555555555555555555",
+    },
+    periphery: {
+      poolSwapTest: null,
+      poolModifyLiquidityTest: null,
+      stateView: "0x6666666666666666666666666666666666666666",
+      quoter: "0x7777777777777777777777777777777777777777",
+      positionDescriptor: null,
+      positionManager: DM_POSITION_MANAGER,
+    },
+  });
   try {
     return fn();
   } finally {
-    // BASE_CHAIN_ID is the registries' only key — restore the empty
-    // pre-deployment state exactly.
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- test-only registry reset; the key is a compile-time constant.
-    delete DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- test-only registry reset; the key is a compile-time constant.
-    delete MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID];
+    restore();
   }
 }
 
 void describe("market-pool liquidity gating (B7-004)", () => {
+  // The gated state — Base now carries real entries, so remove them here.
+  let restore: () => void;
+  before(() => {
+    restore = overrideMarketsRegistry(UNDEPLOYED);
+  });
+  after(() => {
+    restore();
+  });
+
   void it("assertMarketPoolsDeployed throws the typed gated error while the DM stack is absent", () => {
     assert.throws(
       () => assertMarketPoolsDeployed(BASE_CHAIN_ID),

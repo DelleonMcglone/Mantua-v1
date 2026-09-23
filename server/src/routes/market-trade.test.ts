@@ -3,8 +3,8 @@
  * 050 — /api/markets/trade/quote leaves the daily ledger untouched;
  *       /api/markets/trade/calldata inks it exactly once (C-019).
  *
- * B7 edge case: with MARKETS_BY_CHAIN empty (this repo state — the Base
- * deployment is pending), a market-pool route must surface the gated
+ * B7 edge case: with MARKETS_BY_CHAIN empty (simulated for this file — Base
+ * has the real entries), a market-pool route must surface the gated
  * state as a typed response (503 MARKETS_NOT_DEPLOYED), never an opaque
  * 502. The sell direction is used so no spending-cap/DB machinery runs —
  * the request path is auth → validation → buildMarketTrade, which throws
@@ -33,6 +33,12 @@ process.env.PRIVY_APP_SECRET ??= "test-stub";
 const { marketTradeRouter, createMarketTradeRouter } = await import("./market-trade.ts");
 const { SafetyError } = await import("../lib/errors.ts");
 
+// Base carries the real market registries now; these routes are exercised
+// in the gated (undeployed) state, so remove the entries for this file and
+// put them back when it finishes.
+const { UNDEPLOYED, overrideMarketsRegistry } = await import("../lib/testing/markets-registry.ts");
+const restoreRegistry = overrideMarketsRegistry(UNDEPLOYED);
+
 type SpendGuardIo = import("../lib/spending-cap.ts").SpendGuardIo;
 type BuiltMarketTrade = import("../lib/sports/market-trade-build.ts").BuiltMarketTrade;
 type BuildMarketTrade = typeof import("../lib/sports/market-trade-build.ts").buildMarketTrade;
@@ -42,6 +48,7 @@ const WALLET = "0x00000000000000000000000000000000000000aa";
 const servers: Server[] = [];
 after(() => {
   for (const s of servers) s.close();
+  restoreRegistry();
 });
 
 function serve(withWallet: boolean, router: Router = marketTradeRouter): Promise<string> {
