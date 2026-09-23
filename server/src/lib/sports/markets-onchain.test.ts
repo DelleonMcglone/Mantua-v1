@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 import { getAddress } from "viem";
 import {
   creatableMarkets,
+  marketSignerWallet,
   planPositionSettlement,
   type SettleablePositionRow,
 } from "./markets-onchain.ts";
 import { MARKETS_BY_CHAIN } from "../markets-contracts.ts";
+import { BASE_CHAIN_ID } from "../chains.ts";
+import { env } from "../../env.ts";
 import { isAllowedTarget } from "../circle/allowed-targets.ts";
 import type { PlannedMarket } from "./ingest.ts";
 
@@ -28,8 +31,26 @@ function planned(overrides: Partial<PlannedMarket> = {}): PlannedMarket {
 }
 
 void describe("markets on-chain wiring", () => {
-  // Base Mainnet markets deployment is pending — when an entry lands in
-  // MARKETS_BY_CHAIN these assertions cover it automatically.
+  void it("registers the Base settlement layer deployed 2026-09-23", () => {
+    assert.deepEqual(MARKETS_BY_CHAIN[BASE_CHAIN_ID], {
+      factory: "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93",
+      resolver: "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281",
+      collateral: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    });
+  });
+
+  void it("opens nothing without the operator's signing key — the deployed-but-closed state", (t) => {
+    // Markets are deployed but held closed until launch sign-off by leaving
+    // MARKET_SIGNER_PRIVATE_KEY unset in production: no signer, no
+    // createMarketIfAbsent / registerPool / seed transactions.
+    if (env.MARKET_SIGNER_PRIVATE_KEY !== undefined) {
+      t.skip("MARKET_SIGNER_PRIVATE_KEY is set in this environment");
+      return;
+    }
+    assert.equal(marketSignerWallet(BASE_CHAIN_ID), null);
+  });
+
+  // Every configured settlement layer, Base's included.
   void it("configured settlement layers are checksummed, distinct, and allowlisted (B8-006)", () => {
     for (const markets of Object.values(MARKETS_BY_CHAIN)) {
       // Object.values on an interface type falls back to any[]; the cast
@@ -90,7 +111,10 @@ describe("planPositionSettlement (P-006 — the pure half of the settlement pass
       [row({ id: "y", state: "INVALID" }), row({ id: "n", side: "no", state: "INVALID" })],
       new Map(),
     );
-    assert.deepEqual(plan.marks.map((m) => m.settlementPrice), ["0.50000", "0.50000"]);
+    assert.deepEqual(
+      plan.marks.map((m) => m.settlementPrice),
+      ["0.50000", "0.50000"],
+    );
   });
 
   it("HOLDS a resolved market whose winner the log doesn't know — never guesses", () => {

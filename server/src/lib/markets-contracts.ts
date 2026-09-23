@@ -5,11 +5,12 @@ import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
  * Sports-market settlement layer (MarketFactory + Resolver) and the
  * market-pool v4 periphery, per chain.
  *
- * Base Mainnet: the market-pool periphery is deployed (2026-09-23, H-009);
- * the settlement layer (MarketFactory + Resolver) is not yet, so
- * MARKETS_BY_CHAIN stays empty and every consumer degrades gracefully
- * (market creation/resolution and on-chain market reads are skipped while
- * the settlement deployment is absent).
+ * Base Mainnet: the market-pool periphery (H-009) and the settlement layer
+ * (DeployMarkets.s.sol) are both deployed, 2026-09-23. Markets still only
+ * OPEN when the server holds the operator's signing key
+ * (`MARKET_SIGNER_PRIVATE_KEY`, see markets-onchain.ts) — without it the
+ * sync plans markets but sends nothing. Consumers keep degrading
+ * gracefully on a chain with no entry.
  */
 
 export interface MarketsDeployment {
@@ -27,9 +28,16 @@ export interface MarketsPeriphery {
   positionManager: `0x${string}`;
 }
 
-/** Per-chain markets settlement layer. Base Mainnet deployment pending
- *  (contracts/script/DeployMarkets.s.sol). */
-export const MARKETS_BY_CHAIN: Partial<Record<SupportedChainId, MarketsDeployment>> = {};
+/** Per-chain markets settlement layer (contracts/script/DeployMarkets.s.sol).
+ *  Base: checked on-chain — resolver.factory() ↔ factory.resolver(), the
+ *  resolver's operator and signer are the DM operator, collateral is USDC. */
+export const MARKETS_BY_CHAIN: Partial<Record<SupportedChainId, MarketsDeployment>> = {
+  [BASE_CHAIN_ID]: {
+    factory: "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93",
+    resolver: "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281",
+    collateral: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  },
+};
 
 /**
  * Per-chain market-pool periphery (the Dynamic Market PoolManager's

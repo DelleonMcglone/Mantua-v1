@@ -1,8 +1,8 @@
 /**
  * B7-004 — /api/liquidity/add/calldata market-pool addressing.
  *
- * With MARKETS_BY_CHAIN empty (no Dynamic Market deployment — today's
- * state), an add against a market pool must return the structured gated
+ * With MARKETS_BY_CHAIN empty (no Dynamic Market deployment — simulated
+ * here; Base has the real entries), an add against a market pool must return the structured gated
  * response (409, MARKET_POOLS_NOT_DEPLOYED, gated: true) — never succeed
  * and never fail opaquely. Same contract for the remove route's `market`
  * flag. The base-pair path stays byte-compatible (schema errors pinned).
@@ -24,9 +24,16 @@ process.env.PRIVY_APP_SECRET ??= "test-stub";
 const { liquidityAddRouter } = await import("./liquidity-add.ts");
 const { liquidityRemoveRouter } = await import("./liquidity-remove.ts");
 
+// Base carries the real market registries now; these routes are exercised
+// in the gated (undeployed) state, so remove the entries for this file and
+// put them back when it finishes.
+const { UNDEPLOYED, overrideMarketsRegistry } = await import("../lib/testing/markets-registry.ts");
+const restoreRegistry = overrideMarketsRegistry(UNDEPLOYED);
+
 const servers: Server[] = [];
 after(() => {
   for (const s of servers) s.close();
+  restoreRegistry();
 });
 
 function serve(): Promise<string> {

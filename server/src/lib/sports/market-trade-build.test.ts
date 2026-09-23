@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 
 import {
@@ -15,6 +15,7 @@ import {
 import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { MIN_SQRT_PRICE_LIMIT, MAX_SQRT_PRICE_LIMIT } from "../v4-onchain-swap.ts";
 import { MARKETS_BY_CHAIN } from "../markets-contracts.ts";
+import { overrideMarketsRegistry } from "../testing/markets-registry.ts";
 import { BASE_CHAIN_ID } from "../chains.ts";
 
 describe("marketTradeSpendUsd (C-019 market-trade cap leg)", () => {
@@ -174,10 +175,17 @@ describe("marketSwapSqrtPriceLimit (B7-003 — protection in the calldata)", () 
 // ─── B7 edge case: graceful gating with no markets deployment ───────────────
 
 describe("buildMarketTrade gating (MARKETS_BY_CHAIN empty)", () => {
+  // Only the settlement layer is removed: the real DM stack stays, which
+  // pins that the hook stack alone is not enough to trade.
+  let restore: () => void;
+  before(() => {
+    restore = overrideMarketsRegistry({ markets: undefined });
+  });
+  after(() => {
+    restore();
+  });
+
   it("throws MarketsNotDeployedError — a typed gated state, not an opaque error", async () => {
-    // Precondition: the settlement layer (MarketFactory + Resolver) is not
-    // deployed on Base in this repo state — the DM hook stack alone is not
-    // enough to trade.
     assert.equal(MARKETS_BY_CHAIN[BASE_CHAIN_ID], undefined);
     await assert.rejects(
       buildMarketTrade({
