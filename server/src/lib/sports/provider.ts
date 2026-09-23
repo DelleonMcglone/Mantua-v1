@@ -238,6 +238,13 @@ export interface SportsDataProvider {
   /** Every team in the league (hierarchy feed). */
   getTeams?(league: LeagueSlug): Promise<ProviderFeed<ProviderTeam>>;
 
+  /**
+   * The slate after `getSlate`'s — for a weekly feed, next week. Lets the
+   * daily sync see upcoming games before the provider's "current" window
+   * rolls over. Resolves null when there is no next slate (off-season).
+   */
+  getNextSlate?(league: LeagueSlug): Promise<ProviderSlate | null>;
+
   /** Full roster for one team, by the provider's team id. */
   getRoster?(league: LeagueSlug, providerTeamId: string): Promise<ProviderFeed<ProviderPlayer>>;
 
@@ -249,10 +256,7 @@ export interface SportsDataProvider {
    * Quota rule: the ingest worker calls this only for LIVE and just-finished
    * games on a bounded per-tick rotation — never per user request.
    */
-  getPlayByPlay?(
-    league: LeagueSlug,
-    providerEventId: string,
-  ): Promise<ProviderFeed<ProviderPlay>>;
+  getPlayByPlay?(league: LeagueSlug, providerEventId: string): Promise<ProviderFeed<ProviderPlay>>;
 
   /** Season standings/records across the league (task 041). */
   getStandings?(league: LeagueSlug): Promise<ProviderFeed<ProviderTeamStanding>>;

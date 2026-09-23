@@ -272,6 +272,45 @@ export async function refreshSlate(
   };
 }
 
+/** How far ahead next-week games join market planning. Covers Thursday
+ *  night from Wednesday's daily sync and Sunday from Friday's, without
+ *  seeding markets (and parking their USDC float) a week early. */
+export const NEXT_WEEK_PLAN_HORIZON_SECONDS = 48 * 3600;
+
+export interface NextSlateResult {
+  /** Every next-week game — persisted so the board shows the coming week. */
+  events: ProviderEvent[];
+  /** The subset close enough to kickoff to plan markets for. */
+  plannable: ProviderEvent[];
+}
+
+/**
+ * The provider's next slate (Sportradar: next week), best-effort. The daily
+ * sync calls this so upcoming games reach the board before the provider's
+ * "current week" rolls over. Never throws — a failure here must not cost
+ * the current-week refresh — and returns null when the provider has no
+ * next-slate capability or there is no next week.
+ */
+export async function refreshNextSlate(
+  provider: SportsDataProvider,
+  league: LeagueSlug,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): Promise<NextSlateResult | null> {
+  if (typeof provider.getNextSlate !== "function") return null;
+  try {
+    const slate = await provider.getNextSlate(league);
+    if (!slate) return null;
+    const horizon = nowSeconds + NEXT_WEEK_PLAN_HORIZON_SECONDS;
+    return {
+      events: slate.events,
+      plannable: slate.events.filter((e) => e.startsAt <= horizon),
+    };
+  } catch (err) {
+    logger.warn({ err, league, provider: provider.name }, "sports: next-week slate failed");
+    return null;
+  }
+}
+
 // ─── Per-feed freshness (S-003) ─────────────────────────────────────────────
 //
 // The `events` table already carries `last_polled_at` per row; teams and

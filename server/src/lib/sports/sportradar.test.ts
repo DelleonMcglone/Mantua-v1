@@ -7,6 +7,7 @@ import {
   mapInjuryStatus,
   mapRosterStatus,
   mapSportradarStatus,
+  nextSeasonWeek,
   parseSeasonPointer,
   parseSportradarGame,
   parseSportradarHierarchy,
@@ -588,6 +589,44 @@ void describe("SportradarProvider", () => {
     assert.equal(calls.length, 1);
   });
 
+  void it("fetches next week's schedule off the current week's pointer (REG 2 → REG 3)", async () => {
+    const WEEK_3 = {
+      ...SCHEDULE,
+      week: {
+        id: "w-3",
+        sequence: 3,
+        title: "3",
+        games: [{ ...GAME, id: "next-week-game", status: "scheduled", scoring: undefined }],
+      },
+    };
+    const { p, calls } = provider({
+      "/games/current_week/schedule.json": SCHEDULE,
+      "/games/2026/REG/3/schedule.json": WEEK_3,
+    });
+    await p.getSlate("nfl");
+    const next = await p.getNextSlate("nfl");
+    assert.ok(next);
+    assert.deepEqual(
+      next.events.map((e) => e.providerEventId),
+      ["next-week-game"],
+    );
+    // The current-week read is shared with getSlate's cache: one call each.
+    assert.equal(calls.length, 2);
+    assert.ok(calls[1].includes("/nfl/official/production/v7/en/games/2026/REG/3/schedule.json"));
+  });
+
+  void it("returns null after the Super Bowl without a second upstream call", async () => {
+    const { p, calls } = provider({
+      "/games/current_week/schedule.json": {
+        ...SCHEDULE,
+        type: "PST",
+        week: { ...SCHEDULE.week, sequence: 4 },
+      },
+    });
+    assert.equal(await p.getNextSlate("nfl"), null);
+    assert.equal(calls.length, 1);
+  });
+
   void it("reads one game from the boxscore feed", async () => {
     const { p, calls } = provider({ [`/games/${GAME.id}/boxscore.json`]: GAME });
     const e = await p.getEvent("nfl", GAME.id);
@@ -662,5 +701,18 @@ void describe("season type on schedule games (D-105)", () => {
     assert.equal("seasonType" in (parseSportradarSchedule(odd, "nfl")[0] ?? {}), false);
     assert.equal(mapSeasonType("pst"), "postseason", "case-insensitive");
     assert.equal(mapSeasonType(3), null, "numbers are ESPN's convention, not Sportradar's");
+  });
+});
+
+void describe("nextSeasonWeek", () => {
+  void it("walks the NFL calendar without guessing weeks that don't exist", () => {
+    const at = (type: string, week: number) => nextSeasonWeek({ year: 2026, type, week });
+    assert.deepEqual(at("PRE", 0), { year: 2026, type: "PRE", week: 1 });
+    assert.deepEqual(at("PRE", 3), { year: 2026, type: "REG", week: 1 });
+    assert.deepEqual(at("REG", 2), { year: 2026, type: "REG", week: 3 });
+    assert.deepEqual(at("REG", 18), { year: 2026, type: "PST", week: 1 });
+    assert.deepEqual(at("PST", 3), { year: 2026, type: "PST", week: 4 });
+    assert.equal(at("PST", 4), null);
+    assert.equal(at("???", 1), null);
   });
 });

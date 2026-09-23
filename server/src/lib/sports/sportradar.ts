@@ -353,6 +353,24 @@ export interface SeasonPointer {
   week: number;
 }
 
+/**
+ * The week after `p` on the NFL calendar, or null past the Super Bowl.
+ * Deterministic on purpose: guessing a week that doesn't exist would 404,
+ * and repeated upstream failures open the host's breaker for every feed.
+ * Sportradar numbers PRE 0 (Hall of Fame game) to 3, REG 1–18, PST 1–4
+ * (Wild Card … Super Bowl).
+ */
+export function nextSeasonWeek(p: SeasonPointer): SeasonPointer | null {
+  if (p.type === "PRE") {
+    return p.week >= 3 ? { year: p.year, type: "REG", week: 1 } : { ...p, week: p.week + 1 };
+  }
+  if (p.type === "REG") {
+    return p.week >= 18 ? { year: p.year, type: "PST", week: 1 } : { ...p, week: p.week + 1 };
+  }
+  if (p.type === "PST") return p.week >= 4 ? null : { ...p, week: p.week + 1 };
+  return null;
+}
+
 export function parseSeasonPointer(payload: unknown): SeasonPointer | null {
   const root = asRecord(payload);
   const year = asNumber(root?.["year"]);
@@ -809,6 +827,43 @@ export class SportradarProvider implements SportsDataProvider {
       league,
       events: parseSportradarSchedule(res.value, league),
       delayed: res.delayed,
+      fetchedAt: res.fetchedAt,
+    };
+  }
+
+  /**
+   * Next week's schedule. Sportradar's `current_week` does not roll over the
+   * day after Monday Night Football: on 2026-09-23 (a Wednesday) it still
+   * returned week 2, so a sync that reads only the current week leaves the
+   * board empty for the coming Thursday and Sunday and can't open their
+   * markets ahead of kickoff. Path:
+   * /games/{year}/{type}/{week}/schedule.json (nfl-weekly-schedule), keyed
+   * off the current week's season pointer. Null past the Super Bowl.
+   * Quota: one call per schedule TTL — the daily sync calls it, the
+   * five-minute live tick does not.
+   */
+  async getNextSlate(league: LeagueSlug): Promise<ProviderSlate | null> {
+    this.assertLeague(league);
+    const sched = await this.http.get<unknown>(
+      `sportradar:slate:${league}`,
+      `${this.prefix}/games/current_week/schedule.json`,
+      this.ttl.schedule,
+    );
+    const current = parseSeasonPointer(sched.value);
+    if (!current) throw new ProviderShapeError("schedule payload names no season/week");
+    const next = nextSeasonWeek(current);
+    if (!next) return null;
+
+    const res = await this.http.get<unknown>(
+      `sportradar:slate:${league}:${String(next.year)}:${next.type}:${String(next.week)}`,
+      `${this.prefix}/games/${String(next.year)}/${next.type}/${String(next.week)}/schedule.json`,
+      this.ttl.schedule,
+    );
+    return {
+      provider: this.name,
+      league,
+      events: parseSportradarSchedule(res.value, league),
+      delayed: sched.delayed || res.delayed,
       fetchedAt: res.fetchedAt,
     };
   }

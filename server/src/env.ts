@@ -491,8 +491,43 @@ export function resolutionDisputeWindowIssues(e: Env): string[] {
   ];
 }
 
+const MARKET_SIGNER_KEY = /^0x[a-fA-F0-9]{64}$/;
+
+/**
+ * A malformed `MARKET_SIGNER_PRIVATE_KEY` degrades market operations; it must
+ * not take the platform down. 2026-09-23: a bad paste into Vercel failed the
+ * schema, `loadEnv` exited, and every route 500'd — the board, scores, and
+ * status included — for a key only the market sweep reads. Absent is already
+ * a supported state (markets are planned but nothing is signed), so a value
+ * that isn't a key is treated as absent, loudly. Surrounding whitespace is
+ * the one paste artifact forgiven; anything else (missing 0x, quotes, wrong
+ * length) is dropped rather than guessed at — guessing could turn market
+ * creation on with a key nobody meant to set. The value is never logged.
+ * Exported for tests.
+ */
+export function dropMalformedSignerKey(raw: Record<string, string | undefined>): {
+  env: Record<string, string | undefined>;
+  warnings: string[];
+} {
+  const value = raw["MARKET_SIGNER_PRIVATE_KEY"];
+  if (value === undefined) return { env: raw, warnings: [] };
+  const trimmed = value.trim();
+  if (MARKET_SIGNER_KEY.test(trimmed)) {
+    return { env: { ...raw, MARKET_SIGNER_PRIVATE_KEY: trimmed }, warnings: [] };
+  }
+  return {
+    env: { ...raw, MARKET_SIGNER_PRIVATE_KEY: undefined },
+    warnings: [
+      `MARKET_SIGNER_PRIVATE_KEY is set but is not 0x + 64 hex characters (length ${String(value.length)}) — ` +
+        "ignored; market creation and settlement stay off until it is corrected.",
+    ],
+  };
+}
+
 export function loadEnv(): Env {
-  const parsed = schema.safeParse(blankEnvToUndefined(process.env));
+  const signer = dropMalformedSignerKey(blankEnvToUndefined(process.env));
+  for (const w of signer.warnings) console.warn(`Configuration warning: ${w}`);
+  const parsed = schema.safeParse(signer.env);
   if (!parsed.success) {
     console.error("Invalid environment configuration:");
     console.error(z.treeifyError(parsed.error));

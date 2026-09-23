@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
 import { activeBreakerState, providerFor } from "../lib/sports/active-provider.ts";
-import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
+import { feedFreshnessSnapshot, refreshNextSlate, refreshSlate } from "../lib/sports/ingest.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
@@ -107,6 +107,14 @@ cronSportsSyncRouter.get(
           league,
           refresh.events,
         );
+        // Next week too (Sportradar's current week rolls over late — see
+        // getNextSlate): persisted for the board, planned only inside the
+        // horizon. Best-effort; null when unavailable.
+        const next = await refreshNextSlate(provider, league, nowSeconds);
+        const nextEventsPersisted: unknown = next
+          ? await upsertEvents(db, refresh.provider, league, next.events)
+          : null;
+        const planEvents = next ? [...refresh.events, ...next.plannable] : refresh.events;
         for (const chainId of chains) {
           // Market ids are chain-distinct (market-id.ts), so each chain
           // gets its own canonical plan against the same slate fetch.
@@ -114,7 +122,7 @@ cronSportsSyncRouter.get(
             db,
             refresh.provider,
             league,
-            refresh.events,
+            planEvents,
             nowSeconds,
             chainId,
           );
@@ -156,7 +164,13 @@ cronSportsSyncRouter.get(
           playByPlay = { error: err instanceof Error ? err.message : String(err) };
         }
 
-        results[league] = { events: eventsPersisted, reference, playByPlay, chains: perChain };
+        results[league] = {
+          events: eventsPersisted,
+          nextWeekEvents: nextEventsPersisted,
+          reference,
+          playByPlay,
+          chains: perChain,
+        };
       } catch (err) {
         failures += 1;
         logger.error({ league, err }, "sports-sync: league failed");
