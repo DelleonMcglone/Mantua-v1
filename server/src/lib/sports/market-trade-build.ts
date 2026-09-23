@@ -30,6 +30,7 @@ import {
 } from "../markets-contracts.ts";
 import { planMarketPool } from "./market-pool.ts";
 import { quoteMarketFee, type MarketFeeQuote } from "./market-fee.ts";
+import { withMarketHookErrors } from "./market-hook-errors.ts";
 import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
 import { getToken } from "../tokens.ts";
 import { DEFAULT_SLIPPAGE_BPS } from "../constants.ts";
@@ -498,12 +499,16 @@ export async function buildMarketSwap(a: MarketSwapArgs): Promise<BuiltMarketTra
   // "market-pool"; a cross-over would mean the routing split broke.
   assertSwapRoute("market-pool", inputToken, outputToken, chainId);
 
-  const { result } = await client.simulateContract({
-    address: periphery.quoter,
-    abi: V4_QUOTER_ABI,
-    functionName: "quoteExactInputSingle",
-    args: [{ poolKey: plan.key, zeroForOne, exactAmount: args.amountRaw, hookData: "0x" }],
-  });
+  // T-024 — the quoter runs the hook's beforeSwap; a halt or cap revert
+  // surfaces as a typed MarketHookRevertError, not a generic quote failure.
+  const { result } = await withMarketHookErrors(() =>
+    client.simulateContract({
+      address: periphery.quoter,
+      abi: V4_QUOTER_ABI,
+      functionName: "quoteExactInputSingle",
+      args: [{ poolKey: plan.key, zeroForOne, exactAmount: args.amountRaw, hookData: "0x" }],
+    }),
+  );
   const [amountOut] = result;
 
   // B7-003 — slippage protection IN the calldata for both directions:
@@ -525,13 +530,8 @@ export async function buildMarketSwap(a: MarketSwapArgs): Promise<BuiltMarketTra
   // D-105 — the fee quote comes from the hook itself (H-012). A revert here
   // is a trade the hook would refuse (halt, size cap), surfaced before any
   // calldata is built.
-  const fee = await quoteMarketFee(
-    client,
-    dm.hook,
-    plan.key,
-    zeroForOne,
-    args.amountRaw,
-    inputIsYes,
+  const fee = await withMarketHookErrors(() =>
+    quoteMarketFee(client, dm.hook, plan.key, zeroForOne, args.amountRaw, inputIsYes),
   );
 
   const calldata = buildPoolSwapTestCalldata({

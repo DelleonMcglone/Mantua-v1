@@ -85,8 +85,8 @@ Completed:   237   (+21 partial 🟡)
 | Phase 2: Fiat Rails (Plaid + On/Off-Ramp)                  | 🔴 P0 | 9     | 3 (+6 🟡)  |
 | Phase 3: Sports Data Layer (Sportradar)                    | 🔴 P0 | 26    | 24 (+2 🟡) |
 | Phase 4: Prediction Market Protocol                        | 🔴 P0 | 14    | 14 ✅      |
-| Phase 5: Dynamic Market Hook & Fee Model                   | 🔴 P0 | 17    | 16 (+1 🟡) |
-| Phase 6: Core Trading UX (Consumer Layer)                  | 🔴 P0 | 24    | 23         |
+| Phase 5: Dynamic Market Hook & Fee Model                   | 🔴 P0 | 17    | 17 ✅      |
+| Phase 6: Core Trading UX (Consumer Layer)                  | 🔴 P0 | 24    | 24 ✅      |
 | Phase 7: Live-Sports Reliability Infrastructure            | 🔴 P0 | 11    | 7 (+4 🟡)  |
 | Phase 8: AI Agent Core (Circle Agent)                      | 🔴 P0 | 47    | 43 (+2 🟡) |
 | Phase 9: Portfolio Management + Activity                   | 🔴 P0 | 19    | 19 ✅      |
@@ -328,7 +328,7 @@ where `C` = number of contracts traded, `fee rate` = Mantua's dynamic rate cappe
 | T-021 | Clearly distinguish probability types — every probability tagged **market price / projection / agent estimate**                                                                                                                                                                                                                                                                                                                        | ✅     |
 | T-022 | Never present an agent prediction as certainty — a **"not a guarantee" note** sits under agent and analysis output                                                                                                                                                                                                                                                                                                                     | ✅     |
 | T-023 | Show data freshness — an **"Updated Ns ago" stamp** on every live-data surface                                                                                                                                                                                                                                                                                                                                                         | ✅     |
-| T-024 | Surface hook reverts distinctly in the trade ticket — they currently collapse into a generic quote error (follow-up surfaced during task 050)                                                                                                                                                                                                                                                                                          | ⬜     |
+| T-024 | Surface hook reverts distinctly in the trade ticket — the hook's `MarketPaused` / `MarketResolved` / `MarketVoided` / `MarketFrozen` / `TradeExceedsCap` / `PoolNotRegistered` now decode from both the quoter and `quoteFee` paths into distinct codes with their own ticket copy; the size-cap message names the cap                                                                                                                 | ✅     |
 
 ---
 

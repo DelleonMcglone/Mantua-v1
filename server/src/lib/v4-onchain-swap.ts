@@ -205,6 +205,19 @@ export function decodeSwapRevertReason(err: unknown): string | null {
 }
 
 /**
+ * The most specific revert payload in a failed quote/swap/read: the hook's
+ * own reason bytes when PoolManager wrapped them (`WrappedError`), else the
+ * quoter's inner payload, else the outer revert data. Null when the failure
+ * carried no revert data (transport error). Callers decode it against their
+ * own error ABI — see `market-hook-errors.ts`.
+ */
+export function mostSpecificRevertBytes(err: unknown): `0x${string}` | null {
+  const cause = err instanceof Error && err.cause ? err.cause : err;
+  const decoded = decodeQuoterRevert(cause);
+  return decoded.hookReasonHex ?? decoded.innerHex ?? decoded.outerHex;
+}
+
+/**
  * v4 sqrt price limits. Anything inside `MIN_SQRT_PRICE_LIMIT <
  * sqrtPriceX96 < MAX_SQRT_PRICE_LIMIT` is accepted; using these
  * extremes effectively disables price-impact protection at the

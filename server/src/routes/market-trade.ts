@@ -15,6 +15,10 @@ import {
 import { MAX_SLIPPAGE_BPS } from "../lib/constants.ts";
 import { isSupportedChainId } from "../lib/chains.ts";
 import { SafetyError } from "../lib/errors.ts";
+import {
+  MarketHookRevertError,
+  marketHookRevertResponse,
+} from "../lib/sports/market-hook-errors.ts";
 import { getRequestContext } from "../lib/request-context.ts";
 import { counters } from "../lib/metrics.ts";
 import {
@@ -100,6 +104,7 @@ function tradeErrorCode(err: unknown): string {
   if (err instanceof NoMarketError) return "no_market";
   if (err instanceof MarketClosedError) return "closed";
   if (err instanceof MarketDataOutageError) return "halted";
+  if (err instanceof MarketHookRevertError) return `hook_${err.reason}`;
   return "quote_failed";
 }
 
@@ -131,6 +136,13 @@ function respondTradeError(err: unknown, res: Response, wallet: string, label: s
     // temporary error; sells (exits) never reach this branch. 503
     // because the condition clears when the feed recovers.
     res.status(503).json({ error: err.message, code: "TRADING_HALTED" });
+    return;
+  }
+  if (err instanceof MarketHookRevertError) {
+    // T-024 — the hook itself refused (halt, size cap, unregistered pool):
+    // say which, instead of the generic "may lack liquidity" 502.
+    const { status, body } = marketHookRevertResponse(err);
+    res.status(status).json(body);
     return;
   }
   logger.warn({ err }, `${label}: quote failed`);

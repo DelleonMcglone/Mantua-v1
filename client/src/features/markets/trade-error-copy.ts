@@ -62,6 +62,41 @@ export const BY_CODE: Partial<Record<string, TradeErrorCopy>> = {
     title: "No market for this game yet",
     body: "Markets open as the schedule fills in. Try another game.",
   },
+  // T-024 — the market's hook refused the trade. Each halt is its own
+  // situation: a frozen or settled market is over, a paused one waits for
+  // the operator, one not yet open waits for its pool.
+  MARKET_FROZEN: {
+    kind: "closed",
+    title: "This market is closed",
+    body: "The game is over, so trading has stopped. Your positions settle once the result is confirmed.",
+  },
+  MARKET_RESOLVED: {
+    kind: "resolved",
+    title: "This market has settled",
+    body: "Trading is over. If you hold winning shares, you can redeem them from your positions.",
+  },
+  MARKET_VOIDED: {
+    kind: "voided",
+    title: "This market was cancelled",
+    body: "Trading is over. Any shares you hold can be redeemed for their refund from your positions.",
+  },
+  MARKET_PAUSED: {
+    kind: "paused",
+    title: "This market is paused",
+    body: "Trading on this game is paused for now. Nothing was placed. Check back shortly.",
+    action: RETRY,
+  },
+  MARKET_NOT_OPEN: {
+    kind: "not-open",
+    title: "This market isn't open yet",
+    body: "Trading on this game opens shortly. Try again in a few minutes.",
+    action: RETRY,
+  },
+  TRADE_EXCEEDS_CAP: {
+    kind: "size-cap",
+    title: "Too large for this market",
+    body: "This market has a per-trade limit right now. Try a smaller amount.",
+  },
   QUOTE_FAILED: {
     kind: "quote",
     title: "Couldn't price this size",
