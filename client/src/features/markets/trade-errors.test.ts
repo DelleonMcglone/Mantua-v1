@@ -32,6 +32,12 @@ test("every server code the trade route can return has owner-readable copy (T-01
     [server(401, "WALLET_REQUIRED"), /log in|wallet/i],
     [server(400, "slippage_too_high"), /moved|price/i],
     [server(400, "BAD_REQUEST"), /amount/i],
+    [server(409, "MARKET_FROZEN"), /closed|over/i],
+    [server(409, "MARKET_RESOLVED"), /settled|redeem/i],
+    [server(409, "MARKET_VOIDED"), /cancelled|refund/i],
+    [server(503, "MARKET_PAUSED"), /paused/i],
+    [server(503, "MARKET_NOT_OPEN"), /open/i],
+    [server(400, "TRADE_EXCEEDS_CAP"), /smaller|limit/i],
   ];
   for (const [err, expect] of cases) {
     const copy = describeTradeError(err);
@@ -79,4 +85,41 @@ test("copy never leaks chain vocabulary", () => {
       code,
     );
   }
+});
+
+test("hook refusals are told apart, and none reads as the generic quote failure (T-024)", () => {
+  const codes = [
+    "MARKET_FROZEN",
+    "MARKET_RESOLVED",
+    "MARKET_VOIDED",
+    "MARKET_PAUSED",
+    "MARKET_NOT_OPEN",
+    "TRADE_EXCEEDS_CAP",
+  ];
+  const generic = describeTradeError(server(502, "QUOTE_FAILED"));
+  const titles = new Set<string>();
+  for (const code of codes) {
+    const copy = describeTradeError(server(409, code));
+    assert.notEqual(copy.kind, "quote", code);
+    assert.notEqual(copy.title, generic.title, code);
+    titles.add(`${copy.kind}:${copy.title}`);
+  }
+  assert.equal(titles.size, codes.length);
+});
+
+test("a size-cap refusal names the cap from the server's details", () => {
+  class DetailedError extends ApiError {
+    readonly details: unknown;
+    constructor(details: unknown) {
+      super(400, "TRADE_EXCEEDS_CAP", "too big");
+      this.details = details;
+    }
+  }
+  const copy = describeTradeError(new DetailedError({ notional: "250000000", cap: "100000000" }));
+  assert.equal(copy.kind, "size-cap");
+  assert.match(copy.body, /\$100\.00 per trade/);
+  // Malformed details fall back to the static copy rather than "$NaN".
+  const fallback = describeTradeError(new DetailedError({ cap: "lots" }));
+  assert.equal(fallback.kind, "size-cap");
+  assert.doesNotMatch(fallback.body, /\$/);
 });

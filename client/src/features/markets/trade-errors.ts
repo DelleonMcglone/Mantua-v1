@@ -15,7 +15,11 @@ export type TradeErrorKind =
   | "cap"
   | "paused"
   | "not-deployed"
+  | "not-open"
   | "no-market"
+  | "resolved"
+  | "voided"
+  | "size-cap"
   | "quote"
   | "rate-limit"
   | "login"
@@ -33,7 +37,7 @@ export interface TradeErrorCopy {
   action?: { label: string; kind: "retry" | "fund" | "login" };
 }
 
-function isCoded(err: unknown): err is { code: string; status: number } {
+function isCoded(err: unknown): err is { code: string; status: number; details?: unknown } {
   return (
     typeof err === "object" &&
     err !== null &&
@@ -45,6 +49,10 @@ function isCoded(err: unknown): err is { code: string; status: number } {
 /** Map any thrown value from the quote/execute path to copy. */
 export function describeTradeError(err: unknown): TradeErrorCopy {
   if (isCoded(err)) {
+    if (err.code === "TRADE_EXCEEDS_CAP") {
+      const cap = capFromDetails(err.details);
+      if (cap !== null) return sizeCapError(cap);
+    }
     const known = BY_CODE[err.code];
     if (known) return known;
     if (err.status === 429) return RATE_LIMITED;
@@ -66,6 +74,24 @@ export function describeTradeError(err: unknown): TradeErrorCopy {
     body: "Something went wrong on our side. Nothing was placed. Try again in a moment.",
     action: RETRY,
   };
+}
+
+/** T-024 — the hook's per-trade size cap, named in dollars. The cap moves
+ *  with the market's state (tighter while stale or in-play), so it is read
+ *  from the server's response rather than known in advance. */
+export function sizeCapError(capRaw: bigint): TradeErrorCopy {
+  const cap = dollars(capRaw);
+  return {
+    kind: "size-cap",
+    title: "Too large for this market",
+    body: `This market takes up to ${cap} per trade right now. Try ${cap} or less.`,
+  };
+}
+
+function capFromDetails(details: unknown): bigint | null {
+  const cap = (details as { cap?: unknown } | null | undefined)?.cap;
+  if (typeof cap !== "string" || !/^\d+$/.test(cap)) return null;
+  return BigInt(cap);
 }
 
 /** The trade was mined and reverted (Phase 7 `failed`): nothing traded, nothing charged. */
