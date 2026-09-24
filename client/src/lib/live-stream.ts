@@ -10,6 +10,9 @@ import {
 import type { Slate } from "@/features/markets/use-slate.ts";
 import { isPlatformStatusWire, publishPlatformStatus } from "@/features/status/status-bus.ts";
 import type { PlatformStatusWire } from "@/features/status/connection-status-core.ts";
+import { getAccessToken } from "@privy-io/react-auth";
+import { parseBalancesFrame, parsePositionsFrame } from "@/features/portfolio/user-stream-core.ts";
+import { publishUserBalances, publishUserPositions } from "@/features/portfolio/user-stream-bus.ts";
 
 /**
  * Phase 7 / R-001 — the client for `GET /api/stream/live` (the SSE market
@@ -25,6 +28,11 @@ import type { PlatformStatusWire } from "@/features/status/connection-status-cor
  *
  * Hidden tabs disconnect and reconnect on return: a background board
  * costs the server nothing, and a returning user gets a fresh snapshot.
+ *
+ * Signed in, each attempt sends the Privy access token, and the server
+ * adds the wallet's `positions` and `balances` frames (R-001), published
+ * to the user-stream bus. The token is read per attempt, so the server's
+ * max-duration reconnect also picks up a refreshed token or a new login.
  */
 
 export type LiveStreamState =
@@ -48,6 +56,8 @@ export interface LiveStreamHandlers {
 
 export interface LiveStreamOptions {
   fetchImpl?: typeof fetch;
+  /** The bearer token for a signed-in stream; null = anonymous. */
+  getToken?: () => Promise<string | null>;
   /** Injected for tests; defaults to the document's visibility. */
   isHidden?: () => boolean;
 }
@@ -105,6 +115,7 @@ export function subscribeLive(
   options: LiveStreamOptions = {},
 ): () => void {
   const fetchImpl = options.fetchImpl ?? fetch;
+  const getToken = options.getToken ?? (() => getAccessToken().catch((): string | null => null));
   const isHidden = options.isHidden ?? (() => document.visibilityState === "hidden");
   const controller = new AbortController();
   const { signal } = controller;
@@ -149,6 +160,16 @@ export function subscribeLive(
       case "status":
         if (isPlatformStatusWire(payload)) publishPlatformStatus(payload);
         return false;
+      case "positions": {
+        const frame = parsePositionsFrame(payload);
+        if (frame) publishUserPositions(frame);
+        return false;
+      }
+      case "balances": {
+        const frame = parseBalancesFrame(payload);
+        if (frame) publishUserBalances(frame);
+        return false;
+      }
       case "end":
         return true;
       default:
@@ -176,6 +197,8 @@ export function subscribeLive(
     try {
       const headers = new Headers({ Accept: "text/event-stream" });
       if (live.lastEventId !== null) headers.set("Last-Event-ID", live.lastEventId);
+      const token = await getToken();
+      if (token) headers.set("Authorization", `Bearer ${token}`);
       const res = await fetchImpl(`${API_BASE}/api/stream/live${query(params)}`, {
         headers,
         signal: ac.signal,

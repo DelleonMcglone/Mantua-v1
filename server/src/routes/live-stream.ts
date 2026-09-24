@@ -8,6 +8,9 @@ import { readCanonicalPublicSlate } from "../lib/sports/store.ts";
 import { withLiveOdds } from "../lib/sports/live-odds.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 import { platformStatusReader } from "./platform-status.ts";
+import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
+import { readMarketPositions, type MarketPositionRow } from "../lib/sports/market-positions.ts";
+import { readWalletBalances, type UserBalance } from "../lib/user-portfolio.ts";
 import { datesToRangeMs, parseDates } from "./sports-slate.ts";
 
 /**
@@ -32,7 +35,18 @@ import { datesToRangeMs, parseDates } from "./sports-slate.ts";
  *   event: slate      data: { league, slate: PublicSlate }     — on change only
  *   event: status     data: PlatformStatus                     — on change only
  *   : heartbeat                                                — every HEARTBEAT_MS
+ *   event: positions  data: { wallet, positions: MarketPositionRow[] }  — signed-in only
+ *   event: balances   data: { wallet, chainId, balances: UserBalance[] } — signed-in only
  *   event: end        data: { reason: "max_duration" }         — then the response closes
+ *
+ * Signed-in streams (R-001): the stream stays public, but a request that
+ * carries the user's bearer token (the soft `attachAuth` resolves
+ * `req.walletAddress` from it — never from a query parameter) also gets
+ * that wallet's market positions and token balances: once right after the
+ * snapshot, then on change. Both come through the shared per-wallet caches
+ * (positions 10 s, balances 15 s) that a verified fill invalidates, so a
+ * trade shows on the next tick and N tabs cost one read per window. An
+ * anonymous stream is byte-for-byte what it was.
  *
  * Cadence: `LIVE_TICK_MS` while any served league has a game in play,
  * `IDLE_TICK_MS` otherwise. Every stream on an instance shares one read
@@ -68,6 +82,11 @@ export interface LiveStreamDeps {
     range: { fromMs: number; toMs: number } | undefined,
   ) => Promise<PublicSlate>;
   readStatus: () => Promise<PlatformStatus>;
+  /** The signed-in wallet's marked market positions (cached per wallet). */
+  readPositions: (wallet: `0x${string}`) => Promise<MarketPositionRow[]>;
+  /** The signed-in wallet's token balances on `balancesChainId` (cached). */
+  readBalances: (wallet: `0x${string}`) => Promise<UserBalance[]>;
+  balancesChainId: SupportedChainId;
   now: () => number;
   liveTickMs: number;
   idleTickMs: number;
@@ -86,6 +105,9 @@ function defaultDeps(): LiveStreamDeps {
         READ_CACHE_MS,
       ),
     readStatus: platformStatusReader,
+    readPositions: readMarketPositions,
+    readBalances: (wallet) => readWalletBalances(wallet, BASE_CHAIN_ID),
+    balancesChainId: BASE_CHAIN_ID,
     now: () => Date.now(),
     liveTickMs: LIVE_TICK_MS,
     idleTickMs: IDLE_TICK_MS,
@@ -192,18 +214,34 @@ export function createLiveStreamRouter(overrides: Partial<LiveStreamDeps> = {}):
       }
     };
 
+    // Set only by attachAuth from a verified token — the one wallet this
+    // connection may see. Null = anonymous: no user frames at all.
+    const wallet = (req.walletAddress?.toLowerCase() ?? null) as `0x${string}` | null;
+    const readUser = async <T>(what: string, read: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await read();
+      } catch (err) {
+        logger.warn({ err }, `live-stream: ${what} read failed`);
+        return null;
+      }
+    };
+
     const lastSlate = new Map<string, string>();
     let lastStatus = "";
+    let lastPositions = "";
+    let lastBalances = "";
     let anyLive = false;
 
     const tick = async (initial: boolean): Promise<void> => {
       if (gone()) return;
-      const [frames, status] = await Promise.all([
+      const [frames, status, positions, balances] = await Promise.all([
         Promise.all(leagues.map(async (l) => [l, await readLeague(l)] as const)),
         deps.readStatus().catch((err: unknown) => {
           logger.warn({ err }, "live-stream: status read failed");
           return null;
         }),
+        wallet ? readUser("positions", () => deps.readPositions(wallet)) : null,
+        wallet ? readUser("balances", () => deps.readBalances(wallet)) : null,
       ]);
       if (gone()) return;
       const nowMs = deps.now();
@@ -229,6 +267,22 @@ export function createLiveStreamRouter(overrides: Partial<LiveStreamDeps> = {}):
         if (status && statusJson !== lastStatus) {
           lastStatus = statusJson;
           send("status", status);
+        }
+      }
+      // User frames after the snapshot on the first tick, then on change. A
+      // failed read sends nothing (the client keeps its last value / poll).
+      if (wallet && positions) {
+        const json = JSON.stringify(positions);
+        if (json !== lastPositions) {
+          lastPositions = json;
+          send("positions", { wallet, positions });
+        }
+      }
+      if (wallet && balances) {
+        const json = JSON.stringify(balances);
+        if (json !== lastBalances) {
+          lastBalances = json;
+          send("balances", { wallet, chainId: deps.balancesChainId, balances });
         }
       }
       if (nowMs - startedAt >= deps.maxDurationMs) {
