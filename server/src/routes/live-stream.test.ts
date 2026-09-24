@@ -92,8 +92,16 @@ function parseFrames(text: string): Frame[] {
     });
 }
 
-function serve(overrides: Partial<LiveStreamDeps>): Promise<string> {
+/** `wallet` stands in for what the soft attachAuth resolves from a bearer
+ *  token; omitted = an anonymous stream. */
+function serve(overrides: Partial<LiveStreamDeps>, wallet?: string): Promise<string> {
   const app = express();
+  if (wallet) {
+    app.use((req, _res, next) => {
+      req.walletAddress = wallet;
+      next();
+    });
+  }
   app.use(createLiveStreamRouter(overrides));
   return new Promise((resolve) => {
     const server = app.listen(0, "127.0.0.1", () => {
@@ -287,5 +295,129 @@ void describe("slateHasLiveGame", () => {
       "not yet kicked off",
     );
     assert.equal(slateHasLiveGame(slate("nfl", 0, "final"), NOW), false);
+  });
+});
+
+// ─── R-001: positions and balances for a signed-in stream ───────────────────
+
+type PositionRow = import("../lib/sports/market-positions.ts").MarketPositionRow;
+type Balance = import("../lib/user-portfolio.ts").UserBalance;
+
+const WALLET = "0x00000000000000000000000000000000000000aa";
+
+function position(balance: string): PositionRow {
+  return {
+    marketId: "0xm",
+    outcomeIndex: 0,
+    label: "AAA to beat BBB",
+    state: "open",
+    startsAt: Math.floor(NOW / 1000),
+    side: "yes",
+    balance,
+    impliedProbBps: 5_000,
+    valueRaw: "500000",
+    league: "nfl",
+    providerEventId: "401",
+    entryPriceBps: 4_800,
+    pnlRaw: "20000",
+    potentialPayoutRaw: "1000000",
+  };
+}
+
+function usdc(raw: string): Balance {
+  return {
+    symbol: "USDC",
+    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    decimals: 6,
+    balanceRaw: raw,
+    usdValue: Number(raw) / 1e6,
+  };
+}
+
+/** The scripted world plus per-wallet readers that record who they served. */
+function userWorld() {
+  const w = world();
+  const user = {
+    yes: "1000000",
+    usdcRaw: "5000000",
+    positionReads: [] as string[],
+    failBalances: false,
+  };
+  w.deps.readPositions = (wallet) => {
+    user.positionReads.push(wallet);
+    return Promise.resolve([position(user.yes)]);
+  };
+  w.deps.readBalances = () =>
+    user.failBalances
+      ? Promise.reject(new Error("rpc down"))
+      : Promise.resolve([usdc(user.usdcRaw)]);
+  w.deps.balancesChainId = 8453;
+  return { ...w, user };
+}
+
+void describe("GET /api/stream/live — signed-in positions and balances (R-001)", () => {
+  void it("an anonymous stream carries no user frames and never reads a wallet", async () => {
+    const { deps, user } = userWorld();
+    const origin = await serve(deps);
+    const res = await fetch(`${origin}/api/stream/live`);
+    const frames = await readStream(res, (f) => f.filter((x) => x.event).length >= 1, 300);
+    assert.equal(frames.find((f) => f.event)?.event, "snapshot");
+    assert.ok(!frames.some((f) => f.event === "positions" || f.event === "balances"));
+    assert.deepEqual(user.positionReads, []);
+  });
+
+  void it("sends the wallet's positions and balances right after the snapshot", async () => {
+    const { deps, user } = userWorld();
+    const origin = await serve(deps, WALLET);
+    const res = await fetch(`${origin}/api/stream/live`);
+    const frames = await readStream(res, (f) => f.some((x) => x.event === "balances"));
+    const events = frames.filter((f) => f.event).map((f) => f.event);
+    assert.deepEqual(events.slice(0, 3), ["snapshot", "positions", "balances"]);
+    const pos = frames.find((f) => f.event === "positions")?.data as {
+      wallet: string;
+      positions: PositionRow[];
+    };
+    assert.equal(pos.wallet, WALLET);
+    assert.equal(pos.positions[0].balance, "1000000");
+    const bal = frames.find((f) => f.event === "balances")?.data as {
+      wallet: string;
+      chainId: number;
+      balances: Balance[];
+    };
+    assert.equal(bal.chainId, 8453);
+    assert.equal(bal.balances[0].balanceRaw, "5000000");
+    assert.ok(user.positionReads.every((w) => w === WALLET));
+  });
+
+  void it("pushes a user frame only when that data changes", async () => {
+    const { deps, user } = userWorld();
+    const origin = await serve(deps, WALLET);
+    const res = await fetch(`${origin}/api/stream/live`);
+    // A fill lands: USDC down, YES up — both frames re-send, nothing else.
+    setTimeout(() => {
+      user.usdcRaw = "4000000";
+      user.yes = "3000000";
+    }, 60);
+    const frames = await readStream(
+      res,
+      (f) => f.filter((x) => x.event === "balances").length >= 2,
+    );
+    const balances = frames.filter((f) => f.event === "balances");
+    const positions = frames.filter((f) => f.event === "positions");
+    assert.equal(balances.length, 2, "one initial + one on change");
+    assert.equal((balances[1].data as { balances: Balance[] }).balances[0].balanceRaw, "4000000");
+    assert.equal(positions.length, 2);
+    assert.ok(!frames.some((f) => f.event === "slate"), "an unchanged slate stays quiet");
+  });
+
+  void it("a failed user read sends nothing for it and keeps the stream alive", async () => {
+    const { deps, user } = userWorld();
+    user.failBalances = true;
+    const origin = await serve(deps, WALLET);
+    const res = await fetch(`${origin}/api/stream/live`);
+    const frames = await readStream(res, (f) => f.some((x) => x.event === "positions"));
+    assert.ok(frames.some((f) => f.event === "snapshot"));
+    assert.ok(frames.some((f) => f.event === "positions"));
+    assert.ok(!frames.some((f) => f.event === "balances"));
   });
 });

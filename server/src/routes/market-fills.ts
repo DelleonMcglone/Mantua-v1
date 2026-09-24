@@ -13,7 +13,13 @@ import { getRpcClient } from "../lib/rpc-client.ts";
 import { sharedCache } from "../lib/shared-cache.ts";
 import { counters } from "../lib/metrics.ts";
 import { positionsCacheKey } from "./market-positions.ts";
-import { DEFAULT_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
+import {
+  BASE_CHAIN_ID,
+  DEFAULT_CHAIN_ID,
+  isSupportedChainId,
+  type SupportedChainId,
+} from "../lib/chains.ts";
+import { balancesCacheKey } from "../lib/user-portfolio.ts";
 import { MARKETS_BY_CHAIN, MARKETS_PERIPHERY_BY_CHAIN } from "../lib/markets-contracts.ts";
 import { DYNAMIC_MARKET_BY_CHAIN } from "../lib/v4-contracts.ts";
 import { decodeRevertedBuyAmountIn } from "../lib/sports/market-trade-revert.ts";
@@ -58,7 +64,8 @@ export interface MarketFillsDeps {
   /** Is this tx already on record? (the trade-status read, R-004) */
   fillExists: (txHash: string) => Promise<boolean>;
   recordArtifacts: typeof recordFillArtifacts;
-  /** Drop the wallet's cached positions after a verified fill (R-007). */
+  /** Drop the wallet's cached positions and balances after a verified
+   *  fill (R-007; balances since R-001 streams them). */
   invalidatePositions: (address: string) => Promise<void>;
   /** C-024 — the collateral (USDC) on this chain, for proving a reverted
    *  swap was a BUY from its calldata. Null when markets aren't deployed. */
@@ -128,7 +135,13 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
     recordArtifacts: overrides.recordArtifacts ?? recordFillArtifacts,
     invalidatePositions:
       overrides.invalidatePositions ??
-      ((address) => sharedCache.invalidate(positionsCacheKey(address))),
+      (async (address) => {
+        await Promise.all([
+          sharedCache.invalidate(positionsCacheKey(address)),
+          // Markets trade on Base only; the balance a fill moves is there.
+          sharedCache.invalidate(balancesCacheKey(address, BASE_CHAIN_ID)),
+        ]);
+      }),
     recordActivity: overrides.recordActivity ?? recordActivity,
     collateralFor:
       overrides.collateralFor ?? ((chainId) => MARKETS_BY_CHAIN[chainId]?.collateral ?? null),
@@ -267,8 +280,9 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
         // → no row returned) writes nothing twice. Best-effort: the fill row
         // is the primary record; bookkeeping failures log, never 500.
         if (inserted) {
-          // Phase 7 / R-007 — the wallet's cached positions are stale the
-          // moment a fill lands; drop them so the next read re-marks.
+          // Phase 7 / R-007 — the wallet's cached positions (and, R-001,
+          // balances) are stale the moment a fill lands; drop them so the
+          // next read — and the next stream tick — re-marks.
           await deps.invalidatePositions(address).catch(() => undefined);
           // Task 062 / PF-015 — the user's timeline entry for the trade.
           const userId = await activityUserId(db, resolveUserId, req.privyUserId);

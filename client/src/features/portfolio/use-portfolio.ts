@@ -4,6 +4,8 @@ import { ApiError, api } from "@/lib/api.ts";
 import { usd as formatUsd } from "@/lib/format.ts";
 import { getTokens, type Token, type TokenSymbol } from "@/lib/tokens.ts";
 import { BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
+import { onUserBalances } from "./user-stream-bus.ts";
+import { frameIsFor } from "./user-stream-core.ts";
 
 interface PortfolioBalance {
   symbol: TokenSymbol;
@@ -121,6 +123,16 @@ export function usePortfolio(): PortfolioState {
       if (timer) clearTimeout(timer);
     };
   }, [authenticated, ready, wallet, refreshNonce, chainId]);
+
+  // R-001 — an open signed-in stream's `balances` frame applies at once;
+  // transactions still come from the poll (the stream doesn't carry them).
+  useEffect(() => {
+    if (!wallet) return;
+    return onUserBalances((frame) => {
+      if (frame.chainId !== chainId || !frameIsFor(frame, wallet)) return;
+      setState((s) => ({ ...s, balances: frame.balances as PortfolioBalance[], error: null }));
+    });
+  }, [wallet, chainId]);
 
   return state;
 }
