@@ -112,8 +112,13 @@ and after each owner user test.
 The API emits everything as structured pino JSON to stdout, which Vercel
 captures per invocation. To get cross-instance dashboards and a pager:
 
-1. Vercel → Project → Settings → Log Drains → add a drain to the vendor
-   (Datadog, Grafana Cloud/Loki, Axiom, Better Stack — any JSON drain).
+1. **Vendor: Better Stack** (owner decision 2026-09-24 — logs and on-call
+   paging in one account). Sign up, create a Telemetry **source** for
+   Vercel, and connect it: either Better Stack's Vercel integration or
+   Vercel → Project → Settings → Log Drains with the source's drain URL
+   (JSON, production environment). Confirm lines arrive, then add the
+   alert rules in step 4 and an on-call contact (phone/SMS) under
+   Better Stack's incident settings.
 2. Route on `event`: `alert` (by `severity`), `latency_budget_exceeded`
    (by `key`), and the request logs' `res.statusCode`/`responseTime` for
    the p95 panels.
@@ -122,7 +127,10 @@ captures per invocation. To get cross-instance dashboards and a pager:
    test's client-side numbers; production needs the client to report it —
    follow-up), feed lag (`/api/status.feeds.*.ageMs`, scrape every 60 s),
    RPC host health (`/api/ops/metrics.rpc.hosts`).
-4. Pager rules = the table above. Until a drain exists, the live-sync
+4. Pager rules = the table above. In Better Stack, one alert per row
+   keyed on the log fields: `event = "alert" AND severity = "critical"`
+   → page; `event = "alert" AND severity = "warn"` → notify (no page);
+   `event = "latency_budget_exceeded"` over the thresholds above → notify. Until a drain exists, the live-sync
    workflow's run log carries the `alert` lines and `/api/ops/alerts` is
    the on-call's first `curl`.
 

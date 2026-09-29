@@ -78,7 +78,7 @@ live-sync.yml` fires it every 5 minutes. `IN_PLAY_FEED_MAX_AGE_MS` is
 - [x] `GET /api/markets/trade/status` maps receipt success / revert / known-unmined / never-seen to confirmed / failed / pending / unknown with `recorded` (R-004).
 - [x] The ticket distinguishes confirming, pending (with explorer link, "you can leave this page"), done, failed (reverted — nothing traded), and pre-chain errors by kind (R-004).
 - [x] The pending register persists per wallet, resumes on load, re-reports a missing fill, and surfaces earlier outcomes with a dismiss (R-004).
-- [ ] Positions and balances streamed — after R-007 (R-001).
+- [x] Positions and balances streamed — after R-007 (R-001). Signed-in streams, 2026-09-24.
 
 ## Failure conditions
 
