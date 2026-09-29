@@ -57,10 +57,17 @@ touches the agent wallet's balances or its daily cap.
 
 Mantua is also an x402 **seller**: `GET /api/x402/analyst-brief` returns the
 agent's live analyst brief (pegs, market pulse, narratives, TVL movers) for a
-**$0.01 USDC** micro-payment, settled on Base Mainnet via the public x402
-facilitator. Payment is the auth — no login. Enable by setting
+**$0.01 USDC** micro-payment, settled on Base Mainnet via the facilitator at
+`X402_FACILITATOR_URL`. Payment is the auth — no login. Enable by setting
 `X402_SELLER_ADDRESS` (the 0x address that receives the USDC) in the server env;
 unset → the endpoint reports 503.
+
+> **Facilitator must serve Base Mainnet.** With `X402_FACILITATOR_URL` unset the
+> paywall uses the public x402.org facilitator, which serves **testnets only**
+> (`eip155:84532`) and rejects scheme `exact` on `eip155:8453`. The server then
+> logs a boot warning and the brief answers 503 `X402_FACILITATOR_UNSUPPORTED`
+> (it never throws). Check a candidate with
+> `curl <url>/supported` — it must list `exact` on `eip155:8453`.
 
 1. **See the paywall** (no payment):
    ```bash

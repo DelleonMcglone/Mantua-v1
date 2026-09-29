@@ -1,5 +1,4 @@
 import type { Request, RequestHandler, Response } from "express";
-import { paymentMiddlewareFromConfig } from "@x402/express";
 import {
   HTTPFacilitatorClient,
   decodePaymentResponseHeader,
@@ -23,6 +22,7 @@ import { CIRCLE_BATCHING_NAME, CIRCLE_BATCHING_VERSION } from "@circle-fin/x402-
 import { logAudit } from "../lib/audit.ts";
 import { X402_NETWORK, x402PriceString, type X402ServiceDef } from "../lib/x402/catalog.ts";
 import { logger } from "../lib/logger.ts";
+import { createGuardedPaywall } from "../lib/x402/guarded-paywall.ts";
 
 /**
  * Phase 17 (MP-004) — the dual-rail x402 paywall factory.
@@ -31,7 +31,8 @@ import { logger } from "../lib/logger.ts";
  * `accepts` array (Circle become-a-seller pattern):
  *
  *  1. vanilla rail — classic EIP-3009 `exact` payments verified/settled by
- *     the public facilitator (x402.org), like the legacy analyst brief;
+ *     the X402_FACILITATOR_URL facilitator (default x402.org, which serves
+ *     testnets only), like the legacy analyst brief;
  *  2. Gateway rail — Circle Gateway batched payments (`extra.name =
  *     "GatewayWalletBatched"`), verified/settled by the Gateway facilitator.
  *
@@ -145,7 +146,9 @@ export interface X402PaywallDeps {
   payerAllowlist?: string[] | undefined;
   /** Circle Gateway facilitator URL (testnet vs mainnet). */
   gatewayFacilitatorUrl?: string | undefined;
-  /** Test seam — replaces the vanilla x402.org facilitator. */
+  /** X402_FACILITATOR_URL — vanilla-rail facilitator; unset → x402.org (testnets only). */
+  vanillaFacilitatorUrl?: string | undefined;
+  /** Test seam — replaces the vanilla facilitator client outright. */
   vanillaFacilitator?: FacilitatorClient | undefined;
   /** Test seam — replaces the default logAudit-backed sale audit. */
   auditSale?: SaleAuditFn | undefined;
@@ -157,12 +160,14 @@ export function x402PaywallDepsFromEnv(env: {
   X402_SELLER_SERVICES?: string[] | undefined;
   X402_SPORTS_INTEL_ALLOWLIST?: string[] | undefined;
   X402_GATEWAY_FACILITATOR_URL?: string | undefined;
+  X402_FACILITATOR_URL?: string | undefined;
 }): X402PaywallDeps {
   return {
     sellerAddress: env.X402_SELLER_ADDRESS,
     enabledServiceIds: env.X402_SELLER_SERVICES,
     payerAllowlist: env.X402_SPORTS_INTEL_ALLOWLIST,
     gatewayFacilitatorUrl: env.X402_GATEWAY_FACILITATOR_URL,
+    vanillaFacilitatorUrl: env.X402_FACILITATOR_URL,
   };
 }
 
@@ -325,15 +330,22 @@ export function x402ServiceChain(def: X402ServiceDef, deps: X402PaywallDeps): Re
   }
 
   const seller = deps.sellerAddress as string;
-  const vanilla = deps.vanillaFacilitator ?? new HTTPFacilitatorClient();
+  const vanilla =
+    deps.vanillaFacilitator ??
+    new HTTPFacilitatorClient(
+      deps.vanillaFacilitatorUrl ? { url: deps.vanillaFacilitatorUrl } : undefined,
+    );
   const gateway = new BatchFacilitatorClient(
     deps.gatewayFacilitatorUrl ? { url: deps.gatewayFacilitatorUrl } : {},
   );
 
-  let paywall: (req: Request, res: Response, next: () => void) => Promise<void>;
+  let paywall: RequestHandler;
   try {
-    paywall = paymentMiddlewareFromConfig(
-      {
+    // Guarded: the facilitator handshake starts now but can never become an
+    // unhandled rejection; until it succeeds the service answers 503 dark.
+    paywall = createGuardedPaywall({
+      label: def.id,
+      routes: {
         [def.path]: {
           accepts: [
             {
@@ -357,9 +369,12 @@ export function x402ServiceChain(def: X402ServiceDef, deps: X402PaywallDeps): Re
           serviceName: `Mantua ${def.id}`,
         },
       },
-      new DualRailFacilitator(vanilla, gateway),
-      [{ network: "eip155:*", server: new GatewayEvmScheme() }],
-    );
+      facilitator: new DualRailFacilitator(vanilla, gateway),
+      schemes: [{ network: "eip155:*", server: new GatewayEvmScheme() }],
+      onUnavailable: (res) => {
+        darkResponse(res);
+      },
+    }).handler;
   } catch (err) {
     // Fail-safe: a broken paywall config must 503 dark, never crash boot.
     logger.error({ err, serviceId: def.id }, "x402 paywall construction failed — service dark");
@@ -372,9 +387,7 @@ export function x402ServiceChain(def: X402ServiceDef, deps: X402PaywallDeps): Re
 
   const chain: RequestHandler[] = [];
   if (def.auth === "allowlist+payment") chain.push(allowlistGate(deps, def));
-  chain.push((req, res, next) => {
-    void paywall(req, res, next);
-  });
+  chain.push(paywall);
   chain.push(auditSaleMiddleware(deps, def));
   return chain;
 }
