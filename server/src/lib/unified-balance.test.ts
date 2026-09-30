@@ -4,7 +4,6 @@ import { guardGatewaySpend } from "./unified-balance.ts";
 import type { SpendGuardIo } from "./spending-cap.ts";
 import { SafetyError } from "./errors.ts";
 
-
 const WALLET = "0xAbC0000000000000000000000000000000000001";
 const THIRD_PARTY = "0xdef0000000000000000000000000000000000002";
 
@@ -63,10 +62,16 @@ void describe("guardGatewaySpend (C-010 Gateway cap recording)", () => {
   void it("runs check, then issue, then record — a failed issue leaves no ink", async () => {
     const { io, calls } = makeLedgerIo(100);
     await assert.rejects(
-      guardGatewaySpend(WALLET, THIRD_PARTY, "10", () => {
-        calls.push("issue");
-        return Promise.reject(new Error("gateway down"));
-      }, io),
+      guardGatewaySpend(
+        WALLET,
+        THIRD_PARTY,
+        "10",
+        () => {
+          calls.push("issue");
+          return Promise.reject(new Error("gateway down"));
+        },
+        io,
+      ),
       /gateway down/,
     );
     assert.deepEqual(calls, ["check:10", "issue"], "record must not run after a failed issue");
@@ -89,10 +94,16 @@ void describe("guardGatewaySpend (C-010 Gateway cap recording)", () => {
     const { io, calls } = makeLedgerIo(100);
     let issued = false;
     await assert.rejects(
-      guardGatewaySpend(WALLET, THIRD_PARTY, "not-a-number", () => {
-        issued = true;
-        return Promise.resolve("burn");
-      }, io),
+      guardGatewaySpend(
+        WALLET,
+        THIRD_PARTY,
+        "not-a-number",
+        () => {
+          issued = true;
+          return Promise.resolve("burn");
+        },
+        io,
+      ),
       /Invalid Gateway spend amount/,
     );
     assert.equal(issued, false);
@@ -114,27 +125,26 @@ process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
 process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
 
-const { GATEWAY_SPEND_CHAINS, isGatewaySpendChain, resolveGatewaySpendChain } = await import(
-  "./unified-balance.ts"
-);
+const { GATEWAY_SPEND_CHAINS, isGatewaySpendChain, resolveGatewaySpendChain } =
+  await import("./unified-balance.ts");
 
 void describe("gateway spend-chain vocabulary", () => {
-  void it("lists the five mainnet destinations, Base (the home chain) excluded", () => {
+  void it("lists the five mainnet destinations, Arc (the home chain) excluded", () => {
     assert.deepEqual(
       [...GATEWAY_SPEND_CHAINS],
       ["Ethereum", "Avalanche", "Optimism", "Arbitrum", "Polygon"],
     );
     assert.equal(
-      (GATEWAY_SPEND_CHAINS as readonly string[]).includes("Base"),
+      (GATEWAY_SPEND_CHAINS as readonly string[]).includes("Arc"),
       false,
-      "deposits live on Base — it is never a spend destination",
+      "deposits live on Arc — it is never a spend destination",
     );
   });
 
   void it("isGatewaySpendChain accepts exactly the canonical names", () => {
     for (const chain of GATEWAY_SPEND_CHAINS) assert.equal(isGatewaySpendChain(chain), true);
     assert.equal(isGatewaySpendChain("ethereum"), false, "case-sensitive by design");
-    assert.equal(isGatewaySpendChain("Base"), false);
+    assert.equal(isGatewaySpendChain("Arc"), false);
     assert.equal(isGatewaySpendChain(""), false);
     assert.equal(isGatewaySpendChain(42), false);
     assert.equal(isGatewaySpendChain(null), false);

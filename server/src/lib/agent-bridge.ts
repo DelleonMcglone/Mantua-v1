@@ -22,12 +22,12 @@ import { logAudit } from "./audit.ts";
  */
 
 type HomeChain = Parameters<BK.BridgeKit["bridge"]>[0]["from"]["chain"];
-/** Bridge Kit's identifier for Arc Mainnet. The pinned kit (1.11.1) knows
- *  only "Arc_Testnet", so there is none yet: every bridge degrades to
- *  BridgeUnavailableError until a release adds mainnet (C-014 gate). */
-const HOME_CHAIN: HomeChain | null = null;
+/** Bridge Kit's identifier for Arc Mainnet (chain 5042, USDC 0x3600…0000):
+ *  "Arc", a CCTP-V2 `BridgeChain` since bridge-kit 1.15 (C-014, verified
+ *  against the installed kit by `npm run circle:id-smoke`). Kept as a
+ *  literal so the smoke script can read it from this source file. */
+const HOME_CHAIN = "Arc" as const satisfies HomeChain;
 function homeChain(): HomeChain {
-  if (!HOME_CHAIN) throw new BridgeUnavailableError("Bridging from Arc is not available yet.");
   return HOME_CHAIN;
 }
 
