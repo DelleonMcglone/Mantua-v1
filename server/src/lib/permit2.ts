@@ -6,7 +6,7 @@ import { PERMIT2, PERMIT2_ABI } from "./v4-contracts.ts";
 export const PERMIT2_MAX_AMOUNT = (1n << 160n) - 1n;
 
 /** Allowance window we ask the user to sign — long enough to cover slow
- *  Base blocks + retries, short enough that a leaked signature can't
+ *  Arc blocks + retries, short enough that a leaked signature can't
  *  drain a wallet a week later. */
 export const PERMIT2_EXPIRATION_SECONDS = 30 * 60;
 

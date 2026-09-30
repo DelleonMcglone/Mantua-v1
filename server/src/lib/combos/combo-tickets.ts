@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { markets } from "../../db/schema/index.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { sharedCache } from "../shared-cache.ts";
 import { MarketsNotDeployedError } from "../sports/market-trade-build.ts";
 import { readComboOnChain, type ComboOnChain } from "./combo-market.ts";
@@ -65,7 +65,7 @@ export interface ComboTicketView {
 /** The combo market's chain view, cached briefly; null when absent or undeployed. */
 export async function cachedComboOnChain(
   marketId: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<ComboOnChain | null> {
   return sharedCache.getOrCompute(
     `combo-chain:${String(chainId)}:${marketId}`,

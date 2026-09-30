@@ -18,7 +18,7 @@ import {
 
 /**
  * Phase 17 (MP-009) — the PAID portfolio-exposure service on /api/x402/v1:
- * positions for ANY queried Base address, deliberately limited to what is
+ * positions for ANY queried Arc address, deliberately limited to what is
  * already public on-chain. A thin wrapper over the existing on-chain
  * position readers — Mantua v4 LP positions (v4-onchain-positions.ts) and
  * pre-Mantua v4 positions (external-positions.ts via subgraph). No user

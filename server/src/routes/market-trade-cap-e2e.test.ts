@@ -58,7 +58,7 @@ const MARKET_ID: `0x${string}` = `0x${"11".repeat(32)}`;
 const TX = `0x${"c".repeat(64)}`;
 const REVERTED_TX = `0x${"d".repeat(64)}`;
 /** The pool this market trades in: YES sorts below USDC, so YES is currency0. */
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+const USDC = "0x3600000000000000000000000000000000000000" as const;
 const YES = "0x00000000000000000000000000000000000000e2" as const;
 const HOOK = "0x00000000000000000000000000000000000000e3" as const;
 
@@ -140,7 +140,7 @@ const build: BuildMarketTrade = (args) => {
     data: `0x${args.amountRaw.toString(16).padStart(64, "0")}`,
     value: "0",
     approvalTarget: SWAP_ROUTER,
-    inputToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    inputToken: "0x3600000000000000000000000000000000000000",
     marketId: MARKET_ID,
     marketAddress: "0x00000000000000000000000000000000000000e1",
     yesToken: "0x00000000000000000000000000000000000000e2",
@@ -296,7 +296,7 @@ async function postJson(
 }
 
 const tradeBody = (direction: "buy" | "sell", amountRaw: string) => ({
-  chainId: 8453,
+  chainId: 5042,
   providerEventId: "401547401",
   outcomeIndex: 0,
   direction,
@@ -349,7 +349,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
     // Stage 4 — the client reports the fill exactly as use-market-trade.ts
     // does: amounts from the calldata's own quote.
     const fillBody = {
-      chainId: 8453,
+      chainId: 5042,
       txHash: TX,
       marketId: calldata.marketId,
       direction: "buy",
@@ -425,7 +425,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
     };
     chain.mined.set(TX, { to: calldata.to, from: WALLET, status: "success" });
     const fill = await postJson(origin, "/api/markets/fills", {
-      chainId: 8453,
+      chainId: 5042,
       txHash: TX,
       marketId: calldata.marketId,
       direction: "sell",
@@ -448,7 +448,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
       quote: { amountIn: string; amountOut: string };
     };
     const report = (txHash: string) => ({
-      chainId: 8453,
+      chainId: 5042,
       txHash,
       marketId: calldata.marketId,
       direction: "buy",
@@ -522,7 +522,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
 
     // The client reports the failure and claims ten times the size.
     const failure = {
-      chainId: 8453,
+      chainId: 5042,
       txHash: REVERTED_TX,
       marketId: calldata.marketId,
       direction: "buy",
@@ -571,7 +571,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
       input: signedSwapCalldata("sell", 80_000_000n),
     });
     const res = await postJson(origin, "/api/markets/fills", {
-      chainId: 8453,
+      chainId: 5042,
       txHash: sellTx,
       marketId: MARKET_ID,
       direction: "sell",
@@ -601,7 +601,7 @@ void describe("task 050 market trade E2E — quotes burn no headroom, one trade 
       input: signedSwapCalldata("buy", 30_000_000n),
     });
     const res = await postJson(origin, "/api/markets/fills", {
-      chainId: 8453,
+      chainId: 5042,
       txHash: foreignTx,
       marketId: MARKET_ID,
       direction: "buy",

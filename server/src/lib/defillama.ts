@@ -69,7 +69,7 @@ async function cached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 }
 
 /**
- * P4-001 — list Uniswap pools on Base. Filtered + sorted by TVL desc.
+ * P4-001 — list Uniswap pools on Arc. Filtered + sorted by TVL desc.
  * Cached for 60s. Uses DefiLlama's open `/pools` endpoint (no auth).
  */
 export async function listBasePools(): Promise<DefiLlamaPool[]> {
@@ -86,7 +86,7 @@ export async function listBasePools(): Promise<DefiLlamaPool[]> {
       return [];
     }
     return parsed.data.data
-      .filter((p) => p.chain === "Base" && p.project.startsWith("uniswap"))
+      .filter((p) => p.chain === "Arc" && p.project.startsWith("uniswap"))
       .sort((a, b) => b.tvlUsd - a.tvlUsd);
   });
 }
@@ -188,7 +188,7 @@ const dexOverviewSchema = z
 export type DefiLlamaDexOverview = z.infer<typeof dexOverviewSchema>;
 
 /**
- * DEX overview for a chain (Base, Ethereum, etc.). Returns aggregated
+ * DEX overview for a chain (Arc, Ethereum, etc.). Returns aggregated
  * volume + per-protocol breakdown. We always pass the
  * `excludeTotalDataChart{Breakdown}` flags to skip the heavy historical
  * series — those bloat the response into MB. Cached for 60s.
@@ -238,7 +238,7 @@ function validateCoins(coins: readonly string[]): void {
 /**
  * Current token prices for a list of coin keys. Each key is either
  * `coingecko:<id>` or `<chain>:<contract-address>` (e.g.
- * `base:0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`).
+ * `base:0x3600000000000000000000000000000000000000`).
  *
  * Cached for 60s under a key derived from the sorted coin list (so
  * the cache hits regardless of caller order, but a different set of
@@ -512,7 +512,7 @@ export interface ProtocolLookupMatch {
 export interface ProtocolLookupResult {
   query: string;
   matches: ProtocolLookupMatch[];
-  /** Set when the query names a CHAIN (e.g. "Base", "Arbitrum") — total chain TVL. */
+  /** Set when the query names a CHAIN (e.g. "Arc", "Arbitrum") — total chain TVL. */
   chainTvl?: { name: string; tvlUsd: number };
 }
 

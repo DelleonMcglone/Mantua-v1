@@ -13,7 +13,7 @@ export const agentChatRouter = Router();
 const chatSchema = z.object({
   message: z.string().min(1).max(2000),
   sessionId: z.uuid().optional(),
-  /** The user's selected chain; omitted means Base (back-compat). */
+  /** The user's selected chain; omitted means Arc (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
   /**
    * Task 069 (V-009) — how the user entered this message. `"voice"` means

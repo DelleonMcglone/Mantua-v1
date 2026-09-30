@@ -62,7 +62,7 @@ const provider = {
 
 const wallet = {
   address: E2E_ADDRESS,
-  chainId: "eip155:8453",
+  chainId: "eip155:5042",
   walletClientType: "privy",
   connectorType: "embedded",
   getEthereumProvider: () => Promise.resolve(provider),
@@ -85,7 +85,7 @@ export function usePrivy() {
     ready: true,
     authenticated,
     user: authenticated
-      ? { id: "did:privy:e2e", wallet: { address: E2E_ADDRESS, chainId: "eip155:8453" } }
+      ? { id: "did:privy:e2e", wallet: { address: E2E_ADDRESS, chainId: "eip155:5042" } }
       : null,
     login,
     logout: () => {

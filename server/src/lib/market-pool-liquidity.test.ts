@@ -23,10 +23,11 @@ process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
 process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
 
-const { BASE_CHAIN_ID } = await import("./chains.ts");
+const { ARC_CHAIN_ID } = await import("./chains.ts");
 const { MarketLiquidityGatedError, assertMarketPoolsDeployed, resolveMarketPoolLiquidity } =
   await import("./market-pool-liquidity.ts");
 const { UNDEPLOYED, overrideMarketsRegistry } = await import("./testing/markets-registry.ts");
+const { overrideCanonicalV4 } = await import("./testing/canonical-v4.ts");
 const { DYNAMIC_FEE_FLAG, getV4PositionManager, getV4StackForHook } =
   await import("./v4-contracts.ts");
 const { buildAddLiquidityCalldataForKey } = await import("./v4-add-liquidity.ts");
@@ -75,7 +76,7 @@ void describe("market-pool liquidity gating (B7-004)", () => {
 
   void it("assertMarketPoolsDeployed throws the typed gated error while the DM stack is absent", () => {
     assert.throws(
-      () => assertMarketPoolsDeployed(BASE_CHAIN_ID),
+      () => assertMarketPoolsDeployed(ARC_CHAIN_ID),
       (err: unknown) => {
         assert.ok(err instanceof MarketLiquidityGatedError);
         assert.equal(err.code, "MARKET_POOLS_NOT_DEPLOYED");
@@ -90,7 +91,7 @@ void describe("market-pool liquidity gating (B7-004)", () => {
       resolveMarketPoolLiquidity({
         providerEventId: "401671789",
         outcomeIndex: 0,
-        chainId: BASE_CHAIN_ID,
+        chainId: ARC_CHAIN_ID,
       }),
       (err: unknown) => err instanceof MarketLiquidityGatedError,
     );
@@ -114,12 +115,12 @@ void describe("key-addressed add builder routes per DM-112", () => {
     slippageBps: 50,
     owner: "0x9999999999999999999999999999999999999999" as const,
     deadlineSeconds: 1_900_000_000,
-    chainId: BASE_CHAIN_ID,
+    chainId: ARC_CHAIN_ID,
   };
 
   void it("a Dynamic Market hook key routes to the DM PositionManager once deployed", () => {
     withFakeDmDeployment(() => {
-      const stack = getV4StackForHook(DM_HOOK, BASE_CHAIN_ID);
+      const stack = getV4StackForHook(DM_HOOK, ARC_CHAIN_ID);
       assert.equal(stack.positionManager, DM_POSITION_MANAGER);
       const built = buildAddLiquidityCalldataForKey({ key: baseKey, ...amounts });
       assert.equal(built.to, DM_POSITION_MANAGER);
@@ -129,13 +130,18 @@ void describe("key-addressed add builder routes per DM-112", () => {
     });
   });
 
-  void it("a no-hook key still routes to the canonical PositionManager", () => {
-    withFakeDmDeployment(() => {
-      const built = buildAddLiquidityCalldataForKey({
-        key: { ...baseKey, hooks: "0x0000000000000000000000000000000000000000", fee: 3000 },
-        ...amounts,
+  void it("a no-hook key still routes to the canonical PositionManager (synthetic on Arc)", () => {
+    const restoreCanonical = overrideCanonicalV4(ARC_CHAIN_ID);
+    try {
+      withFakeDmDeployment(() => {
+        const built = buildAddLiquidityCalldataForKey({
+          key: { ...baseKey, hooks: "0x0000000000000000000000000000000000000000", fee: 3000 },
+          ...amounts,
+        });
+        assert.equal(built.to, getV4PositionManager(ARC_CHAIN_ID));
       });
-      assert.equal(built.to, getV4PositionManager(BASE_CHAIN_ID));
-    });
+    } finally {
+      restoreCanonical();
+    }
   });
 });

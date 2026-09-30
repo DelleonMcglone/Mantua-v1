@@ -3,7 +3,7 @@
   "info": {
     "title": "Mantua sports intelligence",
     "version": "1.0.0",
-    "description": "Honesty-status game context and live odds for allowlisted partners. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet). Auth mode is allowlist+payment (X402_SPORTS_INTEL_ALLOWLIST): the payer is checked against the allowlist BEFORE any settlement — an un-allowlisted payer receives 403 x402_payer_not_authorized and is never charged; an empty allowlist keeps the service dark (503).",
+    "description": "Honesty-status game context and live odds for allowlisted partners. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:5042 (Arc Mainnet). Auth mode is allowlist+payment (X402_SPORTS_INTEL_ALLOWLIST): the payer is checked against the allowlist BEFORE any settlement — an un-allowlisted payer receives 403 x402_payer_not_authorized and is never charged; an empty allowlist keeps the service dark (503).",
     "x-mantua-service-id": "sports-intelligence",
     "x-mantua-price-usd": "0.01"
   },
@@ -109,7 +109,7 @@
             }
           },
           "402": {
-            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:5042.",
             "headers": {
               "PAYMENT-REQUIRED": {
                 "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",

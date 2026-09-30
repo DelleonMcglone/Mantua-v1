@@ -40,7 +40,7 @@ const TEST_KEY = "0x000000000000000000000000000000000000000000000000000000000000
 const TEST_ADDR = "0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf";
 
 const SERVICE_URL = "https://api.example.test/brief";
-const BASE_NETWORK = "eip155:8453";
+const BASE_NETWORK = "eip155:5042";
 
 // The x402 knobs live on the already-parsed env object; mutate + restore.
 interface X402Env {
@@ -79,7 +79,7 @@ function paymentRequiredHeader(amountAtomic: string): string {
         network: BASE_NETWORK,
         amount: amountAtomic,
         payTo: "0x000000000000000000000000000000000000dEaD",
-        asset: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        asset: "0x3600000000000000000000000000000000000000",
       },
     ],
   };
@@ -107,8 +107,7 @@ function installFetch(opts: {
   let serviceCalls = 0;
   globalThis.fetch = async (input, init): Promise<Response> => {
     const req = input instanceof Request ? input : null;
-    const url =
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const method = req?.method ?? init?.method ?? "GET";
     const headers = new Headers(req ? req.headers : init?.headers);
     const paidHeader = headers.has("payment-signature") || headers.has("x-payment");
@@ -125,7 +124,11 @@ function installFetch(opts: {
     const parsed = JSON.parse(bodyText) as { id?: number } | { id?: number }[];
     const id = (Array.isArray(parsed) ? parsed[0]?.id : parsed.id) ?? 1;
     if (opts.rpcBalance === "error" || opts.rpcBalance === undefined) {
-      return Response.json({ jsonrpc: "2.0", id, error: { code: 3, message: "execution reverted" } });
+      return Response.json({
+        jsonrpc: "2.0",
+        id,
+        error: { code: 3, message: "execution reverted" },
+      });
     }
     const result = `0x${opts.rpcBalance.toString(16).padStart(64, "0")}`;
     return Response.json({ jsonrpc: "2.0", id, result });
@@ -322,9 +325,8 @@ void describe("x402 buyer — daily cap summed from agent_x402 audit rows", () =
 
   void it("allows a call that lands exactly on the cap", async () => {
     const { seen } = installFetch({
-      service: (call) =>
-        call === 1 ? paywallResponse("250000") : Response.json({ data: "paid" }), // $0.25
-      rpcBalance: 5_000_000n, // $5 on Base — plenty
+      service: (call) => (call === 1 ? paywallResponse("250000") : Response.json({ data: "paid" })), // $0.25
+      rpcBalance: 5_000_000n, // $5 on Arc — plenty
     });
     e.X402_MAX_CALL_USD = 0.25;
     const dbStub = installDb([{ params: { usdCost: 0.5 } }, { params: { usdCost: 0.25 } }]); // $0.75
@@ -340,8 +342,7 @@ void describe("x402 buyer — daily cap summed from agent_x402 audit rows", () =
 void describe("x402 buyer — one audit row per payment", () => {
   void it("writes a success row with url/method/chain/usdCost after a paid call", async () => {
     installFetch({
-      service: (call) =>
-        call === 1 ? paywallResponse("50000") : Response.json({ data: "paid" }), // $0.05
+      service: (call) => (call === 1 ? paywallResponse("50000") : Response.json({ data: "paid" })), // $0.05
       rpcBalance: 1_000_000n, // $1
     });
     const dbStub = installDb([]);
@@ -368,9 +369,7 @@ void describe("x402 buyer — one audit row per payment", () => {
   void it("writes a failure row and flags mayHaveCharged when the service 500s after payment", async () => {
     installFetch({
       service: (call) =>
-        call === 1
-          ? paywallResponse("50000")
-          : new Response("boom", { status: 500 }),
+        call === 1 ? paywallResponse("50000") : new Response("boom", { status: 500 }),
       rpcBalance: 1_000_000n,
     });
     const dbStub = installDb([]);
@@ -405,7 +404,7 @@ void describe("x402 buyer — balance pre-flight on the settlement rail", () => 
       (err: unknown) =>
         err instanceof X402Error &&
         !err.mayHaveCharged &&
-        /holds only \$0\.01 USDC on Base mainnet/.test(err.message) &&
+        /holds only \$0\.01 USDC on Arc mainnet/.test(err.message) &&
         /Nothing was charged/.test(err.message),
     );
     assert.equal(seen.filter((s) => s.url.startsWith(SERVICE_URL)).length, 1);
@@ -414,8 +413,7 @@ void describe("x402 buyer — balance pre-flight on the settlement rail", () => 
 
   void it("fails open when the balance read errors (facilitator stays the source of truth)", async () => {
     installFetch({
-      service: (call) =>
-        call === 1 ? paywallResponse("50000") : Response.json({ data: "paid" }),
+      service: (call) => (call === 1 ? paywallResponse("50000") : Response.json({ data: "paid" })),
       rpcBalance: "error",
     });
     const dbStub = installDb([]);

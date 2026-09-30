@@ -25,7 +25,7 @@ interface RatePoint {
  * GET /api/pair-price-chart?base=USDC&quote=EURC&range=30D
  *
  * The pair exchange rate over time — `quote` priced in `base` (e.g. "EURC per
- * USDC", "cbBTC per USDC"). Public read-only data; behind the global rate
+ * USDC", "cirBTC per USDC"). Public read-only data; behind the global rate
  * limiter, no auth.
  *
  * The pool itself has no historical index yet, so we derive the

@@ -15,8 +15,8 @@ export const pools = pgTable("pools", {
   id: uuid("id")
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  /** Chain the pool lives on — Base Mainnet (8453). */
-  chainId: integer("chain_id").notNull().default(8453),
+  /** Chain the pool lives on — Arc Mainnet (5042). */
+  chainId: integer("chain_id").notNull().default(5042),
   poolKeyHash: varchar("pool_key_hash", { length: 66 }).notNull().unique(),
   token0: varchar("token0", { length: 42 }).notNull(),
   token1: varchar("token1", { length: 42 }).notNull(),
@@ -65,7 +65,7 @@ export const portfolioTransactions = pgTable(
     walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
     action: varchar("action", { length: 32 }).notNull(),
     txHash: varchar("tx_hash", { length: 66 }).notNull().unique(),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     params: jsonb("params").notNull(),
     outcome: varchar("outcome", { length: 16 }).notNull(),
     usdValue: numeric("usd_value", { precision: 20, scale: 2 }),

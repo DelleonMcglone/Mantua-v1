@@ -1,4 +1,4 @@
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { env } from "../../env.ts";
 import { computeComboMarketId } from "../market-id.ts";
 import {
@@ -86,7 +86,7 @@ export interface ComboOnChain {
 /** Null when the factory has no market for this id. */
 export async function readComboOnChain(
   marketId: `0x${string}`,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<ComboOnChain | null> {
   const markets = MARKETS_BY_CHAIN[chainId];
   const periphery = MARKETS_PERIPHERY_BY_CHAIN[chainId];
@@ -136,7 +136,7 @@ export type EnsureResult =
 /** Create the combo market, pool and seed when absent; idempotent. */
 export async function ensureComboMarket(
   plan: ComboMarketPlan,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<EnsureResult> {
   const existing = await readComboOnChain(plan.marketId, chainId);
   if (!marketSignerWallet(chainId)) {

@@ -82,7 +82,7 @@ agentSendRouter.post(
         return;
       }
       if (err instanceof CircleReceiptTimeoutError) {
-        // C-015 — PENDING: the transfer is still driving on Base. Not a
+        // C-015 — PENDING: the transfer is still driving on Arc. Not a
         // success (no receipt) and not a failure (no revert); the durable
         // webhook finalizer records the real outcome. No audit row here —
         // the finalizer writes exactly one.

@@ -55,13 +55,13 @@ void describe("spendGate", () => {
 });
 
 void describe("withdrawalGate", () => {
-  const dest = { status: "verified", chainId: 8453 };
+  const dest = { status: "verified", chainId: 5042 };
   void it("below the threshold executes at once; at or above it needs a second approver", () => {
-    assert.deepEqual(withdrawalGate({ ...base, usd: 999.99, destination: dest, chainId: 8453 }), {
+    assert.deepEqual(withdrawalGate({ ...base, usd: 999.99, destination: dest, chainId: 5042 }), {
       ok: true,
       needsApproval: false,
     });
-    assert.deepEqual(withdrawalGate({ ...base, usd: 1000, destination: dest, chainId: 8453 }), {
+    assert.deepEqual(withdrawalGate({ ...base, usd: 1000, destination: dest, chainId: 5042 }), {
       ok: true,
       needsApproval: true,
     });
@@ -72,7 +72,7 @@ void describe("withdrawalGate", () => {
       institution: { ...INST, approvalThresholdUsd: 0 },
       usd: 1,
       destination: dest,
-      chainId: 8453,
+      chainId: 5042,
     });
     assert.deepEqual(r, { ok: true, needsApproval: true });
   });
@@ -80,19 +80,19 @@ void describe("withdrawalGate", () => {
     const pending = withdrawalGate({
       ...base,
       usd: 1,
-      destination: { status: "pending", chainId: 8453 },
-      chainId: 8453,
+      destination: { status: "pending", chainId: 5042 },
+      chainId: 5042,
     });
     assert.equal(pending.ok, false);
     assert.equal(pending.code, "destination_unverified");
-    const missing = withdrawalGate({ ...base, usd: 1, destination: null, chainId: 8453 });
+    const missing = withdrawalGate({ ...base, usd: 1, destination: null, chainId: 5042 });
     assert.equal(missing.ok, false);
     assert.equal(missing.code, "destination_unverified");
     const chain = withdrawalGate({
       ...base,
       usd: 1,
       destination: { status: "verified", chainId: 1 },
-      chainId: 8453,
+      chainId: 5042,
     });
     assert.equal(chain.ok, false);
     assert.equal(chain.code, "destination_chain_mismatch");
@@ -103,11 +103,11 @@ void describe("withdrawalGate", () => {
       member: { ...trader, role: "viewer" },
       usd: 1,
       destination: dest,
-      chainId: 8453,
+      chainId: 5042,
     });
     assert.equal(viewer.ok, false);
     assert.equal(viewer.code, "member_cannot_withdraw");
-    const capped = withdrawalGate({ ...base, usd: 5000, destination: dest, chainId: 8453 });
+    const capped = withdrawalGate({ ...base, usd: 5000, destination: dest, chainId: 5042 });
     assert.equal(capped.ok, false);
     assert.equal(capped.code, "per_trade_cap");
   });

@@ -221,7 +221,7 @@ async function quoteLoop(args: Args, samples: Samples, until: number): Promise<v
           method: "POST",
           headers: headers({ "content-type": "application/json" }),
           body: JSON.stringify({
-            chainId: 8453,
+            chainId: 5042,
             providerEventId: eventId,
             outcomeIndex: 0,
             direction: "buy",

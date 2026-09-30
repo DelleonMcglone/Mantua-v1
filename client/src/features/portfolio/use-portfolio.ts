@@ -3,7 +3,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { ApiError, api } from "@/lib/api.ts";
 import { usd as formatUsd } from "@/lib/format.ts";
 import { getTokens, type Token, type TokenSymbol } from "@/lib/tokens.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
 import { onUserBalances } from "./user-stream-bus.ts";
 import { frameIsFor } from "./user-stream-core.ts";
 
@@ -47,13 +47,13 @@ const POLL_MS = 15_000;
 
 /**
  * Live portfolio polling. Returns the real on-chain balances for the
- * connected Privy wallet on Base (or null until login). Polls
+ * connected Privy wallet on Arc (or null until login). Polls
  * `/api/portfolio` every 15s so balances update without requiring a
  * full page refresh after the user receives more tokens.
  */
 export function usePortfolio(): PortfolioState {
   const { authenticated, ready, user } = usePrivy();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const wallet = user?.wallet?.address ?? null;
   const [state, setState] = useState<PortfolioState>({
     balances: [],

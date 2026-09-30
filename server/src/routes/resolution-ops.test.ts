@@ -118,10 +118,7 @@ function post(origin: string, path: string, body: unknown, secret = "ops-test-se
 void describe("resolution ops — auth posture", () => {
   void it("rejects a wrong or missing cron secret (same gate as the crons)", async () => {
     const origin = await serve({ store: fakeStore() });
-    for (const headers of [
-      {},
-      { authorization: "Bearer wrong" },
-    ] as Record<string, string>[]) {
+    for (const headers of [{}, { authorization: "Bearer wrong" }] as Record<string, string>[]) {
       const res = await fetch(`${origin}/api/ops/resolution`, { headers });
       assert.equal(res.status, 401);
     }
@@ -170,7 +167,7 @@ void describe("POST /api/ops/resolution/hold + /release (D-104 operator hold)", 
       note: "scores look wrong on TV",
     });
     assert.equal(res.status, 200);
-    assert.deepEqual(held, [["401671789", 8453, "scores look wrong on TV", NOW]]);
+    assert.deepEqual(held, [["401671789", 5042, "scores look wrong on TV", NOW]]);
     assert.equal(audits.length, 1);
     assert.equal(audits[0].action, "market_resolution");
     assert.equal(audits[0].outcome, "success");
@@ -296,7 +293,7 @@ void describe("POST /api/ops/resolution/override (D-104 manual override)", () =>
     assert.equal(res.status, 200);
     const body = (await res.json()) as { txHash?: string; explorerUrl?: string };
     assert.equal(body.txHash, "0xtxmanual");
-    assert.match(body.explorerUrl ?? "", /^https:\/\/basescan\.org\/tx\/0xtxmanual$/);
+    assert.match(body.explorerUrl ?? "", /^https:\/\/explorer\.arc\.io\/tx\/0xtxmanual$/);
 
     // Same submitter path as the sweep: in-line freeze, then resolve.
     assert.deepEqual(calls, [`freeze:${MARKET_ID.slice(0, 6)}`, "resolve:1"]);
@@ -314,7 +311,13 @@ void describe("POST /api/ops/resolution/override (D-104 manual override)", () =>
     assert.equal(evidence["providerEventId"], "401671789");
 
     assert.deepEqual(settled, [
-      ["401671789", 8453, "0xtxmanual", "provider outage; verified final on official league site", NOW],
+      [
+        "401671789",
+        5042,
+        "0xtxmanual",
+        "provider outage; verified final on official league site",
+        NOW,
+      ],
     ]);
 
     assert.equal(audits.length, 1);
@@ -387,7 +390,7 @@ void describe("POST /api/ops/resolution/override (D-104 manual override)", () =>
 });
 
 void describe("GET /api/ops/resolution (P-010 verifiability surface)", () => {
-  void it("lists settlement rows with BaseScan links, window stamps, and payload summaries, plus the pending queue", async () => {
+  void it("lists settlement rows with Arcscan links, window stamps, and payload summaries, plus the pending queue", async () => {
     const opensAt = new Date("2026-09-06T17:00:00Z");
     const closesAt = new Date("2026-09-06T17:15:00Z");
     const origin = await serve({
@@ -422,7 +425,7 @@ void describe("GET /api/ops/resolution (P-010 verifiability surface)", () => {
             {
               id: "p1",
               providerEventId: "401671790",
-              chainId: 8453,
+              chainId: 5042,
               state: "VERIFIED",
               policy: "single-source",
               reason: "policy_exempt_final",
@@ -455,7 +458,7 @@ void describe("GET /api/ops/resolution (P-010 verifiability surface)", () => {
     assert.equal(typeof body.disputeWindowSeconds, "number");
 
     const row = body.resolutions[0];
-    assert.equal(row["explorerUrl"], "https://basescan.org/tx/0xdeadbeef");
+    assert.equal(row["explorerUrl"], "https://explorer.arc.io/tx/0xdeadbeef");
     assert.equal(row["method"], "auto");
     assert.equal(row["signer"], "0xSIGNER");
     assert.equal(row["confidenceState"], "VERIFIED");

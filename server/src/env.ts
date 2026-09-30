@@ -32,31 +32,35 @@ const schema = z.object({
   /** D-112 — the USDC destination network for fiat deposits is CONFIG, not
    *  code. Zero Hash asset codes are `USDC.<NETWORK>`; this names the
    *  network half. Whether Zero Hash can deliver USDC on Arc is an OPEN
-   *  question tracked in D-112 — if the launch chain moves, this variable
-   *  (plus Zero Hash-side asset support) is the entire switch. */
-  FIAT_USDC_NETWORK: z.string().min(1).default("BASE"),
+   *  question (F-001 is still in onboarding) — this variable plus Zero
+   *  Hash-side asset support is the entire switch. */
+  FIAT_USDC_NETWORK: z.string().min(1).default("ARC"),
   PLAID_CLIENT_ID: z.string().min(1).optional(),
   PLAID_SECRET: z.string().min(1).optional(),
   PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),
   /** Zero Hash's Plaid processor id, issued during commercial onboarding. */
   ZERO_HASH_PLAID_PROCESSOR_ID: z.string().min(1).optional(),
 
-  /** Network gate. Mantua runs on Base Mainnet — defaults to `mainnet`;
+  /** Network gate. Mantua runs on Arc Mainnet — defaults to `mainnet`;
    *  the `testnet` option is retained for the shared IS_MAINNET guard. */
   MANTUA_NETWORK: z.enum(["mainnet", "testnet"]).default("mainnet"),
 
-  /** Base Mainnet RPC URL — used by all server-side viem reads and the
+  /** Arc Mainnet RPC URL — used by all server-side viem reads and the
    *  wallet-side proxy. Phase 7 / R-006: production MUST point this at a
    *  dedicated endpoint (Alchemy / QuickNode / paid dRPC …); a public,
    *  rate-limited host fails the production boot (`rpcProviderIssues` in
    *  lib/rpc-client.ts). The default is a dev convenience only. */
-  BASE_RPC_URL: z.url().default("https://mainnet.base.org"),
+  ARC_RPC_URL: z.url().default("https://rpc.mainnet.arc.io"),
   /** Additional DEDICATED endpoints, comma-separated, tried in order after
    *  the primary (viem `fallback`). Public hosts here are a config error. */
-  BASE_RPC_FALLBACK_URLS: z.string().min(1).optional(),
+  ARC_RPC_FALLBACK_URLS: z.string().min(1).optional(),
   /** Append the public hosts as a last-resort backstop. Unset → on outside
    *  production, off in production. `1` in production fails the boot. */
-  BASE_RPC_PUBLIC_FALLBACK: z.union([z.literal("0"), z.literal("1")]).optional(),
+  ARC_RPC_PUBLIC_FALLBACK: z.union([z.literal("0"), z.literal("1")]).optional(),
+  /** Cutover-window escape hatch (R-006): lets production boot on a public
+   *  Arc primary while the dedicated key is provisioned. Logged loudly on
+   *  every boot; unset it the moment ARC_RPC_URL is a dedicated endpoint. */
+  RPC_ALLOW_PUBLIC_PRIMARY: z.union([z.literal("0"), z.literal("1")]).optional(),
 
   // ── Postgres pool (Phase 7 / R-002) — per lambda instance ────────────
   /** Connections per instance. Small on purpose: the real ceiling is this
@@ -72,10 +76,10 @@ const schema = z.object({
    *  to surface pre-Mantua v4 positions; absence degrades gracefully (only
    *  Mantua-opened positions are returned). */
   THE_GRAPH_API_KEY: z.string().min(1).optional(),
-  UNISWAP_V4_BASE_SUBGRAPH_ID: z
-    .string()
-    .min(1)
-    .default("HNCFA9TyBqpo5qpe6QreQABAA1kV8g46mhkCcicu6v2R"),
+  /** Uniswap v4 subgraph id for the active chain. None is published for
+   *  Arc (no canonical v4 there), so it is optional and the subgraph read
+   *  degrades to "Mantua-opened positions only" when unset. */
+  UNISWAP_V4_SUBGRAPH_ID: z.string().min(1).optional(),
 
   // ── Circle credentials ───────────────────────────────────────────────
   // Provisioned by hand in the Circle Developer Console — see
@@ -362,7 +366,7 @@ const schema = z.object({
   /** Owner EOA private key for the Stable Protection hook's peg-reference admin.
    *  The peg-sync keeper signs `setPegReference` (EUR/USD) with it. Absent →
    *  the keeper is disabled (503). Moves no user funds; only sets the FX
-   *  reference. Fund this address with ETH (Base gas). */
+   *  reference. Fund this address with USDC — Arc's gas token. */
   MANTUA_ADMIN_PRIVATE_KEY: z
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
@@ -382,7 +386,7 @@ const schema = z.object({
    *  (B4). Signs market creation (`createMarketIfAbsent`), freeze sweeps,
    *  and resolve/void submissions. Absent → market creation is skipped and
    *  /api/cron/resolution stays a 503 dry run. Holds no user funds; fund
-   *  with ETH for Base gas. */
+   *  with USDC — Arc's gas token. */
   MARKET_SIGNER_PRIVATE_KEY: z
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
@@ -436,7 +440,7 @@ export function circleCredentialIssues(e: Env): string[] {
   }
   if (/^TEST_API_KEY:/i.test(e.CIRCLE_API_KEY ?? "")) {
     issues.push(
-      "CIRCLE_API_KEY is a TEST key — the agent would be operating on testnet while the rest of the app is on Base Mainnet. Use a LIVE key.",
+      "CIRCLE_API_KEY is a TEST key — the agent would be operating on testnet while the rest of the app is on Arc Mainnet. Use a LIVE key.",
     );
   }
   return issues;

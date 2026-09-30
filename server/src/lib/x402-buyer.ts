@@ -1,5 +1,5 @@
 import { createPublicClient, erc20Abi, formatUnits, http, type Chain } from "viem";
-import { base } from "viem/chains";
+import { arc } from "./arc-chain.ts";
 import { privateKeyToAccount } from "viem/accounts";
 import { wrapFetchWithPayment, x402Client } from "@x402/fetch";
 import { ExactEvmScheme } from "@x402/evm";
@@ -22,7 +22,7 @@ import { logger } from "./logger.ts";
  * - Payment: a bare request draws HTTP 402 + PAYMENT-REQUIRED (base64 JSON
  *   accepts); `wrapFetchWithPayment` signs an EIP-3009 authorization with the
  *   buyer EOA and retries. The facilitator settles on-chain — the buyer needs
- *   USDC on Base but NO gas.
+ *   USDC on Arc but NO gas.
  * - Buyer wallet: X402_BUYER_PRIVATE_KEY, falling back to
  *   MANTUA_ADMIN_PRIVATE_KEY — the same EOA our x402 SELLER is paid to, so
  *   seller revenue funds buyer spend.
@@ -35,9 +35,9 @@ import { logger } from "./logger.ts";
 /** The x402 Bazaar index (public, no auth) — hosted on Coinbase's CDP
  *  facilitator; the registry behind the agent marketplaces. */
 const BAZAAR_URL = "https://api.cdp.coinbase.com/platform/v2/x402";
-/** CAIP-2 id for Base mainnet — the x402 settlement rail. Payable the
- *  moment the buyer EOA holds (a few cents of) real USDC on Base. */
-const X402_MAINNET = "eip155:8453";
+/** CAIP-2 id for Arc mainnet — the x402 settlement rail. Payable the
+ *  moment the buyer EOA holds (a few cents of) real USDC on Arc. */
+const X402_MAINNET = "eip155:5042";
 /** Networks the buyer can sign for, in preference order. */
 const BUYER_NETWORKS = [X402_MAINNET] as const;
 /** Settlement rails: CAIP-2 id → viem chain + native USDC for balance reads. */
@@ -48,9 +48,9 @@ interface Rail {
 }
 const RAILS: Record<string, Rail> = {
   [X402_MAINNET]: {
-    chain: base,
-    usdc: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    label: "Base mainnet",
+    chain: arc,
+    usdc: "0x3600000000000000000000000000000000000000",
+    label: "Arc mainnet",
   },
 };
 const USDC_DECIMALS = 6;
@@ -275,7 +275,7 @@ async function inspectPrice(
   if (!chosen) {
     const nets = [...new Set(accepts.map((a) => a.network).filter(Boolean))].join(", ");
     throw new X402Error(
-      `This service doesn't settle on a rail the buyer wallet can pay (accepts: ${nets || "unknown"}; buyer pays on Base).`,
+      `This service doesn't settle on a rail the buyer wallet can pay (accepts: ${nets || "unknown"}; buyer pays on Arc).`,
     );
   }
   const price = priceUsdFromAccept(chosen);

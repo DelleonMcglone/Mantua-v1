@@ -2,7 +2,7 @@ import { and, asc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import { events, leagues, marketFills, marketPrices, markets } from "../../db/schema/markets.ts";
 import { gamePlays } from "../../db/schema/sports-stats.ts";
-import { BASE_CHAIN_ID } from "../chains.ts";
+import { ARC_CHAIN_ID } from "../chains.ts";
 
 /**
  * Task 070 / AE-002 — the canonical-table reads behind the post
@@ -36,7 +36,7 @@ export async function readOpenMarketRows(db: DB, nowSeconds: number) {
     .where(
       and(
         eq(markets.state, "OPEN"),
-        eq(markets.chainId, BASE_CHAIN_ID),
+        eq(markets.chainId, ARC_CHAIN_ID),
         gte(events.startsAt, new Date((nowSeconds - AFTER_KICKOFF_SECONDS) * 1000)),
         lte(events.startsAt, new Date((nowSeconds + BEFORE_KICKOFF_SECONDS) * 1000)),
       ),

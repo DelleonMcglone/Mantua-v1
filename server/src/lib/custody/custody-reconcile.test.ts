@@ -4,7 +4,7 @@ import { circleUsdcRaw, reconcileWallet } from "./custody-reconcile.ts";
 
 /** Task 074 / IC-001 — the custodian's number against the chain's. */
 
-const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
+const USDC = "0x3600000000000000000000000000000000000000";
 
 void describe("reconcileWallet", () => {
   const w = { address: "0xaaa", circleWalletId: "cw-1" };

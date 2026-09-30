@@ -16,7 +16,7 @@ export const agentQueryRouter = Router();
  * server-side route to call so it isn't inert. Phase 7 will add more
  * query types under the same `/api/agent/query/...` prefix.
  *
- * Routing: `?type=pools` → list Base v3/v4 Uniswap pools.
+ * Routing: `?type=pools` → list Arc v3/v4 Uniswap pools.
  *          `?type=pool&poolId=...` → one pool's metadata.
  *          `?type=chart&poolId=...&days=N` → historical TVL + APY.
  */

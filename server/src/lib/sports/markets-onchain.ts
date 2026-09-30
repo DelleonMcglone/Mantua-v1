@@ -13,7 +13,7 @@
 import { recordActivity } from "../activity.ts";
 import { createWalletClient, encodePacked, http, keccak256, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { base } from "viem/chains";
+import { arc } from "../arc-chain.ts";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { env } from "../../env.ts";
 import type { DB } from "../../db/client.ts";
@@ -24,7 +24,7 @@ import {
   resolutions,
 } from "../../db/schema/index.ts";
 import { logAudit } from "../audit.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { registerDynamicTargets } from "../circle/allowed-targets.ts";
 import { executeAgentCalldata } from "../circle/execute.ts";
 import { logger } from "../logger.ts";
@@ -62,14 +62,14 @@ import type { ResolutionPlan, ResolutionSubmitter } from "./resolution.ts";
  *  (`DYNAMIC_MARKET_BY_CHAIN[chainId].operator`). This guard is
  *  load-bearing — a mispasted key is refused loudly instead of silently
  *  signing transactions the Resolver will reject. */
-export function marketSignerWallet(chainId: SupportedChainId = BASE_CHAIN_ID) {
+export function marketSignerWallet(chainId: SupportedChainId = ARC_CHAIN_ID) {
   const operator = DYNAMIC_MARKET_BY_CHAIN[chainId]?.operator.toLowerCase();
   if (!operator) return null;
   const key = env.MARKET_SIGNER_PRIVATE_KEY;
   if (key) {
     const account = privateKeyToAccount(key as `0x${string}`);
     if (account.address.toLowerCase() === operator) {
-      return createWalletClient({ account, chain: base, transport: http(env.BASE_RPC_URL) });
+      return createWalletClient({ account, chain: arc, transport: http(env.ARC_RPC_URL) });
     }
   }
   logger.warn(
@@ -80,7 +80,7 @@ export function marketSignerWallet(chainId: SupportedChainId = BASE_CHAIN_ID) {
 }
 
 /** The chain's markets/periphery/dynamic-market config, or throw. The
- *  Base Mainnet deployment is pending (docs/tasks/v2-roadmap.md), so today
+ *  Arc Mainnet deployment is pending (docs/tasks/v2-roadmap.md), so today
  *  this always throws and callers degrade to planning/read-only paths. */
 function marketsCfg(chainId: SupportedChainId) {
   const markets = MARKETS_BY_CHAIN[chainId];
@@ -335,7 +335,7 @@ async function bootstrapMarketPool(
  */
 export async function createMarketsOnChain(
   planned: readonly PlannedMarket[],
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
   /** Task 072 — combo pools seed from their own budget (COMBO_SEED_USDC). */
   seedRaw?: bigint,
 ): Promise<MarketCreationSummary | null> {
@@ -421,7 +421,7 @@ export async function createMarketsOnChain(
  * clean per-market failure for `executeResolution` to isolate.
  */
 export function liveResolutionSubmitter(
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): ResolutionSubmitter | null {
   const wallet = marketSignerWallet(chainId);
   if (!wallet) return null;
@@ -523,7 +523,7 @@ export interface ReclaimSummary {
  */
 export async function reclaimSettledMarkets(
   candidates: readonly ReclaimCandidate[],
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<ReclaimSummary | null> {
   const wallet = marketSignerWallet(chainId);
   if (!wallet) return null;
@@ -682,7 +682,7 @@ export interface RebandSummary {
  */
 export async function rebandOpenMarkets(
   candidates: readonly ReclaimCandidate[],
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<RebandSummary | null> {
   const wallet = marketSignerWallet(chainId);
   if (!wallet) return null;
@@ -960,7 +960,7 @@ export interface SettlementDeps {
  */
 export async function settleResolvedPositions(
   db: DB,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
   deps: SettlementDeps = {},
 ): Promise<SettlementSummary> {
   const rows = await db
@@ -1179,7 +1179,7 @@ export async function settleResolvedPositions(
 
 export async function filterPlanToExistingMarkets(
   plan: ResolutionPlan,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<ResolutionPlan> {
   const ids = [...new Set([...plan.freezes, ...plan.submissions.map((s) => s.marketId)])];
   if (ids.length === 0) return plan;

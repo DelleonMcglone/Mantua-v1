@@ -10,7 +10,7 @@ import {
 import { ArrowLeft, Bot, Check, ExternalLink, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { Banner } from "@/components/ui/banner.tsx";
-import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { Button } from "@/components/ui/button.tsx";
 import { useAgentPortfolio } from "./use-agent-portfolio.ts";
 import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
@@ -145,7 +145,7 @@ const uid = () => {
 
 export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Props) {
   const agent = useAgentPortfolio();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const [messages, setMessages] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const sessionIdRef = useRef<string | undefined>(undefined);
@@ -723,10 +723,7 @@ function renderResult(step: ToolStep): ReactNode {
             from the minted amount.
           </Banner>
           {d.burnTxHash && (
-            <TxRow
-              hash={d.burnTxHash}
-              explorerUrl={getExplorerTxUrl(BASE_CHAIN_ID, d.burnTxHash)}
-            />
+            <TxRow hash={d.burnTxHash} explorerUrl={getExplorerTxUrl(ARC_CHAIN_ID, d.burnTxHash)} />
           )}
         </div>
       );

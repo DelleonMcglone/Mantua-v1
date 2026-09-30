@@ -6,13 +6,16 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 **Spec:** [`docs/specs/dynamic-market-hook.md`](../../docs/specs/dynamic-market-hook.md)
 §37–§42.
 **Task:** B2-005.
-**Status: hook stack and periphery deployed and BaseScan-verified on Base
-Mainnet (8453), 2026-09-23** — see [Deployment record](#deployment-record). Wired into
-`server/src/lib/v4-contracts.ts` / `markets-contracts.ts` (PR #79). The
-settlement layer is deployed and registered too (see
-[Settlement layer](#settlement-layer)). **Markets are held closed** until
-launch sign-off (G-018 audit, G-017 rehearsal): production has no
-`MARKET_SIGNER_PRIVATE_KEY`, so the sync plans markets but sends nothing.
+**Status: Arc Mainnet (5042) deployment pending — the launch chain moved
+to Arc on 2026-09-29 (B-005).** The 2026-09-23 Base Mainnet deployment
+recorded below is **superseded** and no longer registered in the server;
+it stays as the reference run. Arc pre-checks passed 2026-09-29: transient
+storage works (tested live), the CREATE2 factory and Permit2 are present,
+there is no canonical Uniswap v4 on Arc (this stack brings its own
+`PoolManager`), gas is ~20 gwei paid in USDC (whole stack under $1), and
+Arcscan is Blockscout (`--verifier blockscout`, no API key). The deploy
+tooling below is still Base-targeted and is retargeted in the follow-up
+(H-009).
 
 **Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the

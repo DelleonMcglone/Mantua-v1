@@ -52,8 +52,8 @@ export interface X402ServiceDef {
   specRef: string;
 }
 
-/** CAIP-2 id for Base Mainnet — x402's USDC settlement network. */
-export const X402_NETWORK = "eip155:8453";
+/** CAIP-2 id for Arc Mainnet — x402's USDC settlement network. */
+export const X402_NETWORK = "eip155:5042";
 
 export const X402_SERVICES: readonly X402ServiceDef[] = [
   {
@@ -104,7 +104,7 @@ export const X402_SERVICES: readonly X402ServiceDef[] = [
     auth: "payment",
     family: "portfolio-exposure",
     summary:
-      "Positions, portfolio value, and exposure for any Base address — public chain state only",
+      "Positions, portfolio value, and exposure for any Arc address — public chain state only",
     specRef: "/api/x402/openapi/portfolio-exposure.json",
   },
   {

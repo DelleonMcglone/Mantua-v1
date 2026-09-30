@@ -2,7 +2,8 @@ import { keccak256, toHex } from "viem";
 import { baseRpcClient } from "./rpc-client.ts";
 import { fetchSubgraphPositions, type SubgraphPosition } from "./subgraph.ts";
 import { decodePositionInfo } from "./v4-position-info.ts";
-import { POSITION_MANAGER_VIEW_ABI, V4_POSITION_MANAGER } from "./v4-contracts.ts";
+import { POSITION_MANAGER_VIEW_ABI, getV4Addresses, hasCanonicalV4 } from "./v4-contracts.ts";
+import { DEFAULT_CHAIN_ID } from "./chains.ts";
 import { logger } from "./logger.ts";
 
 /**
@@ -60,18 +61,21 @@ interface OnchainEnrichment {
   liquidity: bigint;
 }
 
-async function enrichOne(tokenId: string): Promise<OnchainEnrichment | null> {
+async function enrichOne(
+  positionManager: `0x${string}`,
+  tokenId: string,
+): Promise<OnchainEnrichment | null> {
   try {
     const tokenIdBig = BigInt(tokenId);
     const [poolAndInfo, liquidity] = await Promise.all([
       baseRpcClient.readContract({
-        address: V4_POSITION_MANAGER,
+        address: positionManager,
         abi: POSITION_MANAGER_VIEW_ABI,
         functionName: "getPoolAndPositionInfo",
         args: [tokenIdBig],
       }),
       baseRpcClient.readContract({
-        address: V4_POSITION_MANAGER,
+        address: positionManager,
         abi: POSITION_MANAGER_VIEW_ABI,
         functionName: "getPositionLiquidity",
         args: [tokenIdBig],
@@ -124,6 +128,10 @@ export async function loadExternalPositions(
   walletAddress: string,
   options: { excludeTokenIds?: Set<string> } = {},
 ): Promise<EnrichedPosition[]> {
+  // Arc has no canonical v4 stack (v4-contracts.ts), so there are no
+  // externally-opened v4 positions to discover: degrade to none.
+  if (!hasCanonicalV4(DEFAULT_CHAIN_ID)) return [];
+  const positionManager = getV4Addresses(DEFAULT_CHAIN_ID).positionManager;
   let subgraphRows: SubgraphPosition[] | null;
   try {
     subgraphRows = await fetchSubgraphPositions(walletAddress);
@@ -137,7 +145,7 @@ export async function loadExternalPositions(
 
   const enriched = await Promise.all(
     candidates.map(async (sub) => {
-      const on = await enrichOne(sub.tokenId);
+      const on = await enrichOne(positionManager, sub.tokenId);
       if (!on || on.liquidity === 0n) return null;
       return toEnriched(sub, on);
     }),

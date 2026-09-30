@@ -56,7 +56,7 @@ function appendHistory(state: string, at: Date, reason: string) {
   ])}::jsonb`;
 }
 
-export function drizzleResolutionLog(db: DB, chainId = 8453): ResolutionLogWriter {
+export function drizzleResolutionLog(db: DB, chainId = 5042): ResolutionLogWriter {
   return {
     async record(entry: ResolutionRecord): Promise<void> {
       await db.insert(resolutions).values({
@@ -222,7 +222,11 @@ export async function syncConfidenceReviews(
         ...(step.state === "DISPUTED" ? { disputedAt: now } : {}),
         history: [{ state: step.state, at: now.toISOString(), reason: step.reason }],
       });
-      result.changed.push({ providerEventId: a.providerEventId, state: step.state, reason: step.reason });
+      result.changed.push({
+        providerEventId: a.providerEventId,
+        state: step.state,
+        reason: step.reason,
+      });
     } else if (step.changed) {
       await db
         .update(resolutionReviews)
@@ -242,7 +246,11 @@ export async function syncConfidenceReviews(
           history: appendHistory(step.state, now, step.reason),
         })
         .where(eq(resolutionReviews.id, existing.id));
-      result.changed.push({ providerEventId: a.providerEventId, state: step.state, reason: step.reason });
+      result.changed.push({
+        providerEventId: a.providerEventId,
+        state: step.state,
+        reason: step.reason,
+      });
       if (step.state === "DISPUTED" || step.state === "MANUAL_REVIEW") {
         logger.error(
           { providerEventId: a.providerEventId, state: step.state, reason: step.reason },
@@ -278,7 +286,9 @@ export async function loadStoredEvents(
       lastPolledAt: events.lastPolledAt,
     })
     .from(events)
-    .where(and(eq(events.provider, provider), inArray(events.providerEventId, [...providerEventIds])));
+    .where(
+      and(eq(events.provider, provider), inArray(events.providerEventId, [...providerEventIds])),
+    );
   for (const r of rows) {
     out.set(r.providerEventId, {
       status: r.status,
@@ -501,9 +511,7 @@ export function drizzleResolutionOpsStore(db: DB): ResolutionOpsStore {
       return db
         .select()
         .from(resolutionReviews)
-        .where(
-          and(eq(resolutionReviews.chainId, chainId), ne(resolutionReviews.state, "RESOLVED")),
-        )
+        .where(and(eq(resolutionReviews.chainId, chainId), ne(resolutionReviews.state, "RESOLVED")))
         .orderBy(desc(resolutionReviews.updatedAt))
         .limit(limit);
     },

@@ -9,7 +9,7 @@ import {
 import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
 import { ActivityFeed } from "@/features/activity/ActivityFeed.tsx";
@@ -43,7 +43,7 @@ interface AssetsCardProps {
 }
 
 export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const [tab, setTab] = useState<"assets" | "cash" | "positions" | "agent" | "activity">("assets");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("Descending");
@@ -376,7 +376,7 @@ function shortenAddress(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
-const KNOWN_ASSETS: AssetSymbol[] = ["USDC", "EURC", "cbBTC"];
+const KNOWN_ASSETS: AssetSymbol[] = ["USDC", "EURC", "cirBTC"];
 
 function AssetRowIcon({ symbol }: { symbol: string }) {
   const norm = symbol === "WETH" ? "ETH" : symbol;

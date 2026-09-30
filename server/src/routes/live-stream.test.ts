@@ -327,7 +327,7 @@ function position(balance: string): PositionRow {
 function usdc(raw: string): Balance {
   return {
     symbol: "USDC",
-    address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    address: "0x3600000000000000000000000000000000000000",
     decimals: 6,
     balanceRaw: raw,
     usdValue: Number(raw) / 1e6,
@@ -351,7 +351,7 @@ function userWorld() {
     user.failBalances
       ? Promise.reject(new Error("rpc down"))
       : Promise.resolve([usdc(user.usdcRaw)]);
-  w.deps.balancesChainId = 8453;
+  w.deps.balancesChainId = 5042;
   return { ...w, user };
 }
 
@@ -384,7 +384,7 @@ void describe("GET /api/stream/live — signed-in positions and balances (R-001)
       chainId: number;
       balances: Balance[];
     };
-    assert.equal(bal.chainId, 8453);
+    assert.equal(bal.chainId, 5042);
     assert.equal(bal.balances[0].balanceRaw, "5000000");
     assert.ok(user.positionReads.every((w) => w === WALLET));
   });

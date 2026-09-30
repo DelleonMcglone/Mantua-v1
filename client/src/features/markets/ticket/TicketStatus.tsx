@@ -1,5 +1,5 @@
 import { Banner } from "@/components/ui/banner.tsx";
-import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import type { TradeErrorCopy } from "../trade-errors.ts";
 import type { TradePhase } from "../use-market-trade.ts";
 import type { TradeTicketModel } from "./use-trade-ticket.ts";
@@ -44,7 +44,7 @@ export function TicketStatus({
 function ViewLink({ hash }: { hash: `0x${string}` }) {
   return (
     <a
-      href={getExplorerTxUrl(BASE_CHAIN_ID, hash)}
+      href={getExplorerTxUrl(ARC_CHAIN_ID, hash)}
       target="_blank"
       rel="noopener noreferrer"
       className="underline"

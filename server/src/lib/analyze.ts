@@ -57,7 +57,7 @@ const TOKEN_ALIASES: { aliases: string[]; coingeckoId: string; label: string; sy
     aliases: ["coinbase wrapped btc", "cbbtc", "cb-btc"],
     coingeckoId: "coinbase-wrapped-btc",
     label: "Coinbase Wrapped BTC",
-    symbol: "cbBTC",
+    symbol: "cirBTC",
   },
   { aliases: ["bitcoin", "btc"], coingeckoId: "bitcoin", label: "Bitcoin", symbol: "BTC" },
   { aliases: ["ethereum", "eth"], coingeckoId: "ethereum", label: "Ethereum", symbol: "ETH" },
@@ -217,15 +217,15 @@ async function usdcEurcPool(): Promise<AnalyzeResponse> {
       topic: "usdc-eurc-pool",
       title: "USDC/EURC pool health",
       summary:
-        "DefiLlama doesn't currently surface a USDC/EURC pool on Base. The USD/EUR stablecoin cross is thin onchain today; on Mantua it's the canonical pair for the Stable Protection hook, which keeps the pool from draining when either leg drifts off peg.",
-      sources: [{ name: "DefiLlama (Base pools)", url: "https://defillama.com/yields?chain=Base" }],
+        "DefiLlama doesn't currently surface a USDC/EURC pool on Arc. The USD/EUR stablecoin cross is thin onchain today; on Mantua it's the canonical pair for the Stable Protection hook, which keeps the pool from draining when either leg drifts off peg.",
+      sources: [{ name: "DefiLlama (Arc pools)", url: "https://defillama.com/yields?chain=Arc" }],
     };
   }
   const top = candidates.sort((a, b) => b.tvlUsd - a.tvlUsd)[0];
   return {
     topic: "usdc-eurc-pool",
-    title: "USDC/EURC — top Base pool",
-    summary: `The deepest USDC/EURC pool on Base sits in ${top.project} with ${fmtUsd(top.tvlUsd)} TVL${
+    title: "USDC/EURC — top Arc pool",
+    summary: `The deepest USDC/EURC pool on Arc sits in ${top.project} with ${fmtUsd(top.tvlUsd)} TVL${
       top.poolMeta ? ` (fee tier ${top.poolMeta})` : ""
     }. ${
       top.apy && top.apy > 0
@@ -244,14 +244,14 @@ async function usdcEurcPool(): Promise<AnalyzeResponse> {
 
 async function cbbtc24hVolume(): Promise<AnalyzeResponse> {
   const all = await listBasePools();
-  const cbbtcPools = all.filter((p) => /cbBTC/i.test(p.symbol));
+  const cbbtcPools = all.filter((p) => /cirBTC/i.test(p.symbol));
   if (cbbtcPools.length === 0) {
     return {
       topic: "cbbtc-24h-volume",
-      title: "cbBTC volume on Base",
+      title: "cirBTC volume on Arc",
       summary:
-        "DefiLlama doesn't currently surface cbBTC pools on Base. cbBTC was minted on Base in 2024; once liquidity migrates onto v3/v4 pools the route returns real numbers here.",
-      sources: [{ name: "DefiLlama (Base pools)", url: "https://defillama.com/yields?chain=Base" }],
+        "DefiLlama doesn't currently surface cirBTC pools on Arc. cirBTC was minted on Arc in 2024; once liquidity migrates onto v3/v4 pools the route returns real numbers here.",
+      sources: [{ name: "DefiLlama (Arc pools)", url: "https://defillama.com/yields?chain=Arc" }],
     };
   }
   const total24h = cbbtcPools.reduce((s, p) => s + (p.volumeUsd1d ?? 0), 0);
@@ -261,8 +261,8 @@ async function cbbtc24hVolume(): Promise<AnalyzeResponse> {
   const top = cbbtcPools.sort((a, b) => (b.volumeUsd1d ?? 0) - (a.volumeUsd1d ?? 0))[0];
   return {
     topic: "cbbtc-24h-volume",
-    title: "cbBTC — 24h volume on Base",
-    summary: `Across ${String(cbbtcPools.length)} cbBTC pools on Base, ${fmtUsd(total24h)} of volume cleared in the last 24h${
+    title: "cirBTC — 24h volume on Arc",
+    summary: `Across ${String(cbbtcPools.length)} cirBTC pools on Arc, ${fmtUsd(total24h)} of volume cleared in the last 24h${
       Number.isFinite(trend) ? ` (${fmtPct(trend)} vs the trailing 7-day daily average)` : ""
     }. Largest single pool: ${top.project} ${top.symbol} at ${fmtUsd(top.volumeUsd1d ?? 0)}.`,
     metrics: [
@@ -273,15 +273,15 @@ async function cbbtc24hVolume(): Promise<AnalyzeResponse> {
     ],
     sources: [
       {
-        name: "DefiLlama (Base cbBTC pools)",
-        url: "https://defillama.com/yields?chain=Base&token=CBBTC",
+        name: "DefiLlama (Arc cirBTC pools)",
+        url: "https://defillama.com/yields?chain=Arc&token=CBBTC",
       },
     ],
   };
 }
 
 async function cbbtcPrice(): Promise<AnalyzeResponse> {
-  // cbBTC (Coinbase Wrapped BTC) tracks Bitcoin — evaluate it at the BTC spot.
+  // cirBTC (Coinbase Wrapped BTC) tracks Bitcoin — evaluate it at the BTC spot.
   const [prices, changes] = await Promise.all([
     getTokenPrices(["coingecko:bitcoin"]),
     getTokenChangePercents(["coingecko:bitcoin"]),
@@ -291,8 +291,8 @@ async function cbbtcPrice(): Promise<AnalyzeResponse> {
   const change = changes["coingecko:bitcoin"] ?? 0;
   return {
     topic: "cbbtc-price",
-    title: "cbBTC spot price",
-    summary: `cbBTC (Coinbase Wrapped BTC) is evaluated at the Bitcoin spot — ${fmtUsd(price)} per cbBTC${
+    title: "cirBTC spot price",
+    summary: `cirBTC (Coinbase Wrapped BTC) is evaluated at the Bitcoin spot — ${fmtUsd(price)} per cirBTC${
       Number.isFinite(change) ? `, ${fmtPct(change)} in the last 24h` : ""
     }.`,
     metrics: [
@@ -311,7 +311,7 @@ async function usdc24hVolume(): Promise<AnalyzeResponse> {
       topic: "usdc-24h-volume",
       title: "USDC 24h volume",
       summary: "DefiLlama doesn't currently surface USDC pool volume for this view.",
-      sources: [{ name: "DefiLlama (Base pools)", url: "https://defillama.com/yields?chain=Base" }],
+      sources: [{ name: "DefiLlama (Arc pools)", url: "https://defillama.com/yields?chain=Arc" }],
     };
   }
   const total24h = usdcPools.reduce((s, p) => s + (p.volumeUsd1d ?? 0), 0);
@@ -321,8 +321,8 @@ async function usdc24hVolume(): Promise<AnalyzeResponse> {
   const top = usdcPools.sort((a, b) => (b.volumeUsd1d ?? 0) - (a.volumeUsd1d ?? 0))[0];
   return {
     topic: "usdc-24h-volume",
-    title: "USDC — 24h volume on Base",
-    summary: `Across ${String(usdcPools.length)} USDC pools on Base, ${fmtUsd(total24h)} of volume cleared in the last 24h${
+    title: "USDC — 24h volume on Arc",
+    summary: `Across ${String(usdcPools.length)} USDC pools on Arc, ${fmtUsd(total24h)} of volume cleared in the last 24h${
       Number.isFinite(trend) ? ` (${fmtPct(trend)} vs the trailing 7-day daily average)` : ""
     }. Largest single pool: ${top.project} ${top.symbol} at ${fmtUsd(top.volumeUsd1d ?? 0)}.`,
     metrics: [
@@ -333,8 +333,8 @@ async function usdc24hVolume(): Promise<AnalyzeResponse> {
     ],
     sources: [
       {
-        name: "DefiLlama (Base USDC pools)",
-        url: "https://defillama.com/yields?chain=Base&token=USDC",
+        name: "DefiLlama (Arc USDC pools)",
+        url: "https://defillama.com/yields?chain=Arc&token=USDC",
       },
     ],
   };
@@ -393,13 +393,18 @@ async function marketSummary(): Promise<AnalyzeResponse> {
   };
 }
 
-/** Mantua's hooked pools on Base (hook + pair + static fee tier). */
-const BASE_POOLS: { hook: HookName; a: TokenSymbol; b: TokenSymbol; fee: FeeTier; label: string }[] =
-  [
-    { hook: "stable-protection", a: "USDC", b: "EURC", fee: 100, label: "Stable Protection" },
-    { hook: "dynamic-fee", a: "USDC", b: "cbBTC", fee: 3000, label: "Dynamic Fee" },
-    { hook: "dynamic-fee", a: "EURC", b: "cbBTC", fee: 3000, label: "Dynamic Fee" },
-  ];
+/** Mantua's hooked pools on Arc (hook + pair + static fee tier). */
+const BASE_POOLS: {
+  hook: HookName;
+  a: TokenSymbol;
+  b: TokenSymbol;
+  fee: FeeTier;
+  label: string;
+}[] = [
+  { hook: "stable-protection", a: "USDC", b: "EURC", fee: 100, label: "Stable Protection" },
+  { hook: "dynamic-fee", a: "USDC", b: "cirBTC", fee: 3000, label: "Dynamic Fee" },
+  { hook: "dynamic-fee", a: "EURC", b: "cirBTC", fee: 3000, label: "Dynamic Fee" },
+];
 
 /** sqrtPriceX96 → human price (token1 per token0), decimal-adjusted. */
 function priceFromSqrt(sqrtPriceX96: bigint, dec0: number, dec1: number): number {
@@ -439,10 +444,10 @@ async function basePools(): Promise<AnalyzeResponse> {
   }
   return {
     topic: "base-pools",
-    title: "Live Mantua pools on Base",
-    summary: `${String(liveCount)} of ${String(BASE_POOLS.length)} Mantua hooked pools are initialized on Base — prices read live from on-chain v4 state.`,
+    title: "Live Mantua pools on Arc",
+    summary: `${String(liveCount)} of ${String(BASE_POOLS.length)} Mantua hooked pools are initialized on Arc — prices read live from on-chain v4 state.`,
     metrics,
-    sources: [{ name: "BaseScan", url: "https://basescan.org" }],
+    sources: [{ name: "Arcscan", url: "https://explorer.arc.io" }],
   };
 }
 
@@ -494,7 +499,7 @@ async function tokenPrice(symbol: string): Promise<AnalyzeResponse> {
     return {
       topic: "token-price",
       title: `Price lookup: ${symbol}`,
-      summary: `I don't have ${symbol} in my alias map yet. Known names: bitcoin, ethereum, cbBTC, USDC, USDT, EURC, WETH, MKR, PENDLE, ONDO, CFG, SOL.`,
+      summary: `I don't have ${symbol} in my alias map yet. Known names: bitcoin, ethereum, cirBTC, USDC, USDT, EURC, WETH, MKR, PENDLE, ONDO, CFG, SOL.`,
     };
   }
   const key = `coingecko:${alias.coingeckoId}`;
@@ -532,10 +537,10 @@ function mantuaHooks(): AnalyzeResponse {
     topic: "mantua-hooks",
     title: "Mantua hooks",
     summary:
-      "Mantua ships two hooks on Base: Stable Protection and Dynamic Fee. Each plugs into the pool lifecycle to add behavior vanilla pools can't.",
+      "Mantua ships two hooks on Arc: Stable Protection and Dynamic Fee. Each plugs into the pool lifecycle to add behavior vanilla pools can't.",
     bullets: [
       "Stable Protection — FX-aware peg-zone pool. Reads virtual reserves at every swap, measures deviation against a live EUR/USD reference (Pyth), classifies HEALTHY through CRITICAL, and blocks or surcharges trades during real depegs. Pair: USDC/EURC.",
-      "Dynamic Fee — adjusts the per-swap fee on every trade based on a TWAP-derived volatility signal. Rewards LPs more during turbulence; cheaper for stable flow. Pairs: USDC/cbBTC and EURC/cbBTC.",
+      "Dynamic Fee — adjusts the per-swap fee on every trade based on a TWAP-derived volatility signal. Rewards LPs more during turbulence; cheaper for stable flow. Pairs: USDC/cirBTC and EURC/cirBTC.",
     ],
     sources: [
       { name: "Uniswap v4 Hooks", url: "https://docs.uniswap.org/contracts/v4/concepts/hooks" },
@@ -545,7 +550,7 @@ function mantuaHooks(): AnalyzeResponse {
 
 /**
  * Coinbase spot prices for the three Mantua assets via Coinbase's public
- * (no-auth) market-data endpoints. cbBTC is BTC-pegged, so it tracks
+ * (no-auth) market-data endpoints. cirBTC is BTC-pegged, so it tracks
  * Coinbase's BTC-USD (which also carries 24h change). USDC/EURC come from
  * the public spot endpoint. Read-only — no trading/keys involved.
  */
@@ -560,7 +565,7 @@ async function coinbasePrices(): Promise<AnalyzeResponse> {
   if (eurc !== null) metrics.push({ label: "EURC", value: fmtUsd(eurc) });
   if (btc) {
     metrics.push({
-      label: "cbBTC (tracks BTC)",
+      label: "cirBTC (tracks BTC)",
       value: fmtUsd(btc.price),
       ...(btc.change24hPct !== null ? { hint: `${fmtPct(btc.change24hPct)} 24h` } : {}),
     });
@@ -570,7 +575,7 @@ async function coinbasePrices(): Promise<AnalyzeResponse> {
   return {
     topic: "coinbase-prices",
     title: "Coinbase spot prices",
-    summary: `Coinbase spot (read-only public market data): USDC ${usdc !== null ? fmtUsd(usdc) : "—"}, EURC ${eurc !== null ? fmtUsd(eurc) : "—"}. cbBTC is BTC-pegged and tracks Coinbase BTC at ${btc ? fmtUsd(btc.price) : "—"}${btcChange != null ? ` (${fmtPct(btcChange)} 24h)` : ""}.`,
+    summary: `Coinbase spot (read-only public market data): USDC ${usdc !== null ? fmtUsd(usdc) : "—"}, EURC ${eurc !== null ? fmtUsd(eurc) : "—"}. cirBTC is BTC-pegged and tracks Coinbase BTC at ${btc ? fmtUsd(btc.price) : "—"}${btcChange != null ? ` (${fmtPct(btcChange)} 24h)` : ""}.`,
     metrics,
     sources: [
       {

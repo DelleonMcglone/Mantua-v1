@@ -13,7 +13,7 @@ import { hedgeStrategies, type HedgeStrategy } from "../../db/schema/markets.ts"
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
 import type { AuditAction } from "../../db/schema/safety.ts";
 import { users } from "../../db/schema/users.ts";
-import { BASE_CHAIN_ID } from "../chains.ts";
+import { ARC_CHAIN_ID } from "../chains.ts";
 import type { StrategyConfig } from "./strategies.ts";
 
 export async function resolveUserId(db: DB, privyUserId: string): Promise<string | null> {
@@ -41,7 +41,7 @@ async function audit(
     action,
     outcome,
     params,
-    chainId: BASE_CHAIN_ID,
+    chainId: ARC_CHAIN_ID,
     ...(reason ? { reason } : {}),
   });
 }
@@ -167,7 +167,7 @@ export async function engineExecuted(
     outcome: "executed",
     params: { strategyId, ...detail },
     txHash,
-    chainId: BASE_CHAIN_ID,
+    chainId: ARC_CHAIN_ID,
   });
   // Task 062 / PF-015, PF-020 — the hedge on the user's timeline, linked to
   // the position it protected (PF-010's hedge relationship).
@@ -177,7 +177,7 @@ export async function engineExecuted(
     actor: "agent",
     userId: row.userId,
     txHash,
-    chainId: BASE_CHAIN_ID,
+    chainId: ARC_CHAIN_ID,
     marketId: typeof detail["marketId"] === "string" ? detail["marketId"] : row.marketId,
     positionRef: strategyId,
     asset: row.strategyType,

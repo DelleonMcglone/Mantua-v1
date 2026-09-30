@@ -8,11 +8,11 @@ export const poolsRouter = Router();
 
 /**
  * P4-001 — GET /api/pools
- * Returns Base Uniswap pools sorted by TVL desc. Open route (no auth)
+ * Returns Arc Uniswap pools sorted by TVL desc. Open route (no auth)
  * since it's read-only public data; rate-limit applies via the global
  * ipRateLimiter wired in server/src/index.ts.
  *
- * DefiLlama only indexes Base mainnet, so when `MANTUA_NETWORK` is
+ * DefiLlama only indexes Arc mainnet, so when `MANTUA_NETWORK` is
  * flipped off "mainnet" we return an empty list rather than surfacing
  * pools the user can't actually interact with. Once we start indexing
  * Mantua-created pools, swap this branch for the real source.

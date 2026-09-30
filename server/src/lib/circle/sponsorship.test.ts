@@ -1,7 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { env } from "../../env.ts";
-import { V4_POOL_MANAGER } from "../v4-contracts.ts";
+import { PERMIT2 } from "../v4-contracts.ts";
+
+// Any allowlisted target works as the fake execution `to`; Permit2 is on
+// every chain (Arc has no canonical v4 PoolManager).
+const V4_POOL_MANAGER = PERMIT2;
 import { setCircleClientForTesting } from "./client.ts";
 import {
   CircleReceiptTimeoutError,

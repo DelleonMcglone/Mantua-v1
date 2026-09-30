@@ -32,7 +32,7 @@ const savedSeller = e.X402_SELLER_ADDRESS;
 
 const SELLER = "0x00000000000000000000000000000000DeaDBeef";
 const BRIEF_PATH = "/api/x402/analyst-brief";
-const BASE_NETWORK = "eip155:8453";
+const BASE_NETWORK = "eip155:5042";
 
 // The paywall middleware syncs supported payment kinds from the public
 // facilitator (x402.org) when the module loads / on first paywalled request.
@@ -41,8 +41,7 @@ const BASE_NETWORK = "eip155:8453";
 const realFetch = globalThis.fetch;
 const facilitatorHits: string[] = [];
 globalThis.fetch = (input, init): Promise<Response> => {
-  const url =
-    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (url.includes("x402.org")) {
     facilitatorHits.push(url);
     return Promise.resolve(
@@ -96,32 +95,18 @@ void describe("x402 seller — /api/x402/analyst-brief", () => {
     assert.equal(facilitatorHits.length, 0, "graceful-dark must not touch the facilitator");
   });
 
-  void it("paywalls an unpaid request with 402 + PAYMENT-REQUIRED when the seller is set", async () => {
+  void it("answers an unpaid request with a typed 503 while the exact scheme has no Arc config", async () => {
+    // Arc cutover (B-005): @x402/evm's built-in network registry has no
+    // eip155:5042 entry, so payment-requirement construction throws. The
+    // route degrades to 503 X402_NETWORK_UNSUPPORTED rather than a crashed
+    // request; moving it onto the dual-rail paywall (x402-paywall.ts)
+    // restores the 402 — tracked as the analyst-brief follow-up.
     e.X402_SELLER_ADDRESS = SELLER;
-    const origin = await serve(await loadRouter("enabled"));
-    const res = await realFetch(`${origin}${BRIEF_PATH}`, {
-      headers: { Accept: "application/json" },
-    });
-    assert.equal(res.status, 402, "payment IS the auth — unpaid requests get 402");
-
-    const header = res.headers.get("payment-required");
-    assert.ok(header, "402 must carry the PAYMENT-REQUIRED header");
-    const decoded = JSON.parse(Buffer.from(header, "base64").toString("utf8")) as {
-      accepts?: {
-        scheme?: string;
-        network?: string;
-        payTo?: string;
-        amount?: string;
-        maxAmountRequired?: string;
-      }[];
-    };
-    const accept = decoded.accepts?.[0];
-    assert.ok(accept, "accepts[] must not be empty");
-    assert.equal(accept.scheme, "exact");
-    assert.equal(accept.network, BASE_NETWORK);
-    assert.equal(accept.payTo?.toLowerCase(), SELLER.toLowerCase());
-    // $0.01 USDC in atomic units (6 decimals).
-    assert.equal(accept.amount ?? accept.maxAmountRequired, "10000");
+    const origin = await serve(await loadRouter("arc-gated"));
+    const res = await realFetch(`${origin}${BRIEF_PATH}`);
+    assert.equal(res.status, 503);
+    const body = (await res.json()) as { code?: string };
+    assert.equal(body.code, "X402_NETWORK_UNSUPPORTED");
   });
 
   void it("keeps unrelated paths out of the paywall", async () => {

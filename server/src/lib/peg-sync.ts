@@ -1,6 +1,6 @@
 import { createWalletClient, http, parseAbi, parseUnits } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { base } from "viem/chains";
+import { arc } from "./arc-chain.ts";
 import { env } from "../env.ts";
 import { logger } from "./logger.ts";
 import { getPythPrice, PYTH_EUR_USD_FEED_ID } from "./pyth-prices.ts";
@@ -21,7 +21,7 @@ import { baseRpcClient } from "./rpc-client.ts";
  * first and the write is skipped when it is within DRIFT_GATE_BPS of the
  * live rate, so cadence doesn't translate into hourly transactions (EUR/USD
  * moves slowly relative to the 5% CRITICAL band). Disabled (503) when
- * `MANTUA_ADMIN_PRIVATE_KEY` is unset or the SP hook has no Base Mainnet
+ * `MANTUA_ADMIN_PRIVATE_KEY` is unset or the SP hook has no Arc Mainnet
  * deployment yet (STABLE_PROTECTION_HOOK_ADDRESS).
  */
 
@@ -76,7 +76,7 @@ export function pegDriftBps(liveX18: bigint, onchainX18: bigint): number {
 }
 
 /** Read EUR/USD from Pyth and push it to the SP hook's peg reference on
- *  Base, unless the on-chain ref is already within the drift gate. */
+ *  Arc, unless the on-chain ref is already within the drift gate. */
 export async function syncEurUsdPegReference(): Promise<PegSyncResult> {
   const key = env.MANTUA_ADMIN_PRIVATE_KEY;
   if (!key) throw new PegSyncUnavailableError();
@@ -88,9 +88,7 @@ export async function syncEurUsdPegReference(): Promise<PegSyncResult> {
 
   const spHook = getHookAddress("stable-protection", DEFAULT_CHAIN_ID);
   if (!spHook) {
-    throw new PegSyncUnavailableError(
-      "Stable Protection hook is not deployed on Base Mainnet yet.",
-    );
+    throw new PegSyncUnavailableError("Stable Protection hook is not deployed on Arc Mainnet yet.");
   }
   const { key: poolKey } = buildPoolKey(
     "USDC",
@@ -125,8 +123,8 @@ export async function syncEurUsdPegReference(): Promise<PegSyncResult> {
   const account = privateKeyToAccount(key as `0x${string}`);
   const wallet = createWalletClient({
     account,
-    chain: base,
-    transport: http(env.BASE_RPC_URL),
+    chain: arc,
+    transport: http(env.ARC_RPC_URL),
   });
 
   const txHash = await wallet.writeContract({

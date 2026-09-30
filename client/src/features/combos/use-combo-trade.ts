@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api.ts";
 import { useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import { usePendingTrades } from "@/features/markets/PendingTradesProvider.tsx";
 import { classifyTradeError } from "@/features/markets/trade-status-core.ts";
 import type { TradeCalldata, TradePhase, TradeQuote } from "@/features/markets/use-market-trade.ts";
@@ -42,7 +42,7 @@ function buildingQuote(quote: ComboQuoteOk): TradeQuote {
 
 export function useComboTrade(legs: readonly BuilderLeg[]) {
   const getWallet = useChainWalletClient();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const register = usePendingTrades();
   const [phase, setPhase] = useState<TradePhase>({ kind: "idle" });
 

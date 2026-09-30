@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api.ts";
 import { useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import type { FeeQuoteWire } from "./market-trade-core.ts";
 import { usePendingTrades } from "./PendingTradesProvider.tsx";
 import { classifyTradeError, type TradeErrorKind } from "./trade-status-core.ts";
 import { approveIfNeeded, awaitTradeReceipt, sendTrade } from "./wallet-execution.ts";
 
 /** How long the ticket itself waits for the receipt before handing the
- *  trade to the pending register (which keeps asking the server). A Base
+ *  trade to the pending register (which keeps asking the server). An Arc
  *  block is ~2 s; a minute of silence is an RPC problem, not a slow chain. */
 export { RECEIPT_WAIT_MS } from "./wallet-execution.ts";
 
@@ -108,7 +108,7 @@ interface Args {
  */
 export function useMarketTrade({ eventId, outcomeIndex, direction, amount, enabled }: Args) {
   const getWallet = useChainWalletClient();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const [phase, setPhase] = useState<TradePhase>({ kind: "idle" });
   const register = usePendingTrades();
 

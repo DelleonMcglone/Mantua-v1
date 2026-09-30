@@ -5,7 +5,7 @@ import { agentWallets } from "../db/schema/agent.ts";
 import { custodyDestinations, type Institution } from "../db/schema/institutions.ts";
 import { users } from "../db/schema/users.ts";
 import { logAudit } from "../lib/audit.ts";
-import { BASE_CHAIN_ID } from "../lib/chains.ts";
+import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
 import { limitsOf, membersOf } from "../lib/custody/custody-store.ts";
 import { segregateAgentWallet } from "../lib/custody/custody-wallet-set.ts";
@@ -45,7 +45,7 @@ institutionRouter.get("/api/institution", requireAuth, async (req: Request, res:
       db
         .select()
         .from(agentWallets)
-        .where(and(eq(agentWallets.userId, ctx.userId), eq(agentWallets.blockchain, "BASE")))
+        .where(and(eq(agentWallets.userId, ctx.userId), eq(agentWallets.blockchain, "ARC")))
         .limit(1)
         .then((rows) => rows.at(0) ?? null),
       db
@@ -106,7 +106,7 @@ institutionRouter.post(
     const ctx = await memberContext(req, res);
     if (!ctx || !allow(ctx, "trade", res)) return;
     try {
-      const result = await segregateAgentWallet(db, { userId: ctx.userId, chainId: BASE_CHAIN_ID });
+      const result = await segregateAgentWallet(db, { userId: ctx.userId, chainId: ARC_CHAIN_ID });
       await logAudit({
         ...getRequestContext(req),
         action: "agent_wallet_provision",

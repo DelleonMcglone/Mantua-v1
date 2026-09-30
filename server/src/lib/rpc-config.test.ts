@@ -9,19 +9,21 @@ import {
   rpcProviderIssues,
 } from "./rpc-config.ts";
 
-const DEDICATED = "https://base-mainnet.g.alchemy.com/v2/KEY";
-const DEDICATED_2 = "https://ancient-icy-sky.base-mainnet.quiknode.pro/KEY2/";
+const DEDICATED = "https://arc-mainnet.g.alchemy.com/v2/KEY";
+const DEDICATED_2 = "https://ancient-icy-sky.arc-mainnet.quiknode.pro/KEY2/";
+const PUBLIC = "https://rpc.mainnet.arc.io";
 
 /**
  * Phase 7 / R-006 — no public rate-limited endpoint in production: the
  * upstream list is pure and the boot check is exact.
  */
 void describe("isPublicRpcUrl", () => {
-  void it("recognizes the public Base hosts (and subdomains), not dedicated providers", () => {
-    assert.equal(isPublicRpcUrl("https://mainnet.base.org"), true);
-    assert.equal(isPublicRpcUrl("https://base-rpc.publicnode.com"), true);
-    assert.equal(isPublicRpcUrl("https://base.llamarpc.com"), true);
-    assert.equal(isPublicRpcUrl("https://rpc.base.drpc.org"), true, "subdomain of a public host");
+  void it("recognizes the public Arc hosts (and subdomains), not dedicated providers", () => {
+    assert.equal(isPublicRpcUrl(PUBLIC), true);
+    assert.equal(isPublicRpcUrl("https://rpc.testnet.arc.io"), true);
+    assert.equal(isPublicRpcUrl("https://rpc.mainnet.arc.network"), true);
+    assert.equal(isPublicRpcUrl("https://arc.drpc.org"), true, "subdomain of a public gateway");
+    assert.equal(isPublicRpcUrl("https://1rpc.io/arc"), true);
     assert.equal(isPublicRpcUrl(DEDICATED), false);
     assert.equal(isPublicRpcUrl(DEDICATED_2), false);
     assert.equal(isPublicRpcUrl("not a url"), false);
@@ -33,65 +35,78 @@ void describe("resolveRpcUrls", () => {
     assert.deepEqual(
       resolveRpcUrls({
         NODE_ENV: "development",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_FALLBACK_URLS: `${DEDICATED_2}, ${DEDICATED}`,
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_FALLBACK_URLS: `${DEDICATED_2}, ${DEDICATED}`,
       }),
-      [DEDICATED, DEDICATED_2, "https://mainnet.base.org", "https://base-rpc.publicnode.com"],
+      [DEDICATED, DEDICATED_2, PUBLIC],
     );
   });
 
-  void it("in production the public hosts are NOT appended unless explicitly allowed", () => {
+  void it("in production the public host is NOT appended unless explicitly allowed", () => {
     assert.deepEqual(
       resolveRpcUrls({
         NODE_ENV: "production",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_FALLBACK_URLS: DEDICATED_2,
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_FALLBACK_URLS: DEDICATED_2,
       }),
       [DEDICATED, DEDICATED_2],
     );
     assert.deepEqual(
       resolveRpcUrls({
         NODE_ENV: "production",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_PUBLIC_FALLBACK: "1",
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_PUBLIC_FALLBACK: "1",
       }),
-      [DEDICATED, "https://mainnet.base.org", "https://base-rpc.publicnode.com"],
+      [DEDICATED, PUBLIC],
     );
     assert.deepEqual(
       resolveRpcUrls({
         NODE_ENV: "development",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_PUBLIC_FALLBACK: "0",
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_PUBLIC_FALLBACK: "0",
       }),
       [DEDICATED],
     );
   });
 
   void it("the dev default (a public primary) still yields a working list", () => {
-    assert.deepEqual(
-      resolveRpcUrls({ NODE_ENV: "development", BASE_RPC_URL: "https://mainnet.base.org" }),
-      ["https://mainnet.base.org", "https://base-rpc.publicnode.com"],
-    );
+    assert.deepEqual(resolveRpcUrls({ NODE_ENV: "development", ARC_RPC_URL: PUBLIC }), [PUBLIC]);
   });
 });
 
 void describe("rpcProviderIssues (the boot check)", () => {
   void it("a public primary is an issue everywhere (env.ts makes it fatal in production)", () => {
+    const issues = rpcProviderIssues({ NODE_ENV: "production", ARC_RPC_URL: PUBLIC });
+    assert.equal(issues.length, 1);
+    assert.match(issues[0] ?? "", /public, rate-limited host rpc\.mainnet\.arc\.io/);
+    assert.match(issues[0] ?? "", /dedicated Arc RPC endpoint/);
+  });
+
+  void it("RPC_ALLOW_PUBLIC_PRIMARY=1 lifts only the public-primary issue — the cutover escape hatch", () => {
+    assert.deepEqual(
+      rpcProviderIssues({
+        NODE_ENV: "production",
+        ARC_RPC_URL: PUBLIC,
+        RPC_ALLOW_PUBLIC_PRIMARY: "1",
+      }),
+      [],
+    );
+    // It does not excuse a public host in the fallback list.
     const issues = rpcProviderIssues({
       NODE_ENV: "production",
-      BASE_RPC_URL: "https://mainnet.base.org",
+      ARC_RPC_URL: DEDICATED,
+      ARC_RPC_FALLBACK_URLS: PUBLIC,
+      RPC_ALLOW_PUBLIC_PRIMARY: "1",
     });
     assert.equal(issues.length, 1);
-    assert.match(issues[0] ?? "", /public, rate-limited host mainnet\.base\.org/);
-    assert.match(issues[0] ?? "", /dedicated RPC endpoint/);
   });
 
   void it("a dedicated primary with dedicated fallbacks and no public backstop is clean", () => {
     assert.deepEqual(
       rpcProviderIssues({
         NODE_ENV: "production",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_FALLBACK_URLS: DEDICATED_2,
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_FALLBACK_URLS: DEDICATED_2,
       }),
       [],
     );
@@ -100,24 +115,24 @@ void describe("rpcProviderIssues (the boot check)", () => {
   void it("a public host in the fallback list, or the public backstop enabled in production, are issues", () => {
     const fallback = rpcProviderIssues({
       NODE_ENV: "production",
-      BASE_RPC_URL: DEDICATED,
-      BASE_RPC_FALLBACK_URLS: "https://base.llamarpc.com",
+      ARC_RPC_URL: DEDICATED,
+      ARC_RPC_FALLBACK_URLS: "https://rpc.testnet.arc.io",
     });
     assert.equal(fallback.length, 1);
-    assert.match(fallback[0] ?? "", /BASE_RPC_FALLBACK_URLS contains the public host/);
+    assert.match(fallback[0] ?? "", /ARC_RPC_FALLBACK_URLS contains the public host/);
     const backstop = rpcProviderIssues({
       NODE_ENV: "production",
-      BASE_RPC_URL: DEDICATED,
-      BASE_RPC_PUBLIC_FALLBACK: "1",
+      ARC_RPC_URL: DEDICATED,
+      ARC_RPC_PUBLIC_FALLBACK: "1",
     });
     assert.equal(backstop.length, 1);
-    assert.match(backstop[0] ?? "", /BASE_RPC_PUBLIC_FALLBACK=1 in production/);
+    assert.match(backstop[0] ?? "", /ARC_RPC_PUBLIC_FALLBACK=1 in production/);
     // Outside production the backstop is fine.
     assert.deepEqual(
       rpcProviderIssues({
         NODE_ENV: "development",
-        BASE_RPC_URL: DEDICATED,
-        BASE_RPC_PUBLIC_FALLBACK: "1",
+        ARC_RPC_URL: DEDICATED,
+        ARC_RPC_PUBLIC_FALLBACK: "1",
       }),
       [],
     );
@@ -134,14 +149,14 @@ void describe("parseUrlList", () => {
 
 void describe("RpcHealthRegistry (R-005's RPC rung)", () => {
   void it("starts healthy, counts consecutive failures per host, and reports fallback when the primary is down", () => {
-    const r = new RpcHealthRegistry([DEDICATED, DEDICATED_2, "https://mainnet.base.org"]);
+    const r = new RpcHealthRegistry([DEDICATED, DEDICATED_2, "https://rpc.mainnet.arc.io"]);
     let s = r.snapshot();
     assert.equal(s.healthy, true);
     assert.equal(s.onFallback, false);
     assert.equal(s.detail, "ok");
     assert.equal(
       s.hosts[0]?.host,
-      "base-mainnet.g.alchemy.com",
+      "arc-mainnet.g.alchemy.com",
       "hostname only — never the keyed URL",
     );
     assert.equal(s.hosts[0]?.primary, true);
@@ -154,7 +169,7 @@ void describe("RpcHealthRegistry (R-005's RPC rung)", () => {
     assert.equal(s.hosts[0]?.lastError, "429 rate limit");
     assert.equal(s.healthy, true, "the fallbacks are still up");
     assert.equal(s.onFallback, true);
-    assert.match(s.detail, /primary base-mainnet\.g\.alchemy\.com failing — on fallback/);
+    assert.match(s.detail, /primary arc-mainnet\.g\.alchemy\.com failing — on fallback/);
 
     r.record(0, true, undefined, 2_000);
     s = r.snapshot();

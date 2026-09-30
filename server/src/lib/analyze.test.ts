@@ -1,6 +1,6 @@
 /**
  * P9-001 — analyze alias resolver tests. Covers the canonical
- * mapping between user-typed token names (bitcoin, btc, cbBTC,
+ * mapping between user-typed token names (bitcoin, btc, cirBTC,
  * etc.) and CoinGecko coin IDs that the runner uses. Pure function;
  * no network. Network-driven runners (`tokenPrice`, etc.) are
  * covered indirectly by the integration probes in this thread plus
@@ -27,7 +27,7 @@ describe("resolveTokenAlias", () => {
     assert.equal(resolveTokenAlias("eth")?.coingeckoId, "ethereum");
   });
 
-  it("resolves cbBTC family (cbbtc, cb-btc) before bitcoin", () => {
+  it("resolves cirBTC family (cbbtc, cb-btc) before bitcoin", () => {
     // The aliases array orders longer / more specific entries first
     // so 'cbbtc' doesn't fall through to the 'bitcoin' / 'btc' entry.
     assert.equal(resolveTokenAlias("cbbtc")?.coingeckoId, "coinbase-wrapped-btc");

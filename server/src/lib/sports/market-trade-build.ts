@@ -12,7 +12,7 @@ import { and, eq } from "drizzle-orm";
 const MARKET_STARTS_AT_ABI = parseAbi(["function startsAt() view returns (uint64)"]);
 import { db as defaultDb, type DB } from "../../db/client.ts";
 import { events, markets as marketsTable } from "../../db/schema/index.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { computeMarketId } from "../market-id.ts";
 import {
@@ -39,8 +39,8 @@ import { sqrtBigInt } from "../sqrt-price.ts";
 import { assertSwapRoute } from "../swap-route.ts";
 
 /**
- * C-004 — the platform currency is the chain's canonical USDC (on Base
- * Mainnet: 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913). Every market's
+ * C-004 — the platform currency is the chain's canonical USDC (on Arc
+ * Mainnet: 0x3600000000000000000000000000000000000000). Every market's
  * collateral, quote, fee accrual, and redemption is denominated in it, so a
  * markets deployment wired to any other token is a config error that would
  * silently misdenominate balances, spending-cap accounting (which treats
@@ -393,7 +393,7 @@ export async function buildMarketTrade(
   },
   deps: { db?: DB } = {},
 ): Promise<BuiltMarketTrade> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const slippageBps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   assertSlippageBounds(slippageBps);
   const markets = MARKETS_BY_CHAIN[chainId];

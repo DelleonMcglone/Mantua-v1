@@ -40,7 +40,7 @@ export const activity = pgTable(
     status: varchar("status", { length: 12 }).notNull().default("completed"),
     /** PF-016 attribution — user | agent | system. */
     actor: varchar("actor", { length: 8 }).notNull().default("user"),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     marketId: varchar("market_id", { length: 66 }),
     poolId: varchar("pool_id", { length: 66 }),
     /** Related position / strategy / intent (no FK — entries outlive them). */

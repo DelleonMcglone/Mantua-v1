@@ -7,7 +7,7 @@ import { users } from "../db/schema/users.ts";
 import { explorerTxUrl } from "./agent-send.ts";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
 import { executeAgentAbiCall, executeAgentCalldata } from "./circle/execute.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { buildPoolKey } from "./pool-key.ts";
 import { getRpcClient } from "./rpc-client.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
@@ -26,7 +26,7 @@ import {
 import { buildRemoveLiquidityCalldata } from "./v4-remove-liquidity.ts";
 import { readSlot0 } from "./v4-state-view.ts";
 
-const AGENT_NETWORK = "base" as const;
+const AGENT_NETWORK = "arc" as const;
 /**
  * Bounded-approval policy (D-110): every grant is sized to the current trade
  * and short-lived — never a max allowance, never a far-future expiry.
@@ -201,7 +201,7 @@ export interface AgentAddLiquidityArgs {
   amountB: string;
   slippageBps: number;
   deadlineSeconds: number;
-  /** Execution chain — defaults to Base. */
+  /** Execution chain — defaults to Arc. */
   chainId?: SupportedChainId;
 }
 
@@ -219,7 +219,7 @@ export interface AgentAddLiquidityResult {
 }
 
 /**
- * Add liquidity from the agent's Circle wallet on Base (with or without a hook).
+ * Add liquidity from the agent's Circle wallet on Arc (with or without a hook).
  *
  *   1. Lookup wallet, parseUnits, USD-value cap check.
  *   2. Read sqrtPriceX96 (pool must already be initialized).
@@ -228,14 +228,14 @@ export interface AgentAddLiquidityResult {
  *      each pool token, sized to the mint's max pull for that token, so the
  *      mint needs no per-tx signature.
  *   5. Execute the modifyLiquidities calldata via the Circle wallet.
- *   6. Fetch the receipt from Base, extract the minted tokenId.
+ *   6. Fetch the receipt from Arc, extract the minted tokenId.
  *   7. recordSpending + persist the position (mirrors the user add-record path).
  */
 export async function addLiquidityFromAgentWallet(
   args: AgentAddLiquidityArgs,
 ): Promise<AgentAddLiquidityResult> {
   const { privyUserId, tokenA, tokenB, fee, amountA, amountB, slippageBps, deadlineSeconds } = args;
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const hook = args.hook ?? null;
   if (tokenA === tokenB) throw new Error("tokenA and tokenB must differ");
 
@@ -402,7 +402,7 @@ export interface AgentRemoveLiquidityArgs {
   percentage: number;
   slippageBps: number;
   deadlineSeconds: number;
-  /** Execution chain — defaults to Base. */
+  /** Execution chain — defaults to Arc. */
   chainId?: SupportedChainId;
 }
 
@@ -420,7 +420,7 @@ export async function removeLiquidityFromAgentWallet(
   args: AgentRemoveLiquidityArgs,
 ): Promise<AgentRemoveLiquidityResult> {
   const { privyUserId, positionId, percentage, slippageBps, deadlineSeconds } = args;
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
 
   const wallet = await getAgentWallet(privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(privyUserId);
@@ -565,7 +565,7 @@ export interface AgentPositionSummary {
  */
 export async function listAgentPositions(
   privyUserId: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<AgentPositionSummary[]> {
   const userRows = await db
     .select({ id: users.id })
@@ -611,7 +611,7 @@ export interface AgentCreatePoolArgs {
   tokenA: TokenSymbol;
   tokenB: TokenSymbol;
   fee: FeeTier;
-  /** Execution chain — defaults to Base. */
+  /** Execution chain — defaults to Arc. */
   chainId?: SupportedChainId;
 }
 
@@ -634,7 +634,7 @@ export interface AgentCreatePoolResult {
 export async function createPoolFromAgentWallet(
   args: AgentCreatePoolArgs,
 ): Promise<AgentCreatePoolResult> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const wallet = await getAgentWallet(args.privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(args.privyUserId);
   if (args.tokenA === args.tokenB) throw new Error("tokenA and tokenB must differ.");

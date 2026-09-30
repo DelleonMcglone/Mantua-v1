@@ -37,7 +37,7 @@ export class CircleUnavailableError extends Error {
 
 /**
  * Lazy singleton for the Circle Developer-Controlled Wallets SDK — the
- * agent-wallet provider on Base. Mirrors the old `getCdpClient()`: the server
+ * agent-wallet provider on Arc. Mirrors the old `getCdpClient()`: the server
  * boots without Circle creds (they're `.optional()` in env.ts) and the first
  * call either constructs the client or throws `CircleUnavailableError`, which
  * routes catch and surface as 503 so the rest of the API stays up.

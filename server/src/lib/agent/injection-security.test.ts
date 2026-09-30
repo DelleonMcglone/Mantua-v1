@@ -221,7 +221,7 @@ void describe("A-036 — malicious instructions inside external data", () => {
     const sim = await simulateMarketTrade(
       deps,
       { providerEventId: "401", outcomeIndex: 0, direction: "buy", amountRaw: 500_000_000n },
-      8453,
+      5042,
     );
     assert.equal(sim.executable, false);
     assert.match(sim.blockers.join(";"), /Insufficient agent balance/);

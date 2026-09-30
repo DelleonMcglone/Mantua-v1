@@ -26,7 +26,7 @@ export const agentWallets = pgTable(
     /** Circle blockchain id: "BASE". One wallet row per (user,
      *  blockchain) — the walletId IS the chain selector on Circle's
      *  transaction API. */
-    blockchain: varchar("blockchain", { length: 32 }).notNull().default("BASE"),
+    blockchain: varchar("blockchain", { length: 32 }).notNull().default("ARC"),
     // Circle Developer-Controlled Wallets wallet id (chain-specific).
     circleWalletId: varchar("circle_wallet_id", { length: 128 }).notNull().unique(),
     /** Task 074 — the Circle wallet set the wallet was created in. Null for

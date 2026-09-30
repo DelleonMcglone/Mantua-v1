@@ -1,7 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { api } from "@/lib/api.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import { selectUsdcRaw, type BalanceRow } from "./live-balance-core.ts";
 import { onUserBalances } from "./user-stream-bus.ts";
 import { frameIsFor } from "./user-stream-core.ts";
@@ -41,7 +41,7 @@ function emit(next: Snapshot) {
 async function tick() {
   try {
     const data = await api.get<{ balances: BalanceRow[] }>(
-      `/api/portfolio?chainId=${String(BASE_CHAIN_ID)}`,
+      `/api/portfolio?chainId=${String(ARC_CHAIN_ID)}`,
     );
     emit({ usdcRaw: selectUsdcRaw(data.balances), updatedAt: Date.now() });
   } catch {
@@ -61,7 +61,7 @@ function start(wallet: string) {
   if (active) return;
   active = true;
   unsubscribeStream = onUserBalances((frame) => {
-    if (frame.chainId !== BASE_CHAIN_ID || !frameIsFor(frame, currentWallet)) return;
+    if (frame.chainId !== ARC_CHAIN_ID || !frameIsFor(frame, currentWallet)) return;
     emit({ usdcRaw: selectUsdcRaw(frame.balances), updatedAt: Date.now() });
     schedulePoll();
   });

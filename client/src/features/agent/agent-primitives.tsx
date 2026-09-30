@@ -19,7 +19,7 @@ import type { TokenSymbol } from "@/lib/tokens.ts";
 
 /**
  * Token mark for the agent flows. Delegates to the app's canonical
- * `TokenIcon` (the same USDC / EURC / cbBTC `AssetIcon` marks used in the
+ * `TokenIcon` (the same USDC / EURC / cirBTC `AssetIcon` marks used in the
  * portfolio + swap UIs) so the agent panel matches the rest of the app,
  * with a neutral coin-initial fallback for any unknown symbol.
  */

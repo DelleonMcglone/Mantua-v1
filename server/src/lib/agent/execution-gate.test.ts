@@ -95,7 +95,7 @@ const TRADE_ARGS = {
 };
 
 async function simulation(price = 5000): Promise<TradeSimulation> {
-  return simulateMarketTrade(simDeps(price), TRADE_ARGS, 8453);
+  return simulateMarketTrade(simDeps(price), TRADE_ARGS, 5042);
 }
 
 function newStore() {
@@ -524,7 +524,7 @@ void describe("authorizeExecution — other modes", () => {
             }),
         }),
         TRADE_ARGS,
-        8453,
+        5042,
       );
     assert.equal(
       await refusal(

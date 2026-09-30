@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
 import { useConfirmedAction } from "@/hooks/use-confirmed-action.tsx";
 import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { getTokens, type TokenSymbol } from "@/lib/tokens.ts";
 import { usePortfolio } from "./use-portfolio.ts";
 import { formatRawAmount, isValidEvmAddress, parseAmountRaw } from "./withdraw-helpers.ts";
@@ -21,7 +21,7 @@ import { formatRawAmount, isValidEvmAddress, parseAmountRaw } from "./withdraw-h
 const ERC20_TRANSFER = parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]);
 
 /** The withdrawable set — USDC first (the platform currency), then the rest. */
-const WITHDRAW_SYMBOLS: TokenSymbol[] = ["USDC", "EURC", "cbBTC"];
+const WITHDRAW_SYMBOLS: TokenSymbol[] = ["USDC", "EURC", "cirBTC"];
 
 type Phase =
   | { kind: "idle" }
@@ -45,7 +45,7 @@ interface Props {
  * C-011 mental model — "Withdraw USDC", never a network name.
  */
 export function WithdrawModal({ onClose, initialRecipient }: Props) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const { balances } = usePortfolio();
   const confirm = useConfirmedAction();
   const getWallet = useChainWalletClient();

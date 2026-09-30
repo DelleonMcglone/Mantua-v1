@@ -3,7 +3,7 @@ import { useWallets } from "@privy-io/react-auth";
 import { createPublicClient, createWalletClient, custom } from "viem";
 // C-005 gasless hook point (D-111): resolves to a no-op unless VITE_GASLESS_ENABLED.
 import { useGaslessWalletClient } from "../gasless/use-gasless-wallet-client.ts";
-import { BASE_CHAIN_ID, CHAIN_INFO, getRpcTransport, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, CHAIN_INFO, getRpcTransport, type SupportedChainId } from "../chains.ts";
 
 /**
  * Per-chain public viem clients for read-only chain calls, on the
@@ -40,7 +40,7 @@ export function publicClientFor(chainId: SupportedChainId): AppPublicClient {
  * reads (YES balances etc.) keep using this; chain-aware code uses
  * `publicClientFor(chainId)`.
  */
-export const publicClient = publicClientFor(BASE_CHAIN_ID);
+export const publicClient = publicClientFor(ARC_CHAIN_ID);
 
 interface Eip1193RequestArgs {
   method: string;
@@ -172,7 +172,7 @@ export function useChainWalletClient() {
   // smart-account client (same viem WalletClient shape); otherwise the
   // getter resolves null and the EOA path below stays the default.
   const getGaslessClient = useGaslessWalletClient();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
 
   return useCallback(async () => {
     const gasless = await getGaslessClient();

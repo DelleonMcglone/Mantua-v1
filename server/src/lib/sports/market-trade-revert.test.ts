@@ -24,7 +24,7 @@ process.env.PRIVY_APP_SECRET ??= "test-stub";
 const { POOL_SWAP_TEST_ABI } = await import("../v4-contracts.ts");
 const { decodeRevertedBuyAmountIn } = await import("./market-trade-revert.ts");
 
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+const USDC = "0x3600000000000000000000000000000000000000" as const;
 const YES = "0x00000000000000000000000000000000000000e2" as const;
 const HOOK = "0x00000000000000000000000000000000000000e3" as const;
 

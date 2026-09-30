@@ -69,7 +69,7 @@ institutionDestinationsRouter.post(
     const ctx = await memberContext(req, res);
     if (!ctx || !allow(ctx, "manage_destinations", res)) return;
     const address = parsed.data.address.toLowerCase();
-    const chainId = parsed.data.chainId ?? 8453;
+    const chainId = parsed.data.chainId ?? 5042;
     const duplicate = await db
       .select({ id: custodyDestinations.id })
       .from(custodyDestinations)

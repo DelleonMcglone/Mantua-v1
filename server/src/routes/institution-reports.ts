@@ -1,6 +1,6 @@
 import { Router, type Response } from "express";
 import { db } from "../db/client.ts";
-import { BASE_CHAIN_ID } from "../lib/chains.ts";
+import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
 import { reconcileInstitution } from "../lib/custody/custody-reconcile-run.ts";
 import {
@@ -77,7 +77,7 @@ institutionReportsRouter.get(
     const ctx = await memberContext(req, res);
     if (!ctx || !allow(ctx, "view_reports", res)) return;
     try {
-      const wallets = await reconcileInstitution(db, ctx.institution.id, BASE_CHAIN_ID);
+      const wallets = await reconcileInstitution(db, ctx.institution.id, ARC_CHAIN_ID);
       res.setHeader("Cache-Control", "private, no-store");
       res.json({ institution: ctx.institution.slug, at: new Date().toISOString(), wallets });
     } catch (err) {

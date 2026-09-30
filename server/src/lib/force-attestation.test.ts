@@ -26,7 +26,7 @@ void describe("messageAuthorizesForce", () => {
       "yes",
       "go ahead",
       "sounds good",
-      "swap 50 USDC for cbBTC",
+      "swap 50 USDC for cirBTC",
       "please execute the swap",
       "sure, do it",
       "that's fine with me",

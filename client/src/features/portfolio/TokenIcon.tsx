@@ -1,7 +1,7 @@
 import { AssetIcon, type AssetSymbol } from "@/features/portfolio/asset-icons.tsx";
 import type { TokenSymbol } from "@/lib/tokens.ts";
 
-const KNOWN: AssetSymbol[] = ["USDC", "EURC", "cbBTC"];
+const KNOWN: AssetSymbol[] = ["USDC", "EURC", "cirBTC"];
 
 /**
  * Renders the matching `AssetIcon` for the given token symbol; falls

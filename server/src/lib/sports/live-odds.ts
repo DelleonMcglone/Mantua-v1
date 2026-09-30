@@ -10,7 +10,7 @@ import { computeMarketId } from "../market-id.ts";
 import { sqrtPriceX96ToRawProbability } from "../probability.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { sharedCache } from "../shared-cache.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import {
   MARKETS_BY_CHAIN,
   MARKETS_PERIPHERY_BY_CHAIN,
@@ -29,7 +29,7 @@ import type { PublicSlate } from "./public-slate.ts";
 const CACHE_TTL_MS = 15_000;
 
 /** Chains probed for a live pool price, in order — single chain today. */
-export const LIVE_ODDS_CHAINS: readonly SupportedChainId[] = [BASE_CHAIN_ID];
+export const LIVE_ODDS_CHAINS: readonly SupportedChainId[] = [ARC_CHAIN_ID];
 
 /**
  * The home market's pool price on one chain, as YES-implied bps. Null when

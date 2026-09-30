@@ -1,6 +1,6 @@
 /**
  * Task 067 (G-001) — a scripted JSON-RPC node for the browser suite. The
- * client's read transport points at `/__e2e/rpc` (VITE_BASE_RPC_URL) and
+ * client's read transport points at `/__e2e/rpc` (VITE_ARC_RPC_URL) and
  * Playwright answers it here: gas, nonce, estimates, a broadcast that
  * returns one hash, and a receipt that says the trade mined. Batches are
  * answered element-wise, as viem sends them.

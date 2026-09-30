@@ -13,7 +13,7 @@ import { logger } from "./logger.ts";
  * alert evaluator (`alerts.ts`) and the load test (task 054) assert.
  *
  * Why these numbers (topology after task 052: function, Neon and Upstash
- * in `iad1`, a dedicated Base RPC):
+ * in `iad1`, a dedicated Arc RPC):
  *  - `quote`  800 ms — 5 serial RPC hops (marketOf, yesToken, quoter,
  *    slot0, quoteFee) at ~100 ms each on a dedicated endpoint + one DB
  *    read. The ticket re-quotes on every keystroke behind a 400 ms
@@ -24,7 +24,7 @@ import { logger } from "./logger.ts";
  *  - `slate`    500 ms — cached canonical read + cached live-odds overlay.
  *  - `positions` 1 500 ms — cached per wallet; the cold path is ~3 RPC
  *    reads per market row.
- *  - `confirmation` 8 000 ms — client-side, Base blocks are ~2 s; the
+ *  - `confirmation` 8 000 ms — client-side, Arc blocks are ~2 s; the
  *    ticket waits 60 s before handing off to the pending register, and
  *    p95 under four blocks is the target the register's `slow` label is
  *    tuned against. Measured by the load test, not by this middleware.

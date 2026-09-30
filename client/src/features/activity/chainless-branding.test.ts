@@ -21,7 +21,7 @@ const ALLOWLIST = new Set([
   "features/portfolio/DepositCard.tsx",
 ]);
 const BRANDED =
-  /basescan\.org|\bBaseScan\b|\bEtherscan\b|etherscan\.io|\bon Base\b|Base Sepolia|Base Mainnet/i;
+  /basescan\.org|\bBaseScan\b|explorer\.arc\.io|\bArcscan\b|\bEtherscan\b|etherscan\.io|\bon Base\b|\bon Arc\b|Base Sepolia|Base Mainnet|Arc Testnet|Arc Mainnet/i;
 
 function* walk(dir: string): Generator<string> {
   for (const name of readdirSync(dir)) {

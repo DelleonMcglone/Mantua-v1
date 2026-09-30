@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { custodyDestinations, custodyWithdrawals } from "../db/schema/institutions.ts";
-import { BASE_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
 import { requestWithdrawal } from "../lib/custody/custody-withdrawal-request.ts";
 import { isTokenSymbol } from "../lib/tokens.ts";
 import { requireAuth } from "../middleware/auth.ts";
@@ -67,7 +67,7 @@ institutionWithdrawalsRouter.post(
           destinationId: parsed.data.destinationId,
           symbol: parsed.data.symbol,
           amount: parsed.data.amount,
-          chainId: parsed.data.chainId ?? BASE_CHAIN_ID,
+          chainId: parsed.data.chainId ?? ARC_CHAIN_ID,
           audit: withdrawalAuditFor(req),
         }),
       );

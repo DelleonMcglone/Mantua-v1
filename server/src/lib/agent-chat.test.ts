@@ -32,7 +32,7 @@ const { auditActionForToolCall, auditChatToolCall } = await import("./agent-chat
 const { db } = await import("../db/client.ts");
 
 const WALLET = "0xAbCd000000000000000000000000000000000001";
-const CHAIN_ID = 8453 as const;
+const CHAIN_ID = 5042 as const;
 
 interface InsertedRow {
   walletAddress: string | null;

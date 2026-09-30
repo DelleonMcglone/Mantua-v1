@@ -4,7 +4,7 @@
  */
 
 /**
- * Network gate. Mantua runs on **Base Mainnet** — `MANTUA_NETWORK`
+ * Network gate. Mantua runs on **Arc Mainnet** — `MANTUA_NETWORK`
  * defaults to `mainnet`. The `testnet` branch of the enum is retained so
  * the shared IS_MAINNET guard keeps compiling, but there is no supported
  * testnet target.
@@ -13,8 +13,8 @@ export const NETWORK = process.env.MANTUA_NETWORK === "testnet" ? "testnet" : "m
 export const IS_MAINNET = NETWORK === "mainnet";
 export const IS_TESTNET = NETWORK === "testnet";
 
-/** The single active chain id (Base Mainnet). */
-export const ACTIVE_CHAIN_ID: number = 8453;
+/** The single active chain id (Arc Mainnet). */
+export const ACTIVE_CHAIN_ID: number = 5042;
 
 // Spending caps — USD equivalent.
 // (D-009 ACCEPTED: $500 default, tiered raise by account age, $50k absolute ceiling.)

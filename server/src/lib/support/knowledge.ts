@@ -31,13 +31,13 @@ export const KNOWLEDGE: readonly KnowledgeTopic[] = [
     id: "deposits",
     title: "Deposits",
     keywords: ["deposit", "fund", "add funds", "bank", "ach", "usdc", "wire"],
-    body: "Deposit by bank transfer (through the regulated on-ramp partner, which handles identity checks and holds funds only during conversion) or by sending USDC on Base to your wallet address from the Profile page. A bank deposit shows as pending until the partner confirms it, then as complete; USDC sent on chain appears as soon as the transfer confirms.",
+    body: "Deposit by bank transfer (through the regulated on-ramp partner, which handles identity checks and holds funds only during conversion) or by sending USDC on Arc to your wallet address from the Profile page. A bank deposit shows as pending until the partner confirms it, then as complete; USDC sent on chain appears as soon as the transfer confirms.",
   },
   {
     id: "withdrawals",
     title: "Withdrawals",
     keywords: ["withdraw", "withdrawal", "cash out", "payout", "bank account"],
-    body: "Withdraw to a linked bank account from the Profile page, or send USDC to any Base address. A bank withdrawal shows pending, then processing, then complete; a failed one names the reason and whether to retry or contact support. Winning positions must be redeemed to USDC before that USDC can be withdrawn.",
+    body: "Withdraw to a linked bank account from the Profile page, or send USDC to any Arc address. A bank withdrawal shows pending, then processing, then complete; a failed one names the reason and whether to retry or contact support. Winning positions must be redeemed to USDC before that USDC can be withdrawn.",
   },
   {
     id: "positions",
@@ -61,7 +61,7 @@ export const KNOWLEDGE: readonly KnowledgeTopic[] = [
     id: "fees-and-network",
     title: "Fees, gas and the network",
     keywords: ["gas", "network", "base", "chain", "fees", "eth"],
-    body: "Mantua runs on Base. Trades made through the app are designed to be gasless for you; the agent's wallet holds a little ETH for its own transactions. Market fees are shown on the ticket before you confirm; there are no hidden platform fees.",
+    body: "Mantua runs on Arc. Trades made through the app are designed to be gasless for you; the agent's wallet holds a little ETH for its own transactions. Market fees are shown on the ticket before you confirm; there are no hidden platform fees.",
   },
   {
     id: "safety",

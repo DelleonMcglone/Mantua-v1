@@ -7,7 +7,7 @@ import { users } from "../db/schema/users.ts";
 import { explorerTxUrl } from "./agent-send.ts";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
 import { executeAgentAbiCall, executeAgentCalldata } from "./circle/execute.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { DEFAULT_SLIPPAGE_BPS } from "./constants.ts";
 import { assertSlippageBounds } from "./slippage.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
@@ -23,7 +23,7 @@ import {
 import type { FeeTier } from "./v4-contracts.ts";
 
 /**
- * Execute a swap from the agent wallet on Base via its Circle
+ * Execute a swap from the agent wallet on Arc via its Circle
  * Developer-Controlled Wallet.
  *
  * Agent swaps run against the no-hook pool for the pair (the Stable Protection
@@ -34,7 +34,7 @@ import type { FeeTier } from "./v4-contracts.ts";
  * (ERC-20→Permit2, Permit2→router — never MaxUint, C-022), then the
  * `execute` calldata, all gas-sponsored Circle txs.
  */
-const AGENT_NETWORK = "base";
+const AGENT_NETWORK = "arc";
 
 /**
  * Convert the route-level fractional-percent `slippageTolerance`
@@ -64,7 +64,7 @@ export interface AgentSwapArgs {
    *  DEFAULT_SLIPPAGE_BPS; hard-capped at MAX_SLIPPAGE_BPS. Drives the
    *  on-chain `amountOutMinimum` in the router calldata. */
   slippageTolerance?: number;
-  /** Execution chain — defaults to Base. */
+  /** Execution chain — defaults to Arc. */
   chainId?: SupportedChainId;
 }
 
@@ -100,7 +100,7 @@ export async function quoteAgentSwap(args: {
   chainId?: SupportedChainId;
 }): Promise<AgentSwapQuote> {
   const { tokenIn, tokenOut, amountIn } = args;
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   if (tokenIn === tokenOut) throw new Error("tokenIn and tokenOut must differ");
   const amountAtomic = parseUnits(amountIn, getToken(tokenIn, chainId).decimals);
   if (amountAtomic <= 0n) throw new Error("amountIn must be positive");
@@ -122,7 +122,7 @@ export async function quoteAgentSwap(args: {
 
 export async function swapFromAgentWallet(args: AgentSwapArgs): Promise<AgentSwapResult> {
   const { privyUserId, tokenIn, tokenOut, amountIn } = args;
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   if (tokenIn === tokenOut) throw new Error("tokenIn and tokenOut must differ");
   // Validate slippage BEFORE any money movement — throws above the hard cap.
   const slippageBps = agentSlippageBps(args.slippageTolerance);

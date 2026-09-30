@@ -12,7 +12,7 @@ import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 import { getRpcClient } from "../lib/rpc-client.ts";
 import { getRequestContext } from "../lib/request-context.ts";
-import { BASE_CHAIN_ID, DEFAULT_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, DEFAULT_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
 import { MARKETS_BY_CHAIN, MARKET_ABI, MARKET_FACTORY_ABI } from "../lib/markets-contracts.ts";
 import {
   estimatePayoutRaw,
@@ -54,7 +54,7 @@ export interface RedeemableRow {
  *
  * Balances are public chain data; auth is required anyway (same posture as
  * /api/markets/positions) so the endpoint can't enumerate wallets anonymously.
- * Until the markets deployment exists on Base Mainnet this returns an empty
+ * Until the markets deployment exists on Arc Mainnet this returns an empty
  * list — there is nothing on-chain to redeem.
  */
 marketRedeemRouter.get(
@@ -73,7 +73,7 @@ marketRedeemRouter.get(
 
     // Graceful degradation: no deployment → no on-chain markets → nothing
     // claimable. Empty list, not an error (the UI simply shows no claims).
-    if (!MARKETS_BY_CHAIN[BASE_CHAIN_ID]) {
+    if (!MARKETS_BY_CHAIN[ARC_CHAIN_ID]) {
       res.json({ redeemable: [] });
       return;
     }
@@ -127,7 +127,7 @@ marketRedeemRouter.get(
         }
       }
 
-      const client = getRpcClient(BASE_CHAIN_ID);
+      const client = getRpcClient(ARC_CHAIN_ID);
       const redeemable: RedeemableRow[] = [];
       await Promise.all(
         rows.map(async (row) => {
@@ -179,7 +179,7 @@ marketRedeemRouter.get(
 
 const calldataBodySchema = z.object({
   marketId: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
-  /** Execution chain — omitted means Base (back-compat). */
+  /** Execution chain — omitted means Arc (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
 });
 
@@ -311,7 +311,7 @@ marketRedeemRouter.post(
 const recordBodySchema = z.object({
   txHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
   marketId: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
-  /** Chain the redemption happened on — omitted means Base (back-compat). */
+  /** Chain the redemption happened on — omitted means Arc (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
 });
 

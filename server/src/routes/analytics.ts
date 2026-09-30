@@ -28,7 +28,7 @@ export const analyticsRouter = Router();
  * `walletRateLimiter` to limit per-user fan-out.
  *
  * Query types:
- *   - `pools`         — list of Base v3/v4 Uniswap pools
+ *   - `pools`         — list of Arc v3/v4 Uniswap pools
  *   - `pool`          — single pool by id
  *   - `chart`         — historical TVL + APY for a pool
  *   - `protocol`      — protocol detail (TVL history, chains, etc.) by slug

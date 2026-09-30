@@ -2,16 +2,16 @@ import { formatUnits } from "viem";
 import { logger } from "./logger.ts";
 
 /**
- * Base explorer (Blockscout v2) client — the agent's on-chain "explorer
- * skills" on Base Mainnet: inspect any address, token, or transaction,
+ * Arc explorer (Blockscout v2) client — the agent's on-chain "explorer
+ * skills" on Arc Mainnet: inspect any address, token, or transaction,
  * Etherscan-style. Data comes from the public Blockscout instance (no
- * auth); human-facing links point at BaseScan. Mirrors the defillama.ts
+ * auth); human-facing links point at Arcscan. Mirrors the defillama.ts
  * pattern: cached() 60s TTL, short timeout, warn + safe fallbacks (callers
  * degrade to "data unavailable" instead of erroring the whole chat turn).
  */
 
 const BASE = "https://base.blockscout.com/api/v2";
-export const BASESCAN_WEB = "https://basescan.org";
+export const ARCSCAN_WEB = "https://explorer.arc.io";
 const TTL_MS = 60_000;
 const TIMEOUT_MS = 8_000;
 
@@ -95,7 +95,7 @@ export async function getAddressInfo(address: string): Promise<BaseAddressInfo |
       isContract: d["is_contract"] === true || typeof d["creator_address_hash"] === "string",
       label: typeof d["name"] === "string" && d["name"] ? d["name"] : null,
       hasTokenTransfers: d["has_token_transfers"] === true,
-      explorerUrl: `${BASESCAN_WEB}/address/${address}`,
+      explorerUrl: `${ARCSCAN_WEB}/address/${address}`,
     };
   });
 }
@@ -203,7 +203,7 @@ export async function getTokenInfo(address: string): Promise<BaseTokenInfo | nul
       decimals,
       totalSupply: formatUnits(BigInt(supply || "0"), Number.isFinite(decimals) ? decimals : 18),
       holdersCount: Number(typeof d["holders_count"] === "string" ? d["holders_count"] : "0"),
-      explorerUrl: `${BASESCAN_WEB}/token/${address}`,
+      explorerUrl: `${ARCSCAN_WEB}/token/${address}`,
     };
   });
 }
@@ -302,7 +302,7 @@ export async function getTransactionInfo(hash: string): Promise<BaseTxDetail | n
           ),
         };
       }),
-      explorerUrl: `${BASESCAN_WEB}/tx/${hash}`,
+      explorerUrl: `${ARCSCAN_WEB}/tx/${hash}`,
     };
   });
 }

@@ -8,7 +8,7 @@ import {
   type SettleablePositionRow,
 } from "./markets-onchain.ts";
 import { MARKETS_BY_CHAIN } from "../markets-contracts.ts";
-import { BASE_CHAIN_ID } from "../chains.ts";
+import { ARC_CHAIN_ID } from "../chains.ts";
 import { env } from "../../env.ts";
 import { isAllowedTarget } from "../circle/allowed-targets.ts";
 import type { PlannedMarket } from "./ingest.ts";
@@ -31,23 +31,21 @@ function planned(overrides: Partial<PlannedMarket> = {}): PlannedMarket {
 }
 
 void describe("markets on-chain wiring", () => {
-  void it("registers the Base settlement layer deployed 2026-09-23", () => {
-    assert.deepEqual(MARKETS_BY_CHAIN[BASE_CHAIN_ID], {
-      factory: "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93",
-      resolver: "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281",
-      collateral: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-    });
+  void it("has no settlement layer registered on Arc yet (H-009 / L-018 — deployment pending)", () => {
+    // Registering a placeholder would let the sweep sign against a factory
+    // that is not there; the entry appears with the Arc deploy.
+    assert.equal(MARKETS_BY_CHAIN[ARC_CHAIN_ID], undefined);
   });
 
   void it("opens nothing without the operator's signing key — the deployed-but-closed state", (t) => {
-    // Markets are deployed but held closed until launch sign-off by leaving
+    // Markets stay closed until launch sign-off by leaving
     // MARKET_SIGNER_PRIVATE_KEY unset in production: no signer, no
     // createMarketIfAbsent / registerPool / seed transactions.
     if (env.MARKET_SIGNER_PRIVATE_KEY !== undefined) {
       t.skip("MARKET_SIGNER_PRIVATE_KEY is set in this environment");
       return;
     }
-    assert.equal(marketSignerWallet(BASE_CHAIN_ID), null);
+    assert.equal(marketSignerWallet(ARC_CHAIN_ID), null);
   });
 
   // Every configured settlement layer, Base's included.

@@ -8,7 +8,7 @@ import {
 } from "./withdraw-helpers.ts";
 
 test("isValidEvmAddress: accepts a canonical 0x + 40 hex address", () => {
-  assert.equal(isValidEvmAddress("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"), true);
+  assert.equal(isValidEvmAddress("0x3600000000000000000000000000000000000000"), true);
   assert.equal(isValidEvmAddress("0x" + "a".repeat(40)), true);
 });
 
@@ -27,7 +27,7 @@ test("parseAmountRaw: plain decimals to raw base units", () => {
   assert.equal(parseAmountRaw("25", 6), 25_000_000n);
   assert.equal(parseAmountRaw("1.", 6), 1_000_000n); // trailing dot ok
   assert.equal(parseAmountRaw(" 2 ", 6), 2_000_000n); // surrounding whitespace trimmed
-  assert.equal(parseAmountRaw("0.00000001", 8), 1n); // cbBTC-style 8dp
+  assert.equal(parseAmountRaw("0.00000001", 8), 1n); // cirBTC-style 8dp
 });
 
 test("parseAmountRaw: rejects non-amounts and zero", () => {

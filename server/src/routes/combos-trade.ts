@@ -3,7 +3,7 @@ import type { Log } from "viem";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { readPolicy, type AgentPolicyView } from "../lib/agent/policy.ts";
-import { BASE_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
 import { ComboLegMismatchError, recordComboFill } from "../lib/combos/combo-fill.ts";
 import { readComboOnChain, type ComboOnChain } from "../lib/combos/combo-market.ts";
 import { comboPolicyGate } from "../lib/combos/combo-policy.ts";
@@ -244,7 +244,7 @@ export function createComboTradeRouter(overrides: Partial<ComboTradeDeps> = {}):
         return;
       }
       const { direction } = parsed.data;
-      const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+      const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
       const amountRaw = BigInt(parsed.data.amountRaw);
       const marketId = parsed.data.marketId.toLowerCase() as `0x${string}`;
       try {
@@ -301,7 +301,7 @@ export function createComboTradeRouter(overrides: Partial<ComboTradeDeps> = {}):
         res.status(401).json({ error: "Wallet not linked", code: "WALLET_REQUIRED" });
         return;
       }
-      const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+      const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
       const swapRouter = deps.swapRouterFor(chainId);
       if (!swapRouter) {
         res.status(400).json({ error: "Markets not deployed on this chain", code: "BAD_CHAIN" });

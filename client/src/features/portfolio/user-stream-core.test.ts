@@ -22,7 +22,7 @@ const position = {
 };
 const usdc = {
   symbol: "USDC",
-  address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  address: "0x3600000000000000000000000000000000000000",
   decimals: 6,
   balanceRaw: "5000000",
   usdValue: 5,
@@ -32,10 +32,10 @@ test("parses the server's positions and balances frames (R-001)", () => {
   const p = parsePositionsFrame({ wallet: WALLET, positions: [position] });
   assert.ok(p);
   assert.equal(p.positions[0]?.balance, "1000000");
-  const b = parseBalancesFrame({ wallet: WALLET, chainId: 8453, balances: [usdc] });
+  const b = parseBalancesFrame({ wallet: WALLET, chainId: 5042, balances: [usdc] });
   assert.ok(b);
   assert.equal(b.balances[0]?.balanceRaw, "5000000");
-  assert.equal(b.chainId, 8453);
+  assert.equal(b.chainId, 5042);
 });
 
 test("a malformed frame is dropped whole, never half-applied", () => {
@@ -49,7 +49,7 @@ test("a malformed frame is dropped whole, never half-applied", () => {
   assert.equal(
     parseBalancesFrame({
       wallet: WALLET,
-      chainId: 8453,
+      chainId: 5042,
       balances: [{ ...usdc, balanceRaw: "1.5" }],
     }),
     null,

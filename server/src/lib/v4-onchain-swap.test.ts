@@ -13,7 +13,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { BASE_CHAIN_ID } from "./chains.ts";
+import { ARC_CHAIN_ID } from "./chains.ts";
 import { getHookAddress, HOOK_NAMES } from "./v4-contracts.ts";
 import { HookNotDeployedError, resolveHookAddress } from "./v4-onchain-swap.ts";
 
@@ -21,20 +21,20 @@ const ZERO = "0x0000000000000000000000000000000000000000";
 
 void describe("resolveHookAddress — fail closed on undeployed hooks", () => {
   void it("null hook → the zero (no-hook) address", () => {
-    assert.equal(resolveHookAddress(null, BASE_CHAIN_ID), ZERO);
+    assert.equal(resolveHookAddress(null, ARC_CHAIN_ID), ZERO);
   });
 
   void it("a named hook never silently degrades to the no-hook pool", () => {
     for (const name of HOOK_NAMES) {
-      const deployed = getHookAddress(name, BASE_CHAIN_ID);
+      const deployed = getHookAddress(name, ARC_CHAIN_ID);
       if (deployed === null) {
         assert.throws(
-          () => resolveHookAddress(name, BASE_CHAIN_ID),
+          () => resolveHookAddress(name, ARC_CHAIN_ID),
           HookNotDeployedError,
           `${name} has no deployment and must throw`,
         );
       } else {
-        assert.equal(resolveHookAddress(name, BASE_CHAIN_ID), deployed, name);
+        assert.equal(resolveHookAddress(name, ARC_CHAIN_ID), deployed, name);
         assert.notEqual(deployed, ZERO, name);
       }
     }
@@ -45,7 +45,7 @@ void describe("resolveHookAddress — fail closed on undeployed hooks", () => {
       () =>
         resolveHookAddress(
           "not-a-real-hook" as unknown as (typeof HOOK_NAMES)[number],
-          BASE_CHAIN_ID,
+          ARC_CHAIN_ID,
         ),
       HookNotDeployedError,
     );

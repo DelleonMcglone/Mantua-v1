@@ -42,7 +42,7 @@ function makeBridge(publicResult: unknown = "public-result") {
   const bridge = createSmartAccountBridge({
     smart: sender,
     address: ADDRESS,
-    chainId: 8453,
+    chainId: 5042,
     publicRequest: (args) => {
       publicCalls.push(args);
       return Promise.resolve(publicResult);
@@ -95,7 +95,7 @@ test("bridge: accounts and chainId answered locally", async () => {
   const { bridge, publicCalls } = makeBridge();
   assert.deepEqual(await bridge.request({ method: "eth_accounts" }), [ADDRESS]);
   assert.deepEqual(await bridge.request({ method: "eth_requestAccounts" }), [ADDRESS]);
-  assert.equal(await bridge.request({ method: "eth_chainId" }), "0x2105"); // 8453
+  assert.equal(await bridge.request({ method: "eth_chainId" }), "0x13b2"); // 5042
   assert.equal(publicCalls.length, 0);
 });
 

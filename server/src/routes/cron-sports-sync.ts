@@ -20,7 +20,7 @@ import {
 } from "../lib/sports/markets-onchain.ts";
 import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 
 export const cronSportsSyncRouter = Router();
@@ -28,9 +28,9 @@ export const cronSportsSyncRouter = Router();
 /** The covered leagues, per DM-105. Promotion is a data change elsewhere. */
 const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 
-/** Chains markets mint on — Base Mainnet. */
+/** Chains markets mint on — Arc Mainnet. */
 function marketChains(): SupportedChainId[] {
-  return [BASE_CHAIN_ID];
+  return [ARC_CHAIN_ID];
 }
 
 /**

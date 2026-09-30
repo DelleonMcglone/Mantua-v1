@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api.ts";
 import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import type { RedeemableRow } from "./market-redeem-core.ts";
 
 /** Mirrors POST /api/markets/redeem/calldata (server/src/routes/market-redeem.ts). */
@@ -65,7 +65,7 @@ export function useRedeemable(address: string | null | undefined) {
  */
 export function useMarketRedeem(onClaimed?: () => void) {
   const getWallet = useChainWalletClient();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const [phase, setPhase] = useState<RedeemPhase>({ kind: "idle" });
 
   const claim = async (marketId: string) => {

@@ -21,10 +21,10 @@ From a single natural-language prompt you can:
 - **Get help**: a read-only support agent that explains markets, your own deposits,
   withdrawals and positions, walks through troubleshooting, and hands off to a person.
 
-> **Status: live at [mantua.ai](https://mantua.ai) on Base Mainnet (8453).** The app (markets,
-> agent, portfolio, analytics) runs against Base Mainnet. **Mantua's own contracts (the Dynamic
+> **Status: live at [mantua.ai](https://mantua.ai) on Arc Mainnet (5042).** The app (markets,
+> agent, portfolio, analytics) runs against Arc Mainnet. **Mantua's own contracts (the Dynamic
 > Market Hook, the market factory/resolver, and the agent-commerce escrow) are awaiting their
-> Base Mainnet deployment**; until they are deployed, hook-gated market pools and on-chain
+> Arc Mainnet deployment**; until they are deployed, hook-gated market pools and on-chain
 > market minting stay dark and the app degrades gracefully (addresses are env-driven, `null`
 > by default). There is no separate landing page: `/` is the board for every visitor.
 > [`docs/tasks/v2-roadmap.md`](docs/tasks/v2-roadmap.md) tracks the build plan and
@@ -33,14 +33,14 @@ From a single natural-language prompt you can:
 
 ## Network
 
-Mantua runs on a single chain: **Base Mainnet**.
+Mantua runs on a single chain: **Arc Mainnet** — Circle's L1, where USDC is also the gas token.
 
-| Network          | Chain id | RPC                        | Explorer             |
-| ---------------- | -------- | -------------------------- | -------------------- |
-| **Base Mainnet** | `8453`   | `https://mainnet.base.org` | https://basescan.org |
+| Network         | Chain id | RPC                          | Explorer                |
+| --------------- | -------- | ---------------------------- | ----------------------- |
+| **Arc Mainnet** | `5042`   | `https://rpc.mainnet.arc.io` | https://explorer.arc.io |
 
-RPC overrides: `VITE_BASE_RPC_URL` (client), `BASE_RPC_URL` (server and agent); fallback
-`https://base-rpc.publicnode.com`. Every transaction is gas-sponsored: Circle Gas Station
+RPC overrides: `VITE_ARC_RPC_URL` (client), `ARC_RPC_URL` (server); fallback
+`https://rpc.mainnet.arc.io`. Every transaction is gas-sponsored: Circle Gas Station
 covers the agent wallet and Circle Paymaster covers user transactions, so no wallet ever needs
 ETH. Contract addresses live in
 [`server/src/lib/v4-contracts.ts`](server/src/lib/v4-contracts.ts) and
@@ -163,7 +163,7 @@ Programmable money buying programmable intelligence, then acting on it in one au
 ## Agent capabilities (your Circle Agent)
 
 A research analyst and market operator running a tool-using Claude loop over a
-server-custodied Circle wallet on Base Mainnet, gas-sponsored by Circle Gas Station and bounded
+server-custodied Circle wallet on Arc Mainnet, gas-sponsored by Circle Gas Station and bounded
 by a daily USD spending cap. Reads run as the conversation goes; anything that moves money is
 previewed in the chat and executed only after you reply "confirm". The server mints a
 single-use confirmation id from your own message and re-simulates a market trade right before
@@ -175,7 +175,7 @@ confirmation.
 - **Positions**: take and close YES/NO positions and combos on covered games, every one
   cap-checked, simulated immediately before execution, and recorded to the activity spine.
 - **Move funds**: send USDC from the agent wallet.
-- **On-chain analysis (BaseScan).** Inspect any Base address (balance, activity, whale
+- **On-chain analysis (Arcscan).** Inspect any Arc address (balance, activity, whale
   signals: accumulating/selling, stables-to-tokens rotation), any token (holders, top-10
   concentration, safety red flags), and any transaction (decoded token movements).
 - **Analyst workflow.** "Give me my daily briefing" runs market pulse, then portfolio review,
@@ -240,9 +240,9 @@ Fireblocks, Copper, and others): recorded, never integrated. Full spec:
 ### Uniswap v4
 
 - **The Dynamic Market Hook**: Mantua's one hook, deployed at a mined CREATE2 address, carried
-  by every market's YES/USDC pool. Base Mainnet deployment is pending (address env-driven,
+  by every market's YES/USDC pool. Arc Mainnet deployment is pending (address env-driven,
   `null` until deployed). Source: [`contracts/src/hooks/dynamic-market/`](contracts/src/hooks/dynamic-market).
-- **v4 periphery**: the canonical Base Mainnet stack (PoolManager, PositionManager,
+- **v4 periphery**: Arc has no canonical Uniswap v4 stack; the market periphery is Mantua's own (PoolManager, PositionManager,
   StateView, V4Quoter) plus the market pool's own periphery (its swap and liquidity routers,
   lens, and quoter), recorded per chain in `markets-contracts.ts`.
 - Prices read through **StateView**; quotes through **V4Quoter**; all addresses live in

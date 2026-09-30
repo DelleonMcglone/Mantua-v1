@@ -110,8 +110,8 @@ export async function tokenAmountUsdStrict(
 
 /** USD value of `amount` (raw base units) for a known token object. Use
  *  this over the symbol-based `tokenAmountUsd` when you already hold the
- *  chain-correct token (the legacy `TOKENS` map is Base-only and lacks
- *  chain-specific tokens like cbBTC). */
+ *  chain-correct token (the legacy `TOKENS` map is Arc-only and lacks
+ *  chain-specific tokens like cirBTC). */
 export async function tokenAmountUsdForToken(token: Token, amountRaw: bigint): Promise<number> {
   const price = await getUsdPriceForToken(token);
   if (price === 0) return 0;
@@ -121,7 +121,7 @@ export async function tokenAmountUsdForToken(token: Token, amountRaw: bigint): P
 }
 
 /** USD value of `amount` (raw base units) for `symbol`, resolved against
- *  the legacy Base registry. Returns 0 for unknown symbols. */
+ *  the legacy Arc registry. Returns 0 for unknown symbols. */
 export async function tokenAmountUsd(symbol: TokenSymbol, amountRaw: bigint): Promise<number> {
   return tokenAmountUsdForToken(TOKENS[symbol], amountRaw);
 }

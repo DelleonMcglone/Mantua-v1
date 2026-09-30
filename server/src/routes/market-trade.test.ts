@@ -137,7 +137,7 @@ function fakeBuild(): { build: BuildMarketTrade; builds: string[] } {
       data: "0xdeadbeef",
       value: "0",
       approvalTarget: "0x00000000000000000000000000000000000000f1",
-      inputToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      inputToken: "0x3600000000000000000000000000000000000000",
       marketId: `0x${"11".repeat(32)}`,
       marketAddress: "0x00000000000000000000000000000000000000e1",
       yesToken: "0x00000000000000000000000000000000000000e2",

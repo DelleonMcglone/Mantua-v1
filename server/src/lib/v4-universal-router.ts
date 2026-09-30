@@ -1,12 +1,12 @@
 /**
- * 031 — UniversalRouter/Permit2 swap execution path (Base Mainnet).
+ * 031 — UniversalRouter/Permit2 swap execution path (Arc Mainnet).
  *
  * Builds `UniversalRouter.execute(bytes commands, bytes[] inputs,
  * uint256 deadline)` calldata for a Uniswap v4 exact-input single-pool
  * swap, replacing the PoolSwapTest path (which does not exist in the
- * canonical mainnet deployment — `poolSwapTest: null` on 8453).
+ * canonical mainnet deployment — `poolSwapTest: null` on 5042).
  *
- * Encoding verified against the Solidity actually deployed on Base
+ * Encoding verified against the Solidity actually deployed on Arc
  * (UniversalRouter 0x6fF5693b…9b43 = universal-router tag 2.0.0, whose
  * v4-periphery submodule pins commit 444c526b77d804590f0d7bc5a481af5a3277c952):
  *
@@ -52,10 +52,16 @@
  */
 import { decodeFunctionData, encodeAbiParameters, encodeFunctionData } from "viem";
 import type { PoolKey } from "./pool-key.ts";
-import { BASE_CHAIN_ID, DEFAULT_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, DEFAULT_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
 import { PERMIT2_EXPIRATION_SECONDS } from "./permit2.ts";
-import { ERC20_ABI, PERMIT2, PERMIT2_ABI, UNIVERSAL_ROUTER } from "./v4-contracts.ts";
+import {
+  ERC20_ABI,
+  PERMIT2,
+  PERMIT2_ABI,
+  UNIVERSAL_ROUTER,
+  V4StackNotDeployedError,
+} from "./v4-contracts.ts";
 
 // ─── Verified constants ─────────────────────────────────────────────────────
 
@@ -69,7 +75,7 @@ export const V4_ACTION_TAKE_ALL = 0x0f;
 
 /**
  * How long a built swap stays executable. Bounded and non-configurable:
- * long enough for a wallet prompt + Base inclusion, short enough that a
+ * long enough for a wallet prompt + Arc inclusion, short enough that a
  * signed-but-delayed transaction can't execute against a stale quote
  * far in the future.
  */
@@ -117,12 +123,17 @@ export const PERMIT2_APPROVE_ABI = [
   },
 ] as const;
 
-const UNIVERSAL_ROUTER_BY_CHAIN: Record<SupportedChainId, `0x${string}`> = {
-  [BASE_CHAIN_ID]: UNIVERSAL_ROUTER,
+/** Exported (mutable) only for `lib/testing/canonical-v4.ts`. */
+export const UNIVERSAL_ROUTER_BY_CHAIN: Record<SupportedChainId, `0x${string}` | null> = {
+  [ARC_CHAIN_ID]: UNIVERSAL_ROUTER,
 };
 
+/** The chain's UniversalRouter; throws the typed gated error on Arc, which
+ *  has no canonical Uniswap deployment — base-pair swaps are unavailable. */
 export function getUniversalRouter(chainId: SupportedChainId = DEFAULT_CHAIN_ID): `0x${string}` {
-  return UNIVERSAL_ROUTER_BY_CHAIN[chainId];
+  const router = UNIVERSAL_ROUTER_BY_CHAIN[chainId];
+  if (!router) throw new V4StackNotDeployedError(chainId);
+  return router;
 }
 
 // ─── Calldata builder (pure) ────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import { RPC_UPSTREAMS, recordRpcOutcome } from "../lib/rpc-client.ts";
 export const rpcProxyRouter = Router();
 
 /**
- * Same-origin JSON-RPC proxy for Base Mainnet — the wallet-side answer to the
+ * Same-origin JSON-RPC proxy for Arc Mainnet — the wallet-side answer to the
  * public hosts' per-IP rate limits.
  *
  * Privy's embedded wallet fills gas itself (its "RPC 0x4cef52 Custom
@@ -105,7 +105,7 @@ async function forward(body: unknown): Promise<unknown> {
       recordRpcOutcome(index, false, err);
     }
   }
-  throw lastErr instanceof Error ? lastErr : new Error("all Base RPC upstreams failed");
+  throw lastErr instanceof Error ? lastErr : new Error("all Arc RPC upstreams failed");
 }
 
 rpcProxyRouter.options("/api/rpc", (_req: Request, res: Response) => {
@@ -157,7 +157,7 @@ rpcProxyRouter.post("/api/rpc", async (req: Request, res: Response) => {
     res.status(502).json({
       jsonrpc: "2.0",
       id: null,
-      error: { code: -32603, message: "All Base RPC upstreams failed. Retry shortly." },
+      error: { code: -32603, message: "All Arc RPC upstreams failed. Retry shortly." },
     });
   }
 });

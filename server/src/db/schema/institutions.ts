@@ -82,7 +82,7 @@ export const custodyDestinations = pgTable(
       .references(() => institutions.id, { onDelete: "cascade" }),
     label: varchar("label", { length: 80 }).notNull(),
     address: varchar("address", { length: 42 }).notNull(),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     /** pending | verified | revoked */
     status: varchar("status", { length: 12 }).notNull().default("pending"),
     addedBy: uuid("added_by").notNull(),

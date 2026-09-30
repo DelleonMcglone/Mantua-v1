@@ -4,7 +4,7 @@ import { db } from "../../db/client.ts";
 import { events, leagues, marketFills, markets } from "../../db/schema/index.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { sharedCache } from "../shared-cache.ts";
-import { BASE_CHAIN_ID } from "../chains.ts";
+import { ARC_CHAIN_ID } from "../chains.ts";
 import {
   MARKETS_BY_CHAIN,
   MARKETS_PERIPHERY_BY_CHAIN,
@@ -57,17 +57,17 @@ export interface MarketPositionRow {
   potentialPayoutRaw: string;
 }
 
-type Deployment = (typeof MARKETS_BY_CHAIN)[typeof BASE_CHAIN_ID];
-type Periphery = (typeof MARKETS_PERIPHERY_BY_CHAIN)[typeof BASE_CHAIN_ID];
+type Deployment = (typeof MARKETS_BY_CHAIN)[typeof ARC_CHAIN_ID];
+type Periphery = (typeof MARKETS_PERIPHERY_BY_CHAIN)[typeof ARC_CHAIN_ID];
 
 /** The cached read every caller should use (route and agent alike). */
 export async function readMarketPositions(owner: `0x${string}`): Promise<MarketPositionRow[]> {
-  const client = getRpcClient(BASE_CHAIN_ID);
-  // Markets deployment is env-driven (Base Mainnet deployment pending —
+  const client = getRpcClient(ARC_CHAIN_ID);
+  // Markets deployment is env-driven (Arc Mainnet deployment pending —
   // see docs/tasks/v2-roadmap.md); without it, balances still report but
   // positions stay unmarked.
-  const deployment = MARKETS_BY_CHAIN[BASE_CHAIN_ID];
-  const periphery = MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID];
+  const deployment = MARKETS_BY_CHAIN[ARC_CHAIN_ID];
+  const periphery = MARKETS_PERIPHERY_BY_CHAIN[ARC_CHAIN_ID];
   return sharedCache.getOrCompute(positionsCacheKey(owner), POSITIONS_CACHE_MS, () =>
     computeMarketPositions(owner, client, deployment, periphery),
   );

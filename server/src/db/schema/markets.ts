@@ -263,8 +263,8 @@ export const markets = pgTable(
     marketType: varchar("market_type", { length: 16 }).notNull().default("moneyline"),
     /** Which outcome the YES token represents. Moneyline: 0 home, 1 away. */
     outcomeIndex: smallint("outcome_index").notNull(),
-    /** Chain this market lives on (8453 = Base Mainnet). */
-    chainId: integer("chain_id").notNull().default(8453),
+    /** Chain this market lives on (5042 = Arc Mainnet). */
+    chainId: integer("chain_id").notNull().default(5042),
     /**
      * P-002 — the persisted keccak preimage binding. `marketId` commits to
      * (providerEventId, marketType, outcomeIndex[, chainId]) per
@@ -447,7 +447,7 @@ export const combos = pgTable(
     status: varchar("status", { length: 8 }).notNull().default("draft"),
     /** The conjunction market this ticket holds YES in (task 072). */
     marketId: varchar("market_id", { length: 66 }),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     marketAddress: varchar("market_address", { length: 42 }),
     yesToken: varchar("yes_token", { length: 42 }),
     poolId: varchar("pool_id", { length: 66 }),
@@ -598,7 +598,7 @@ export const resolutionReviews = pgTable(
       .primaryKey()
       .default(sql`gen_random_uuid()`),
     providerEventId: varchar("provider_event_id", { length: 128 }).notNull(),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     /** PENDING_RECONCILIATION | VERIFIED | DISPUTED | MANUAL_REVIEW | RESOLVED */
     state: varchar("state", { length: 24 }).notNull(),
     /** dual-source | single-source — the corroboration regime in force. */

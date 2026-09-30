@@ -54,7 +54,7 @@ const depositSchema = z.object({
 
 /**
  * POST /api/agent/unified-balance/deposit — deposit USDC from the agent wallet
- * (on Base) into its unified balance. Provisions the agent wallet on demand.
+ * (on Arc) into its unified balance. Provisions the agent wallet on demand.
  */
 agentUnifiedBalanceRouter.post(
   "/api/agent/unified-balance/deposit",
@@ -112,7 +112,7 @@ const spendSchema = z.object({
 
 /**
  * POST /api/agent/unified-balance/spend — settle USDC from the agent's
- * unified balance (deposited on Base) to another Gateway chain. Signed by the
+ * unified balance (deposited on Arc) to another Gateway chain. Signed by the
  * admin-EOA delegate; the first call may return `delegate_pending` while
  * Gateway finalizes the delegate registration.
  */

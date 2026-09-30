@@ -21,7 +21,7 @@ import { useAgentPortfolio } from "@/features/agent/use-agent-portfolio.ts";
 function NetworkWarning() {
   return (
     <p className="rounded-sm border border-amber/40 bg-amber/10 px-3 py-2 text-[12px] leading-relaxed text-amber">
-      Sending from an exchange? Choose the <strong>Base</strong> network when you withdraw. Funds
+      Sending from an exchange? Choose the <strong>Arc</strong> network when you withdraw. Funds
       sent on any other network can&apos;t be recovered.
     </p>
   );
@@ -31,7 +31,7 @@ function AcceptedTokens() {
   return (
     <p className="text-[12px] leading-relaxed text-text-dim">
       Accepted: <strong className="text-text">USDC</strong> (everything here is priced and settled
-      in it) — EURC and cbBTC also work as tradeable assets.
+      in it) — EURC and cirBTC also work as tradeable assets.
     </p>
   );
 }

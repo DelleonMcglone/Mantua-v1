@@ -9,7 +9,7 @@ const SLIPPAGE_DENOM = 10_000n;
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 
 export interface BuildRemoveLiquidityArgs {
-  /** Target chain — picks the right PositionManager. Defaults to Base. */
+  /** Target chain — picks the right PositionManager. Defaults to Arc. */
   chainId?: SupportedChainId;
   tokenId: bigint;
   liquidityToRemove: bigint;
@@ -142,7 +142,7 @@ export function buildRemoveLiquidityCalldata(
  */
 export function buildCollectFeesCalldata(args: {
   tokenId: bigint;
-  /** Target chain — picks the right PositionManager. Defaults to Base. */
+  /** Target chain — picks the right PositionManager. Defaults to Arc. */
   chainId?: SupportedChainId;
   currency0: `0x${string}`;
   currency1: `0x${string}`;

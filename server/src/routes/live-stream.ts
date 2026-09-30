@@ -8,7 +8,7 @@ import { readCanonicalPublicSlate } from "../lib/sports/store.ts";
 import { withLiveOdds } from "../lib/sports/live-odds.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 import { platformStatusReader } from "./platform-status.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import { readMarketPositions, type MarketPositionRow } from "../lib/sports/market-positions.ts";
 import { readWalletBalances, type UserBalance } from "../lib/user-portfolio.ts";
 import { datesToRangeMs, parseDates } from "./sports-slate.ts";
@@ -106,8 +106,8 @@ function defaultDeps(): LiveStreamDeps {
       ),
     readStatus: platformStatusReader,
     readPositions: readMarketPositions,
-    readBalances: (wallet) => readWalletBalances(wallet, BASE_CHAIN_ID),
-    balancesChainId: BASE_CHAIN_ID,
+    readBalances: (wallet) => readWalletBalances(wallet, ARC_CHAIN_ID),
+    balancesChainId: ARC_CHAIN_ID,
     now: () => Date.now(),
     liveTickMs: LIVE_TICK_MS,
     idleTickMs: IDLE_TICK_MS,

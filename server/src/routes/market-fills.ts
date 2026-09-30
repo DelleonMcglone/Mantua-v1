@@ -14,7 +14,7 @@ import { sharedCache } from "../lib/shared-cache.ts";
 import { counters } from "../lib/metrics.ts";
 import { positionsCacheKey } from "./market-positions.ts";
 import {
-  BASE_CHAIN_ID,
+  ARC_CHAIN_ID,
   DEFAULT_CHAIN_ID,
   isSupportedChainId,
   type SupportedChainId,
@@ -119,7 +119,7 @@ const bodySchema = z.object({
   direction: z.enum(["buy", "sell"]),
   tokensRaw: z.string().regex(/^\d{1,30}$/),
   usdcRaw: z.string().regex(/^\d{1,30}$/),
-  /** Chain the fill happened on — omitted means Base (back-compat). */
+  /** Chain the fill happened on — omitted means Arc (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
 });
 
@@ -138,8 +138,8 @@ export function createMarketFillsRouter(overrides: Partial<MarketFillsDeps> = {}
       (async (address) => {
         await Promise.all([
           sharedCache.invalidate(positionsCacheKey(address)),
-          // Markets trade on Base only; the balance a fill moves is there.
-          sharedCache.invalidate(balancesCacheKey(address, BASE_CHAIN_ID)),
+          // Markets trade on Arc only; the balance a fill moves is there.
+          sharedCache.invalidate(balancesCacheKey(address, ARC_CHAIN_ID)),
         ]);
       }),
     recordActivity: overrides.recordActivity ?? recordActivity,

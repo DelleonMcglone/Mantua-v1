@@ -267,7 +267,7 @@ export async function recordActivity(db: DB, input: ActivityInput): Promise<Acti
         userId: input.userId ?? null,
         walletAddress: lower(input.walletAddress),
         txHash: lower(input.txHash),
-        chainId: input.chainId ?? 8453,
+        chainId: input.chainId ?? 5042,
         marketId: lower(input.marketId),
         poolId: lower(input.poolId),
         positionRef: input.positionRef ?? null,

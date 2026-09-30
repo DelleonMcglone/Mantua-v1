@@ -26,11 +26,22 @@ import { checkSpendingCap, guardSpend, type SpendGuardIo } from "./spending-cap.
  * AGENT's unified balance — the EOA only signs.
  */
 
-const HOME_CHAIN = "Base";
+type HomeChain = Parameters<UBK.UnifiedBalanceKit["deposit"]>[0]["from"]["chain"];
+/** The kit's identifier for Arc Mainnet. The pinned unified-balance-kit
+ *  (1.2.1) knows only "Arc_Testnet", so there is none yet: every call
+ *  degrades to UnifiedBalanceUnavailableError until a release adds mainnet
+ *  (C-008 / C-014 gate). */
+const HOME_CHAIN: HomeChain | null = null;
+function homeChain(): HomeChain {
+  if (!HOME_CHAIN) {
+    throw new UnifiedBalanceUnavailableError("Unified balance is not available on Arc yet.");
+  }
+  return HOME_CHAIN;
+}
 
 /**
  * Gateway mainnet destinations the spend endpoint accepts. Deposits (and thus
- * the burn allocation) live on Base — the home chain — so Base itself isn't a
+ * the burn allocation) live on Arc — the home chain — so Arc itself isn't a
  * destination; CCTP `bridge` covers point-to-point transfers to the wider
  * chain list.
  */
@@ -191,7 +202,7 @@ export async function getUnifiedBalances(privyUserId: string): Promise<UnifiedBa
 }
 
 /**
- * Deposit USDC from the agent wallet (on Base) into its unified balance. Funds
+ * Deposit USDC from the agent wallet (on Arc) into its unified balance. Funds
  * stay owned by the agent wallet — they're just held in Gateway and become
  * spendable across chains — so no spending-cap check applies. Provisions the
  * agent wallet on demand.
@@ -215,7 +226,7 @@ export async function depositToUnifiedBalance(
   const adapter = createCircleWalletsAdapter({ apiKey, entitySecret });
   const kit = new UnifiedBalanceKit();
   const res = (await kit.deposit({
-    from: { adapter, chain: HOME_CHAIN, address: wallet.address },
+    from: { adapter, chain: homeChain(), address: wallet.address },
     amount,
   })) as unknown as DepositResultLike;
   return {
@@ -229,14 +240,14 @@ export async function depositToUnifiedBalance(
 // Deposit via the ops/buyer EOA
 // ---------------------------------------------------------------------------
 
-/** Where top-ups land: users send Base USDC to this ops wallet, and
- *  `depositToUnifiedBalanceFromBase` moves it into the AGENT's unified
+/** Where top-ups land: users send Arc USDC to this ops wallet, and
+ *  `depositToUnifiedBalanceFromArc` moves it into the AGENT's unified
  *  balance. Same key the x402 buyer signs with. */
 function requireOpsKey(): `0x${string}` {
   const key = env.X402_BUYER_PRIVATE_KEY ?? env.MANTUA_ADMIN_PRIVATE_KEY;
   if (!key) {
     throw new UnifiedBalanceUnavailableError(
-      "Base-side deposits are unavailable: no ops wallet key configured.",
+      "Arc-side deposits are unavailable: no ops wallet key configured.",
     );
   }
   return key as `0x${string}`;
@@ -247,23 +258,23 @@ function requireOpsKey(): `0x${string}` {
 const DEPOSIT_BASE_MAX_USDC = 100;
 
 /**
- * Deposit USDC held by the ops wallet on Base into the agent's unified
+ * Deposit USDC held by the ops wallet on Arc into the agent's unified
  * balance (`depositFor` — the deposit is credited to the AGENT, the ops
  * wallet only signs and pays gas). This is the "top-up via ops wallet"
- * path: the user sends USDC to the ops wallet address on Base, then the
+ * path: the user sends USDC to the ops wallet address on Arc, then the
  * agent moves it into Gateway.
  */
-export async function depositToUnifiedBalanceFromBase(
+export async function depositToUnifiedBalanceFromArc(
   privyUserId: string,
   amount: string,
-): Promise<UnifiedDepositResult & { source: string; sourceChain: string }> {
+): Promise<UnifiedDepositResult & { source: string; sourceChain: HomeChain }> {
   const wallet = await getAgentWallet(privyUserId);
   if (!wallet) throw new UnifiedBalanceUnavailableError("No agent wallet provisioned.");
   const amt = Number(amount);
   if (!(amt > 0)) throw new Error("amount must be a positive decimal string");
   if (amt > DEPOSIT_BASE_MAX_USDC) {
     throw new Error(
-      `Base-side deposits are capped at ${String(DEPOSIT_BASE_MAX_USDC)} USDC per call.`,
+      `Arc-side deposits are capped at ${String(DEPOSIT_BASE_MAX_USDC)} USDC per call.`,
     );
   }
   const key = requireOpsKey();
@@ -272,7 +283,7 @@ export async function depositToUnifiedBalanceFromBase(
   const kit = new ubk.UnifiedBalanceKit();
   // Cast bridges the nominal Blockchain-enum mismatch between the viem
   // adapter's and the kit's bundled types (same as `spend` below).
-  const from = { adapter, chain: HOME_CHAIN } as unknown as Parameters<
+  const from = { adapter, chain: homeChain() } as unknown as Parameters<
     typeof kit.depositFor
   >[0]["from"];
   const res = (await kit.depositFor({
@@ -282,14 +293,14 @@ export async function depositToUnifiedBalanceFromBase(
   })) as unknown as DepositResultLike & { depositedBy?: string };
   logger.info(
     { amount, agent: wallet.address, txHash: res.txHash },
-    "gateway deposit via ops wallet on Base",
+    "gateway deposit via ops wallet on Arc",
   );
   return {
     txHash: res.txHash,
     ...(res.explorerUrl ? { explorerUrl: res.explorerUrl } : {}),
     amount,
     source: privateKeyToAccount(key).address,
-    sourceChain: HOME_CHAIN,
+    sourceChain: homeChain(),
   };
 }
 
@@ -344,7 +355,7 @@ async function loadKitAndAdapters(): Promise<{
 
 /**
  * Is the admin EOA authorized as a Gateway delegate for the agent wallet?
- * Read goes through the owner (SCA) adapter context on Base.
+ * Read goes through the owner (SCA) adapter context on Arc.
  */
 export async function getGatewayDelegateStatus(
   privyUserId: string,
@@ -357,7 +368,7 @@ export async function getGatewayDelegateStatus(
   const adapter = cwa.createCircleWalletsAdapter({ apiKey, entitySecret });
   const kit = new ubk.UnifiedBalanceKit();
   const status = await kit.getDelegateStatus({
-    from: { adapter, chain: HOME_CHAIN, address: wallet.address },
+    from: { adapter, chain: homeChain(), address: wallet.address },
     delegateAddress,
     token: "USDC",
   });
@@ -383,7 +394,7 @@ export async function ensureGatewayDelegate(
   const adapter = cwa.createCircleWalletsAdapter({ apiKey, entitySecret });
   const kit = new ubk.UnifiedBalanceKit();
   await kit.addDelegate({
-    from: { adapter, chain: HOME_CHAIN, address: wallet.address },
+    from: { adapter, chain: homeChain(), address: wallet.address },
     delegateAddress: current.delegateAddress,
     token: "USDC",
   });
@@ -435,7 +446,7 @@ export async function guardGatewaySpend<T>(
 
 /**
  * Spend USDC from the agent wallet's unified balance to `destinationChain`
- * (burn on Base, mint on the destination) — Base as the settlement hub. The
+ * (burn on Arc, mint on the destination) — Arc as the settlement hub. The
  * admin-EOA delegate signs the burn intent; `sourceAccount` keeps the funds
  * drawn from the AGENT's balance. Auto-registers the delegate on first use;
  * if that registration is still finalizing, returns `delegate_pending`
@@ -487,7 +498,7 @@ export async function spendUnifiedBalance(
   const from = {
     adapter,
     sourceAccount: wallet.address,
-    allocations: { amount, chain: HOME_CHAIN },
+    allocations: { amount, chain: homeChain() },
   } as unknown as UBK.SpendSource;
   const issueSpend = async () =>
     (await kit.spend({

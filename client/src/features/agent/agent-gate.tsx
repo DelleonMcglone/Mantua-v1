@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- co-located formatters + strip component by design. */
-import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
 import { ExternalLink } from "lucide-react";
 import { address as shortAddr } from "@/lib/format.ts";
 import { AgentStrip } from "./AgentStrip.tsx";
@@ -28,7 +28,7 @@ export function AgentWalletStrip({
   agent: AgentPortfolioState;
   label?: string;
 }) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   if (!agent.agentAddress) return null;
   const url = getExplorerAddressUrl(chainId, agent.agentAddress);
   return (

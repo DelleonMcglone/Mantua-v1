@@ -35,7 +35,7 @@ function row(over: Partial<Activity>): Activity {
     kind: "market_buy",
     status: "completed",
     actor: "user",
-    chainId: 8453,
+    chainId: 5042,
     marketId: null,
     poolId: null,
     positionRef: null,

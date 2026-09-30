@@ -11,7 +11,7 @@ import {
   liveResolutionSubmitter,
   marketSignerWallet,
 } from "../lib/sports/markets-onchain.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../lib/chains.ts";
 import {
   drizzleDisputeWindow,
   drizzleResolutionLog,
@@ -117,7 +117,7 @@ cronResolutionRouter.get(
     const plans: Record<string, unknown> = {};
     let failures = 0;
 
-    const chains: SupportedChainId[] = [BASE_CHAIN_ID];
+    const chains: SupportedChainId[] = [ARC_CHAIN_ID];
 
     for (const league of LEAGUES) {
       try {
