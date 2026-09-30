@@ -598,10 +598,20 @@ export interface DynamicMarketDeployment {
 }
 
 /**
- * Per-chain Dynamic Market deployments. Arc Mainnet: deployment pending
- * (H-009 — `deploy/dynamic-market/README.md`); the 2026-09-23 Base
- * deployment is superseded and not registered. Consumers degrade
- * gracefully on a chain with no entry.
+ * Per-chain Dynamic Market deployments. Arc Mainnet: H-009, 2026-09-30
+ * (`deploy/dynamic-market/README.md`, Deployment record) — `hook.poolManager()`
+ * and `hook.registry()` were checked on-chain to return this stack. The
+ * 2026-09-23 Base deployment is superseded. Consumers degrade gracefully
+ * on a chain with no entry.
  */
-export const DYNAMIC_MARKET_BY_CHAIN: Partial<Record<SupportedChainId, DynamicMarketDeployment>> =
-  {};
+export const DYNAMIC_MARKET_BY_CHAIN: Partial<Record<SupportedChainId, DynamicMarketDeployment>> = {
+  [ARC_CHAIN_ID]: {
+    poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
+    registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
+    // Low 14 bits 0x28C0 = BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY |
+    // BEFORE_SWAP | AFTER_SWAP (asserted in the deploy tx).
+    hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
+    operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+    keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+  },
+};

@@ -31,10 +31,12 @@ function planned(overrides: Partial<PlannedMarket> = {}): PlannedMarket {
 }
 
 void describe("markets on-chain wiring", () => {
-  void it("has no settlement layer registered on Arc yet (H-009 / L-018 — deployment pending)", () => {
-    // Registering a placeholder would let the sweep sign against a factory
-    // that is not there; the entry appears with the Arc deploy.
-    assert.equal(MARKETS_BY_CHAIN[ARC_CHAIN_ID], undefined);
+  void it("registers the Arc settlement layer deployed 2026-09-30", () => {
+    assert.deepEqual(MARKETS_BY_CHAIN[ARC_CHAIN_ID], {
+      factory: "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93",
+      resolver: "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281",
+      collateral: "0x3600000000000000000000000000000000000000",
+    });
   });
 
   void it("opens nothing without the operator's signing key — the deployed-but-closed state", (t) => {
@@ -48,7 +50,7 @@ void describe("markets on-chain wiring", () => {
     assert.equal(marketSignerWallet(ARC_CHAIN_ID), null);
   });
 
-  // Every configured settlement layer, Base's included.
+  // Every configured settlement layer.
   void it("configured settlement layers are checksummed, distinct, and allowlisted (B8-006)", () => {
     for (const markets of Object.values(MARKETS_BY_CHAIN)) {
       // Object.values on an interface type falls back to any[]; the cast

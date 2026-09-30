@@ -127,16 +127,36 @@ describe("Arc Mainnet deployment pending", () => {
 });
 
 /**
- * The Dynamic Market stack IS deployed on Base (H-009, 2026-09-23). Pin the
- * recorded addresses so an edit can't silently re-point live market pools,
- * and check the hook address carries exactly the four permissions v4 reads
- * from it.
+ * The Dynamic Market stack IS deployed on Arc Mainnet (H-009, 2026-09-30).
+ * Pin the recorded addresses so an edit can't silently re-point live market
+ * pools, and check the hook address carries exactly the four permissions v4
+ * reads from it.
  */
-describe("Dynamic Market stack on Arc Mainnet (H-009 — deployment pending)", () => {
-  it("registers no Dynamic Market stack until the Arc deploy lands", () => {
-    // Registering a placeholder would let getV4StackForHook route live pool
-    // operations at a stack that is not there — worse than the lookup
-    // simply not matching. The entry appears with the Arc deploy.
-    assert.equal(DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID], undefined);
+describe("Dynamic Market stack on Arc Mainnet (H-009)", () => {
+  const dm = DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID];
+
+  it("registers the deployed addresses from deploy/dynamic-market/README.md", () => {
+    assert.deepEqual(dm, {
+      poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
+      registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
+      hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
+      operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+      keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
+    });
+  });
+
+  it("hook address encodes BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY | BEFORE_SWAP | AFTER_SWAP", () => {
+    assert.ok(dm);
+    assert.equal(Number(BigInt(dm.hook) & 0x3fffn), 0x28c0);
+  });
+
+  it("routes the hook to its own PoolManager and the market periphery", () => {
+    assert.ok(dm);
+    const stack = getV4StackForHook(dm.hook, ARC_CHAIN_ID);
+    assert.equal(stack.poolManager, dm.poolManager);
+    assert.equal(stack.quoter, "0x1791972C76a8Bcb9da83E50B9435612590a0102f");
+    assert.equal(stack.stateView, "0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF");
+    assert.equal(stack.positionManager, "0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da");
+    assert.equal(stack.poolSwapTest, "0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF");
   });
 });
