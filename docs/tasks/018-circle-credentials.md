@@ -20,14 +20,14 @@ So this task ships everything that _surrounds_ the credentials — schema,
 validation, safe storage, failure modes, verification — and hands the console
 work to the operator as the runbook below.
 
-| Part                                            | Owner        | Status     |
-| ----------------------------------------------- | ------------ | ---------- |
-| Env schema, format validation, boot-time checks | code         | ✅ done    |
-| `.env.example`, `.gitignore` hardening          | code         | ✅ done    |
-| Wallet-set hard-fail in production              | code         | ✅ done    |
-| Credential preflight script                     | code         | ✅ done    |
-| Circle account + API key + entity secret        | **operator** | ⬜ pending |
-| Wallet set + Gas Station policy                 | **operator** | ⬜ pending |
+| Part                                            | Owner        | Status                  |
+| ----------------------------------------------- | ------------ | ----------------------- |
+| Env schema, format validation, boot-time checks | code         | ✅ done                 |
+| `.env.example`, `.gitignore` hardening          | code         | ✅ done                 |
+| Wallet-set hard-fail in production              | code         | ✅ done                 |
+| Credential preflight script                     | code         | ✅ done                 |
+| Circle account + API key + entity secret        | **operator** | ✅ 2026-09-30 (mainnet) |
+| Wallet set + Gas Station policy                 | **operator** | ✅ 2026-09-30 (Arc)     |
 
 ## Operator runbook
 
