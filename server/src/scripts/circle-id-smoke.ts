@@ -4,8 +4,10 @@
  * Chain identifiers are stringly-typed at every Circle boundary the app
  * crosses, and each SDK family spells them differently:
  *
- *   - Developer-Controlled Wallets uses SCREAMING ids ("BASE", "BASE-SEPOLIA")
- *   - Bridge Kit / Unified Balance Kit use TitleCase names ("Base", "Ethereum")
+ *   - Developer-Controlled Wallets / Smart Contract Platform use SCREAMING
+ *     ids ("ARC", "ARC-TESTNET")
+ *   - Bridge Kit / Unified Balance Kit use TitleCase names ("Arc",
+ *     "Arc_Testnet", "Ethereum")
  *
  * A silent rename in an SDK upgrade would not fail typecheck where the app
  * passes plain strings, so this script re-validates every identifier the app
@@ -14,17 +16,20 @@
  * Two layers:
  *
  *   OFFLINE (always runs, no credentials, no network):
- *     - the DCW `Blockchain` union contains "BASE" (audit-verified once;
- *       re-asserted here both at compile time and against the runtime enum)
- *     - every chain name agent-bridge.ts passes to Bridge Kit exists in the
- *       installed Bridge Kit's `BridgeChain`/`Blockchain` enums
- *     - every chain name unified-balance.ts passes to Unified Balance Kit
- *       exists in the installed kit's `UnifiedBalanceChain` enum
- *     The app-side lists are extracted from the SOURCE FILES, not duplicated
+ *     - the DCW and SCP `Blockchain` unions contain "ARC" and "ARC-TESTNET"
+ *       (compile time), and the ids the app persists/sends
+ *       (agent-wallet-create.ts, circle-contracts.ts) are those literals
+ *     - the Bridge Kit home chain + every destination agent-bridge.ts
+ *       passes exist in the installed kit's `BridgeChain` enum, and the
+ *       kit's Arc definition is chain 5042 / mainnet / USDC 0x3600…0000
+ *     - the Unified Balance Kit home chain + every destination
+ *       unified-balance.ts passes exist in the installed kit's
+ *       `UnifiedBalanceChain` enum
+ *     The app-side ids are extracted from the SOURCE FILES, not duplicated
  *     here, so this cannot drift from what the code actually sends.
  *
  *   LIVE (only when CIRCLE_API_KEY + CIRCLE_ENTITY_SECRET are set):
- *     - one listWallets call asserting a BASE-family blockchain value
+ *     - one listWallets call asserting an ARC-family blockchain value
  *       round-trips through the real API.
  *
  * Exit 0 = every identifier found (live layer passed or was skipped).
@@ -36,11 +41,19 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Blockchain as DcwBlockchain } from "@circle-fin/developer-controlled-wallets";
+import type { Blockchain as ScpBlockchain } from "@circle-fin/smart-contract-platform";
 
-// ── Compile-time re-assertion of the C-014 audit finding ────────────────────
-// If a DCW upgrade drops "BASE" from the `Blockchain` union, `npm run
-// typecheck` fails on this line before the script even runs.
-const DCW_BASE_ID: DcwBlockchain = "BASE";
+// ── Compile-time assertions ─────────────────────────────────────────────────
+// If an SDK upgrade drops an Arc id from a `Blockchain` union, `npm run
+// typecheck` fails on these lines before the script even runs.
+const DCW_ARC_ID: DcwBlockchain = "ARC";
+const DCW_ARC_TESTNET_ID: DcwBlockchain = "ARC-TESTNET";
+const SCP_ARC_ID: ScpBlockchain = "ARC";
+
+/** Arc Mainnet as the app knows it (server/src/lib/chains.ts, tokens.ts). */
+const ARC_CHAIN_ID = 5042;
+const ARC_TESTNET_CHAIN_ID = 5042002;
+const ARC_USDC = "0x3600000000000000000000000000000000000000";
 
 const ok = (m: string) => {
   console.log(`  ✓ ${m}`);
@@ -67,10 +80,10 @@ function extractStringArray(source: string, constName: string, file: string): st
   return [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
 }
 
-/** Extract `const NAME = "value"` from source text. */
+/** Extract `const NAME = "value"` (any trailing `as const` etc.) from source. */
 function extractStringConst(source: string, constName: string, file: string): string {
-  const match = new RegExp(`const ${constName}\\s*=\\s*"([^"]+)"`).exec(source);
-  if (!match) throw new Error(`could not find 'const ${constName} = "..."' in ${file}`);
+  const match = new RegExp(`(?:const|type) ${constName}\\s*=\\s*"([^"]+)"`).exec(source);
+  if (!match) throw new Error(`could not find '${constName} = "..."' in ${file}`);
   return match[1];
 }
 
@@ -95,32 +108,61 @@ function checkIds(label: string, ids: readonly string[], values: Set<string>): b
   return allFound;
 }
 
+function expect(label: string, actual: unknown, wanted: unknown): boolean {
+  if (actual === wanted) {
+    ok(`${label}: ${String(actual)}`);
+    return true;
+  }
+  bad(`${label}: expected ${String(wanted)}, installed SDK says ${String(actual)}`);
+  return false;
+}
+
+/** A kit's chain definition object (bridge-kit exports one per chain). */
+interface KitChainDef {
+  chain?: string;
+  chainId?: number;
+  isTestnet?: boolean;
+  usdcAddress?: string;
+}
+
 async function offlineLayer(): Promise<boolean> {
   let passed = true;
   console.log("Offline — installed-SDK identifier validation");
 
-  // 1. DCW — the app provisions wallets with blockchain "BASE"
-  //    (lib/agent-wallet.ts `CircleBlockchain`).
-  const dcw = (await import("@circle-fin/developer-controlled-wallets")) as unknown as Record<
-    string,
-    unknown
-  >;
-  const dcwValues = enumValues(dcw, "Blockchain");
-  if (dcwValues) {
-    passed = checkIds("developer-controlled-wallets Blockchain", [DCW_BASE_ID], dcwValues) && passed;
-  } else {
-    // The union is importable as a type either way (asserted above at compile
-    // time); a missing runtime export is informational, not a failure.
-    ok(
-      'developer-controlled-wallets exports no runtime Blockchain enum — "BASE" is asserted against the type union at compile time instead',
-    );
-  }
+  // 1. DCW / SCP — the app provisions wallets and deploys contracts with
+  //    blockchain "ARC" (agent-wallet-create.ts, circle-contracts.ts). The
+  //    unions are asserted at compile time above; here the source ids must
+  //    equal those literals.
+  passed =
+    expect(
+      'agent-wallet-create.ts CircleBlockchain (DCW "ARC")',
+      extractStringConst(
+        readLibSource("agent-wallet-create.ts"),
+        "CircleBlockchain",
+        "agent-wallet-create.ts",
+      ),
+      DCW_ARC_ID,
+    ) && passed;
+  passed =
+    expect(
+      'circle-contracts.ts ARC_BLOCKCHAIN (SCP "ARC")',
+      extractStringConst(
+        readLibSource("circle-contracts.ts"),
+        "ARC_BLOCKCHAIN",
+        "circle-contracts.ts",
+      ),
+      SCP_ARC_ID,
+    ) && passed;
+  ok(
+    `developer-controlled-wallets Blockchain union carries "${DCW_ARC_ID}" and "${DCW_ARC_TESTNET_ID}" (compile time)`,
+  );
 
   // 2. Bridge Kit — agent-bridge.ts bridges from HOME_CHAIN to each entry of
   //    AGENT_BRIDGE_DESTINATIONS, passing these names as `chain`.
   const bridgeSource = readLibSource("agent-bridge.ts");
+  const bridgeHome = extractStringConst(bridgeSource, "HOME_CHAIN", "agent-bridge.ts");
   const bridgeIds = [
-    extractStringConst(bridgeSource, "HOME_CHAIN", "agent-bridge.ts"),
+    bridgeHome,
     ...extractStringArray(bridgeSource, "AGENT_BRIDGE_DESTINATIONS", "agent-bridge.ts"),
   ];
   const bk = (await import("@circle-fin/bridge-kit")) as unknown as Record<string, unknown>;
@@ -131,10 +173,21 @@ async function offlineLayer(): Promise<boolean> {
   const bridgeChainValues = enumValues(bk, "BridgeChain");
   if (bridgeChainValues) {
     passed = checkIds("bridge-kit BridgeChain", bridgeIds, bridgeChainValues) && passed;
+    passed = checkIds("bridge-kit BridgeChain (dev)", ["Arc_Testnet"], bridgeChainValues) && passed;
   } else {
     bad("bridge-kit exports no BridgeChain enum — cannot validate bridge chain names");
     passed = false;
   }
+  // The kit's own Arc definitions must describe the chain the app runs on.
+  const arc = bk["Arc"] as KitChainDef | undefined;
+  const arcTestnet = bk["ArcTestnet"] as KitChainDef | undefined;
+  passed = expect("bridge-kit Arc.chain", arc?.chain, bridgeHome) && passed;
+  passed = expect("bridge-kit Arc.chainId", arc?.chainId, ARC_CHAIN_ID) && passed;
+  passed = expect("bridge-kit Arc.isTestnet", arc?.isTestnet, false) && passed;
+  passed =
+    expect("bridge-kit Arc.usdcAddress", arc?.usdcAddress?.toLowerCase(), ARC_USDC) && passed;
+  passed =
+    expect("bridge-kit ArcTestnet.chainId", arcTestnet?.chainId, ARC_TESTNET_CHAIN_ID) && passed;
 
   // 3. Unified Balance Kit — unified-balance.ts spends from HOME_CHAIN to
   //    each entry of GATEWAY_SPEND_CHAINS, passing these names as `chain`.
@@ -150,6 +203,9 @@ async function offlineLayer(): Promise<boolean> {
   const ubkValues = enumValues(ubk, "UnifiedBalanceChain") ?? enumValues(ubk, "Blockchain");
   if (ubkValues) {
     passed = checkIds("unified-balance-kit UnifiedBalanceChain", ubIds, ubkValues) && passed;
+    passed =
+      checkIds("unified-balance-kit UnifiedBalanceChain (dev)", ["Arc_Testnet"], ubkValues) &&
+      passed;
   } else {
     bad(
       "unified-balance-kit exports no UnifiedBalanceChain/Blockchain enum — cannot validate Gateway chain names",
@@ -160,8 +216,8 @@ async function offlineLayer(): Promise<boolean> {
   return passed;
 }
 
-/** DCW blockchain ids that mean "the Base family" — mainnet or Sepolia. */
-const BASE_FAMILY = new Set<string>(["BASE", "BASE-SEPOLIA"]);
+/** DCW blockchain ids that mean "the Arc family" — mainnet or testnet. */
+const ARC_FAMILY = new Set<string>([DCW_ARC_ID, DCW_ARC_TESTNET_ID]);
 
 async function liveLayer(): Promise<boolean | null> {
   const apiKey = process.env.CIRCLE_API_KEY?.trim();
@@ -179,9 +235,8 @@ async function liveLayer(): Promise<boolean | null> {
   }
   console.log(`  key: ${keyShape(apiKey)} (entity secret present, never logged)`);
   try {
-    const { initiateDeveloperControlledWalletsClient } = await import(
-      "@circle-fin/developer-controlled-wallets"
-    );
+    const { initiateDeveloperControlledWalletsClient } =
+      await import("@circle-fin/developer-controlled-wallets");
     const baseUrl = process.env.CIRCLE_API_BASE_URL?.trim();
     const client = initiateDeveloperControlledWalletsClient({
       apiKey,
@@ -198,17 +253,17 @@ async function liveLayer(): Promise<boolean | null> {
     );
     if (observed.size === 0) {
       bad(
-        "listWallets returned no wallets — cannot confirm a BASE-family blockchain value round-trips. Provision a wallet (circle:e2e does this) and re-run.",
+        "listWallets returned no wallets — cannot confirm an ARC-family blockchain value round-trips. Provision a wallet (circle:e2e does this) and re-run.",
       );
       return false;
     }
-    const baseFamily = [...observed].filter((b) => BASE_FAMILY.has(b));
-    if (baseFamily.length > 0) {
-      ok(`BASE-family blockchain round-tripped from the live API: ${baseFamily.join(", ")}`);
+    const arcFamily = [...observed].filter((b) => ARC_FAMILY.has(b));
+    if (arcFamily.length > 0) {
+      ok(`ARC-family blockchain round-tripped from the live API: ${arcFamily.join(", ")}`);
       return true;
     }
     bad(
-      `listWallets returned wallets, but none on a BASE-family chain — observed: ${[...observed].join(", ")}`,
+      `listWallets returned wallets, but none on an ARC-family chain — observed: ${[...observed].join(", ")}`,
     );
     return false;
   } catch (err) {

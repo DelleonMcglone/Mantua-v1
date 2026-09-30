@@ -27,15 +27,13 @@ import { checkSpendingCap, guardSpend, type SpendGuardIo } from "./spending-cap.
  */
 
 type HomeChain = Parameters<UBK.UnifiedBalanceKit["deposit"]>[0]["from"]["chain"];
-/** The kit's identifier for Arc Mainnet. The pinned unified-balance-kit
- *  (1.2.1) knows only "Arc_Testnet", so there is none yet: every call
- *  degrades to UnifiedBalanceUnavailableError until a release adds mainnet
- *  (C-008 / C-014 gate). */
-const HOME_CHAIN: HomeChain | null = null;
-function homeChain(): HomeChain {
-  if (!HOME_CHAIN) {
-    throw new UnifiedBalanceUnavailableError("Unified balance is not available on Arc yet.");
-  }
+/** The kit's identifier for Arc Mainnet: "Arc", a Gateway
+ *  `UnifiedBalanceChain` since unified-balance-kit 1.8 (C-008 / C-014,
+ *  verified against the installed kit by `npm run circle:id-smoke`). A
+ *  literal — it must satisfy both the deposit and the spend chain unions —
+ *  and the smoke script reads it from this source file. */
+const HOME_CHAIN = "Arc" as const satisfies HomeChain;
+function homeChain(): typeof HOME_CHAIN {
   return HOME_CHAIN;
 }
 
