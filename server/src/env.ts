@@ -271,7 +271,7 @@ const schema = z.object({
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
 
   /** x402 nanopayments — the agent pays small USDC fees per call to the x402
-   *  agent marketplace over plain HTTP (v2 protocol; settles on Base Mainnet
+   *  agent marketplace over plain HTTP (v2 protocol; settles on Arc Mainnet
    *  via the public facilitator, no CLI and no gas needed). Off by default;
    *  when off (or no buyer key is configured) the agent falls back to free
    *  data. See docs/x402-setup.md. */
@@ -280,7 +280,7 @@ const schema = z.object({
     .default("0")
     .transform((v) => v === "1"),
   /** Buyer EOA private key that signs x402 payment authorizations (needs
-   *  Base Mainnet USDC, no gas). Falls back to MANTUA_ADMIN_PRIVATE_KEY —
+   *  Arc Mainnet USDC, which is also the gas). Falls back to MANTUA_ADMIN_PRIVATE_KEY —
    *  the same EOA the x402 SELLER is paid to. */
   X402_BUYER_PRIVATE_KEY: z
     .string()
@@ -315,7 +315,7 @@ const schema = z.object({
    *  with graceful fallback, so no separate enable flag. */
   PYTH_HERMES_URL: z.url().default("https://hermes.pyth.network"),
 
-  /** x402 SELLER: address that receives USDC (Base Mainnet) when other agents
+  /** x402 SELLER: address that receives USDC (Arc Mainnet) when other agents
    *  pay for Mantua's analyst brief at /api/x402/analyst-brief. Absent → the
    *  seller endpoint is disabled (503). */
   X402_SELLER_ADDRESS: z
@@ -349,7 +349,7 @@ const schema = z.object({
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
 
-  /** Mantua hook addresses on Base Mainnet. Deployment pending — see
+  /** Mantua hook addresses on Arc Mainnet. Deployment pending — see
    *  docs/tasks/v2-roadmap.md; absent → hook-gated pools don't resolve
    *  (graceful degradation). */
   STABLE_PROTECTION_HOOK_ADDRESS: z
@@ -464,7 +464,7 @@ export function circleDegradations(e: Env): string[] {
   if (!e.CIRCLE_API_KEY || !e.CIRCLE_ENTITY_SECRET) return [];
   if (e.CIRCLE_GAS_STATION_POLICY_ID) return [];
   return [
-    "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored and are REFUSED in production (sponsorship.ts) rather than failing as an opaque timeout. Every other surface — markets, prices, research, support — runs normally. In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base (transactions use only the network's default policy), then record its id.",
+    "CIRCLE_GAS_STATION_POLICY_ID is unset: agent transactions are unsponsored and are REFUSED in production (sponsorship.ts) rather than failing as an opaque timeout. Every other surface — markets, prices, research, support — runs normally. In Console → Gas Station, create a policy for this wallet set on Arc, ACTIVATE it, and make it the default policy for Arc (transactions use only the network's default policy), then record its id.",
   ];
 }
 

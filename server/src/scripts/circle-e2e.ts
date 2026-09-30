@@ -52,8 +52,10 @@ function keyShape(key: string): string {
  *  registered ERC-20; `transfer(self, 0)` moves nothing and touches no state
  *  beyond an event). */
 const USDC_BY_BLOCKCHAIN: Partial<Record<Blockchain, `0x${string}`>> = {
-  BASE: "0x3600000000000000000000000000000000000000",
-  "BASE-SEPOLIA": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+  // Arc's USDC is the gas token's 6-decimal ERC-20 view, same address on
+  // mainnet and testnet (docs.arc.io).
+  ARC: "0x3600000000000000000000000000000000000000",
+  "ARC-TESTNET": "0x3600000000000000000000000000000000000000",
 };
 
 async function main(): Promise<number> {
@@ -86,11 +88,11 @@ async function main(): Promise<number> {
   ok(`CIRCLE_API_KEY present (${keyShape(apiKey)})`);
   ok("CIRCLE_ENTITY_SECRET present (value never logged)");
   const isTestKey = /^TEST_API_KEY:/i.test(apiKey);
-  const blockchain: Blockchain = isTestKey ? "BASE-SEPOLIA" : "BASE";
+  const blockchain: Blockchain = isTestKey ? "ARC-TESTNET" : "ARC";
   if (!isTestKey && process.env.CIRCLE_E2E_ALLOW_MAINNET !== "1") {
     bad(
       "CIRCLE_API_KEY is a LIVE key. This harness targets Circle testnet; refusing to execute " +
-        "on Base Mainnet. Set CIRCLE_E2E_ALLOW_MAINNET=1 to override deliberately.",
+        "on Arc Mainnet. Set CIRCLE_E2E_ALLOW_MAINNET=1 to override deliberately.",
     );
     return 1;
   }
