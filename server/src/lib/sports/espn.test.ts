@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  expandDateRange,
   EspnProvider,
   mapEspnSeasonType,
   mapStatus,
@@ -277,5 +278,45 @@ void describe("season type (D-105)", () => {
     const post = parseEvent({ ...espnEvent(), season: { year: 2027, type: 3 } }, "nfl");
     assert.equal(post.seasonType, "postseason");
     assert.equal("seasonType" in parseEvent(espnEvent(), "nfl"), false);
+  });
+});
+
+void describe("ESPN date windows (R-012 backfill)", () => {
+  void it("expands a YYYYMMDD-YYYYMMDD range into single days, inclusive", () => {
+    assert.deepEqual(expandDateRange("20260924-20260929"), [
+      "20260924",
+      "20260925",
+      "20260926",
+      "20260927",
+      "20260928",
+      "20260929",
+    ]);
+    assert.deepEqual(expandDateRange("20260928"), ["20260928"]);
+    assert.deepEqual(expandDateRange("20260930-20261002"), ["20260930", "20261001", "20261002"]);
+  });
+
+  void it("serves a range as one single-day request per day and merges the events", async () => {
+    const urls: string[] = [];
+    const fake: typeof fetch = (input) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      urls.push(url);
+      const day = /dates=(\d{8})/.exec(url)?.[1] ?? "";
+      // Each day answers one game with a day-specific id; the last day
+      // repeats the previous id to prove the merge dedupes.
+      const id = day === "20260926" ? "day-20260925" : `day-${day}`;
+      return Promise.resolve(
+        new Response(JSON.stringify({ events: [espnEvent({ id })] }), { status: 200 }),
+      );
+    };
+    const slate = await new EspnProvider(fake).getSlate("nfl", "20260924-20260926");
+    assert.deepEqual(
+      urls.map((u) => /dates=([0-9-]+)/.exec(u)?.[1]),
+      ["20260924", "20260925", "20260926"],
+      "single-day requests only — ESPN 400s the range form for the NFL",
+    );
+    assert.deepEqual(slate.events.map((e) => e.providerEventId).sort(), [
+      "day-20260924",
+      "day-20260925",
+    ]);
   });
 });
