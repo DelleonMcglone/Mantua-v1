@@ -1,12 +1,12 @@
 /**
  * Hook ↔ token-pair allowlist, chain-aware.
- *  - Base: Stable Protection USDC/EURC; Dynamic Fee cbBTC vs each
+ *  - Arc: Stable Protection USDC/EURC; Dynamic Fee cirBTC vs each
  *    stablecoin.
  * A hook must also be deployed on-chain (getHookAddress) before it can
  * be used — calling one whose address is unset throws "not deployed".
  */
 
-import { BASE_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { DEFAULT_CHAIN_ID, getHookAddress, type HookName } from "./v4-contracts.ts";
 import { getTokens, ZERO_ADDRESS, type TokenSymbol } from "./tokens.ts";
 
@@ -22,18 +22,15 @@ interface ChainHookAllowlist {
  * means the hook is not available on that chain. `pairs: null` means
  * any pair is allowed.
  */
-const HOOK_ALLOWLIST: Record<
-  SupportedChainId,
-  Partial<Record<HookName, ChainHookAllowlist>>
-> = {
-  [BASE_CHAIN_ID]: {
+const HOOK_ALLOWLIST: Record<SupportedChainId, Partial<Record<HookName, ChainHookAllowlist>>> = {
+  [ARC_CHAIN_ID]: {
     // Stable Protection — the FX-rate-aware showcase on the stable pair.
     "stable-protection": { pairs: [["USDC", "EURC"]] },
-    // Dynamic Fee — cbBTC vs each stablecoin.
+    // Dynamic Fee — cirBTC vs each stablecoin.
     "dynamic-fee": {
       pairs: [
-        ["USDC", "cbBTC"],
-        ["EURC", "cbBTC"],
+        ["USDC", "cirBTC"],
+        ["EURC", "cirBTC"],
       ],
     },
   },

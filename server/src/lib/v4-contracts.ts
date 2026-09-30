@@ -3,17 +3,21 @@
  *
  * Runtime per-chain registry: addresses are keyed by chainId; callers
  * pass `chainId` explicitly. Legacy single-chain exports
- * (V4_POOL_MANAGER, etc.) point at the Base Mainnet entry for code paths
+ * (V4_POOL_MANAGER, etc.) point at the Arc Mainnet entry for code paths
  * not yet migrated — new code MUST use the per-chain getters.
  *
- * Base Mainnet addresses are the CANONICAL Uniswap v4 deployment
- * (developers.uniswap.org/contracts/v4/deployments).
+ * Arc Mainnet has NO canonical Uniswap v4 deployment (checked 2026-09-29
+ * against docs.arc.io/arc/references/contract-addresses): the only v4
+ * stack on Arc is Mantua's own Dynamic Market PoolManager and periphery
+ * (`DYNAMIC_MARKET_BY_CHAIN`, `MARKETS_PERIPHERY_BY_CHAIN`), so the
+ * canonical getters throw a typed `V4StackNotDeployedError` and every
+ * base-pair (non-market) path degrades on it.
  */
 import { env } from "../env.ts";
-import { BASE_CHAIN_ID, DEFAULT_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, DEFAULT_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { MARKETS_PERIPHERY_BY_CHAIN } from "./markets-contracts.ts";
 
-interface V4Addresses {
+export interface V4Addresses {
   poolManager: `0x${string}`;
   positionManager: `0x${string}`;
   stateView: `0x${string}`;
@@ -22,20 +26,28 @@ interface V4Addresses {
   poolSwapTest: `0x${string}` | null;
 }
 
-const V4_BY_CHAIN: Record<SupportedChainId, V4Addresses> = {
-  // Base Mainnet — canonical Uniswap v4 deployment.
-  [BASE_CHAIN_ID]: {
-    poolManager: "0x498581fF718922c3f8e6A244956aF099B2652b2b",
-    positionManager: "0x7C5f5A4bBd8fD63184577525326123B519429bDc",
-    stateView: "0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71",
-    quoter: "0x0d5e0F971ED27FBfF6c2837bf31316121532048D",
-    // No test router ships in the canonical mainnet deployment.
-    poolSwapTest: null,
-  },
-};
+/** No canonical Uniswap v4 stack exists on Arc; the map stays empty.
+ *  Exported (mutable) only for `lib/testing/canonical-v4.ts`. */
+export const CANONICAL_V4_BY_CHAIN: Partial<Record<SupportedChainId, V4Addresses>> = {};
+
+/** The chain carries no canonical Uniswap v4 stack — a gated state. */
+export class V4StackNotDeployedError extends Error {
+  constructor(chainId: SupportedChainId) {
+    super(
+      `No canonical Uniswap v4 stack on chain ${String(chainId)} — base-pair swaps are unavailable.`,
+    );
+    this.name = "V4StackNotDeployedError";
+  }
+}
+
+export function hasCanonicalV4(chainId: SupportedChainId): boolean {
+  return CANONICAL_V4_BY_CHAIN[chainId] !== undefined;
+}
 
 export function getV4Addresses(chainId: SupportedChainId): V4Addresses {
-  return V4_BY_CHAIN[chainId];
+  const v4 = CANONICAL_V4_BY_CHAIN[chainId];
+  if (!v4) throw new V4StackNotDeployedError(chainId);
+  return v4;
 }
 
 export function getV4PoolManager(chainId: SupportedChainId): `0x${string}` {
@@ -54,15 +66,8 @@ export function getPoolSwapTest(chainId: SupportedChainId): `0x${string}` | null
   return getV4Addresses(chainId).poolSwapTest;
 }
 
-/** Legacy single-chain exports. Prefer the per-chain getters. */
-export const V4_POOL_MANAGER: `0x${string}` = V4_BY_CHAIN[BASE_CHAIN_ID].poolManager;
-export const V4_POSITION_MANAGER: `0x${string}` = V4_BY_CHAIN[BASE_CHAIN_ID].positionManager;
-export const V4_STATE_VIEW: `0x${string}` = V4_BY_CHAIN[BASE_CHAIN_ID].stateView;
-export const V4_QUOTER: `0x${string}` = V4_BY_CHAIN[BASE_CHAIN_ID].quoter;
-export const POOL_SWAP_TEST: `0x${string}` | null = V4_BY_CHAIN[BASE_CHAIN_ID].poolSwapTest;
-
-/** Canonical UniversalRouter on Base Mainnet (v4-aware). */
-export const UNIVERSAL_ROUTER = "0x6fF5693b99212Da76ad316178A184AB56D299b43" as const;
+/** Uniswap's UniversalRouter — none on Arc (no canonical v4), so null. */
+export const UNIVERSAL_ROUTER: `0x${string}` | null = null;
 
 /** Canonical Permit2 — same address on every chain (deterministic deploy). */
 export const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3" as const;
@@ -70,19 +75,19 @@ export const PERMIT2 = "0x000000000022d473030f116ddee9f6b43ac78ba3" as const;
 /**
  * Mantua hook addresses. Two hooks:
  *  - Stable Protection — USDC/EURC FX-rate-aware peg defense.
- *  - Dynamic Fee — volatile pairs (cbBTC), fee scales with volatility.
+ *  - Dynamic Fee — volatile pairs (cirBTC), fee scales with volatility.
  *
- * Base Mainnet deployment pending — see docs/tasks/v2-roadmap.md. Until
- * the hooks are deployed on 8453 the addresses are `null` (overridable
+ * Arc Mainnet deployment pending — see docs/tasks/v2-roadmap.md. Until
+ * the hooks are deployed on 5042 the addresses are `null` (overridable
  * via `STABLE_PROTECTION_HOOK_ADDRESS` / `DYNAMIC_FEE_HOOK_ADDRESS`);
  * every consumer degrades gracefully on `null` (hook-gated pools simply
  * don't resolve).
  */
 const STABLE_PROTECTION_BY_CHAIN: Record<SupportedChainId, `0x${string}` | null> = {
-  [BASE_CHAIN_ID]: env.STABLE_PROTECTION_HOOK_ADDRESS ?? null,
+  [ARC_CHAIN_ID]: env.STABLE_PROTECTION_HOOK_ADDRESS ?? null,
 };
 const DYNAMIC_FEE_BY_CHAIN: Record<SupportedChainId, `0x${string}` | null> = {
-  [BASE_CHAIN_ID]: env.DYNAMIC_FEE_HOOK_ADDRESS ?? null,
+  [ARC_CHAIN_ID]: env.DYNAMIC_FEE_HOOK_ADDRESS ?? null,
 };
 export const HOOK_NAMES = ["stable-protection", "dynamic-fee"] as const;
 export type HookName = (typeof HOOK_NAMES)[number];
@@ -103,7 +108,7 @@ export function getHookAddress(
 
 /**
  * Per-hook deployment manifest — the hook address plus the v4 helper
- * routers its pools use. Base Mainnet deployment pending — see
+ * routers its pools use. Arc Mainnet deployment pending — see
  * docs/tasks/v2-roadmap.md; fields stay `null` until the hooks (and a
  * liquidity router bound to the canonical PoolManager) are deployed, and
  * consumers degrade gracefully on `null`.
@@ -118,7 +123,7 @@ export const HOOK_DEPLOYMENTS: Record<
   SupportedChainId,
   Readonly<Record<HookName, HookDeployment>>
 > = {
-  [BASE_CHAIN_ID]: {
+  [ARC_CHAIN_ID]: {
     "stable-protection": {
       hook: env.STABLE_PROTECTION_HOOK_ADDRESS ?? null,
       poolSwapTest: null,
@@ -138,7 +143,7 @@ const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
  * Resolve the full v4 stack (PoolManager + periphery) for a pool by its
  * HOOK ADDRESS — i.e. `PoolKey.hooks`.
  *
- * On Base Mainnet every Mantua hook targets the canonical PoolManager,
+ * On Arc Mainnet every Mantua hook targets the canonical PoolManager,
  * so hook pools and no-hook pools all resolve to the canonical stack.
  * The one exception is the Dynamic Market hook (sports markets), whose
  * pools route to the market periphery on the DM PoolManager (DM-112).
@@ -148,8 +153,7 @@ export function getV4StackForHook(
   chainId: SupportedChainId = DEFAULT_CHAIN_ID,
 ): V4Addresses {
   const lower = hookAddress.toLowerCase();
-  const defaultStack = V4_BY_CHAIN[chainId];
-  if (lower === ZERO_ADDR) return defaultStack;
+  if (lower === ZERO_ADDR) return getV4Addresses(chainId);
   // Dynamic Market Hook — market pools route to the market periphery
   // (DM-112: market pools route directly). Registered here so the shared
   // quote/calldata builders work on market pools without special-casing.
@@ -164,13 +168,13 @@ export function getV4StackForHook(
       poolSwapTest: dmPeriphery.poolSwapTest,
     };
   }
-  return defaultStack;
+  return getV4Addresses(chainId);
 }
 
 /** Legacy single-chain exports. Prefer `getHookAddress(name, chainId)`. */
 export const STABLE_PROTECTION_HOOK: `0x${string}` | null =
-  STABLE_PROTECTION_BY_CHAIN[BASE_CHAIN_ID];
-export const DYNAMIC_FEE_HOOK: `0x${string}` | null = DYNAMIC_FEE_BY_CHAIN[BASE_CHAIN_ID];
+  STABLE_PROTECTION_BY_CHAIN[ARC_CHAIN_ID];
+export const DYNAMIC_FEE_HOOK: `0x${string}` | null = DYNAMIC_FEE_BY_CHAIN[ARC_CHAIN_ID];
 
 /**
  * v4 PoolKey hook permission flags encoded in the lower 14 bits of each
@@ -594,19 +598,10 @@ export interface DynamicMarketDeployment {
 }
 
 /**
- * Per-chain Dynamic Market deployments. Base Mainnet: deployed and
- * BaseScan-verified 2026-09-23 (H-009) — record and on-chain checks in
- * deploy/dynamic-market/README.md. Consumers still degrade gracefully on
- * a chain with no entry.
+ * Per-chain Dynamic Market deployments. Arc Mainnet: deployment pending
+ * (H-009 — `deploy/dynamic-market/README.md`); the 2026-09-23 Base
+ * deployment is superseded and not registered. Consumers degrade
+ * gracefully on a chain with no entry.
  */
-export const DYNAMIC_MARKET_BY_CHAIN: Partial<Record<SupportedChainId, DynamicMarketDeployment>> = {
-  [BASE_CHAIN_ID]: {
-    poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
-    registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
-    // Low 14 bits 0x28C0 = BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY |
-    // BEFORE_SWAP | AFTER_SWAP (asserted in the deploy tx).
-    hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
-    operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
-    keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
-  },
-};
+export const DYNAMIC_MARKET_BY_CHAIN: Partial<Record<SupportedChainId, DynamicMarketDeployment>> =
+  {};

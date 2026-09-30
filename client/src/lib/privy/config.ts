@@ -1,5 +1,5 @@
 import type { PrivyClientConfig } from "@privy-io/react-auth";
-import { base } from "../chains.ts";
+import { arc } from "../chains.ts";
 import { cleanEnv } from "../env.ts";
 
 /**
@@ -8,11 +8,11 @@ import { cleanEnv } from "../env.ts";
  *    Apple and passkey are dropped per the sports-pivot plan.
  *  - D-006 ACCEPTED: createOnLogin = 'users-without-wallets'
  *  - D-007 ACCEPTED: WalletConnect enabled with project ID
- *  - Single supported chain: Base Mainnet (8453). Privy only signs for
- *    chains in this list.
+ *  - Single supported chain: Arc Mainnet (5042). Privy only signs for
+ *    chains in this list; Arc is passed as a custom viem chain.
  */
-const DEFAULT_CHAIN = base;
-const SUPPORTED_CHAINS = [base];
+const DEFAULT_CHAIN = arc;
+const SUPPORTED_CHAINS = [arc];
 
 export const privyConfig: PrivyClientConfig = {
   appearance: {

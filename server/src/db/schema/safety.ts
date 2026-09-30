@@ -50,7 +50,7 @@ export const mantuaAuditLog = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     txHash: varchar("tx_hash", { length: 66 }),
-    chainId: integer("chain_id").notNull().default(8453),
+    chainId: integer("chain_id").notNull().default(5042),
     reason: text("reason"),
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),

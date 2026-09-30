@@ -55,7 +55,7 @@ globalThis.fetch = (input, init): Promise<Response> => {
   if (!url.includes("127.0.0.1") && !url.includes("localhost")) {
     return Promise.resolve(
       Response.json({
-        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" }],
+        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:5042" }],
         extensions: [],
         signers: {},
       }),
@@ -154,13 +154,13 @@ async function boot(
       return Promise.resolve({
         success: true,
         transaction: "0xtxhash",
-        network: "eip155:8453" as const,
+        network: "eip155:5042" as const,
         payer: PAYER,
       });
     },
     getSupported: () =>
       Promise.resolve({
-        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" as const }],
+        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:5042" as const }],
         extensions: [],
         signers: {},
       }),

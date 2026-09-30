@@ -37,7 +37,7 @@ export const calldataSchema = z
         outcomeIndex: z.union([z.literal(0), z.literal(1)]),
       })
       .optional(),
-    /** Target chain — omitted means Base (back-compat). */
+    /** Target chain — omitted means Arc (back-compat). */
     chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
     /** Percentage 1..100 (whole numbers). */
     percentage: z.number().int().min(1).max(100),

@@ -6,7 +6,7 @@ import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
 import { refreshPlayByPlay, upsertEvents } from "../lib/sports/store.ts";
 import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
-import { BASE_CHAIN_ID } from "../lib/chains.ts";
+import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { evaluateAlerts } from "../lib/alerts.ts";
 import { buildAlertInput, defaultOpsDeps } from "./ops-metrics.ts";
@@ -79,7 +79,7 @@ cronLiveSyncRouter.get(
       }
     }
 
-    const priceSnapshot: unknown = await snapshotMarketPoolPrices(db, BASE_CHAIN_ID)
+    const priceSnapshot: unknown = await snapshotMarketPoolPrices(db, ARC_CHAIN_ID)
       .then((snap) => snap ?? "disabled (markets not deployed on this chain)")
       .catch((err: unknown) => {
         logger.warn({ err }, "live-sync: pool-price snapshot failed");

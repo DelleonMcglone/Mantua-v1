@@ -5,12 +5,12 @@ import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
 import { logAudit } from "./audit.ts";
 import { executeAgentAbiCall, executeAgentCalldata } from "./circle/execute.ts";
 import { getRpcClient } from "./rpc-client.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
 import { getToken } from "./tokens.ts";
 
 /**
- * ERC-8183 agent-to-agent commerce from the agent's Circle wallet on Base.
+ * ERC-8183 agent-to-agent commerce from the agent's Circle wallet on Arc.
  *
  * Ports the AgenticCommerce job/escrow actions from the standalone `agent/`
  * EOA package onto the live product's custody model: calls are viem-encoded
@@ -86,9 +86,9 @@ const AGENTIC_COMMERCE_ABI = [
   },
 ] as const;
 
-/** The AgenticCommerce contract, or a clean error while the Base Mainnet
+/** The AgenticCommerce contract, or a clean error while the Arc Mainnet
  *  deployment is pending (docs/tasks/v2-roadmap.md). */
-function commerceAddress(_chainId: SupportedChainId = BASE_CHAIN_ID): `0x${string}` {
+function commerceAddress(_chainId: SupportedChainId = ARC_CHAIN_ID): `0x${string}` {
   const addr = env.AGENTIC_COMMERCE_ADDRESS;
   if (!addr) {
     throw new Error(
@@ -122,7 +122,7 @@ export async function createJobFromAgentWallet(args: {
   expiresInSeconds?: number | undefined;
   chainId?: SupportedChainId;
 }): Promise<CreateJobResult> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const contract = commerceAddress(chainId);
   const client = getRpcClient(chainId);
   const wallet = await requireWallet(args.privyUserId, chainId);
@@ -185,7 +185,7 @@ export async function fundJobFromAgentWallet(args: {
   amountUsdc: string;
   chainId?: SupportedChainId;
 }): Promise<FundJobResult> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const contract = commerceAddress(chainId);
   const wallet = await requireWallet(args.privyUserId, chainId);
   const usdc = getToken("USDC", chainId);
@@ -241,7 +241,7 @@ export async function settleJobFromAgentWallet(args: {
   reason?: string | undefined;
   chainId?: SupportedChainId;
 }): Promise<SettleJobResult> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const contract = commerceAddress(chainId);
   const wallet = await requireWallet(args.privyUserId, chainId);
   const reason = (args.reason ?? ZERO_BYTES32) as `0x${string}`;
@@ -278,7 +278,7 @@ export interface JobStatusResult {
 /** Read-only: whether the job exists and has its budget set (funding precondition). */
 export async function getJobStatus(
   jobId: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<JobStatusResult> {
   const id = BigInt(jobId);
   const contract = commerceAddress(chainId);

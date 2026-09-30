@@ -2,7 +2,7 @@ import { db } from "../db/client.ts";
 import { transitionActivity } from "./activity.ts";
 import { type Address, parseUnits } from "viem";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
-import { BASE_CHAIN_ID, getChainInfo, getExplorerTxUrl, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, getChainInfo, getExplorerTxUrl, type SupportedChainId } from "./chains.ts";
 import {
   awaitReceipt,
   createAgentContractExecution,
@@ -21,7 +21,7 @@ import { tokenAmountUsdStrict } from "./usd-pricing.ts";
 /**
  * P6-004 — send tokens from the agent wallet.
  *
- * Runs on Base via the agent's Circle Developer-Controlled Wallet:
+ * Runs on Arc via the agent's Circle Developer-Controlled Wallet:
  * an ERC-20 `transfer(to, amount)` executed and gas-sponsored by Circle. The
  * user has no signing role (per D-008 the user's Privy wallet is never touched
  * by the agent path). Spending cap is enforced via the Phase 1 rail in
@@ -46,7 +46,7 @@ export interface AgentSendArgs {
   symbol: TokenSymbol;
   /** Decimal-string amount in human-readable units, e.g. "1.5". */
   amount: string;
-  /** Execution chain — defaults to Base. */
+  /** Execution chain — defaults to Arc. */
   chainId?: SupportedChainId;
   /** Request context for the durable audit trail (optional). */
   auditContext?: { ipAddress?: string; userAgent?: string };
@@ -67,7 +67,7 @@ export interface AgentSendResult {
   explorerUrl: string;
 }
 
-export function explorerTxUrl(txHash: string, chainId: SupportedChainId = BASE_CHAIN_ID): string {
+export function explorerTxUrl(txHash: string, chainId: SupportedChainId = ARC_CHAIN_ID): string {
   return getExplorerTxUrl(chainId, txHash);
 }
 
@@ -76,7 +76,7 @@ export type SendReceiptState = TransactionState;
 
 export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSendResult> {
   const { privyUserId, to, symbol, amount } = args;
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
 
   const wallet = await getAgentWallet(privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(privyUserId);
@@ -93,7 +93,7 @@ export async function sendFromAgentWallet(args: AgentSendArgs): Promise<AgentSen
   const usdValue = await tokenAmountUsdStrict(symbol, amountAtomic);
   await checkSpendingCap(wallet.address, usdValue);
 
-  // All app tokens (USDC/EURC/cbBTC) are read as ERC-20s, so a send is an
+  // All app tokens (USDC/EURC/cirBTC) are read as ERC-20s, so a send is an
   // ERC-20 transfer executed by the agent's Circle wallet (gas-sponsored).
   if (token.native) {
     throw new Error(`Native ${symbol} transfers are not supported via the agent wallet yet`);

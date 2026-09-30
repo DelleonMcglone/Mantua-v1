@@ -26,7 +26,7 @@ export const poolCreateRouter = Router();
 
 const hookSchema = z.enum(HOOK_NAMES);
 
-/** Supported chain ids — Base Mainnet. */
+/** Supported chain ids — Arc Mainnet. */
 const chainIdSchema = z
   .number()
   .int()

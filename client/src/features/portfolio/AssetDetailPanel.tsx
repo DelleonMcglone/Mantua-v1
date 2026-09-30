@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
-import { BASE_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
 import { getTokens, type TokenSymbol } from "@/lib/tokens.ts";
 import { AssetIcon } from "./asset-icons.tsx";
 import {
@@ -25,7 +25,7 @@ interface Props {
  * sends where it's the token moved). Each row links to the explorer.
  */
 export function AssetDetailPanel({ symbol, onClose }: Props) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const portfolio = usePortfolio();
   const asset = useMemo<DisplayAsset | null>(() => {
     if (!portfolio.walletAddress) return null;

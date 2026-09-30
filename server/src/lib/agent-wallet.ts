@@ -13,7 +13,7 @@ import { recordFirstSeen } from "./wallet-age.ts";
 
 export { deriveAgentAccountName, circleBlockchainFor, type CircleBlockchain };
 
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { HARD_DAILY_CAP_USD } from "./constants.ts";
 
 export class UserNotFoundError extends Error {
@@ -51,7 +51,7 @@ export class AgentWalletNotFoundError extends Error {
  *      Errors only if we also have no wallet address to record.
  *   2. If an `agent_wallets` row already exists for this user, return it
  *      (cheap path; Circle is not contacted).
- *   3. Otherwise create a Circle Developer-Controlled Wallet on Base
+ *   3. Otherwise create a Circle Developer-Controlled Wallet on Arc
  *      (SCA account) in the agent wallet set, and persist it with
  *      `onConflictDoNothing` on the unique `user_id` index. The onConflict
  *      path covers a concurrent-request race where two requests both passed
@@ -64,7 +64,7 @@ export class AgentWalletNotFoundError extends Error {
 export async function getOrCreateAgentWallet(
   privyUserId: string,
   primaryAddress?: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<AgentWallet> {
   const blockchain = circleBlockchainFor(chainId);
   // Indexing into the array (rather than destructuring) gives TS the
@@ -133,7 +133,7 @@ export async function getOrCreateAgentWallet(
 
 export async function getAgentWallet(
   privyUserId: string,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<AgentWallet | null> {
   const userRows = await db
     .select({ id: users.id })

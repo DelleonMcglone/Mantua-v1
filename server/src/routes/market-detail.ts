@@ -6,7 +6,7 @@ import { events, marketComments, marketFills, marketPrices, markets } from "../d
 import { logger } from "../lib/logger.ts";
 import { requireAuth } from "../middleware/auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
-import { getTokenHolders } from "../lib/basescan.ts";
+import { getTokenHolders } from "../lib/arcscan.ts";
 
 export const marketDetailRouter = Router();
 
@@ -134,7 +134,7 @@ marketDetailRouter.get("/api/markets/detail", async (req: Request, res: Response
       playoffs: f.playoffs,
     }));
 
-    // Holders are best-effort — a BaseScan hiccup must not blank the page.
+    // Holders are best-effort — a Arcscan hiccup must not blank the page.
     const holders = await Promise.all(
       rows
         .filter((r): r is typeof r & { yesToken: string } => typeof r.yesToken === "string")

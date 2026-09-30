@@ -10,21 +10,29 @@ import { getUsdPriceStrict } from "./usd-pricing.ts";
 import { logAudit } from "./audit.ts";
 
 /**
- * Bridge USDC OUT of the agent's Circle wallet (Base Mainnet) to another CCTP
+ * Bridge USDC OUT of the agent's Circle wallet (Arc Mainnet) to another CCTP
  * chain via Circle's Bridge Kit + the Circle Wallets adapter — the same
  * lazy-load pattern as `unified-balance.ts` (a top-level import of the adapter
  * can crash boot on a version mismatch; lazy + try/catch degrades to a clean
  * "bridge unavailable" instead).
  *
  * The recipient defaults to the USER's connected wallet on the destination —
- * the agent's wallet is a smart-contract account that exists only on Base, so
+ * the agent's wallet is a smart-contract account that exists only on Arc, so
  * bridging to its own address elsewhere could strand funds.
  */
 
-const HOME_CHAIN = "Base";
+type HomeChain = Parameters<BK.BridgeKit["bridge"]>[0]["from"]["chain"];
+/** Bridge Kit's identifier for Arc Mainnet. The pinned kit (1.11.1) knows
+ *  only "Arc_Testnet", so there is none yet: every bridge degrades to
+ *  BridgeUnavailableError until a release adds mainnet (C-014 gate). */
+const HOME_CHAIN: HomeChain | null = null;
+function homeChain(): HomeChain {
+  if (!HOME_CHAIN) throw new BridgeUnavailableError("Bridging from Arc is not available yet.");
+  return HOME_CHAIN;
+}
 
 /** CCTP-V2 mainnet destinations Bridge Kit can reach (mirror of the client's
- *  bridge-chains.ts sdkNames). Base is the home chain, so it isn't listed. */
+ *  bridge-chains.ts sdkNames). Arc is the home chain, so it isn't listed. */
 export const AGENT_BRIDGE_DESTINATIONS = [
   "Ethereum",
   "Arbitrum",
@@ -113,7 +121,7 @@ interface BridgeResultLike {
   steps?: { name?: string; state?: string; txHash?: string; error?: unknown }[];
 }
 
-/** Bridge USDC from the agent wallet on Base to `recipient` on another chain. */
+/** Bridge USDC from the agent wallet on Arc to `recipient` on another chain. */
 export async function bridgeFromAgentWallet(args: AgentBridgeArgs): Promise<AgentBridgeResult> {
   const wallet = await getAgentWallet(args.privyUserId);
   if (!wallet) throw new AgentWalletNotFoundError(args.privyUserId);
@@ -149,7 +157,7 @@ export async function bridgeFromAgentWallet(args: AgentBridgeArgs): Promise<Agen
   const adapter = createCircleWalletsAdapter({ apiKey, entitySecret });
   const kit = new BridgeKit();
   const res = (await kit.bridge({
-    from: { adapter, chain: HOME_CHAIN, address: wallet.address },
+    from: { adapter, chain: homeChain(), address: wallet.address },
     to: { chain, useForwarder: true, recipientAddress: args.recipient },
     amount: args.amount,
   })) as unknown as BridgeResultLike;

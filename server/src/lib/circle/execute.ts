@@ -12,7 +12,7 @@ export type { TransactionState };
 export type ConfirmedTransactionState = Extract<TransactionState, "CONFIRMED" | "COMPLETE">;
 
 /**
- * Circle Developer-Controlled Wallets execution layer for Base.
+ * Circle Developer-Controlled Wallets execution layer for Arc.
  *
  * Every agent write op (send / swap / add-liquidity / ERC-8004 / ERC-8183)
  * funnels through here: build the call, submit it from the agent's Circle

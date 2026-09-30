@@ -22,7 +22,7 @@ function metrics(): MarketMetrics {
   return {
     marketId: "0x" + "12".repeat(32),
     state: "OPEN",
-    chainId: 8453,
+    chainId: 5042,
     outcomeIndex: 0,
     event: {
       providerEventId: "401547401",

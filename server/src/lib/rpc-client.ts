@@ -1,10 +1,10 @@
 import { createPublicClient, fallback, http } from "viem";
-import { base } from "viem/chains";
+import { arc } from "./arc-chain.ts";
 import { type SupportedChainId } from "./chains.ts";
 import { env } from "../env.ts";
 
 /**
- * Base Mainnet public client.
+ * Arc Mainnet public client.
  *
  * Phase 7 / R-006 — the inherited lesson (this file's original header, task
  * 045 §"Flakiness caveat", `contracts.yml`): public RPC hosts rate-limit
@@ -13,13 +13,13 @@ import { env } from "../env.ts";
  * under fan-out. So:
  *
  *  - **Production refuses a public primary.** `env.ts` fails the boot when
- *    `BASE_RPC_URL` is a known public host in production (`rpcProviderIssues`).
+ *    `ARC_RPC_URL` is a known public host in production (`rpcProviderIssues`).
  *  - **Public hosts are a dev convenience, never a production backstop.**
- *    They are appended only when `BASE_RPC_PUBLIC_FALLBACK` allows it —
+ *    They are appended only when `ARC_RPC_PUBLIC_FALLBACK` allows it —
  *    default on outside production, off in production (a rate-limited
  *    fallback does not add availability under the load that took the
  *    primary down; it adds 10 s timeouts).
- *  - `BASE_RPC_FALLBACK_URLS` lists additional dedicated endpoints; viem's
+ *  - `ARC_RPC_FALLBACK_URLS` lists additional dedicated endpoints; viem's
  *    `fallback()` rotates to the next host when one errors or rate-limits.
  *  - `http(..., { batch: true })` coalesces concurrent JSON-RPC calls into a
  *    single HTTP request (rate limits count requests, not calls);
@@ -36,8 +36,8 @@ import { env } from "../env.ts";
 import { RpcHealthRegistry, resolveRpcUrls, type RpcHealth } from "./rpc-config.ts";
 
 export {
-  PUBLIC_BASE_RPC_HOSTS,
-  PUBLIC_BASE_RPC_URLS,
+  PUBLIC_ARC_RPC_HOSTS,
+  PUBLIC_ARC_RPC_URLS,
   RPC_HOST_FAILURE_THRESHOLD,
   RpcHealthRegistry,
   isPublicRpcUrl,
@@ -69,7 +69,7 @@ export function recordRpcOutcome(index: number, ok: boolean, error?: unknown): v
 // chain-specialized return, which TS reports as a spurious duplicate-type
 // conflict. The inferred type is a PublicClient and works for all callers.
 const baseClient = createPublicClient({
-  chain: base,
+  chain: arc,
   batch: { multicall: { wait: 16 } },
   transport: fallback(
     RPC_UPSTREAMS.map((url, i) =>
@@ -97,7 +97,7 @@ baseClient.transport.onResponse(({ status, transport, error }) => {
 /** Legacy single-chain alias. Use `getRpcClient(chainId)` in new code. */
 export const baseRpcClient = baseClient;
 
-/** Per-chain public client — single chain today: 8453 → Base Mainnet. */
+/** Per-chain public client — single chain today: 5042 → Arc Mainnet. */
 export function getRpcClient(_chainId: SupportedChainId) {
   return baseClient;
 }

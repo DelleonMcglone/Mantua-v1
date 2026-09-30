@@ -71,7 +71,7 @@ function serve(recorded: Set<string>): Promise<string> {
 }
 
 async function status(origin: string, txHash: string) {
-  const res = await fetch(`${origin}/api/markets/trade/status?txHash=${txHash}&chainId=8453`);
+  const res = await fetch(`${origin}/api/markets/trade/status?txHash=${txHash}&chainId=5042`);
   return {
     status: res.status,
     body: (await res.json()) as { state?: string; recorded?: boolean; code?: string },

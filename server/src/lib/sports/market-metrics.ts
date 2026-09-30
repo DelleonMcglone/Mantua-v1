@@ -8,7 +8,7 @@
  *   volume               market_fills USDC aggregates, total + 24h
  *   open interest        unredeemed market_positions + YES-token supply
  *   trading activity     fill counts, recency, unique traders
- *   concentration        top-holder share via the BaseScan holders read
+ *   concentration        top-holder share via the Arcscan holders read
  *   liquidity            liquidity captured with the price series, plus
  *                        live v4 pool liquidity (StateView) when the
  *                        market periphery is deployed — null before then
@@ -17,7 +17,7 @@
  * Structure mirrors history.ts: pure `aggregate*`/`derive*` functions over
  * plain row shapes (unit-tested, no DB), a thin DB assembly, and a short
  * TTL cache (ttl-cache.ts) so the authless route can't stampede the DB.
- * Best-effort inputs (BaseScan, RPC) fail to null, never to an error —
+ * Best-effort inputs (Arcscan, RPC) fail to null, never to an error —
  * a metric we can't compute is reported as null, not fabricated.
  */
 
@@ -32,7 +32,7 @@ import {
   marketPrices,
   markets,
 } from "../../db/schema/index.ts";
-import { getTokenHolders } from "../basescan.ts";
+import { getTokenHolders } from "../arcscan.ts";
 import { isSupportedChainId } from "../chains.ts";
 import { logger } from "../logger.ts";
 import {
@@ -471,7 +471,7 @@ export async function getMarketMetrics(
   db: DB = defaultDb,
 ): Promise<MarketMetrics | null> {
   // Phase 7 / R-007 — shared across instances (the metrics read fans out to
-  // BaseScan + two RPC reads per market; one computation per window, total).
+  // Arcscan + two RPC reads per market; one computation per window, total).
   return sharedCache.getOrCompute(`metrics:${marketId.toLowerCase()}`, METRICS_TTL_MS, () =>
     computeMarketMetrics(db, marketId, Math.floor(Date.now() / 1000)),
   );
@@ -516,7 +516,7 @@ export interface PoolSnapshotSummary {
  */
 export async function snapshotMarketPoolPrices(
   db: DB = defaultDb,
-  chainId = 8453,
+  chainId = 5042,
   nowMs: number = Date.now(),
 ): Promise<PoolSnapshotSummary | null> {
   if (!isSupportedChainId(chainId)) return null;

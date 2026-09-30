@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { env } from "../env.ts";
-import { BASE_CHAIN_ID } from "../lib/chains.ts";
+import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { runComboMonitor } from "../lib/combos/combo-monitor-run.ts";
 import { logger } from "../lib/logger.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
@@ -24,7 +24,7 @@ cronCombosRouter.get(
     try {
       const outcomes = await runComboMonitor(db, {
         mode: env.AGENT_MODE,
-        chainId: BASE_CHAIN_ID,
+        chainId: ARC_CHAIN_ID,
         nowMs: started,
       });
       const failed = outcomes.filter((o) => o.disposition === "failed").length;

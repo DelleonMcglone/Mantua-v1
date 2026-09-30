@@ -1,8 +1,8 @@
 import { parseAbi } from "viem";
 import { publicClientFor, useChainWalletClient } from "@/lib/privy/wallet-client.ts";
-import type { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import type { ARC_CHAIN_ID } from "@/lib/chains.ts";
 
-type ChainId = typeof BASE_CHAIN_ID;
+type ChainId = typeof ARC_CHAIN_ID;
 
 /**
  * Task 072 — the wallet half of a server-built trade, shared by the market

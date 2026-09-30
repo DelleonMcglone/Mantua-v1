@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 import { legRefs, type BuilderLeg, type ComboQuoteResult } from "./combo-core.ts";
 
 /**
@@ -33,7 +33,7 @@ export function useComboQuote(legs: readonly BuilderLeg[], stake: string, enable
       }));
       api
         .post<ComboQuoteResult>("/api/combos/quote", {
-          chainId: BASE_CHAIN_ID,
+          chainId: ARC_CHAIN_ID,
           legs: JSON.parse(refs) as unknown,
           stakeRaw: String(raw),
         })

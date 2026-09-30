@@ -8,12 +8,25 @@
  * 444c526b — see the header of v4-universal-router.ts). If any constant
  * drifts, a signed swap would target the wrong dispatch path.
  */
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { decodeAbiParameters, decodeFunctionData, toFunctionSelector } from "viem";
 import type { PoolKey } from "./pool-key.ts";
 import { PERMIT2_EXPIRATION_SECONDS } from "./permit2.ts";
-import { PERMIT2, UNIVERSAL_ROUTER } from "./v4-contracts.ts";
+import { PERMIT2 } from "./v4-contracts.ts";
+import {
+  SYNTHETIC_UNIVERSAL_ROUTER as UNIVERSAL_ROUTER,
+  overrideCanonicalV4,
+} from "./testing/canonical-v4.ts";
+
+// Arc has no UniversalRouter; the encoder is pinned against a synthetic one.
+let restoreCanonical: () => void;
+before(() => {
+  restoreCanonical = overrideCanonicalV4();
+});
+after(() => {
+  restoreCanonical();
+});
 import {
   PERMIT2_APPROVE_ABI,
   PERMIT2_VALIDITY_BUFFER_SECONDS,
@@ -29,8 +42,8 @@ import {
   type SwapAllowanceState,
 } from "./v4-universal-router.ts";
 
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
-const EURC = "0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42" as const;
+const USDC = "0x3600000000000000000000000000000000000000" as const;
+const EURC = "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1" as const;
 const ZERO = "0x0000000000000000000000000000000000000000" as const;
 const NOW = 1_800_000_000;
 

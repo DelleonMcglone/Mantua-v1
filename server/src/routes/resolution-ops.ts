@@ -6,7 +6,7 @@
  *
  *  - `GET  /api/ops/resolution` — the P-010 verifiability surface: every
  *    settlement row (txHash, signer, method, confidence state, source
- *    payload summary, dispute-window timestamps, BaseScan link) plus the
+ *    payload summary, dispute-window timestamps, Arcscan link) plus the
  *    pending review queue with window/hold state. This is internal ops
  *    only — the public user UI stays chainless by design.
  *  - `POST /api/ops/resolution/hold` / `release` — park / un-park a pending
@@ -30,8 +30,8 @@ import { z } from "zod";
 import { db } from "../db/client.ts";
 import { env } from "../env.ts";
 import { logAudit } from "../lib/audit.ts";
-import { BASESCAN_WEB } from "../lib/basescan.ts";
-import { BASE_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
+import { ARCSCAN_WEB } from "../lib/arcscan.ts";
+import { ARC_CHAIN_ID, isSupportedChainId, type SupportedChainId } from "../lib/chains.ts";
 import { logger } from "../lib/logger.ts";
 import { liveResolutionSubmitter } from "../lib/sports/markets-onchain.ts";
 import {
@@ -53,11 +53,7 @@ export interface ResolutionOpsDeps {
   now: () => Date;
 }
 
-const chainIdSchema = z
-  .number()
-  .int()
-  .refine(isSupportedChainId, "Unsupported chainId")
-  .optional();
+const chainIdSchema = z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional();
 
 const holdSchema = z.object({
   providerEventId: z.string().min(1).max(128),
@@ -77,7 +73,7 @@ const overrideSchema = z
     chainId: chainIdSchema,
   })
   .refine((v) => v.action !== "resolve" || v.outcome !== undefined, {
-    message: "outcome (0|1) is required for action \"resolve\"",
+    message: 'outcome (0|1) is required for action "resolve"',
     path: ["outcome"],
   });
 
@@ -99,11 +95,12 @@ export function summarizeSourcePayload(payload: unknown): Record<string, unknown
     ...(typeof p["kind"] === "string" ? { kind: p["kind"] } : {}),
     providerEventId: p["providerEventId"] ?? null,
     ...(typeof p["policy"] === "string" ? { policy: p["policy"] } : {}),
-    ...(consensus && typeof consensus["kind"] === "string"
-      ? { consensus: consensus["kind"] }
-      : {}),
+    ...(consensus && typeof consensus["kind"] === "string" ? { consensus: consensus["kind"] } : {}),
     ...(criteria
-      ? { criteriaPassed: criteria.filter((c) => c.pass === true).length, criteriaTotal: criteria.length }
+      ? {
+          criteriaPassed: criteria.filter((c) => c.pass === true).length,
+          criteriaTotal: criteria.length,
+        }
       : {}),
     ...(typeof p["note"] === "string" ? { note: p["note"] } : {}),
     decidedAt: p["decidedAt"] ?? null,
@@ -120,62 +117,58 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
   const router = Router();
 
   // ── P-010 — list/inspect resolutions + the pending queue ───────────────
-  router.get(
-    "/api/ops/resolution",
-    requireCronSecret,
-    async (req: Request, res: Response) => {
-      const rawLimit = Number(req.query["limit"] ?? 50);
-      const limit = Number.isInteger(rawLimit) && rawLimit > 0 && rawLimit <= 200 ? rawLimit : 50;
-      const chainId = BASE_CHAIN_ID;
-      try {
-        const [rows, pending] = await Promise.all([
-          deps.store.listResolutions(limit),
-          deps.store.listPending(chainId, limit),
-        ]);
-        res.json({
-          disputeWindowSeconds: env.RESOLUTION_DISPUTE_WINDOW_SECONDS,
-          resolutions: rows.map((r) => ({
-            id: r.id,
-            marketId: r.marketId,
-            method: r.method,
-            winningOutcomeIndex: r.winningOutcomeIndex,
-            source: r.source,
-            signer: r.signer,
-            txHash: r.txHash,
-            explorerUrl: r.txHash ? `${BASESCAN_WEB}/tx/${r.txHash}` : null,
-            confidenceState: r.confidenceState,
-            note: r.note,
-            disputeWindow:
-              r.disputeWindowOpensAt && r.disputeWindowClosesAt
-                ? { opensAt: r.disputeWindowOpensAt, closesAt: r.disputeWindowClosesAt }
-                : null,
-            sourcePayloadSummary: summarizeSourcePayload(r.sourcePayload),
-            createdAt: r.createdAt,
-          })),
-          pending: pending.map((p) => ({
-            providerEventId: p.providerEventId,
-            chainId: p.chainId,
-            state: p.state,
-            policy: p.policy,
-            reason: p.reason,
-            winningOutcomeIndex: p.winningOutcomeIndex,
-            disputeWindow:
-              p.disputeWindowOpensAt && p.disputeWindowClosesAt
-                ? { opensAt: p.disputeWindowOpensAt, closesAt: p.disputeWindowClosesAt }
-                : null,
-            operatorHold: p.operatorHoldAt
-              ? { at: p.operatorHoldAt, note: p.operatorHoldNote }
+  router.get("/api/ops/resolution", requireCronSecret, async (req: Request, res: Response) => {
+    const rawLimit = Number(req.query["limit"] ?? 50);
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 && rawLimit <= 200 ? rawLimit : 50;
+    const chainId = ARC_CHAIN_ID;
+    try {
+      const [rows, pending] = await Promise.all([
+        deps.store.listResolutions(limit),
+        deps.store.listPending(chainId, limit),
+      ]);
+      res.json({
+        disputeWindowSeconds: env.RESOLUTION_DISPUTE_WINDOW_SECONDS,
+        resolutions: rows.map((r) => ({
+          id: r.id,
+          marketId: r.marketId,
+          method: r.method,
+          winningOutcomeIndex: r.winningOutcomeIndex,
+          source: r.source,
+          signer: r.signer,
+          txHash: r.txHash,
+          explorerUrl: r.txHash ? `${ARCSCAN_WEB}/tx/${r.txHash}` : null,
+          confidenceState: r.confidenceState,
+          note: r.note,
+          disputeWindow:
+            r.disputeWindowOpensAt && r.disputeWindowClosesAt
+              ? { opensAt: r.disputeWindowOpensAt, closesAt: r.disputeWindowClosesAt }
               : null,
-            firstFinalSeenAt: p.firstFinalSeenAt,
-            updatedAt: p.updatedAt,
-          })),
-        });
-      } catch (err) {
-        logger.error({ err }, "resolution-ops: list failed");
-        res.status(500).json({ error: "Failed to list resolutions", code: "INTERNAL" });
-      }
-    },
-  );
+          sourcePayloadSummary: summarizeSourcePayload(r.sourcePayload),
+          createdAt: r.createdAt,
+        })),
+        pending: pending.map((p) => ({
+          providerEventId: p.providerEventId,
+          chainId: p.chainId,
+          state: p.state,
+          policy: p.policy,
+          reason: p.reason,
+          winningOutcomeIndex: p.winningOutcomeIndex,
+          disputeWindow:
+            p.disputeWindowOpensAt && p.disputeWindowClosesAt
+              ? { opensAt: p.disputeWindowOpensAt, closesAt: p.disputeWindowClosesAt }
+              : null,
+          operatorHold: p.operatorHoldAt
+            ? { at: p.operatorHoldAt, note: p.operatorHoldNote }
+            : null,
+          firstFinalSeenAt: p.firstFinalSeenAt,
+          updatedAt: p.updatedAt,
+        })),
+      });
+    } catch (err) {
+      logger.error({ err }, "resolution-ops: list failed");
+      res.status(500).json({ error: "Failed to list resolutions", code: "INTERNAL" });
+    }
+  });
 
   // ── D-104 — operator hold / release ────────────────────────────────────
   router.post(
@@ -190,7 +183,7 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
         return;
       }
       const { providerEventId, note } = parsed.data;
-      const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+      const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
       const at = deps.now();
       const result = await deps.store.setHold(providerEventId, chainId, note, at);
       if (result === "not_found") {
@@ -223,7 +216,7 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
         return;
       }
       const { providerEventId, note } = parsed.data;
-      const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+      const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
       const result = await deps.store.clearHold(providerEventId, chainId, deps.now());
       if (result === "not_found") {
         res.status(404).json({
@@ -233,9 +226,7 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
         return;
       }
       if (result === "no_hold") {
-        res
-          .status(409)
-          .json({ error: "That event carries no operator hold", code: "NO_HOLD" });
+        res.status(409).json({ error: "That event carries no operator hold", code: "NO_HOLD" });
         return;
       }
       await logAudit({
@@ -263,7 +254,7 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
       }
       const { action, note } = parsed.data;
       const marketId = parsed.data.marketId as `0x${string}`;
-      const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+      const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
 
       const submitter = deps.submitterFor(chainId);
       if (!submitter) {
@@ -360,7 +351,7 @@ export function createResolutionOpsRouter(overrides: Partial<ResolutionOpsDeps> 
           marketId,
           kind: action,
           txHash,
-          explorerUrl: `${BASESCAN_WEB}/tx/${txHash}`,
+          explorerUrl: `${ARCSCAN_WEB}/tx/${txHash}`,
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

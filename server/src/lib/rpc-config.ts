@@ -6,30 +6,26 @@
  * can build the client from the same rules. Rationale in rpc-client.ts.
  */
 
-/** Hosts that are public and rate-limited — never a production primary. */
-export const PUBLIC_BASE_RPC_HOSTS: readonly string[] = [
-  "mainnet.base.org",
-  "sepolia.base.org",
-  "base-rpc.publicnode.com",
-  "base.llamarpc.com",
-  "base.drpc.org",
+/** Hosts that are public and rate-limited — never a production primary.
+ *  Arc's own public endpoints (docs.arc.io/arc/references/connect-to-arc)
+ *  plus the generic public gateways that front Arc. Dedicated providers
+ *  (Alchemy, QuickNode, Blockdaemon, dRPC paid) are the production path. */
+export const PUBLIC_ARC_RPC_HOSTS: readonly string[] = [
+  "rpc.mainnet.arc.io",
+  "rpc.testnet.arc.io",
+  "rpc.mainnet.arc.network",
+  "rpc.testnet.arc.network",
   "1rpc.io",
-  "base.blockpi.network",
-  "base-mainnet.public.blastapi.io",
-  "base.meowrpc.com",
-  "base.gateway.tenderly.co",
+  "drpc.org",
 ];
 
-/** The two public hosts appended as the dev-time backstop. */
-export const PUBLIC_BASE_RPC_URLS: readonly string[] = [
-  "https://mainnet.base.org",
-  "https://base-rpc.publicnode.com",
-];
+/** The public host appended as the dev-time backstop. */
+export const PUBLIC_ARC_RPC_URLS: readonly string[] = ["https://rpc.mainnet.arc.io"];
 
 export function isPublicRpcUrl(url: string): boolean {
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return PUBLIC_BASE_RPC_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+    return PUBLIC_ARC_RPC_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
   } catch {
     return false;
   }
@@ -37,9 +33,13 @@ export function isPublicRpcUrl(url: string): boolean {
 
 export interface RpcEnv {
   NODE_ENV: string;
-  BASE_RPC_URL: string;
-  BASE_RPC_FALLBACK_URLS?: string | undefined;
-  BASE_RPC_PUBLIC_FALLBACK?: "0" | "1" | undefined;
+  ARC_RPC_URL: string;
+  ARC_RPC_FALLBACK_URLS?: string | undefined;
+  ARC_RPC_PUBLIC_FALLBACK?: "0" | "1" | undefined;
+  /** Temporary, loud escape hatch: boot production on a public primary.
+   *  Exists only so the Arc cutover can deploy before the dedicated Arc key
+   *  (R-006) is provisioned; every boot with it set logs a warning. */
+  RPC_ALLOW_PUBLIC_PRIMARY?: "0" | "1" | undefined;
 }
 
 /** Comma-separated URLs → trimmed, de-duplicated list. */
@@ -60,10 +60,10 @@ export function parseUrlList(raw: string | undefined): string[] {
  */
 export function resolveRpcUrls(e: RpcEnv): string[] {
   const allowPublic =
-    e.BASE_RPC_PUBLIC_FALLBACK === "1" ||
-    (e.BASE_RPC_PUBLIC_FALLBACK === undefined && e.NODE_ENV !== "production");
-  const urls = [e.BASE_RPC_URL, ...parseUrlList(e.BASE_RPC_FALLBACK_URLS)];
-  if (allowPublic) urls.push(...PUBLIC_BASE_RPC_URLS);
+    e.ARC_RPC_PUBLIC_FALLBACK === "1" ||
+    (e.ARC_RPC_PUBLIC_FALLBACK === undefined && e.NODE_ENV !== "production");
+  const urls = [e.ARC_RPC_URL, ...parseUrlList(e.ARC_RPC_FALLBACK_URLS)];
+  if (allowPublic) urls.push(...PUBLIC_ARC_RPC_URLS);
   const out: string[] = [];
   for (const u of urls) if (!out.includes(u)) out.push(u);
   return out;
@@ -77,21 +77,21 @@ export function resolveRpcUrls(e: RpcEnv): string[] {
  */
 export function rpcProviderIssues(e: RpcEnv): string[] {
   const issues: string[] = [];
-  if (isPublicRpcUrl(e.BASE_RPC_URL)) {
+  if (isPublicRpcUrl(e.ARC_RPC_URL) && e.RPC_ALLOW_PUBLIC_PRIMARY !== "1") {
     issues.push(
-      `BASE_RPC_URL is the public, rate-limited host ${new URL(e.BASE_RPC_URL).hostname} — production must use a dedicated RPC endpoint (Alchemy / QuickNode / Infura / dRPC paid tier). Set BASE_RPC_URL to the provider URL; see docs/tasks/052-rpc-cache-pooling.md (R-006).`,
+      `ARC_RPC_URL is the public, rate-limited host ${new URL(e.ARC_RPC_URL).hostname} — production must use a dedicated Arc RPC endpoint (Alchemy / QuickNode / Blockdaemon / dRPC paid tier). Set ARC_RPC_URL to the provider URL; see docs/tasks/052-rpc-cache-pooling.md (R-006). RPC_ALLOW_PUBLIC_PRIMARY=1 overrides this for the cutover window only.`,
     );
   }
-  for (const u of parseUrlList(e.BASE_RPC_FALLBACK_URLS)) {
+  for (const u of parseUrlList(e.ARC_RPC_FALLBACK_URLS)) {
     if (isPublicRpcUrl(u)) {
       issues.push(
-        `BASE_RPC_FALLBACK_URLS contains the public host ${new URL(u).hostname} — list dedicated endpoints only; the public backstop is governed by BASE_RPC_PUBLIC_FALLBACK.`,
+        `ARC_RPC_FALLBACK_URLS contains the public host ${new URL(u).hostname} — list dedicated endpoints only; the public backstop is governed by ARC_RPC_PUBLIC_FALLBACK.`,
       );
     }
   }
-  if (e.NODE_ENV === "production" && e.BASE_RPC_PUBLIC_FALLBACK === "1") {
+  if (e.NODE_ENV === "production" && e.ARC_RPC_PUBLIC_FALLBACK === "1") {
     issues.push(
-      "BASE_RPC_PUBLIC_FALLBACK=1 in production appends the public rate-limited hosts as a backstop — under the load that degrades a dedicated endpoint they add 10 s timeouts, not availability. Unset it (or set 0) and list a second dedicated endpoint in BASE_RPC_FALLBACK_URLS instead.",
+      "ARC_RPC_PUBLIC_FALLBACK=1 in production appends the public rate-limited hosts as a backstop — under the load that degrades a dedicated endpoint they add 10 s timeouts, not availability. Unset it (or set 0) and list a second dedicated endpoint in ARC_RPC_FALLBACK_URLS instead.",
     );
   }
   return issues;

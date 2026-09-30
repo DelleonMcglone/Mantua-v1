@@ -3,7 +3,7 @@
   "info": {
     "title": "Mantua market discovery",
     "version": "1.0.0",
-    "description": "Filterable upcoming sports market slate with liquidity and popularity. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet).",
+    "description": "Filterable upcoming sports market slate with liquidity and popularity. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:5042 (Arc Mainnet).",
     "x-mantua-service-id": "market-discovery",
     "x-mantua-price-usd": "0.001"
   },
@@ -91,7 +91,7 @@
             }
           },
           "402": {
-            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:5042.",
             "headers": {
               "PAYMENT-REQUIRED": {
                 "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",

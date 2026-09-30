@@ -3,7 +3,7 @@
   "info": {
     "title": "Mantua trading calldata",
     "version": "1.0.0",
-    "description": "Execution-ready market trade calldata; the caller signs with its own wallet. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:8453 (Base Mainnet). Typed refusals after payment (cap_blocked, BETTING_CLOSED, TRADING_HALTED, NO_MARKET) are definitive answers — the request was purchased.",
+    "description": "Execution-ready market trade calldata; the caller signs with its own wallet. x402-priced service. Unpaid requests receive 402 PAYMENT-REQUIRED with both rails in one accepts array: Circle Gateway nanopayments and vanilla exact x402 on eip155:5042 (Arc Mainnet). Typed refusals after payment (cap_blocked, BETTING_CLOSED, TRADING_HALTED, NO_MARKET) are definitive answers — the request was purchased.",
     "x-mantua-service-id": "trading-calldata",
     "x-mantua-price-usd": "0.02"
   },
@@ -18,7 +18,7 @@
       "post": {
         "operationId": "x402TradingCalldata",
         "summary": "Execution-ready market trade calldata; the caller signs with its own wallet",
-        "description": "Issues calldata for one trade on Base under the paying wallet's daily cap (check → build → record). The calldata is signed and submitted by the caller's own wallet — the server holds no keys, moves no funds, executes nothing.",
+        "description": "Issues calldata for one trade on Arc under the paying wallet's daily cap (check → build → record). The calldata is signed and submitted by the caller's own wallet — the server holds no keys, moves no funds, executes nothing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -70,7 +70,7 @@
             }
           },
           "402": {
-            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:8453.",
+            "description": "Payment required — see PAYMENT-REQUIRED header. The header lists both rails in one accepts array: Circle Gateway nanopayments (gasless, batch-settled) and vanilla exact x402 on eip155:5042.",
             "headers": {
               "PAYMENT-REQUIRED": {
                 "description": "Base64url JSON carrying the accepts[] payment requirements for both rails.",
@@ -148,7 +148,7 @@
     "schemas": {
       "TradeRequest": {
         "type": "object",
-        "description": "The browser trade shape minus chainId — trading happens on Base, the settlement network.",
+        "description": "The browser trade shape minus chainId — trading happens on Arc, the settlement network.",
         "properties": {
           "providerEventId": {
             "type": "string",

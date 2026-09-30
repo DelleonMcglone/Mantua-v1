@@ -8,7 +8,7 @@
  *
  * Host lists follow the vendor CSP guidance for the pinned SDK versions
  * (Privy react-auth 3.x, WalletConnect/Reown via Privy, Plaid Link, Google
- * Fonts) plus the Base RPC hosts in client/src/lib/chains.ts.
+ * Fonts) plus the Arc RPC host in client/src/lib/chains.ts.
  */
 export interface CspSource {
   origin: string;
@@ -41,8 +41,7 @@ export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "fon
     { origin: "https://api.web3modal.org", why: "WalletConnect modal assets" },
     { origin: "https://pulse.walletconnect.org", why: "WalletConnect telemetry" },
     { origin: "https://*.plaid.com", why: "Plaid Link API" },
-    { origin: "https://mainnet.base.org", why: "Base RPC (public)" },
-    { origin: "https://base-rpc.publicnode.com", why: "Base RPC (public fallback)" },
+    { origin: "https://rpc.mainnet.arc.io", why: "Arc RPC (public fallback)" },
     {
       origin: "wss://api.elevenlabs.io",
       why: "Scribe v2 Realtime transcription socket (task 069, V-001)",

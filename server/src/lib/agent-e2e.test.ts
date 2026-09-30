@@ -54,9 +54,8 @@ const { guardSpend } = await import("./spending-cap.ts");
 const { SafetyError } = await import("./errors.ts");
 const { pollReceipt, CircleReceiptTimeoutError } = await import("./circle/execute.ts");
 const { auditChatToolCall } = await import("./agent-chat.ts");
-const { createKillSwitchGate, createRuntimeKillSwitchFlag } = await import(
-  "../middleware/kill-switch.ts"
-);
+const { createKillSwitchGate, createRuntimeKillSwitchFlag } =
+  await import("../middleware/kill-switch.ts");
 const { db } = await import("../db/client.ts");
 
 type SpendGuardIo = import("./spending-cap.ts").SpendGuardIo;
@@ -65,7 +64,7 @@ type TransactionState = import("./circle/execute.ts").TransactionState;
 type RequestHandler = import("express").RequestHandler;
 
 const WALLET = "0xAbCd000000000000000000000000000000000001";
-const CHAIN_ID = 8453 as const;
+const CHAIN_ID = 5042 as const;
 const NL_MESSAGE = "swap 25 USDC into EURC";
 const TX = `0x${"c".repeat(64)}`;
 
@@ -212,7 +211,10 @@ void describe("B10-005 agent E2E — NL → parse → preview → confirm → ex
     // The real parse layer drove the model seam: the NL text went in as the
     // user message, with the swap tool on offer.
     assert.equal(model.requests.length, 1);
-    const req = model.requests[0] as { messages: { content: unknown }[]; tools: { name: string }[] };
+    const req = model.requests[0] as {
+      messages: { content: unknown }[];
+      tools: { name: string }[];
+    };
     assert.equal(req.messages[0].content, NL_MESSAGE);
     assert.ok(req.tools.some((t) => t.name === "swap"));
 
@@ -374,14 +376,21 @@ void describe("B10-005 agent E2E — NL → parse → preview → confirm → ex
       thrown = err;
     }
     assert.ok(thrown instanceof CircleReceiptTimeoutError, "SENT never resolves the receipt");
-    assert.equal(thrown.txHash, TX, "the timeout still reports the broadcast hash — pending, not success");
+    assert.equal(
+      thrown.txHash,
+      TX,
+      "the timeout still reports the broadcast hash — pending, not success",
+    );
     assert.deepEqual(
       ledger.calls,
       ["check:25", "issue:25"],
       "a failed issue leaves no record ink (C-019)",
     );
     assert.equal(ledger.spent(), 0);
-    assert.ok(circle.polls() > 0, "the state machine really polled and refused to call SENT terminal");
+    assert.ok(
+      circle.polls() > 0,
+      "the state machine really polled and refused to call SENT terminal",
+    );
 
     await auditChatToolCall({
       walletAddress: WALLET,

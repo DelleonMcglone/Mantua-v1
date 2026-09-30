@@ -43,7 +43,7 @@ export const v4SwapRouter = Router();
  *   - a hook ("stable-protection" / "dynamic-fee" / "rwa-gate" / "alo")
  *     → that hook's gated pool (pair-allowlisted per hook-pair-gating).
  *   - "No Hook" (hook = null) → the plain zero-hook pool on the hero
- *     PoolManager stack, allowed for ANY pair (USDC/EURC/cbBTC in any
+ *     PoolManager stack, allowed for ANY pair (USDC/EURC/cirBTC in any
  *     combination) — no pair gating applies when there's no hook.
  * Both kinds require the pool to be initialized on-chain first (create
  * it via Add Liquidity with the matching hook/No-Hook + fee tier).

@@ -218,7 +218,7 @@ void describe("R-008 in-process spike", () => {
         data: "0x00",
         value: "0",
         approvalTarget: null,
-        inputToken: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        inputToken: "0x3600000000000000000000000000000000000000",
         marketId: `0x${"11".repeat(32)}`,
         marketAddress: "0x00000000000000000000000000000000000000e1",
         yesToken: "0x00000000000000000000000000000000000000e2",

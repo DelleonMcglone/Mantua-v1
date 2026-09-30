@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { ApiError, api } from "@/lib/api.ts";
 import type { TokenSymbol } from "@/lib/tokens.ts";
-import { BASE_CHAIN_ID } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID } from "@/lib/chains.ts";
 
 interface AgentBalance {
   symbol: TokenSymbol;
@@ -42,7 +42,7 @@ interface AgentPortfolioResponse {
 }
 
 export interface AgentPortfolioState {
-  /** Agent wallet address (Circle on Base), or null until provisioned. */
+  /** Agent wallet address (Circle on Arc), or null until provisioned. */
   agentAddress: string | null;
   balances: AgentBalance[];
   positions: AgentPosition[];
@@ -62,7 +62,7 @@ const POLL_MS = 30_000;
  */
 export function useAgentPortfolio(): AgentPortfolioState {
   const { authenticated, ready } = usePrivy();
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const [state, setState] = useState<AgentPortfolioState>({
     agentAddress: null,
     balances: [],

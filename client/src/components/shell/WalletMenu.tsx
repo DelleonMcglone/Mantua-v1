@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { BASE_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ export function WalletMenu({
   onOpenProfile,
   onOpenAgent,
 }: WalletMenuProps) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const { explorerUrl } = CHAIN_INFO[chainId];
   const [copied, setCopied] = useState(false);
 

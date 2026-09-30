@@ -3,7 +3,7 @@
  *
  * A market pool is the YES/USDC pool a sports market trades on. It lives
  * on the Dynamic Market v4 stack (its own PoolManager + periphery), NOT
- * the canonical Base stack — so a liquidity action against one must
+ * the canonical stack — so a liquidity action against one must
  * resolve contracts via `getV4StackForHook(dm.hook)` (DM-112), never the
  * default stack.
  *

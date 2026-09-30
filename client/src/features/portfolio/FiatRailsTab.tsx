@@ -13,7 +13,7 @@ function dollar(value: string): string {
   return Number.isFinite(n) ? `$${n.toFixed(2)}` : "$0.00";
 }
 
-/** Deposit → trade → withdraw. The detailed Plaid, Zero Hash, Circle and Base
+/** Deposit → trade → withdraw. The detailed Plaid, Zero Hash, Circle and Arc
  * choreography stays deliberately below the product boundary. */
 export function FiatRailsTab() {
   const rails = useFiatRails();

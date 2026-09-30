@@ -337,7 +337,7 @@ export const DOCS_GROUPS: DocsGroup[] = [
                 [
                   "USDC",
                   "6",
-                  <A key="u" href={`${BASE_EXPLORER}/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`}>
+                  <A key="u" href={`${BASE_EXPLORER}/0x3600000000000000000000000000000000000000`}>
                     0x833589…2913
                   </A>,
                 ],

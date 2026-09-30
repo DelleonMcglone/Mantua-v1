@@ -2,7 +2,7 @@ import { env } from "../env.ts";
 import { logger } from "./logger.ts";
 
 /**
- * Uniswap v4 Base subgraph client (The Graph decentralized network).
+ * Uniswap v4 subgraph client (The Graph decentralized network).
  *
  * The official subgraph schema is intentionally minimal: a Position only
  * exposes id/tokenId/owner/origin/createdAtTimestamp. Full position state
@@ -43,7 +43,7 @@ function gatewayUrl(apiKey: string, subgraphId: string): string {
 }
 
 /**
- * Fetch positions owned by `walletAddress` from the v4 Base subgraph.
+ * Fetch positions owned by `walletAddress` from the v4 subgraph.
  *
  * Returns `null` when subgraph indexing is unconfigured (no API key) so
  * callers can degrade gracefully — e.g. /api/positions still serves
@@ -53,9 +53,9 @@ export async function fetchSubgraphPositions(
   walletAddress: string,
   options: { first?: number; signal?: AbortSignal } = {},
 ): Promise<SubgraphPosition[] | null> {
-  if (!env.THE_GRAPH_API_KEY) return null;
+  if (!env.THE_GRAPH_API_KEY || !env.UNISWAP_V4_SUBGRAPH_ID) return null;
   const first = options.first ?? 100;
-  const url = gatewayUrl(env.THE_GRAPH_API_KEY, env.UNISWAP_V4_BASE_SUBGRAPH_ID);
+  const url = gatewayUrl(env.THE_GRAPH_API_KEY, env.UNISWAP_V4_SUBGRAPH_ID);
   const res = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },

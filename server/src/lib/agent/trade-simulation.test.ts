@@ -99,7 +99,7 @@ function deps(over: {
 
 void describe("simulateMarketTrade", () => {
   void it("is executable with the full estimate, fees, position and policy results", async () => {
-    const sim = await simulateMarketTrade(deps({}), ARGS, 8453);
+    const sim = await simulateMarketTrade(deps({}), ARGS, 5042);
     assert.equal(sim.executable, true);
     assert.deepEqual(sim.blockers, []);
     assert.equal(sim.expiresAt, 1_000_000 + SIMULATION_TTL_MS);
@@ -123,7 +123,7 @@ void describe("simulateMarketTrade", () => {
     const sim = await simulateMarketTrade(
       deps({ quote: () => Promise.reject(new MarketClosedError("Market closed: game is final")) }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(sim.executable, false);
     assert.equal(sim.market.tradability, "closed");
@@ -136,7 +136,7 @@ void describe("simulateMarketTrade", () => {
     const poor = await simulateMarketTrade(
       deps({ wallet: { usdcBalanceRaw: 5_000_000n } }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(poor.executable, false);
     assert.match(poor.walletPolicy.reason ?? "", /Insufficient agent balance/);
@@ -144,7 +144,7 @@ void describe("simulateMarketTrade", () => {
     const capped = await simulateMarketTrade(
       deps({ wallet: { dailyCapUsd: 25, spentTodayUsd: 20 } }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(capped.executable, false);
     assert.match(capped.walletPolicy.reason ?? "", /Daily cap/);
@@ -155,21 +155,21 @@ void describe("simulateMarketTrade", () => {
     const paused = await simulateMarketTrade(
       deps({ policy: { status: "paused", maxStakePerTradeUsd: 25, allowedLeagues: [] } }),
       ARGS,
-      8453,
+      5042,
     );
     assert.match(paused.marketPolicy.reason ?? "", /paused/);
 
     const limit = await simulateMarketTrade(
       deps({ policy: { status: "active", maxStakePerTradeUsd: 5, allowedLeagues: [] } }),
       ARGS,
-      8453,
+      5042,
     );
     assert.match(limit.marketPolicy.reason ?? "", /Per-trade limit/);
 
     const league = await simulateMarketTrade(
       deps({ policy: { status: "active", maxStakePerTradeUsd: 25, allowedLeagues: ["nba"] } }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(league.marketPolicy.leagueAllowed, false);
     assert.equal(league.executable, false);
@@ -179,7 +179,7 @@ void describe("simulateMarketTrade", () => {
         policy: { status: "active", maxStakePerTradeUsd: 25, allowedLeagues: ["nfl", "nba"] },
       }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(ok.executable, true);
   });
@@ -195,7 +195,7 @@ void describe("simulateMarketTrade", () => {
         },
       }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(sim.executable, false);
     assert.match(sim.marketPolicy.reason ?? "", /Exposure limit/);
@@ -209,7 +209,7 @@ void describe("simulateMarketTrade", () => {
         },
       }),
       ARGS,
-      8453,
+      5042,
     );
     assert.equal(fine.executable, true);
   });
@@ -219,14 +219,14 @@ void describe("simulateMarketTrade", () => {
     const short = await simulateMarketTrade(
       deps({ wallet: { yesBalanceRaw: 1_000_000n } }),
       sell,
-      8453,
+      5042,
     );
     assert.match(short.walletPolicy.reason ?? "", /Insufficient position/);
 
     const sim = await simulateMarketTrade(
       deps({ wallet: { yesBalanceRaw: 10_000_000n, dailyCapUsd: 1, spentTodayUsd: 1 } }),
       sell,
-      8453,
+      5042,
     );
     assert.equal(sim.executable, true, "a sell is not capped");
     assert.equal(sim.position.afterRaw, "6000000");
@@ -238,8 +238,8 @@ void describe("materialDrift", () => {
     fresh: Parameters<typeof deps>[0],
   ): Promise<[TradeSimulation, TradeSimulation]> {
     return [
-      await simulateMarketTrade(deps({}), ARGS, 8453),
-      await simulateMarketTrade(deps(fresh), ARGS, 8453),
+      await simulateMarketTrade(deps({}), ARGS, 5042),
+      await simulateMarketTrade(deps(fresh), ARGS, 5042),
     ];
   }
 
@@ -277,8 +277,8 @@ void describe("materialDrift", () => {
   });
 
   void it("flags different parameters", async () => {
-    const a = await simulateMarketTrade(deps({}), ARGS, 8453);
-    const b = await simulateMarketTrade(deps({}), { ...ARGS, outcomeIndex: 1 }, 8453);
+    const a = await simulateMarketTrade(deps({}), ARGS, 5042);
+    const b = await simulateMarketTrade(deps({}), { ...ARGS, outcomeIndex: 1 }, 5042);
     assert.match(materialDrift(a, b).join(";"), /parameters differ/);
   });
 });

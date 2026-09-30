@@ -26,7 +26,7 @@ const WALLET = "0x00000000000000000000000000000000000000aa";
 const T = (h: number): Date => new Date(Date.UTC(2026, 8, 12, h));
 
 const POSITION = {
-  chainId: 8453,
+  chainId: 5042,
   tokenId: "42",
   positionManager: "0x00000000000000000000000000000000000000f0",
   tokenA: "USDC",

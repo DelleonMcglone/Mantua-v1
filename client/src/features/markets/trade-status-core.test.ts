@@ -19,7 +19,7 @@ const TX = `0x${"c".repeat(64)}` as const;
 function trade(over: Partial<PendingTrade> = {}): PendingTrade {
   return {
     txHash: TX,
-    chainId: 8453,
+    chainId: 5042,
     wallet: "0x00000000000000000000000000000000000000AA",
     marketId: `0x${"1".repeat(64)}`,
     providerEventId: "401",
@@ -128,7 +128,7 @@ void describe("pending-trade persistence", () => {
     assert.deepEqual(parsePendingTrades(null), []);
     assert.deepEqual(parsePendingTrades("{not json"), []);
     assert.deepEqual(parsePendingTrades('{"a":1}'), []);
-    const mixed = JSON.stringify([trade(), { txHash: "0x12", chainId: 8453 }, 7, null]);
+    const mixed = JSON.stringify([trade(), { txHash: "0x12", chainId: 5042 }, 7, null]);
     assert.equal(parsePendingTrades(mixed).length, 1);
   });
 

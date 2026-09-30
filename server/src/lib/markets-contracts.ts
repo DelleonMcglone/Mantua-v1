@@ -1,16 +1,16 @@
 import { parseAbi } from "viem";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { type SupportedChainId } from "./chains.ts";
 
 /**
  * Sports-market settlement layer (MarketFactory + Resolver) and the
  * market-pool v4 periphery, per chain.
  *
- * Base Mainnet: the market-pool periphery (H-009) and the settlement layer
- * (DeployMarkets.s.sol) are both deployed, 2026-09-23. Markets still only
- * OPEN when the server holds the operator's signing key
- * (`MARKET_SIGNER_PRIVATE_KEY`, see markets-onchain.ts) — without it the
- * sync plans markets but sends nothing. Consumers keep degrading
- * gracefully on a chain with no entry.
+ * Arc Mainnet: deployment pending (H-009 / L-018) — the maps stay empty
+ * and every consumer degrades gracefully (market creation/resolution and
+ * on-chain market reads are skipped while the deployment is absent). The
+ * 2026-09-23 Base deployment is superseded. Markets only OPEN when the
+ * server also holds the operator's signing key (`MARKET_SIGNER_PRIVATE_KEY`,
+ * see markets-onchain.ts).
  */
 
 export interface MarketsDeployment {
@@ -28,33 +28,16 @@ export interface MarketsPeriphery {
   positionManager: `0x${string}`;
 }
 
-/** Per-chain markets settlement layer (contracts/script/DeployMarkets.s.sol).
- *  Base: checked on-chain — resolver.factory() ↔ factory.resolver(), the
- *  resolver's operator and signer are the DM operator, collateral is USDC. */
-export const MARKETS_BY_CHAIN: Partial<Record<SupportedChainId, MarketsDeployment>> = {
-  [BASE_CHAIN_ID]: {
-    factory: "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93",
-    resolver: "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281",
-    collateral: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-  },
-};
+/** Per-chain markets settlement layer (contracts/script/DeployMarkets.s.sol). */
+export const MARKETS_BY_CHAIN: Partial<Record<SupportedChainId, MarketsDeployment>> = {};
 
 /**
  * Per-chain market-pool periphery (the Dynamic Market PoolManager's
- * routers/lens). Base Mainnet: DeployMarketPeriphery.s.sol against the DM
+ * routers/lens). Arc Mainnet: DeployMarketPeriphery.s.sol against the DM
  * PoolManager, 2026-09-23 — each contract's poolManager()/manager() was
  * checked on-chain to return it.
  */
-export const MARKETS_PERIPHERY_BY_CHAIN: Partial<Record<SupportedChainId, MarketsPeriphery>> = {
-  [BASE_CHAIN_ID]: {
-    poolSwapTest: "0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF",
-    poolModifyLiquidityTest: "0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6",
-    stateView: "0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF",
-    quoter: "0x1791972C76a8Bcb9da83E50B9435612590a0102f",
-    positionDescriptor: "0x6A8Ce701aB14a2909F22a18063426fEE016A36da",
-    positionManager: "0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da",
-  },
-};
+export const MARKETS_PERIPHERY_BY_CHAIN: Partial<Record<SupportedChainId, MarketsPeriphery>> = {};
 
 export const MARKET_FACTORY_ABI = parseAbi([
   "function createMarketIfAbsent(bytes32 marketId, uint64 startsAt, string label) returns (address market, bool created)",

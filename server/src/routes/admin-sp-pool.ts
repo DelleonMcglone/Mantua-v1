@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { parseAbi } from "viem";
 import { logger } from "../lib/logger.ts";
 import { getRpcClient } from "../lib/rpc-client.ts";
-import { BASE_CHAIN_ID } from "../lib/chains.ts";
+import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { getTokens } from "../lib/tokens.ts";
 import {
   DYNAMIC_FEE_FLAG,
@@ -34,7 +34,7 @@ const ERC20_BALANCE_ABI = parseAbi(["function balanceOf(address account) view re
 
 /**
  * GET /api/cron/sp-pool-bootstrap — one-shot (idempotent) bootstrap for
- * Base's Stable Protection USDC/EURC market.
+ * Arc's Stable Protection USDC/EURC market.
  *
  * The hook models the pair as 1:1 parity stables and hard-halts past 5%
  * deviation — and a halted pool can never be swapped back. This opens the
@@ -50,24 +50,24 @@ adminSpPoolRouter.get(
   "/api/cron/sp-pool-bootstrap",
   requireCronSecret,
   async (_req: Request, res: Response) => {
-    const chainId = BASE_CHAIN_ID;
+    const chainId = ARC_CHAIN_ID;
     try {
       const wallet = marketSignerWallet(chainId);
       if (!wallet) {
-        res.status(503).json({ error: "No authorised signer for Base." });
+        res.status(503).json({ error: "No authorised signer for Arc." });
         return;
       }
       const client = getRpcClient(chainId);
       const hook = getHookAddress("stable-protection", chainId);
       if (!hook) {
-        res.status(503).json({ error: "Stable Protection is not deployed on Base." });
+        res.status(503).json({ error: "Stable Protection is not deployed on Arc." });
         return;
       }
       const stack = getV4Addresses(chainId);
       // Any ModifyLiquidity router bound to the canonical PoolManager works.
       const lpRouter = HOOK_DEPLOYMENTS[chainId]["dynamic-fee"].poolModifyLiquidityTest;
       if (!lpRouter) {
-        res.status(503).json({ error: "No liquidity router configured for Base." });
+        res.status(503).json({ error: "No liquidity router configured for Arc." });
         return;
       }
       const tokens = getTokens(chainId);
@@ -141,7 +141,7 @@ adminSpPoolRouter.get(
         res.json({
           ok: false,
           seeded: false,
-          reason: `Signer ${signer} needs both USDC and EURC on Base.`,
+          reason: `Signer ${signer} needs both USDC and EURC on Arc.`,
           ...summary,
         });
         return;

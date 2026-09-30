@@ -5,7 +5,7 @@ import { sqrtPriceX96ToProbability } from "../probability.ts";
 import { DYNAMIC_FEE_FLAG } from "../v4-contracts.ts";
 
 const HOOK = "0xbb5D42DC40128fa681882cA49f9A74d50D15E8c0" as const;
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as const;
+const USDC = "0x3600000000000000000000000000000000000000" as const;
 const YES_LOW = "0x1111111111111111111111111111111111111111" as const;
 const YES_HIGH = "0xffffffff11111111111111111111111111111111" as const;
 

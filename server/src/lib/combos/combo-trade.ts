@@ -1,4 +1,4 @@
-import { BASE_CHAIN_ID, type SupportedChainId } from "../chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { DEFAULT_SLIPPAGE_BPS } from "../constants.ts";
 import { MIN_RATE_PIPS } from "../sports/market-fee.ts";
 import {
@@ -72,7 +72,7 @@ export function assertComboTradable(
 
 /** Quote + encode one combo swap (`toMarketTradeQuote` strips it to a quote). */
 export async function buildComboTrade(args: ComboTradeArgs): Promise<BuiltMarketTrade> {
-  const chainId = args.chainId ?? BASE_CHAIN_ID;
+  const chainId = args.chainId ?? ARC_CHAIN_ID;
   const slippageBps = args.slippageBps ?? DEFAULT_SLIPPAGE_BPS;
   assertSlippageBounds(slippageBps);
   const onChain = assertComboTradable(

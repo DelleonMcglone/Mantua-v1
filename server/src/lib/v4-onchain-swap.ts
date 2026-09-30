@@ -235,7 +235,7 @@ export interface OnchainQuoteArgs {
   fee: FeeTier;
   hook: HookName | null;
   amountInRaw: bigint;
-  /** Target chain for the on-chain quote. Defaults to Base Mainnet
+  /** Target chain for the on-chain quote. Defaults to Arc Mainnet
    *  for legacy callers that haven't been threaded yet. */
   chainId?: SupportedChainId;
   /** Internal: skip on-chain fee-tier auto-resolution because the caller
@@ -331,7 +331,7 @@ async function resolveInitializedFee(
         // dead: past its CRITICAL threshold the hook reverts every swap,
         // and with swaps blocked the price can never come back. Skip such
         // a pool so a healthy pool at another tier can serve the pair
-        // (Base carries one of these — a USDC/EURC pool crashed by test
+        // (Arc carries one of these — a USDC/EURC pool crashed by test
         // swaps against dust liquidity). Fail-open: if the deviation read
         // itself fails, keep the old behavior and use the pool.
         if (hook === "stable-protection") {
@@ -656,7 +656,7 @@ export interface SwapCalldataResult {
  * Build calldata for `PoolSwapTest.swap`.
  *
  * NOT the token-swap path: the canonical mainnet v4 stack ships no
- * PoolSwapTest (`poolSwapTest: null` on 8453) — token swaps go through
+ * PoolSwapTest (`poolSwapTest: null` on 5042) — token swaps go through
  * the UniversalRouter (`v4-universal-router.ts`, task 031), which
  * enforces min-out and a deadline on-chain. This builder remains for
  * stacks that ship their own router — today the sports-market periphery

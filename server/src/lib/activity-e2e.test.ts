@@ -151,7 +151,7 @@ void describe("PF-021 — every money movement reaches the timeline", () => {
         direction: "buy",
         tokensRaw: "16000000",
         usdcRaw: "10000000",
-        chainId: 8453,
+        chainId: 5042,
       }),
     });
     assert.equal(res.status, 201, await res.text());
@@ -223,7 +223,7 @@ void describe("PF-021 — every money movement reaches the timeline", () => {
       noToken: "0x00000000000000000000000000000000000000e2",
     });
     rowsOf(resolutions).push({ marketId: MARKET, winningOutcomeIndex: 0, createdAt: new Date() });
-    const summary = await settleResolvedPositions(db, 8453, {
+    const summary = await settleResolvedPositions(db, 5042, {
       executeRedeem: () => Promise.reject(new Error("must not redeem")),
     });
     assert.equal(summary.positionsSettled, 1);

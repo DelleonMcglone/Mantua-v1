@@ -6,7 +6,7 @@ import { buildPoolKey } from "./pool-key.ts";
 import { computePoolId } from "./pool-id.ts";
 import { getHookAddress } from "./v4-contracts.ts";
 import { DEFAULT_CHAIN_ID } from "./chains.ts";
-import { BASESCAN_WEB } from "./basescan.ts";
+import { ARCSCAN_WEB } from "./arcscan.ts";
 
 /**
  * Circle Contracts (Smart Contract Platform) integration — the agent reads the
@@ -19,7 +19,7 @@ import { BASESCAN_WEB } from "./basescan.ts";
  * load failure degrades to a clean "unavailable" instead of a boot crash.
  */
 
-const BASE_BLOCKCHAIN = "BASE";
+const ARC_BLOCKCHAIN = "ARC";
 /** Dynamic-fee tier the SP USDC/EURC pool actually uses. */
 const SP_FEE_TIER = 100;
 
@@ -44,14 +44,12 @@ export class ScpUnavailableError extends Error {
   }
 }
 
-/** The SP hook address, or a clean "unavailable" while the Base Mainnet
+/** The SP hook address, or a clean "unavailable" while the Arc Mainnet
  *  deployment is pending (env-overridable — see v4-contracts.ts). */
 function requireSpHook(): `0x${string}` {
   const hook = getHookAddress("stable-protection", DEFAULT_CHAIN_ID);
   if (!hook) {
-    throw new ScpUnavailableError(
-      "Stable Protection hook is not deployed on Base Mainnet yet.",
-    );
+    throw new ScpUnavailableError("Stable Protection hook is not deployed on Arc Mainnet yet.");
   }
   return hook;
 }
@@ -83,7 +81,7 @@ export async function ensureHookImported(): Promise<string> {
   if (importedContractId) return importedContractId;
   const client = await getScpClient();
   const hook = requireSpHook();
-  const list = await client.listContracts({ blockchain: BASE_BLOCKCHAIN as never });
+  const list = await client.listContracts({ blockchain: ARC_BLOCKCHAIN as never });
   const items = (list.data?.contracts ?? []) as { id?: string; contractAddress?: string }[];
   const existing = items.find((c) => c.contractAddress?.toLowerCase() === hook.toLowerCase());
   if (existing?.id) {
@@ -94,7 +92,7 @@ export async function ensureHookImported(): Promise<string> {
     idempotencyKey: crypto.randomUUID(),
     name: "StableProtectionHook",
     address: hook,
-    blockchain: BASE_BLOCKCHAIN,
+    blockchain: ARC_BLOCKCHAIN,
   });
   const id = (res.data?.contract as { id?: string } | undefined)?.id;
   if (!id) throw new ScpUnavailableError("Contract import returned no id.");
@@ -126,7 +124,7 @@ async function scpRead(address: string, fn: string, params?: unknown[]): Promise
   try {
     const res = await client.queryContract({
       address,
-      blockchain: BASE_BLOCKCHAIN,
+      blockchain: ARC_BLOCKCHAIN,
       abiFunctionSignature: fn,
       ...(params ? { abiParameters: params as never } : {}),
     });
@@ -185,7 +183,7 @@ export async function readHookViaScp(): Promise<HookGuardState> {
     zone,
     circuitBreakerBlocksSwaps: zone === "CRITICAL" || zone === "NO_LIQUIDITY",
     contractId,
-    explorerUrl: `${BASESCAN_WEB}/address/${spHook}`,
+    explorerUrl: `${ARCSCAN_WEB}/address/${spHook}`,
     readVia: "circle-contracts",
   };
 }

@@ -19,7 +19,7 @@ import { useCallback } from "react";
 import { createPublicClient, createWalletClient, custom } from "viem";
 import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import type { SmartWalletClientType } from "@privy-io/react-auth/smart-wallets";
-import { BASE_CHAIN_ID, CHAIN_INFO, getRpcTransport } from "../chains.ts";
+import { ARC_CHAIN_ID, CHAIN_INFO, getRpcTransport } from "../chains.ts";
 import { GASLESS_CONFIG } from "./config.ts";
 import {
   createSmartAccountBridge,
@@ -34,8 +34,8 @@ let cachedPublicRequest: ((args: RpcRequestArgs) => Promise<unknown>) | null = n
 function publicRequest(args: RpcRequestArgs): Promise<unknown> {
   if (!cachedPublicRequest) {
     const client = createPublicClient({
-      chain: CHAIN_INFO[BASE_CHAIN_ID].viemChain,
-      transport: getRpcTransport(BASE_CHAIN_ID),
+      chain: CHAIN_INFO[ARC_CHAIN_ID].viemChain,
+      transport: getRpcTransport(ARC_CHAIN_ID),
     });
     cachedPublicRequest = (a: RpcRequestArgs) =>
       (client.request as (x: RpcRequestArgs) => Promise<unknown>)(a);
@@ -68,12 +68,12 @@ function buildGaslessViemClient(smart: SmartWalletClientType) {
   const bridge = createSmartAccountBridge({
     smart: toSender(smart),
     address,
-    chainId: BASE_CHAIN_ID,
+    chainId: ARC_CHAIN_ID,
     publicRequest,
   });
   return createWalletClient({
     account: address,
-    chain: CHAIN_INFO[BASE_CHAIN_ID].viemChain,
+    chain: CHAIN_INFO[ARC_CHAIN_ID].viemChain,
     transport: custom(bridge),
   });
 }
@@ -85,7 +85,7 @@ function useGaslessWalletClientEnabled(): GaslessClientGetter {
   const { getClientForChain } = useSmartWallets();
   return useCallback(async () => {
     try {
-      const smart = await getClientForChain({ id: BASE_CHAIN_ID });
+      const smart = await getClientForChain({ id: ARC_CHAIN_ID });
       if (!smart) return null;
       return buildGaslessViemClient(smart);
     } catch (err) {

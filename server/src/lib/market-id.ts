@@ -1,5 +1,5 @@
 import { keccak256, encodeAbiParameters } from "viem";
-import { BASE_CHAIN_ID } from "./chains.ts";
+import { ARC_CHAIN_ID } from "./chains.ts";
 
 /**
  * Market ID scheme — B0-004.
@@ -36,7 +36,7 @@ export interface MarketIdInput {
    */
   outcomeIndex: number;
   /**
-   * Chain the market lives on. The default chain (Base) is hashed
+   * Chain the market lives on. The default chain (Arc) is hashed
    * WITHOUT the chain id — the original scheme — so default-chain market
    * ids stay stable; any other chain mixes its id into the hash, which
    * keeps `market_id` primary keys distinct across chains without a
@@ -66,8 +66,8 @@ export function computeMarketId(input: MarketIdInput): `0x${string}` {
       `outcomeIndex must be a non-negative integer, got ${String(input.outcomeIndex)}`,
     );
   }
-  const chainId = input.chainId ?? BASE_CHAIN_ID;
-  if (chainId !== BASE_CHAIN_ID) {
+  const chainId = input.chainId ?? ARC_CHAIN_ID;
+  if (chainId !== ARC_CHAIN_ID) {
     return keccak256(
       encodeAbiParameters(
         [{ type: "string" }, { type: "string" }, { type: "uint8" }, { type: "uint256" }],
@@ -136,8 +136,8 @@ export function computeComboMarketId(
     if (!/^0x[0-9a-f]{64}$/.test(id)) throw new InvalidComboLegsError(`not a market id: ${id}`);
   }
   const ids = legs as `0x${string}`[];
-  const chain = chainId ?? BASE_CHAIN_ID;
-  if (chain !== BASE_CHAIN_ID) {
+  const chain = chainId ?? ARC_CHAIN_ID;
+  if (chain !== ARC_CHAIN_ID) {
     return keccak256(
       encodeAbiParameters(
         [{ type: "string" }, { type: "bytes32[]" }, { type: "uint256" }],

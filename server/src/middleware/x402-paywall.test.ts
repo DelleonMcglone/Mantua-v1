@@ -57,7 +57,7 @@ globalThis.fetch = (input, init): Promise<Response> => {
     facilitatorHits++;
     return Promise.resolve(
       Response.json({
-        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" }],
+        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:5042" }],
         extensions: [],
         signers: {},
       }),
@@ -86,13 +86,13 @@ function spyFacilitator(opts: { valid?: boolean; settleOk?: boolean } = {}) {
       return Promise.resolve({
         success: opts.settleOk ?? true,
         transaction: "0xtxhash",
-        network: "eip155:8453" as const,
+        network: "eip155:5042" as const,
         payer: PAYER,
       });
     },
     getSupported: () =>
       Promise.resolve({
-        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:8453" as const }],
+        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:5042" as const }],
         extensions: [],
         signers: {},
       }),
@@ -239,14 +239,14 @@ void describe("dual-rail paywall (MP-004)", () => {
     // Vanilla EIP-3009 rail: USDC domain, one second above the Gateway auth
     // window so core's accepted-requirements matching stays unambiguous.
     assert.equal(vanilla.scheme, "exact");
-    assert.equal(vanilla.network, "eip155:8453");
+    assert.equal(vanilla.network, "eip155:5042");
     assert.equal(vanilla.payTo.toLowerCase(), SELLER.toLowerCase());
     assert.equal(vanilla.amount, "5000", "$0.005 in USDC atomic units (6dp)");
-    assert.deepEqual(vanilla.extra, { name: "USD Coin", version: "2" });
+    assert.deepEqual(vanilla.extra, { name: "USDC", version: "2" });
     assert.equal(vanilla.maxTimeoutSeconds, 604901);
     // Circle Gateway batching rail.
     assert.equal(gateway.scheme, "exact");
-    assert.equal(gateway.network, "eip155:8453");
+    assert.equal(gateway.network, "eip155:5042");
     assert.equal(gateway.amount, "5000");
     assert.equal(gateway.extra?.name, "GatewayWalletBatched");
     assert.equal(gateway.maxTimeoutSeconds, 604900);
@@ -403,7 +403,7 @@ void describe("dual-rail paywall (MP-004)", () => {
     assert.equal(entry.walletAddress?.toLowerCase(), PAYER.toLowerCase());
     assert.equal(entry.params.serviceId, "trading-quote");
     assert.equal(entry.params.priceUsd, "0.005");
-    assert.equal(entry.params.network, "eip155:8453");
+    assert.equal(entry.params.network, "eip155:5042");
     assert.equal(entry.txHash, "0xtxhash");
   });
 

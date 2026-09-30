@@ -18,10 +18,10 @@
  * graceful-gating case removes the entry, each restoring the real config
  * afterwards (try/finally) so test order never matters.
  */
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { BASE_CHAIN_ID } from "./chains.ts";
+import { ARC_CHAIN_ID } from "./chains.ts";
 import { getToken } from "./tokens.ts";
 import {
   SwapRouteMismatchError,
@@ -36,10 +36,11 @@ import {
   type DynamicMarketDeployment,
 } from "./v4-contracts.ts";
 import { MARKETS_PERIPHERY_BY_CHAIN, type MarketsPeriphery } from "./markets-contracts.ts";
+import { overrideCanonicalV4 } from "./testing/canonical-v4.ts";
 
-const USDC = getToken("USDC", BASE_CHAIN_ID).address;
-const EURC = getToken("EURC", BASE_CHAIN_ID).address;
-const CBBTC = getToken("cbBTC", BASE_CHAIN_ID).address;
+const USDC = getToken("USDC", ARC_CHAIN_ID).address;
+const EURC = getToken("EURC", ARC_CHAIN_ID).address;
+const CBBTC = getToken("cirBTC", ARC_CHAIN_ID).address;
 /** A market-minted YES token — deliberately NOT in the registry. */
 const YES_TOKEN = "0x1111111111111111111111111111111111111111" as const;
 const OTHER_OUTCOME = "0x2222222222222222222222222222222222222222" as const;
@@ -70,11 +71,11 @@ function withDmConfig(
   periphery: MarketsPeriphery | undefined,
   run: () => void,
 ): void {
-  const prevDm = DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
-  const prevPeriphery = MARKETS_PERIPHERY_BY_CHAIN[BASE_CHAIN_ID];
+  const prevDm = DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID];
+  const prevPeriphery = MARKETS_PERIPHERY_BY_CHAIN[ARC_CHAIN_ID];
   const set = <T>(map: Partial<Record<number, T>>, v: T | undefined) => {
-    if (v === undefined) Reflect.deleteProperty(map, BASE_CHAIN_ID);
-    else map[BASE_CHAIN_ID] = v;
+    if (v === undefined) Reflect.deleteProperty(map, ARC_CHAIN_ID);
+    else map[ARC_CHAIN_ID] = v;
   };
   set(DYNAMIC_MARKET_BY_CHAIN, dm);
   set(MARKETS_PERIPHERY_BY_CHAIN, periphery);
@@ -101,7 +102,7 @@ describe("resolveSwapRoute (DM-112 split)", () => {
       [CBBTC, EURC],
     ];
     for (const [tin, tout] of pairs) {
-      assert.equal(resolveSwapRoute(tin, tout, BASE_CHAIN_ID), "universal-router");
+      assert.equal(resolveSwapRoute(tin, tout, ARC_CHAIN_ID), "universal-router");
     }
   });
 
@@ -110,7 +111,7 @@ describe("resolveSwapRoute (DM-112 split)", () => {
       resolveSwapRoute(
         USDC.toLowerCase() as `0x${string}`,
         EURC.toUpperCase().replace("0X", "0x") as `0x${string}`,
-        BASE_CHAIN_ID,
+        ARC_CHAIN_ID,
       ),
       "universal-router",
     );
@@ -120,24 +121,24 @@ describe("resolveSwapRoute (DM-112 split)", () => {
     // Outcome token on either side, against every base token and against
     // another outcome token: always market-pool.
     for (const base of [USDC, EURC, CBBTC]) {
-      assert.equal(resolveSwapRoute(YES_TOKEN, base, BASE_CHAIN_ID), "market-pool");
-      assert.equal(resolveSwapRoute(base, YES_TOKEN, BASE_CHAIN_ID), "market-pool");
+      assert.equal(resolveSwapRoute(YES_TOKEN, base, ARC_CHAIN_ID), "market-pool");
+      assert.equal(resolveSwapRoute(base, YES_TOKEN, ARC_CHAIN_ID), "market-pool");
     }
-    assert.equal(resolveSwapRoute(YES_TOKEN, OTHER_OUTCOME, BASE_CHAIN_ID), "market-pool");
+    assert.equal(resolveSwapRoute(YES_TOKEN, OTHER_OUTCOME, ARC_CHAIN_ID), "market-pool");
   });
 
   it("assertSwapRoute throws SwapRouteMismatchError on a cross-over, passes on a match", () => {
     assert.doesNotThrow(() => {
-      assertSwapRoute("market-pool", YES_TOKEN, USDC, BASE_CHAIN_ID);
+      assertSwapRoute("market-pool", YES_TOKEN, USDC, ARC_CHAIN_ID);
     });
     assert.doesNotThrow(() => {
-      assertSwapRoute("universal-router", USDC, EURC, BASE_CHAIN_ID);
+      assertSwapRoute("universal-router", USDC, EURC, ARC_CHAIN_ID);
     });
     assert.throws(() => {
-      assertSwapRoute("universal-router", YES_TOKEN, USDC, BASE_CHAIN_ID);
+      assertSwapRoute("universal-router", YES_TOKEN, USDC, ARC_CHAIN_ID);
     }, SwapRouteMismatchError);
     assert.throws(() => {
-      assertSwapRoute("market-pool", USDC, EURC, BASE_CHAIN_ID);
+      assertSwapRoute("market-pool", USDC, EURC, ARC_CHAIN_ID);
     }, SwapRouteMismatchError);
   });
 });
@@ -145,45 +146,48 @@ describe("resolveSwapRoute (DM-112 split)", () => {
 describe("isMarketPoolHook", () => {
   it("is false for everything while the DM deployment is absent (graceful gating)", () => {
     withDmConfig(undefined, undefined, () => {
-      assert.equal(isMarketPoolHook(DM_HOOK, BASE_CHAIN_ID), false);
+      assert.equal(isMarketPoolHook(DM_HOOK, ARC_CHAIN_ID), false);
       assert.equal(
-        isMarketPoolHook("0x0000000000000000000000000000000000000000", BASE_CHAIN_ID),
+        isMarketPoolHook("0x0000000000000000000000000000000000000000", ARC_CHAIN_ID),
         false,
       );
     });
   });
 
-  it("recognizes the deployed Base Mainnet DM hook", () => {
-    const dm = DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
-    assert.ok(dm);
-    assert.equal(isMarketPoolHook(dm.hook, BASE_CHAIN_ID), true);
-    assert.equal(isMarketPoolHook(DM_HOOK, BASE_CHAIN_ID), false);
-  });
-
   it("recognizes the DM hook (case-insensitively) once deployed, and nothing else", () => {
     withSyntheticDm(() => {
-      assert.equal(isMarketPoolHook(DM_HOOK, BASE_CHAIN_ID), true);
-      assert.equal(isMarketPoolHook(DM_HOOK.toLowerCase(), BASE_CHAIN_ID), true);
+      assert.equal(isMarketPoolHook(DM_HOOK, ARC_CHAIN_ID), true);
+      assert.equal(isMarketPoolHook(DM_HOOK.toLowerCase(), ARC_CHAIN_ID), true);
       assert.equal(
-        isMarketPoolHook("0x0000000000000000000000000000000000000000", BASE_CHAIN_ID),
+        isMarketPoolHook("0x0000000000000000000000000000000000000000", ARC_CHAIN_ID),
         false,
       );
-      assert.equal(isMarketPoolHook(YES_TOKEN, BASE_CHAIN_ID), false);
+      assert.equal(isMarketPoolHook(YES_TOKEN, ARC_CHAIN_ID), false);
     });
   });
 });
 
 describe("getV4StackForHook resolves the DM hook to its own stack (B7-005 failure condition)", () => {
+  // The "never the canonical stack" contrast needs a canonical stack to
+  // contrast against; Arc has none, so a synthetic one is installed here.
+  let restoreCanonical: () => void;
+  before(() => {
+    restoreCanonical = overrideCanonicalV4(ARC_CHAIN_ID);
+  });
+  after(() => {
+    restoreCanonical();
+  });
+
   it("DM hook → DM PoolManager + market periphery, never the canonical stack", () => {
     withSyntheticDm(() => {
-      const stack = getV4StackForHook(DM_HOOK, BASE_CHAIN_ID);
+      const stack = getV4StackForHook(DM_HOOK, ARC_CHAIN_ID);
       assert.equal(stack.poolManager, SYNTHETIC_DM.poolManager);
       assert.equal(stack.quoter, SYNTHETIC_PERIPHERY.quoter);
       assert.equal(stack.stateView, SYNTHETIC_PERIPHERY.stateView);
       assert.equal(stack.poolSwapTest, SYNTHETIC_PERIPHERY.poolSwapTest);
       assert.equal(stack.positionManager, SYNTHETIC_PERIPHERY.positionManager);
 
-      const canonical = getV4Addresses(BASE_CHAIN_ID);
+      const canonical = getV4Addresses(ARC_CHAIN_ID);
       assert.notEqual(stack.poolManager, canonical.poolManager);
       assert.notEqual(stack.quoter, canonical.quoter);
       assert.notEqual(stack.stateView, canonical.stateView);
@@ -192,15 +196,15 @@ describe("getV4StackForHook resolves the DM hook to its own stack (B7-005 failur
 
   it("the case-flipped DM hook address still resolves the DM stack", () => {
     withSyntheticDm(() => {
-      const stack = getV4StackForHook(DM_HOOK.toLowerCase(), BASE_CHAIN_ID);
+      const stack = getV4StackForHook(DM_HOOK.toLowerCase(), ARC_CHAIN_ID);
       assert.equal(stack.poolManager, SYNTHETIC_DM.poolManager);
     });
   });
 
   it("the zero (no-hook) address resolves the canonical stack even with DM deployed", () => {
     withSyntheticDm(() => {
-      const stack = getV4StackForHook("0x0000000000000000000000000000000000000000", BASE_CHAIN_ID);
-      assert.deepEqual(stack, getV4Addresses(BASE_CHAIN_ID));
+      const stack = getV4StackForHook("0x0000000000000000000000000000000000000000", ARC_CHAIN_ID);
+      assert.deepEqual(stack, getV4Addresses(ARC_CHAIN_ID));
     });
   });
 });

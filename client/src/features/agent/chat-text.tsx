@@ -1,5 +1,5 @@
 import { type ReactNode } from "react";
-import { BASE_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerAddressUrl } from "@/lib/chains.ts";
 import { ExternalLink } from "lucide-react";
 import { shortAddr } from "./agent-gate.tsx";
 import { CopyButton } from "./agent-primitives.tsx";
@@ -23,7 +23,7 @@ export function UserBubble({ text }: { text: string }) {
 
 /** Inline EVM address — short form, copy button, and an explorer link. */
 export function AddressInline({ addr }: { addr: string }) {
-  const chainId = BASE_CHAIN_ID;
+  const chainId = ARC_CHAIN_ID;
   const url = getExplorerAddressUrl(chainId, addr);
   return (
     <span className="inline-flex items-center gap-1.5 rounded-[7px] border border-border-soft bg-bg-elev px-[7px] py-px align-baseline">

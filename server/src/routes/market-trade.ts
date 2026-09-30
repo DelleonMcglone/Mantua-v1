@@ -41,7 +41,7 @@ const bodySchema = z.object({
     .refine((v) => BigInt(v) > 0n && BigInt(v) <= 100_000_000_000n, {
       message: "amount out of range",
     }),
-  /** Execution chain — omitted means Base (back-compat). */
+  /** Execution chain — omitted means Arc (back-compat). */
   chainId: z.number().int().refine(isSupportedChainId, "Unsupported chainId").optional(),
   /** Slippage tolerance in bps — becomes the on-chain price bound in the
    *  calldata (B7-003). Hard-capped at MAX_SLIPPAGE_BPS; omitted means the

@@ -9,7 +9,7 @@
  *    `key.fee = DYNAMIC_FEE_FLAG` while the static tier still drives
  *    `tickSpacing`.
  *
- * Base Mainnet token set: USDC / EURC / cbBTC (no native token).
+ * Base Mainnet token set: USDC / EURC / cirBTC (no native token).
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
@@ -29,8 +29,8 @@ describe("buildPoolKey: token sorting", () => {
     assert.ok(a.key.currency0 < a.key.currency1, "currency0 must sort before currency1");
   });
 
-  it("sorts USDC/cbBTC canonically", () => {
-    const r = buildPoolKey("USDC", "cbBTC", 500);
+  it("sorts USDC/cirBTC canonically", () => {
+    const r = buildPoolKey("USDC", "cirBTC", 500);
     assert.ok(r.key.currency0 < r.key.currency1, "currency0 must sort before currency1");
   });
 
@@ -50,13 +50,13 @@ describe("buildPoolKey: tick spacing from static fee tier", () => {
     assert.equal(buildPoolKey("USDC", "EURC", 100).key.tickSpacing, 1);
   });
   it("0.05% (500) → tickSpacing 10", () => {
-    assert.equal(buildPoolKey("USDC", "cbBTC", 500).key.tickSpacing, 10);
+    assert.equal(buildPoolKey("USDC", "cirBTC", 500).key.tickSpacing, 10);
   });
   it("0.30% (3000) → tickSpacing 60", () => {
-    assert.equal(buildPoolKey("USDC", "cbBTC", 3000).key.tickSpacing, 60);
+    assert.equal(buildPoolKey("USDC", "cirBTC", 3000).key.tickSpacing, 60);
   });
   it("1.00% (10000) → tickSpacing 200", () => {
-    assert.equal(buildPoolKey("USDC", "cbBTC", 10000).key.tickSpacing, 200);
+    assert.equal(buildPoolKey("USDC", "cirBTC", 10000).key.tickSpacing, 200);
   });
 });
 
@@ -73,7 +73,7 @@ describe("buildPoolKey: hook-aware effective fee", () => {
   });
 
   it("dynamic-fee → key.fee == DYNAMIC_FEE_FLAG", () => {
-    const r = buildPoolKey("USDC", "cbBTC", 500, HOOK, "dynamic-fee");
+    const r = buildPoolKey("USDC", "cirBTC", 500, HOOK, "dynamic-fee");
     assert.equal(r.key.fee, DYNAMIC_FEE_FLAG);
     assert.equal(r.key.tickSpacing, 10);
   });

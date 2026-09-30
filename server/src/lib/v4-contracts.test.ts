@@ -4,7 +4,7 @@
  * incidents (hook-rejecting initialize, slot0 lookup miss). These
  * tests freeze the contract.
  */
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   DYNAMIC_FEE_FLAG,
@@ -14,26 +14,47 @@ import {
   effectivePoolFee,
   getV4Addresses,
   getV4StackForHook,
+  hasCanonicalV4,
   isFeeTier,
+  V4StackNotDeployedError,
 } from "./v4-contracts.ts";
-import { BASE_CHAIN_ID } from "./chains.ts";
+import { SYNTHETIC_CANONICAL_V4, overrideCanonicalV4 } from "./testing/canonical-v4.ts";
+import { ARC_CHAIN_ID } from "./chains.ts";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 
-describe("getV4StackForHook — stack routing", () => {
-  it("no-hook (zero address) → the canonical Base stack", () => {
+describe("getV4StackForHook — stack routing (synthetic canonical stack)", () => {
+  // Arc ships no canonical Uniswap v4; the routing rules are pinned against
+  // a synthetic stack installed for this block only.
+  let restore: () => void;
+  before(() => {
+    restore = overrideCanonicalV4(ARC_CHAIN_ID);
+  });
+  after(() => {
+    restore();
+  });
+
+  it("no-hook (zero address) → the canonical stack", () => {
     const s = getV4StackForHook(ZERO);
-    assert.equal(s.poolManager, "0x498581fF718922c3f8e6A244956aF099B2652b2b");
-    assert.equal(s.positionManager, "0x7C5f5A4bBd8fD63184577525326123B519429bDc");
+    assert.equal(s.poolManager, SYNTHETIC_CANONICAL_V4.poolManager);
+    assert.equal(s.positionManager, SYNTHETIC_CANONICAL_V4.positionManager);
   });
 
   it("unrecognized hook → falls back to the canonical stack", () => {
     const s = getV4StackForHook("0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead");
-    assert.equal(s.poolManager, "0x498581fF718922c3f8e6A244956aF099B2652b2b");
+    assert.equal(s.poolManager, SYNTHETIC_CANONICAL_V4.poolManager);
   });
 
-  it("no test router ships in the canonical mainnet deployment", () => {
-    assert.equal(getV4Addresses(BASE_CHAIN_ID).poolSwapTest, null);
+  it("no test router ships in a canonical mainnet deployment", () => {
+    assert.equal(getV4Addresses(ARC_CHAIN_ID).poolSwapTest, null);
+  });
+});
+
+describe("getV4StackForHook — Arc has no canonical stack", () => {
+  it("throws the typed gated error for the no-hook address instead of routing at nothing", () => {
+    assert.equal(hasCanonicalV4(ARC_CHAIN_ID), false);
+    assert.throws(() => getV4StackForHook(ZERO), V4StackNotDeployedError);
+    assert.throws(() => getV4Addresses(ARC_CHAIN_ID), V4StackNotDeployedError);
   });
 });
 
@@ -94,12 +115,12 @@ describe("effectivePoolFee", () => {
 });
 
 /**
- * Base Mainnet deployment guards: Mantua's pool hooks (Stable Protection,
+ * Arc Mainnet deployment guards: Mantua's pool hooks (Stable Protection,
  * Dynamic Fee) have no mainnet addresses yet — see
  * docs/tasks/v2-roadmap.md. These regression guards fail if a future
  * change registers a placeholder address before a deployment exists.
  */
-describe("Base Mainnet deployment pending", () => {
+describe("Arc Mainnet deployment pending", () => {
   it("still ships exactly the two live hooks", () => {
     assert.deepEqual([...HOOK_NAMES], ["stable-protection", "dynamic-fee"]);
   });
@@ -111,32 +132,11 @@ describe("Base Mainnet deployment pending", () => {
  * and check the hook address carries exactly the four permissions v4 reads
  * from it.
  */
-describe("Dynamic Market stack on Base Mainnet (H-009)", () => {
-  const dm = DYNAMIC_MARKET_BY_CHAIN[BASE_CHAIN_ID];
-
-  it("registers the deployed addresses from deploy/dynamic-market/README.md", () => {
-    assert.deepEqual(dm, {
-      poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
-      registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
-      hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
-      operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
-      keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
-    });
-  });
-
-  it("hook address encodes BEFORE_INITIALIZE | BEFORE_ADD_LIQUIDITY | BEFORE_SWAP | AFTER_SWAP", () => {
-    assert.ok(dm);
-    assert.equal(Number(BigInt(dm.hook) & 0x3fffn), 0x28c0);
-  });
-
-  it("routes the hook to its own PoolManager and the market periphery", () => {
-    assert.ok(dm);
-    const stack = getV4StackForHook(dm.hook, BASE_CHAIN_ID);
-    assert.equal(stack.poolManager, dm.poolManager);
-    assert.equal(stack.quoter, "0x1791972C76a8Bcb9da83E50B9435612590a0102f");
-    assert.equal(stack.stateView, "0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF");
-    assert.equal(stack.positionManager, "0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da");
-    assert.equal(stack.poolSwapTest, "0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF");
-    assert.notEqual(stack.poolManager, getV4Addresses(BASE_CHAIN_ID).poolManager);
+describe("Dynamic Market stack on Arc Mainnet (H-009 — deployment pending)", () => {
+  it("registers no Dynamic Market stack until the Arc deploy lands", () => {
+    // Registering a placeholder would let getV4StackForHook route live pool
+    // operations at a stack that is not there — worse than the lookup
+    // simply not matching. The entry appears with the Arc deploy.
+    assert.equal(DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID], undefined);
   });
 });

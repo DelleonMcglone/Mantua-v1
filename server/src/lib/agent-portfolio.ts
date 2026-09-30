@@ -3,7 +3,7 @@ import { type Address, parseAbi } from "viem";
 import { db } from "../db/client.ts";
 import { portfolioTransactions, type PortfolioTransaction } from "../db/schema/trading.ts";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
 import { getTokens, type Token, type TokenSymbol } from "./tokens.ts";
 import { tokenAmountUsd } from "./usd-pricing.ts";
@@ -58,7 +58,7 @@ export interface AgentPortfolio {
 export async function getAgentPortfolio(
   privyUserId: string,
   txLimit = 50,
-  chainId: SupportedChainId = BASE_CHAIN_ID,
+  chainId: SupportedChainId = ARC_CHAIN_ID,
 ): Promise<AgentPortfolio> {
   const wallet = await getAgentWallet(privyUserId, chainId);
   if (!wallet) throw new AgentWalletNotFoundError(privyUserId);

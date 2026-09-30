@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { readPolicy } from "../lib/agent/policy.ts";
-import { BASE_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
+import { ARC_CHAIN_ID, isSupportedChainId } from "../lib/chains.ts";
 import { prepareComboMarket } from "../lib/combos/combo-prepare.ts";
 import { platformLimits, quoteComboTicket } from "../lib/combos/combo-quote.ts";
 import { playoffsLookup } from "../lib/combos/combo-season.ts";
@@ -86,7 +86,7 @@ combosRouter.post("/api/combos/quote", requireAuth, async (req: Request, res: Re
       userId,
       legs: parsed.data.legs,
       stakeRaw: BigInt(parsed.data.stakeRaw),
-      chainId: parsed.data.chainId ?? BASE_CHAIN_ID,
+      chainId: parsed.data.chainId ?? ARC_CHAIN_ID,
       policy: await readPolicy(db, userId),
       playoffsOf: await playoffsLookup(),
     });
@@ -111,7 +111,7 @@ combosRouter.post(
     }
     const userId = await userIdFor(req, res);
     if (!userId) return;
-    const chainId = parsed.data.chainId ?? BASE_CHAIN_ID;
+    const chainId = parsed.data.chainId ?? ARC_CHAIN_ID;
     try {
       const result = await prepareComboMarket(db, {
         userId,

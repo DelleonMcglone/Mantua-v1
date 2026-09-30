@@ -3,7 +3,7 @@ import { ArrowDownUp, ArrowLeftRight, Bot, Droplet, Trophy } from "lucide-react"
 import { Button } from "@/components/ui/button.tsx";
 import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { TxRow } from "@/components/ui/tx-row.tsx";
-import { BASE_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
+import { ARC_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import {
   ACTIVITY_FILTERS,
   groupByDay,
@@ -139,7 +139,7 @@ function ActivityCard({ item, nowMs }: { item: ActivityItem; nowMs: number }) {
         </div>
       </div>
       {item.txHash && (
-        <TxRow hash={item.txHash} explorerUrl={getExplorerTxUrl(BASE_CHAIN_ID, item.txHash)} />
+        <TxRow hash={item.txHash} explorerUrl={getExplorerTxUrl(ARC_CHAIN_ID, item.txHash)} />
       )}
     </li>
   );

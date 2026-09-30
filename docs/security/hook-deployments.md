@@ -1,8 +1,13 @@
 # Hook deployment verification (P5-001)
 
-## Base Mainnet (8453) — current target
+## Arc Mainnet (5042) — current target
 
-**Status: `DynamicMarketHook` deployed 2026-09-23** on its own PoolManager
+**Status: no Mantua hook is deployed on Arc yet.** The launch chain moved to
+Arc on 2026-09-29 (B-005); the Base Mainnet rows below are superseded.
+
+## Base Mainnet (8453) — superseded 2026-09-29
+
+**Status: `DynamicMarketHook` was deployed 2026-09-23** on its own PoolManager
 (`0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`; full stack in
 [`deploy/dynamic-market/README.md`](../../deploy/dynamic-market/README.md#deployment-record)).
 `StableProtectionHook` and `DynamicFee` are not deployed yet.

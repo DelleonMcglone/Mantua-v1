@@ -6,7 +6,7 @@ import { db } from "../../db/client.ts";
 import { circleExecutions, webhookEvents, type CircleExecution } from "../../db/schema/circle.ts";
 import { mantuaAuditLog } from "../../db/schema/safety.ts";
 import { portfolioTransactions } from "../../db/schema/trading.ts";
-import { BASE_CHAIN_ID } from "../chains.ts";
+import { ARC_CHAIN_ID } from "../chains.ts";
 import { logAudit, type AuditEntry } from "../audit.ts";
 import { logger } from "../logger.ts";
 import { engineExecuted } from "../sports/strategy-store.ts";
@@ -381,7 +381,7 @@ export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
         await recordComboFill(db, {
           userId: p.userId,
           walletAddress: p.agentAddress,
-          chainId: BASE_CHAIN_ID,
+          chainId: ARC_CHAIN_ID,
           marketId: p.marketId as `0x${string}`,
           direction: p.direction,
           tokensRaw: BigInt(p.direction === "buy" ? p.expectedOutRaw : p.amountRaw),
@@ -408,7 +408,7 @@ export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
           action: "strategy_execute",
           outcome: effect.outcome,
           params: effect.params,
-          chainId: BASE_CHAIN_ID,
+          chainId: ARC_CHAIN_ID,
           ...(effect.txHash ? { txHash: effect.txHash } : {}),
           ...(effect.reason ? { reason: effect.reason } : {}),
         });

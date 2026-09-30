@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { UnreadableQuoteError, quoteSpendLeg } from "./uniswap.ts";
 
-const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const USDC = "0x3600000000000000000000000000000000000000";
 const WETH = "0x4200000000000000000000000000000000000006";
 
 /** Minimal shape that passes the Trading API quote schema (loose objects). */
@@ -12,7 +12,7 @@ function quote(inputToken: string, inputAmount: string): unknown {
     requestId: "test-request",
     routing: "DUTCH_V2",
     quote: {
-      chainId: 8453,
+      chainId: 5042,
       swapper: "0x1111111254eeb25477b68fb85ed929f73a960582",
       tradeType: "EXACT_IN",
       quoteId: "test-quote",

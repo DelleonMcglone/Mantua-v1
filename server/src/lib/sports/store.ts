@@ -794,7 +794,7 @@ export async function readCanonicalSlateRange(
   league: LeagueSlug,
   fromMs: number,
   toMs: number,
-  chainId = 8453,
+  chainId = 5042,
 ): Promise<CanonicalSlate> {
   const leagueId = await ensureLeague(db, league);
   const from = new Date(fromMs);
@@ -941,7 +941,7 @@ export async function upsertMarketRows(
   db: DB,
   provider: string,
   details: readonly OnChainMarketDetail[],
-  chainId = 8453,
+  chainId = 5042,
 ): Promise<number> {
   let written = 0;
   for (const d of details) {

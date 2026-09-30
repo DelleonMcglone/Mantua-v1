@@ -14,19 +14,19 @@ import { TOKENS, ZERO_ADDRESS } from "./tokens.ts";
 
 const USDC = TOKENS.USDC.address;
 const EURC = TOKENS.EURC.address;
-const CBBTC = TOKENS.cbBTC.address;
+const CBBTC = TOKENS.cirBTC.address;
 const UNKNOWN = "0xdeaddeaddeaddeaddeaddeaddeaddeaddeaddead";
 
 // Base Mainnet hook → pair matrix:
 //  - stable-protection: USDC/EURC
-//  - dynamic-fee:       USDC/cbBTC, EURC/cbBTC
+//  - dynamic-fee:       USDC/cirBTC, EURC/cirBTC
 describe("isHookPairAllowed — stable-protection (USDC/EURC only)", () => {
   it("accepts USDC/EURC (either order)", () => {
     assert.equal(isHookPairAllowed("stable-protection", USDC, EURC), true);
     assert.equal(isHookPairAllowed("stable-protection", EURC, USDC), true);
     assert.equal(isHookPairAllowedBySymbol("stable-protection", "USDC", "EURC"), true);
   });
-  it("rejects USDC/cbBTC", () => {
+  it("rejects USDC/cirBTC", () => {
     assert.equal(isHookPairAllowed("stable-protection", USDC, CBBTC), false);
   });
   it("rejects unknown token addresses", () => {
@@ -35,7 +35,7 @@ describe("isHookPairAllowed — stable-protection (USDC/EURC only)", () => {
 });
 
 describe("isHookPairAllowed — dynamic-fee (volatile pairs)", () => {
-  it("accepts USDC/cbBTC and EURC/cbBTC", () => {
+  it("accepts USDC/cirBTC and EURC/cirBTC", () => {
     assert.equal(isHookPairAllowed("dynamic-fee", USDC, CBBTC), true);
     assert.equal(isHookPairAllowed("dynamic-fee", EURC, CBBTC), true);
   });
@@ -50,8 +50,8 @@ describe("listAllowedPairs", () => {
   });
   it("returns the volatile pairs for dynamic-fee", () => {
     assert.deepEqual(listAllowedPairs("dynamic-fee"), [
-      ["USDC", "cbBTC"],
-      ["EURC", "cbBTC"],
+      ["USDC", "cirBTC"],
+      ["EURC", "cirBTC"],
     ]);
   });
 });
@@ -62,7 +62,7 @@ describe("assertHookPairAllowed", () => {
       assertHookPairAllowed("stable-protection", USDC, EURC);
     });
     assert.doesNotThrow(() => {
-      assertHookPairAllowedBySymbol("dynamic-fee", "USDC", "cbBTC");
+      assertHookPairAllowedBySymbol("dynamic-fee", "USDC", "cirBTC");
     });
   });
   it("throws HookPairNotAllowedError for a disallowed pair", () => {

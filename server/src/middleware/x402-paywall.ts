@@ -35,7 +35,7 @@ import { logger } from "../lib/logger.ts";
  *  2. Gateway rail — Circle Gateway batched payments (`extra.name =
  *     "GatewayWalletBatched"`), verified/settled by the Gateway facilitator.
  *
- * Both rails are scheme "exact" on eip155:8453, so a single x402ResourceServer
+ * Both rails are scheme "exact" on eip155:5042, so a single x402ResourceServer
  * carries `GatewayEvmScheme` on the "eip155:*" pattern (it parses USDC prices
  * and merges the Gateway `verifyingContract` into requirement extras). Two
  * mechanics make the rails coexist — both verified against the installed
@@ -170,7 +170,7 @@ export function x402PaywallDepsFromEnv(env: {
  * Routes verify/settle by the matched requirements' rail metadata: Gateway
  * payments to the Gateway facilitator, everything else to the vanilla one.
  * `getSupported` merges both — Gateway kinds first, so the supported-kind
- * stored for (v2, eip155:8453, exact) is the Gateway one and its
+ * stored for (v2, eip155:5042, exact) is the Gateway one and its
  * `verifyingContract` enriches the Gateway requirements (the vanilla row's
  * EIP-3009 domain comes from its own extra; the extra `verifyingContract`
  * is inert for vanilla clients, which key the domain off `asset`).
@@ -223,8 +223,9 @@ class DualRailFacilitator implements FacilitatorClient {
   }
 }
 
-/** The vanilla row's EIP-3009 signing domain — native USDC on Base. */
-const VANILLA_USDC_DOMAIN = { name: "USD Coin", version: "2" };
+/** The vanilla row's EIP-3009 signing domain — USDC on Arc (`name()` is
+ *  "USDC" and `version()` is "2" on 0x3600…0000, read live 2026-09-29). */
+const VANILLA_USDC_DOMAIN = { name: "USDC", version: "2" };
 
 /**
  * The vanilla row must out-timeout the Gateway row or the two accepts entries

@@ -30,6 +30,7 @@ import {
   UNIVERSAL_ROUTER,
   getHookAddress,
   getV4Addresses,
+  hasCanonicalV4,
 } from "../v4-contracts.ts";
 
 export class TargetNotAllowedError extends Error {
@@ -53,12 +54,16 @@ function buildAllowlist(): Set<string> {
   add(UNIVERSAL_ROUTER);
   for (const chainId of SUPPORTED_CHAIN_IDS) {
     for (const token of Object.values(getTokens(chainId))) add(token.address);
-    const v4 = getV4Addresses(chainId);
-    add(v4.poolManager);
-    add(v4.positionManager);
-    add(v4.stateView);
-    add(v4.quoter);
-    add(v4.poolSwapTest);
+    // The canonical Uniswap stack, where the chain has one (Arc does not —
+    // market pools route to the Dynamic Market periphery below).
+    if (hasCanonicalV4(chainId)) {
+      const v4 = getV4Addresses(chainId);
+      add(v4.poolManager);
+      add(v4.positionManager);
+      add(v4.stateView);
+      add(v4.quoter);
+      add(v4.poolSwapTest);
+    }
     for (const name of HOOK_NAMES) add(getHookAddress(name, chainId));
   }
 

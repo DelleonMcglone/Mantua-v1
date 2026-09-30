@@ -1,5 +1,5 @@
 import { env } from "../env.ts";
-import { BASE_CHAIN_ID, type SupportedChainId } from "./chains.ts";
+import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { getCircleClient } from "./circle/client.ts";
 
 /**
@@ -11,9 +11,9 @@ import { getCircleClient } from "./circle/client.ts";
  */
 
 /** Circle blockchain ids per supported chain. */
-export type CircleBlockchain = "BASE";
+export type CircleBlockchain = "ARC";
 const CIRCLE_BLOCKCHAIN: Record<SupportedChainId, CircleBlockchain> = {
-  [BASE_CHAIN_ID]: "BASE",
+  [ARC_CHAIN_ID]: "ARC",
 };
 
 export function circleBlockchainFor(chainId: SupportedChainId): CircleBlockchain {

@@ -52,7 +52,7 @@ function keyShape(key: string): string {
  *  registered ERC-20; `transfer(self, 0)` moves nothing and touches no state
  *  beyond an event). */
 const USDC_BY_BLOCKCHAIN: Partial<Record<Blockchain, `0x${string}`>> = {
-  BASE: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+  BASE: "0x3600000000000000000000000000000000000000",
   "BASE-SEPOLIA": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
 };
 

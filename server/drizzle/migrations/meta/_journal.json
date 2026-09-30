@@ -183,6 +183,13 @@
       "when": 1789900000000,
       "tag": "0025_institutional_custody",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790200000000,
+      "tag": "0026_arc_chain_defaults",
+      "breakpoints": true
     }
   ]
 }

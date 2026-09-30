@@ -5,7 +5,7 @@
  * "breadcrumb" written at mint time — fragile (lost on cache-clear /
  * incognito / another browser) and invisible to positions opened
  * elsewhere. This enumerates the user's PositionManager ERC-721s on the
- * canonical Base v4 stack and reconstructs each position from
+ * canonical v4 stack and reconstructs each position from
  * on-chain state, so the tab always reflects reality.
  *
  * Discovery: each v4 PositionManager mints sequentially from tokenId 1,
@@ -109,7 +109,7 @@ function fmtAmount(raw: bigint, decimals: number): string {
   return `${whole.toString()}.${fracStr.slice(0, 6)}`;
 }
 
-/** PositionManagers to scan — on Base every hook shares the canonical
+/** PositionManagers to scan — on Arc every hook shares the canonical
  *  stack, so there is exactly one. */
 function distinctPositionManagers(chainId: SupportedChainId): `0x${string}`[] {
   return [getV4PositionManager(chainId)];

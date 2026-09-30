@@ -1,8 +1,8 @@
 /**
  * Token SVG icons — ported from prototype `src/shell.jsx` TOKEN_SVGS.
  * Inline so they render without extra requests; sized by `size` prop.
- * Token set matches Mantua's supported tokens on Base (see
- * `client/src/lib/tokens.ts`): ETH, cbBTC, USDC, EURC.
+ * Token set matches Mantua's supported tokens on Arc (see
+ * `client/src/lib/tokens.ts`): ETH, cirBTC, USDC, EURC.
  */
 
 interface IconProps {
@@ -32,7 +32,7 @@ const BTC_PATH =
 /**
  * Circle's signature broken ring — two white arcs with gaps at top and
  * bottom (the centered glyph reads through the gaps). Shared by the
- * USDC / EURC / cbBTC marks.
+ * USDC / EURC / cirBTC marks.
  */
 function CircleRing({ stroke = "#fff" }: { stroke?: string }) {
   return (
@@ -43,7 +43,7 @@ function CircleRing({ stroke = "#fff" }: { stroke?: string }) {
   );
 }
 
-/** cbBTC — royal-blue Bitcoin mark on white with a blue ring. */
+/** cirBTC — royal-blue Bitcoin mark on white with a blue ring. */
 export function CbBtcIcon({ size = 28 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32">
@@ -89,7 +89,7 @@ export function EurcIcon({ size = 28 }: IconProps) {
   );
 }
 
-export type AssetSymbol = "USDC" | "EURC" | "cbBTC";
+export type AssetSymbol = "USDC" | "EURC" | "cirBTC";
 
 export function AssetIcon({ symbol, size = 28 }: { symbol: AssetSymbol; size?: number }) {
   switch (symbol) {
@@ -97,7 +97,7 @@ export function AssetIcon({ symbol, size = 28 }: { symbol: AssetSymbol; size?: n
       return <UsdcIcon size={size} />;
     case "EURC":
       return <EurcIcon size={size} />;
-    case "cbBTC":
+    case "cirBTC":
       return <CbBtcIcon size={size} />;
   }
 }

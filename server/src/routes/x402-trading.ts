@@ -46,7 +46,7 @@ import { getX402ServiceDef, parseCommaList, type X402ServiceDef } from "../lib/x
  * asked "would this trade work", and "no, here's why" is the service
  * delivering, not an outage.
  *
- * Trading happens on Base (the settlement network); the request schema is
+ * Trading happens on Arc (the settlement network); the request schema is
  * the browser trade shape minus chainId (spec sketch: providerEventId,
  * outcomeIndex, direction, amountRaw, slippageBps).
  */
