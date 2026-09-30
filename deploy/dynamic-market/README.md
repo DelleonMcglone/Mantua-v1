@@ -187,26 +187,26 @@ to `0x103be191c9c6fed41d1efa950f4249b97ec33b27d0377d83af1491b82d25880c`
 (7,793 B), identical to the pinned solc 0.8.26 build and to the superseded
 Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 
-| Field                   | Value                                                                                                                                                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chain                   | Arc Mainnet                                                                                                                                                                                                                                 |
-| Chain ID                | `5042`                                                                                                                                                                                                                                      |
-| RPC                     | `https://rpc.mainnet.arc.io`                                                                                                                                                                                                                |
-| Explorer                | <https://explorer.arc.io> (Arcscan / Blockscout)                                                                                                                                                                                            |
-| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                                |
-| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                                |
-| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                                |
-| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                                |
-| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                                |
-| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                                |
-| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                                |
-| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                                |
-| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                                                |
-| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                            |
-| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                              |
-| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                      |
-| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                                |
-| Verification status     | Pending on Arcscan — its API sits behind a Cloudflare challenge that rejects both forge's `--verify` and `verify.sh` (HTTP 403); verify through the explorer's web form with the `verify.sh`-generated standard-JSON input (see note below) |
+| Field                   | Value                                                                                                                                                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain                   | Arc Mainnet                                                                                                                                                                                                                            |
+| Chain ID                | `5042`                                                                                                                                                                                                                                 |
+| RPC                     | `https://rpc.mainnet.arc.io`                                                                                                                                                                                                           |
+| Explorer                | <https://explorer.arc.io> (Arcscan / Blockscout)                                                                                                                                                                                       |
+| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                           |
+| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                           |
+| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                           |
+| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                           |
+| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                           |
+| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                           |
+| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                           |
+| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                           |
+| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                                           |
+| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                       |
+| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                         |
+| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                 |
+| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                           |
+| Verification status     | All 11 verified on Arcscan (2026-09-30) — exact matches on Sourcify (chain 5042) via `verify.sh`, which Arcscan imports; the hook (CREATE2, no creation tx indexed) was submitted through the explorer's web form. See the note below. |
 
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
@@ -220,15 +220,19 @@ Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 > `lib/v4-*/:solmate/=lib/solmate/` context one, drops the file from the
 > submitted sources, and the explorer reports `Source "lib/solmate/..." not found`.
 > `verify.sh` works around it: it completes forge's standard-JSON input with
-> `fix_std_json.py` and submits to Blockscout's standard-input endpoint. On
-> Arcscan (2026-09-30) that endpoint answers a Cloudflare challenge to any
-> non-browser client, so `verify.sh` saves the completed input to
-> `/tmp/<Name>.std-input.json` for the explorer's web form
-> (`https://explorer.arc.io/address/<addr>?tab=contract` → Verify & publish →
-> "Solidity (Standard JSON input)", compiler `v0.8.26+commit.8a97fa7a`, the
-> constructor args from the broadcast file). The completed inputs compile
-> locally with solc 0.8.26 and match the on-chain bytecode byte for byte,
-> metadata hash included.
+> `fix_std_json.py` and submits it to **Sourcify** (`sourcify.dev`, which
+> lists Arc Mainnet 5042); Arcscan imports a Sourcify match the next time
+> the contract page is opened. Arcscan's own API sits behind a Cloudflare
+> challenge that rejects any non-browser client, which is why the script
+> does not talk to it directly. Two things to know: the settlement
+> contracts (`^0.8.26` pragma) compile with the newest installed solc, so
+> pass `SOLC=0.8.35` when the artifact under `out/` is a different
+> version; and a CREATE2-deployed contract (the hook) has no creation
+> transaction Arcscan can index, so its Sourcify match is not auto-imported
+> — submit it through the explorer's web form ("Solidity (Standard JSON
+> input)", compiler `v0.8.26+commit.8a97fa7a`, the standard-JSON that
+> `verify.sh` saves to `/tmp/<Name>.std-input.json`). All 11 inputs match
+> the on-chain bytecode byte for byte, metadata hash included.
 
 ### Settlement layer
 
@@ -246,7 +250,7 @@ Arc Mainnet, blocks 23539320–23539321 (Resolver, MarketFactory,
 | Operator      | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                          |
 | Signer        | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                          |
 | On-chain      | `resolver.factory()` ↔ `factory.resolver()`, `factory.collateral()`, operator, signer |
-| Verification  | Pending on Arcscan (Cloudflare-gated API — web form, see the note above)              |
+| Verification  | Resolver ✅ MarketFactory ✅ (Sourcify exact match at solc 0.8.35 → Arcscan)          |
 
 **Opening markets** is a config change, not a deploy: set
 `MARKET_SIGNER_PRIVATE_KEY` in production to the operator's key
