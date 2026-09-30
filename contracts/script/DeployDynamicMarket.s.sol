@@ -11,7 +11,7 @@ import {MarketStateRegistry} from "../src/hooks/dynamic-market/MarketStateRegist
 import {IMarketStateRegistry} from "../src/hooks/dynamic-market/IMarketStateRegistry.sol";
 
 /// @title  DeployDynamicMarket
-/// @notice Deploys the Dynamic Market Hook stack to Base Mainnet (chain 8453):
+/// @notice Deploys the Dynamic Market Hook stack to Arc Mainnet (chain 5042):
 ///         a dedicated PoolManager, the MarketStateRegistry, and the hook itself
 ///         at a CREATE2 address whose low bits encode exactly the four
 ///         permissions. Spec §37, §38.
@@ -25,7 +25,7 @@ import {IMarketStateRegistry} from "../src/hooks/dynamic-market/IMarketStateRegi
 ///
 ///         Run (from contracts/):
 ///           forge script script/DeployDynamicMarket.s.sol \
-///             --rpc-url https://mainnet.base.org \
+///             --rpc-url https://rpc.mainnet.arc.io \
 ///             --broadcast --via-ir --optimizer-runs 200 \
 ///             --verify --etherscan-api-key "$BASESCAN_API_KEY"
 contract DeployDynamicMarket is Script {

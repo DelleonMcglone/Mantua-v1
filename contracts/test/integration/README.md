@@ -1,6 +1,6 @@
 # Hook integration tests (Phase 5 fork harness)
 
-Foundry-native integration tests that fork **Base Mainnet** (8453) and
+Foundry-native integration tests that fork **Arc Mainnet** (5042) and
 exercise each Mantua hook against the canonical
 `0x498581fF718922c3f8e6A244956aF099B2652b2b` Uniswap v4 PoolManager.
 
@@ -8,22 +8,22 @@ exercise each Mantua hook against the canonical
 
 ```bash
 # From repo root.
-# Optional: set BASE_RPC_URL in .env for a faster, non-rate-limited
-# endpoint. Otherwise the harness falls back to https://mainnet.base.org.
+# Optional: set ARC_RPC_URL in .env for a faster, non-rate-limited
+# endpoint. Otherwise the harness falls back to https://rpc.mainnet.arc.io.
 forge test --root contracts --match-path "test/integration/*.t.sol" -vv
 ```
 
 ## Pending-deployment gating
 
-Mantua's hooks have **no Base Mainnet deployment yet** — deploying them
+Mantua's hooks have **no Arc Mainnet deployment yet** — deploying them
 (after security sign-off) is the launch-gating step. The harness
 therefore reads hook addresses from env vars instead of checked-in
 constants:
 
-| Env var | Hook |
-|---|---|
+| Env var                          | Hook              |
+| -------------------------------- | ----------------- |
 | `STABLE_PROTECTION_HOOK_ADDRESS` | Stable Protection |
-| `DYNAMIC_FEE_HOOK_ADDRESS` | Dynamic Fee |
+| `DYNAMIC_FEE_HOOK_ADDRESS`       | Dynamic Fee       |
 
 While a var is unset, every test that needs that hook **skips** (via
 `_requireHook`). `HookBaseline.t.sol`'s PoolManager check runs
@@ -36,12 +36,12 @@ what the hook source declares (the foundry-native counterpart to
 
 ## Suites
 
-| File | Roadmap ID | Covers |
-|---|---|---|
-| `HookBaseline.t.sol` | P5-001 | Bytecode + permission-flag baseline |
-| `StableProtectionE2E.t.sol` | P5-006 | Stable Protection init + swap happy path |
-| `DynamicFeeE2E.t.sol` | P5-010 | DynamicFee configure + swap during TWAP warmup |
-| `FullLifecycleE2E.t.sol` | P9-002 | create → add → swap (both ways) → remove |
+| File                        | Roadmap ID | Covers                                         |
+| --------------------------- | ---------- | ---------------------------------------------- |
+| `HookBaseline.t.sol`        | P5-001     | Bytecode + permission-flag baseline            |
+| `StableProtectionE2E.t.sol` | P5-006     | Stable Protection init + swap happy path       |
+| `DynamicFeeE2E.t.sol`       | P5-010     | DynamicFee configure + swap during TWAP warmup |
+| `FullLifecycleE2E.t.sol`    | P9-002     | create → add → swap (both ways) → remove       |
 
 `FullLifecycleE2E.t.sol` walks the entire user-facing v2 flow — pool
 create → add liquidity → swap (both directions) → remove liquidity —
@@ -55,7 +55,7 @@ Wired into CI via `.github/workflows/contracts.yml`.
 
 ## Conventions
 
-- All integration tests inherit from `BaseFork`, which handles fork
+- All integration tests inherit from `ArcFork`, which handles fork
   setup and exposes the env-driven hook addresses + permission-flag
   constants.
 - Default fork is `latest` — no pinned block. Pin per-test with

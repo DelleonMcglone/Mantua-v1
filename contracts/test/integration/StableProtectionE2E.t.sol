@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {BaseFork} from "./BaseFork.t.sol";
+import {ArcFork} from "./ArcFork.t.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -28,7 +28,7 @@ import {MockERC20} from "solmate/test/utils/mocks/MockERC20.sol"; // resolved vi
  * The hook has no Base Mainnet deployment yet — until
  * `STABLE_PROTECTION_HOOK_ADDRESS` is set, every test here skips.
  */
-contract StableProtectionE2E is BaseFork {
+contract StableProtectionE2E is ArcFork {
     using PoolIdLibrary for PoolKey;
 
     uint160 internal constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
@@ -43,8 +43,8 @@ contract StableProtectionE2E is BaseFork {
         super.setUp();
         // Hook-dependent setup only runs once the mainnet deploy lands;
         // tests call _requireHook and skip until then.
-        if (STABLE_PROTECTION_HOOK == address(0)) return;
-        IPoolManager manager = IPoolManager(V4_POOL_MANAGER_BASE);
+        if (STABLE_PROTECTION_HOOK == address(0) || V4_POOL_MANAGER == address(0)) return;
+        IPoolManager manager = IPoolManager(V4_POOL_MANAGER);
         swapRouter = new PoolSwapTest(manager);
         liqRouter = new PoolModifyLiquidityTest(manager);
 
@@ -78,6 +78,7 @@ contract StableProtectionE2E is BaseFork {
 
     function test_pegHealthy_swapApplied() public {
         _requireHook(STABLE_PROTECTION_HOOK);
+        _requirePoolManager();
         uint256 balanceBefore = eurcMock.balanceOf(address(this));
         swapRouter.swap(
             poolKey,

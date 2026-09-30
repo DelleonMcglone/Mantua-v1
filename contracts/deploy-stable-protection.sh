@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Stable Protection deploy wrapper — Base Mainnet (8453)
+# Stable Protection deploy wrapper — Arc Mainnet (5042)
 #
 # What this does:
 #   - Verifies clean git tree, required env vars, deployer wallet balance
@@ -19,7 +19,7 @@
 
 set -euo pipefail
 
-MIN_BALANCE_WEI=5000000000000000  # 0.005 ETH — enough for hook deploy + verify
+MIN_BALANCE_WEI=5000000000000000  # 0.005 USDC (18-dp native) — enough for hook deploy + verify
 
 # ── Pre-flight ────────────────────────────────────────────────────────
 
@@ -30,12 +30,12 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
 fi
 
 echo "→ Verifying env vars are set..."
-: "${BASE_RPC_URL:?Set BASE_RPC_URL in your shell (e.g. https://mainnet.base.org)}"
+: "${ARC_RPC_URL:?Set ARC_RPC_URL in your shell (e.g. https://rpc.mainnet.arc.io)}"
 : "${PRIVATE_KEY:?Set PRIVATE_KEY in your shell (dedicated deployer key — this broadcasts on MAINNET)}"
-: "${BASESCAN_API_KEY:?Set BASESCAN_API_KEY for source verification}"
+# Arcscan is Blockscout: source verification needs no API key.
 # The mined CREATE2 address depends on the initcode (PoolManager + owner args).
 # Get it from a dry run first:
-#   cd contracts && forge script script/DeployStableProtection.s.sol --rpc-url base
+#   cd contracts && forge script script/DeployStableProtection.s.sol --rpc-url arc
 # then export the printed "Mined hook address" before broadcasting.
 : "${STABLE_PROTECTION_EXPECTED_ADDRESS:?Set STABLE_PROTECTION_EXPECTED_ADDRESS (mined address from a dry run)}"
 
@@ -44,17 +44,17 @@ EXPECTED_ADDRESS="$STABLE_PROTECTION_EXPECTED_ADDRESS"
 # Strip leading 0x if present, since cast wallet expects hex without prefix
 PRIVATE_KEY_HEX="${PRIVATE_KEY#0x}"
 
-echo "→ Confirming deployer wallet has Base ETH..."
+echo "→ Confirming deployer wallet has USDC on Arc (its gas token)..."
 DEPLOYER=$(cast wallet address --private-key "0x${PRIVATE_KEY_HEX}")
-BALANCE=$(cast balance "$DEPLOYER" --rpc-url "$BASE_RPC_URL")
+BALANCE=$(cast balance "$DEPLOYER" --rpc-url "$ARC_RPC_URL")
 BALANCE_ETH=$(cast --to-unit "$BALANCE" ether)
 echo "  Deployer: $DEPLOYER"
-echo "  Balance:  $BALANCE_ETH ETH"
+echo "  Balance:  $BALANCE_ETH USDC"
 
 if [ "$(echo "$BALANCE < $MIN_BALANCE_WEI" | bc 2>/dev/null || echo 0)" = "1" ]; then
   echo ""
-  echo "ERROR: deployer has < 0.005 ETH (not enough for hook deploy + verify)."
-  echo "Bridge or transfer ETH to the deployer address on Base Mainnet first."
+  echo "ERROR: deployer has < 0.005 USDC (not enough for hook deploy + verify)."
+  echo "Send USDC to the deployer address on Arc Mainnet first (gas is paid in USDC)."
   exit 1
 fi
 
@@ -62,14 +62,14 @@ fi
 
 echo ""
 echo "═══════════════════════════════════════════════════════════════════"
-echo "ABOUT TO BROADCAST DEPLOYMENT TO BASE MAINNET (chain 8453)"
+echo "ABOUT TO BROADCAST DEPLOYMENT TO ARC MAINNET (chain 5042)"
 echo "═══════════════════════════════════════════════════════════════════"
 echo "  Deployer:           $DEPLOYER"
 echo "  Expected address:   $EXPECTED_ADDRESS"
-echo "  Available balance:  $BALANCE_ETH ETH"
+echo "  Available balance:  $BALANCE_ETH USDC"
 echo "  Source verify:      yes (--verify flag)"
 echo ""
-echo "  This will spend REAL ETH and put a contract on Base Mainnet."
+echo "  This will spend REAL USDC (Arc gas) and put a contract on Arc Mainnet."
 echo "  The deploy script enforces address == mined-address via require()."
 echo "  Confirm security sign-off (docs/security/sign-off.md) is complete."
 echo "═══════════════════════════════════════════════════════════════════"
@@ -86,11 +86,11 @@ echo ""
 echo "→ Broadcasting deployment..."
 cd contracts
 forge script script/DeployStableProtection.s.sol \
-  --rpc-url "$BASE_RPC_URL" \
+  --rpc-url "$ARC_RPC_URL" \
   --private-key "0x${PRIVATE_KEY_HEX}" \
   --broadcast \
   --verify \
-  --etherscan-api-key "$BASESCAN_API_KEY" \
+  --verifier blockscout --verifier-url https://explorer.arc.io/api \
   -vvvv
 cd ..
 
@@ -98,7 +98,7 @@ cd ..
 
 echo ""
 echo "→ Confirming bytecode is present at expected address..."
-DEPLOYED_CODE=$(cast code "$EXPECTED_ADDRESS" --rpc-url "$BASE_RPC_URL")
+DEPLOYED_CODE=$(cast code "$EXPECTED_ADDRESS" --rpc-url "$ARC_RPC_URL")
 
 if [ "$DEPLOYED_CODE" = "0x" ] || [ -z "$DEPLOYED_CODE" ]; then
   echo ""
@@ -127,12 +127,12 @@ echo "════════════════════════�
 echo "DEPLOYMENT COMPLETE"
 echo "═══════════════════════════════════════════════════════════════════"
 echo "  Address:   $EXPECTED_ADDRESS"
-echo "  BaseScan:  https://basescan.org/address/$EXPECTED_ADDRESS"
+echo "  Arcscan:   https://explorer.arc.io/address/$EXPECTED_ADDRESS"
 echo ""
 echo "Next steps:"
-echo "  1. Verify BaseScan source is verified (green checkmark on the page)."
+echo "  1. Verify Arcscan source is verified (green checkmark on the page)."
 echo "     If --verify failed, run: forge verify-contract $EXPECTED_ADDRESS"
-echo "     <ContractName> --chain-id 8453 --etherscan-api-key \$BASESCAN_API_KEY"
+echo "     <ContractName> --chain-id 5042 --verifier blockscout --verifier-url https://explorer.arc.io/api"
 echo "  2. Set STABLE_PROTECTION_HOOK_ADDRESS in the server env and record"
 echo "     the address in docs/security/hook-deployments.md via verify:hooks."
 echo "  3. Send the deployed address, tx hash, and verify:hooks bytecode"

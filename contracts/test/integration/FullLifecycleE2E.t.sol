@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {BaseFork} from "./BaseFork.t.sol";
+import {ArcFork} from "./ArcFork.t.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -23,23 +23,23 @@ import {MockERC20} from "solmate/test/utils/mocks/MockERC20.sol";
  * but none walk the user through the whole flow the v2 client puts in
  * front of them.
  *
- * The test forks Base Mainnet, deploys two mock 6-decimal stablecoins
+ * The test forks Arc Mainnet, deploys two mock 6-decimal stablecoins
  * (so we don't dirty the canonical USDC/EURC pools), initializes a
  * Stable Protection pool against the live hook, adds liquidity, swaps
  * in both directions, removes a portion of the liquidity, and asserts
  * the bookkeeping at each step.
  *
- * The hook has no Base Mainnet deployment yet — until
+ * The hook has no Arc Mainnet deployment yet — until
  * `STABLE_PROTECTION_HOOK_ADDRESS` is set, every test here skips.
  *
  * Run from `contracts/`:
  *   forge test --match-path "test/integration/FullLifecycleE2E.t.sol" -vv
  *
  * Or, with a pinned RPC, from repo root:
- *   BASE_RPC_URL=https://mainnet.base.org \
+ *   ARC_RPC_URL=https://rpc.mainnet.arc.io \
  *     forge test --match-path "test/integration/FullLifecycleE2E.t.sol" -vv
  */
-contract FullLifecycleE2E is BaseFork {
+contract FullLifecycleE2E is ArcFork {
     using PoolIdLibrary for PoolKey;
 
     // sqrt(1) * 2^96 — initial price for an even-decimal stable pair.
@@ -61,8 +61,8 @@ contract FullLifecycleE2E is BaseFork {
         super.setUp();
         // Hook-dependent setup only runs once the mainnet deploy lands;
         // tests call _requireHook and skip until then.
-        if (STABLE_PROTECTION_HOOK == address(0)) return;
-        IPoolManager manager = IPoolManager(V4_POOL_MANAGER_BASE);
+        if (STABLE_PROTECTION_HOOK == address(0) || V4_POOL_MANAGER == address(0)) return;
+        IPoolManager manager = IPoolManager(V4_POOL_MANAGER);
         swapRouter = new PoolSwapTest(manager);
         liqRouter = new PoolModifyLiquidityTest(manager);
 
@@ -99,7 +99,8 @@ contract FullLifecycleE2E is BaseFork {
      */
     function test_fullLifecycle_createAddSwapRemove() public {
         _requireHook(STABLE_PROTECTION_HOOK);
-        IPoolManager manager = IPoolManager(V4_POOL_MANAGER_BASE);
+        _requirePoolManager();
+        IPoolManager manager = IPoolManager(V4_POOL_MANAGER);
 
         // ── Stage 1: create the pool. Mirrors PoolCreateForm submit. ──
         manager.initialize(poolKey, SQRT_PRICE_1_1);
@@ -193,7 +194,8 @@ contract FullLifecycleE2E is BaseFork {
      */
     function test_fullLifecycle_repeatAddSwapRemove() public {
         _requireHook(STABLE_PROTECTION_HOOK);
-        IPoolManager manager = IPoolManager(V4_POOL_MANAGER_BASE);
+        _requirePoolManager();
+        IPoolManager manager = IPoolManager(V4_POOL_MANAGER);
         manager.initialize(poolKey, SQRT_PRICE_1_1);
 
         for (uint256 cycle = 0; cycle < 2; cycle++) {

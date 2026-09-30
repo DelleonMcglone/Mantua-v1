@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {BaseFork} from "./BaseFork.t.sol";
+import {ArcFork} from "./ArcFork.t.sol";
 
 /**
  * On-chain baseline: each Mantua hook's bytecode is deployed at its
- * configured Base Mainnet address and its CREATE2-encoded permission
+ * configured Arc Mainnet address and its CREATE2-encoded permission
  * flags match what the hook source declares.
  *
  * This is the foundry-native counterpart to `npm run verify:hooks`
@@ -17,7 +17,7 @@ import {BaseFork} from "./BaseFork.t.sol";
  * deployment is pending, the per-hook checks skip and only the canonical
  * PoolManager check runs.
  */
-contract HookBaseline is BaseFork {
+contract HookBaseline is ArcFork {
     function test_StableProtection_deployed() public {
         _requireHook(STABLE_PROTECTION_HOOK);
         assertGt(STABLE_PROTECTION_HOOK.code.length, 0, "StableProtectionHook not deployed");
@@ -38,9 +38,8 @@ contract HookBaseline is BaseFork {
         );
     }
 
-    function test_PoolManager_deployed() public view {
-        assertGt(
-            V4_POOL_MANAGER_BASE.code.length, 0, "Uniswap v4 PoolManager not deployed at expected address"
-        );
+    function test_PoolManager_deployed() public {
+        _requirePoolManager();
+        assertGt(V4_POOL_MANAGER.code.length, 0, "Mantua PoolManager not deployed at POOL_MANAGER");
     }
 }

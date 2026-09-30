@@ -4,20 +4,20 @@ pragma solidity ^0.8.27;
 import {Test} from "forge-std/Test.sol";
 
 /**
- * Base Mainnet fork harness — shared setUp and on-chain addresses for
+ * Arc Mainnet fork harness — shared setUp and on-chain addresses for
  * every integration test in this directory.
  *
- * Tests fork live Base Mainnet (8453) at `latest` (no pinned block) so
+ * Tests fork live Arc Mainnet (5042) at `latest` (no pinned block) so
  * a freshly-deployed hook shows up immediately. Pinning a block is
  * appropriate for tests that depend on exact pool state — add
  * `vm.createSelectFork(rpc, BLOCK)` overrides per-test as needed.
  *
  * RPC source priority:
- *   1. `BASE_RPC_URL` env var (set in `.env` or CI secrets)
- *   2. Public endpoint `https://mainnet.base.org` (rate-limited; OK for
+ *   1. `ARC_RPC_URL` env var (set in `.env` or CI secrets)
+ *   2. Public endpoint `https://rpc.mainnet.arc.io` (rate-limited; OK for
  *      bytecode/permission-flag checks; not great for high-fanout reads)
  *
- * Mantua's hooks have no Base Mainnet deployment yet, so their addresses
+ * Mantua's hooks have no Arc Mainnet deployment yet, so their addresses
  * come from env vars rather than checked-in constants:
  *   `STABLE_PROTECTION_HOOK_ADDRESS`, `DYNAMIC_FEE_HOOK_ADDRESS`
  * Tests that need a hook call `_requireHook(...)` and skip cleanly while
@@ -27,12 +27,14 @@ import {Test} from "forge-std/Test.sol";
  * Run from repo root:
  *   forge test --match-path "contracts/test/integration/*.t.sol" -vv
  */
-abstract contract BaseFork is Test {
-    uint256 internal constant BASE_CHAIN_ID = 8453;
+abstract contract ArcFork is Test {
+    uint256 internal constant ARC_CHAIN_ID = 5042;
 
-    /// Canonical Uniswap v4 PoolManager on Base Mainnet
-    /// (developers.uniswap.org/contracts/v4/deployments).
-    address internal constant V4_POOL_MANAGER_BASE = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
+    /// Arc has NO canonical Uniswap v4 PoolManager (checked 2026-09-29 against
+    /// docs.arc.io/arc/references/contract-addresses). The only v4 stack on
+    /// Arc is Mantua's own, deployed by DeployDynamicMarket.s.sol — read from
+    /// the `POOL_MANAGER` env var, address(0) until that deploy lands.
+    address internal V4_POOL_MANAGER;
 
     /// Mantua hook addresses — env-driven, address(0) until deployed.
     address internal STABLE_PROTECTION_HOOK;
@@ -47,16 +49,17 @@ abstract contract BaseFork is Test {
     function setUp() public virtual {
         string memory rpc = _resolveRpc();
         vm.createSelectFork(rpc);
-        require(block.chainid == BASE_CHAIN_ID, "fork: not Base Mainnet");
+        require(block.chainid == ARC_CHAIN_ID, "fork: not Arc Mainnet");
+        V4_POOL_MANAGER = _envHook("POOL_MANAGER");
         STABLE_PROTECTION_HOOK = _envHook("STABLE_PROTECTION_HOOK_ADDRESS");
         DYNAMIC_FEE_HOOK = _envHook("DYNAMIC_FEE_HOOK_ADDRESS");
     }
 
     function _resolveRpc() internal returns (string memory) {
-        try vm.envString("BASE_RPC_URL") returns (string memory url) {
+        try vm.envString("ARC_RPC_URL") returns (string memory url) {
             if (bytes(url).length > 0) return url;
         } catch {}
-        return "https://mainnet.base.org";
+        return "https://rpc.mainnet.arc.io";
     }
 
     /// Reads a hook address from the env; address(0) means "not deployed yet".
@@ -67,9 +70,15 @@ abstract contract BaseFork is Test {
         return address(0);
     }
 
-    /// Skips the calling test while the hook's mainnet deployment is pending.
+    /// Skips the calling test while the hook's Arc deployment is pending.
     function _requireHook(address hook) internal {
         if (hook == address(0)) vm.skip(true);
+    }
+
+    /// Skips the calling test until Mantua's PoolManager is deployed on Arc
+    /// and named in `POOL_MANAGER`.
+    function _requirePoolManager() internal {
+        if (V4_POOL_MANAGER == address(0)) vm.skip(true);
     }
 
     function _hookFlags(address hook) internal pure returns (uint16) {
