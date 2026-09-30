@@ -48,6 +48,16 @@ const paywall = seller
       // scheme server handles payment-requirement construction locally.
       undefined,
       [{ network: X402_NETWORK, server: new ExactEvmScheme() }],
+      undefined,
+      undefined,
+      // syncFacilitatorOnStart = false: with it on, @x402/express kicks off
+      // `httpServer.initialize()` as a floating promise at construction —
+      // i.e. at module load — and the facilitator's "does not support
+      // scheme exact on eip155:5042" answer surfaces as an UNHANDLED
+      // REJECTION on every cold start (seen in production logs). Deferred,
+      // the same condition is raised on the first paid request instead,
+      // where the typed X402_NETWORK_UNSUPPORTED gate below catches it.
+      false,
     )
   : null;
 

@@ -40,13 +40,17 @@ const BASE_NETWORK = "eip155:5042";
 // the ephemeral test server included) through to the real fetch.
 const realFetch = globalThis.fetch;
 const facilitatorHits: string[] = [];
+/** What the stubbed facilitator claims to support. The boot-hygiene case
+ *  flips it to a network the route does not sell on — which is what the
+ *  real x402.org answers for eip155:5042 today. */
+let facilitatorNetwork: string = BASE_NETWORK;
 globalThis.fetch = (input, init): Promise<Response> => {
   const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
   if (url.includes("x402.org")) {
     facilitatorHits.push(url);
     return Promise.resolve(
       Response.json({
-        kinds: [{ x402Version: 2, scheme: "exact", network: BASE_NETWORK }],
+        kinds: [{ x402Version: 2, scheme: "exact", network: facilitatorNetwork }],
         extensions: [],
         signers: {},
       }),
@@ -114,5 +118,29 @@ void describe("x402 seller — /api/x402/analyst-brief", () => {
     const origin = await serve(await loadRouter("enabled-other-path"));
     const res = await realFetch(`${origin}/api/health-not-here`);
     assert.equal(res.status, 404, "the router only owns the brief path");
+  });
+});
+
+void describe("x402 seller — boot hygiene", () => {
+  void it("constructing the paywall with a seller configured raises no unhandled rejection", async () => {
+    // @x402/express starts the facilitator sync as a floating promise at
+    // construction unless told not to; on eip155:5042 that promise rejects
+    // ("does not support scheme exact"), which surfaced as an unhandled
+    // rejection on every production cold start. The route defers the sync.
+    const rejections: unknown[] = [];
+    const onRejection = (reason: unknown): void => {
+      rejections.push(reason);
+    };
+    process.on("unhandledRejection", onRejection);
+    facilitatorNetwork = "eip155:8453"; // the facilitator does NOT list Arc
+    e.X402_SELLER_ADDRESS = SELLER;
+    try {
+      await loadRouter("boot-hygiene");
+      await new Promise((r) => setTimeout(r, 250));
+    } finally {
+      process.off("unhandledRejection", onRejection);
+      facilitatorNetwork = BASE_NETWORK;
+    }
+    assert.deepEqual(rejections, []);
   });
 });
