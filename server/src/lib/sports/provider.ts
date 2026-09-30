@@ -222,8 +222,11 @@ export interface SportsDataProvider {
   /** Leagues this adapter can serve. */
   readonly leagues: readonly LeagueSlug[];
 
-  /** Today's slate for a league. */
-  getSlate(league: LeagueSlug): Promise<ProviderSlate>;
+  /** Today's slate for a league. `dates` (YYYYMMDD-YYYYMMDD, validated by
+   *  the caller) asks for a past window instead — a backfill capability
+   *  ESPN honours; adapters that cannot window ignore it and serve their
+   *  current slate. */
+  getSlate(league: LeagueSlug, dates?: string): Promise<ProviderSlate>;
 
   /**
    * One event by the provider's id, for live polling and final capture.

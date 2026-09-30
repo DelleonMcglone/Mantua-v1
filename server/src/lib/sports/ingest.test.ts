@@ -163,11 +163,14 @@ void describe("decideSettlement (B3-005 final capture)", () => {
 });
 
 void describe("refreshSlate (B3-005)", () => {
+  /** The `dates` window each stub received — the R-012 backfill passthrough. */
+  const datesSeen: (string | undefined)[] = [];
   function stubProvider(slate: Partial<ProviderSlate>): SportsDataProvider {
     return {
       name: "stub",
       leagues: ["nfl"],
-      getSlate: (league: LeagueSlug) =>
+      getSlate: (league: LeagueSlug, dates?: string) => (
+        datesSeen.push(dates),
         Promise.resolve({
           provider: "stub",
           league,
@@ -175,10 +178,18 @@ void describe("refreshSlate (B3-005)", () => {
           delayed: false,
           fetchedAt: Date.now(),
           ...slate,
-        }),
+        })
+      ),
       getEvent: () => Promise.resolve(null),
     };
   }
+
+  void it("passes a backfill window through to the provider, and nothing when absent", async () => {
+    datesSeen.length = 0;
+    await refreshSlate(stubProvider({}), "nfl", NOW);
+    await refreshSlate(stubProvider({}), "nfl", NOW, undefined, "20260924-20260929");
+    assert.deepEqual(datesSeen, [undefined, "20260924-20260929"]);
+  });
 
   void it("reads the slate and plans its markets", async () => {
     const result = await refreshSlate(stubProvider({}), "nfl", NOW);

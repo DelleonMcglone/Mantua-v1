@@ -15,6 +15,7 @@ import { platformStatusReader } from "./platform-status.ts";
 import { pushDeps } from "../lib/push/push-store.ts";
 import { eventStatuses } from "../lib/push/live-alerts-db.ts";
 import { runGameEventAlerts, runPositionAlerts } from "../lib/push/live-alerts-run.ts";
+import { parseDates } from "./sports-slate.ts";
 
 export const cronLiveSyncRouter = Router();
 
@@ -41,7 +42,16 @@ const LEAGUES: readonly LeagueSlug[] = ["nfl"];
 cronLiveSyncRouter.get(
   "/api/cron/live-sync",
   requireCronSecret,
-  async (_req: Request, res: Response) => {
+  async (req: Request, res: Response) => {
+    // R-012 follow-up — `?dates=YYYYMMDD-YYYYMMDD` re-ingests a PAST window
+    // (ESPN honours it) so games whose finals were missed while the feed
+    // was dark get their status and scores captured: a status backfill,
+    // no settlement (that is cron-resolution's job and needs the signer).
+    const dates = parseDates(req.query.dates);
+    if (dates !== null && typeof dates === "object") {
+      res.status(400).json({ error: dates.error, code: "BAD_DATES" });
+      return;
+    }
     const results: Record<string, unknown> = {};
     let failures = 0;
     const nowSeconds = Math.floor(Date.now() / 1000);
@@ -56,7 +66,13 @@ cronLiveSyncRouter.get(
           served: provider,
           refresh,
           skipped,
-        } = await refreshSlateWithFallback(liveProviderChainFor(league), league, nowSeconds);
+        } = await refreshSlateWithFallback(
+          liveProviderChainFor(league),
+          league,
+          nowSeconds,
+          undefined,
+          dates ?? undefined,
+        );
         // Task 071 (MX-004) — statuses before the write, so a kickoff or a
         // final is a transition this tick observed, not a re-read.
         const before = await eventStatuses(
@@ -81,6 +97,7 @@ cronLiveSyncRouter.get(
         results[league] = {
           provider: refresh.provider,
           skippedProviders: skipped,
+          ...(dates ? { backfillWindow: dates } : {}),
           delayed: refresh.delayed,
           events: persisted,
           playByPlay,
