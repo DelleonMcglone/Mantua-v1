@@ -41,7 +41,7 @@ const provider = {
   request: ({ method }: { method: string; params?: unknown }): Promise<unknown> => {
     switch (method) {
       case "eth_chainId":
-        return Promise.resolve("0x2105");
+        return Promise.resolve("0x13b2");
       case "eth_accounts":
       case "eth_requestAccounts":
         return Promise.resolve([E2E_ADDRESS]);

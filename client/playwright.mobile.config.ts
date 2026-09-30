@@ -47,7 +47,7 @@ export default defineConfig({
       VITE_E2E_AUTH: "shim",
       VITE_PRIVY_APP_ID: "e2e-shim",
       VITE_API_BASE_URL: "",
-      VITE_BASE_RPC_URL: "http://localhost:4173/__e2e/rpc",
+      VITE_ARC_RPC_URL: "http://localhost:4173/__e2e/rpc",
       VITE_GASLESS_ENABLED: "",
     },
   },

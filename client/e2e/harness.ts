@@ -124,6 +124,23 @@ export async function signIn(page: Page): Promise<void> {
  *  calls it, and because a future gate in front of `/` should only need
  *  to change here. */
 export async function launchApp(page: Page): Promise<void> {
+  // `E2E_DEBUG=1` echoes the page console and every failed request, which is
+  // what tells a hung phase apart from a wrong expectation.
+  if (process.env["E2E_DEBUG"]) {
+    page.on("console", (m) => {
+      console.log(`[page:${m.type()}] ${m.text()}`);
+    });
+    page.on("pageerror", (e) => {
+      console.log(`[pageerror] ${e.message}`);
+    });
+    page.on("response", (r) => {
+      if (r.status() >= 400)
+        console.log(`[response:${String(r.status())}] ${r.request().method()} ${r.url()}`);
+    });
+    page.on("requestfailed", (r) => {
+      console.log(`[requestfailed] ${r.method()} ${r.url()} ${r.failure()?.errorText ?? ""}`);
+    });
+  }
   await page.goto("/");
 }
 

@@ -63,7 +63,7 @@ export function answer(req: RpcRequest): {
   const ok = (result: unknown) => ({ id: req.id, jsonrpc: "2.0" as const, result });
   switch (req.method) {
     case "eth_chainId":
-      return ok("0x2105");
+      return ok("0x13b2");
     case "eth_blockNumber":
       return ok("0x101");
     case "eth_gasPrice":
