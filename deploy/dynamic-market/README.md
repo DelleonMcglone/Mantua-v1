@@ -6,10 +6,11 @@ Deploys the Dynamic Market Hook stack: a dedicated Uniswap v4 `PoolManager`, the
 **Spec:** [`docs/specs/dynamic-market-hook.md`](../../docs/specs/dynamic-market-hook.md)
 §37–§42.
 **Task:** B2-005.
-**Status: Arc Mainnet (5042) deployment pending — the launch chain moved
-to Arc on 2026-09-29 (B-005).** The 2026-09-23 Base Mainnet deployment
-recorded below is **superseded** and no longer registered in the server;
-it stays as the reference run. Arc pre-checks passed 2026-09-29: transient
+**Status: deployed on Arc Mainnet (5042) 2026-09-30 — see the
+[Deployment record](#deployment-record).** The launch chain moved to Arc on
+2026-09-29 (B-005); the 2026-09-23 Base Mainnet run is **superseded** (same
+deployer, same nonces and salt, so the same addresses — but the Base
+contracts are no longer registered anywhere). Arc pre-checks passed 2026-09-29: transient
 storage works (tested live), the CREATE2 factory and Permit2 are present,
 there is no canonical Uniswap v4 on Arc (this stack brings its own
 `PoolManager`), gas is ~20 gwei paid in USDC (whole stack under $1), and
@@ -165,7 +166,7 @@ simulates against the right address.
 
 `--via-ir --optimizer-runs 200` matches the rest of the repo (spec §39).
 Arcscan (Blockscout) verification needs no API key (spec §40; the
-`[etherscan] base` entry in `contracts/foundry.toml` covers chain 8453).
+`[etherscan] arc` entry in `contracts/foundry.toml` covers chain 5042).
 
 The script asserts the mined address matches the deployed one and that the
 permission bits equal `0x28C0`, so a bad deploy fails in the transaction rather
@@ -175,33 +176,37 @@ than at the first pool initialize.
 
 ## Deployment record
 
-Deployed 2026-09-23 18:40 UTC, blocks 51699745–51699746, total gas
-6,170,342 (0.0000349 ETH at 0.00566 gwei). Periphery 20:22 UTC, block
-51702795, gas 13,539,743 (0.0000756 ETH). Filled in from the script logs and on-chain probes (`hook.poolManager()`,
-`hook.registry()`, code sizes) — trust the script's own logs over
-Foundry's receipt banner, whose contract labels have been observed
-scrambled.
+**Arc Mainnet.** Hook stack deployed 2026-09-30 12:23 UTC, block 23538167,
+gas 6,170,342 (0.1234 USDC at 20 gwei). Periphery 12:27 UTC, blocks
+23538534–23538535, gas 13,539,743 (0.2708 USDC). Filled in from the
+script logs and on-chain probes (`hook.poolManager()`, `hook.registry()`,
+every periphery contract's `poolManager()`/`manager()`, code sizes) —
+trust the script's own logs over Foundry's receipt banner, whose contract
+labels have been observed scrambled. The hook's on-chain bytecode hashes
+to `0x103be191c9c6fed41d1efa950f4249b97ec33b27d0377d83af1491b82d25880c`
+(7,793 B), identical to the pinned solc 0.8.26 build and to the superseded
+Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 
-| Field                   | Value                                                                                                                                                                                                          |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chain                   | Base Mainnet                                                                                                                                                                                                   |
-| Chain ID                | `8453`                                                                                                                                                                                                         |
-| RPC                     | `https://mainnet.base.org`                                                                                                                                                                                     |
-| Explorer                | <https://basescan.org>                                                                                                                                                                                         |
-| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                   |
-| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                   |
-| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                   |
-| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                   |
-| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                   |
-| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                   |
-| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                   |
-| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                   |
-| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                   |
-| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                               |
-| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                 |
-| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                         |
-| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                   |
-| Verification status     | All 10 verified on BaseScan (2026-09-23): periphery except PositionManager by the deploy's `--verify`; PoolManager, registry, hook, and PositionManager via `deploy/dynamic-market/verify.sh` (see note below) |
+| Field                   | Value                                                                                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain                   | Arc Mainnet                                                                                                                                                                                                                                 |
+| Chain ID                | `5042`                                                                                                                                                                                                                                      |
+| RPC                     | `https://rpc.mainnet.arc.io`                                                                                                                                                                                                                |
+| Explorer                | <https://explorer.arc.io> (Arcscan / Blockscout)                                                                                                                                                                                            |
+| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                                |
+| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                                |
+| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                                |
+| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                                |
+| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                                |
+| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                                |
+| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                                |
+| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                                |
+| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                                                |
+| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                            |
+| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                              |
+| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                      |
+| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                                |
+| Verification status     | Pending on Arcscan — its API sits behind a Cloudflare challenge that rejects both forge's `--verify` and `verify.sh` (HTTP 403); verify through the explorer's web form with the `verify.sh`-generated standard-JSON input (see note below) |
 
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
@@ -213,33 +218,41 @@ scrambled.
 > solmate through v4-core/v4-periphery: forge resolves the import with the
 > global `solmate/=lib/solmate/src/` remapping instead of the
 > `lib/v4-*/:solmate/=lib/solmate/` context one, drops the file from the
-> submitted sources, and BaseScan reports `Source "lib/solmate/..." not found`.
+> submitted sources, and the explorer reports `Source "lib/solmate/..." not found`.
 > `verify.sh` works around it: it completes forge's standard-JSON input with
-> `fix_std_json.py` and submits to the Etherscan V2 API directly. The completed
-> inputs were compiled locally with solc 0.8.26 and match the on-chain
-> bytecode byte for byte, metadata hash included.
+> `fix_std_json.py` and submits to Blockscout's standard-input endpoint. On
+> Arcscan (2026-09-30) that endpoint answers a Cloudflare challenge to any
+> non-browser client, so `verify.sh` saves the completed input to
+> `/tmp/<Name>.std-input.json` for the explorer's web form
+> (`https://explorer.arc.io/address/<addr>?tab=contract` → Verify & publish →
+> "Solidity (Standard JSON input)", compiler `v0.8.26+commit.8a97fa7a`, the
+> constructor args from the broadcast file). The completed inputs compile
+> locally with solc 0.8.26 and match the on-chain bytecode byte for byte,
+> metadata hash included.
 
 ### Settlement layer
 
-`contracts/script/DeployMarkets.s.sol`, broadcast 2026-09-23 21:15 UTC,
-block 51704405 (Resolver, MarketFactory, `resolver.setFactory` in one
-broadcast; 0.0000186 ETH). Compiled with solc 0.8.35.
+`contracts/script/DeployMarkets.s.sol`, broadcast 2026-09-30 12:31 UTC on
+Arc Mainnet, blocks 23539320–23539321 (Resolver, MarketFactory,
+`resolver.setFactory` in one broadcast; gas 3,105,548 = 0.0621 USDC at
+20 gwei). Compiled with solc 0.8.35. The superseded Base run of 2026-09-23
+(block 51704405) landed at the same addresses.
 
-| Field         | Value                                                             |
-| ------------- | ----------------------------------------------------------------- |
-| Resolver      | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                      |
-| MarketFactory | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                      |
-| Collateral    | USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`                 |
-| Operator      | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                      |
-| Signer        | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                      |
-| On-chain      | `resolver.factory()` ↔ `factory.resolver()`, roles and collateral |
-| Verification  | MarketFactory ✅; Resolver retried by hand (BaseScan lag)         |
+| Field         | Value                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------- |
+| Resolver      | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                                          |
+| MarketFactory | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                                          |
+| Collateral    | USDC `0x3600000000000000000000000000000000000000` (6-decimal view of Arc's gas token) |
+| Operator      | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                          |
+| Signer        | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                          |
+| On-chain      | `resolver.factory()` ↔ `factory.resolver()`, `factory.collateral()`, operator, signer |
+| Verification  | Pending on Arcscan (Cloudflare-gated API — web form, see the note above)              |
 
 **Opening markets** is a config change, not a deploy: set
 `MARKET_SIGNER_PRIVATE_KEY` in production to the operator's key
 (`0x4EF8…12C3` — `marketSignerWallet` refuses any other) and fund it with
-USDC for seeding (`MARKET_SEED_USDC` per market, default 10 USDC) plus ETH
-for gas. The next sync-cron run creates, registers, initializes, and seeds.
+USDC for seeding (`MARKET_SEED_USDC` per market, default 10 USDC); on Arc
+the same USDC balance pays gas. The next sync-cron run creates, registers, initializes, and seeds.
 
 ---
 

@@ -2,32 +2,33 @@
 
 ## Arc Mainnet (5042) — current target
 
-**Status: no Mantua hook is deployed on Arc yet.** The launch chain moved to
-Arc on 2026-09-29 (B-005); the Base Mainnet rows below are superseded.
-
-## Base Mainnet (8453) — superseded 2026-09-29
-
-**Status: `DynamicMarketHook` was deployed 2026-09-23** on its own PoolManager
+**Status: `DynamicMarketHook` was deployed 2026-09-30** on its own PoolManager
 (`0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`; full stack in
 [`deploy/dynamic-market/README.md`](../../deploy/dynamic-market/README.md#deployment-record)).
-`StableProtectionHook` and `DynamicFee` are not deployed yet.
-Until a hook is deployed and wired, its address resolves to `null` (env-overridable via
+`StableProtectionHook` and `DynamicFee` are not deployed yet. Until a hook is
+deployed and wired, its address resolves to `null` (env-overridable via
 `STABLE_PROTECTION_HOOK_ADDRESS` / `DYNAMIC_FEE_HOOK_ADDRESS`) and the app
-degrades gracefully. Mainnet launch checklist:
+degrades gracefully. Launch checklist for the remaining hooks:
 
-1. Deploy `StableProtectionHook`, `DynamicFee`, and `DynamicMarketHook` against
-   Mantua's own Uniswap v4 PoolManager on Arc (there is no canonical v4 there; PoolManager
-   `0x498581fF718922c3f8e6A244956aF099B2652b2b`).
+1. Deploy `StableProtectionHook` and `DynamicFee` against Mantua's own
+   Uniswap v4 PoolManager on Arc (there is no canonical v4 there).
 2. Verify each deployment: bytecode size + hash against the pinned source
    commit, and the hook permission bits encoded in the address.
 3. Record the verified addresses in the table below and set the env overrides.
-4. Re-run this verification and update "Last run".
+4. Re-run this verification (`DYNAMIC_MARKET_HOOK_ADDRESS=… npm run verify:hooks`,
+   last run 2026-09-30) and update "Last run".
 
-| Hook                   | Chain               | Address                                      | Deployed   | Bytecode size | Bytecode hash        | Permissions                                                                 | Match                                           |
-| ---------------------- | ------------------- | -------------------------------------------- | ---------- | ------------: | -------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
-| `StableProtectionHook` | Base Mainnet (8453) | pending                                      | —          |             — | —                    | BEFORE_INITIALIZE, BEFORE_SWAP, AFTER_SWAP                                  | —                                               |
-| `DynamicFee`           | Base Mainnet (8453) | pending                                      | —          |             — | —                    | BEFORE_SWAP, AFTER_SWAP                                                     | —                                               |
-| `DynamicMarketHook`    | Base Mainnet (8453) | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0` | 2026-09-23 |         7,793 | `0x103be191…d25880c` | BEFORE_INITIALIZE, BEFORE_ADD_LIQUIDITY, BEFORE_SWAP, AFTER_SWAP (`0x28C0`) | ✓ solc 0.8.26 rebuild matches on-chain bytecode |
+| Hook                   | Chain              | Address                                      | Deployed   | Bytecode size | Bytecode hash        | Permissions                                                                 | Match                                           |
+| ---------------------- | ------------------ | -------------------------------------------- | ---------- | ------------: | -------------------- | --------------------------------------------------------------------------- | ----------------------------------------------- |
+| `StableProtectionHook` | Arc Mainnet (5042) | pending                                      | —          |             — | —                    | BEFORE_INITIALIZE, BEFORE_SWAP, AFTER_SWAP                                  | —                                               |
+| `DynamicFee`           | Arc Mainnet (5042) | pending                                      | —          |             — | —                    | BEFORE_SWAP, AFTER_SWAP                                                     | —                                               |
+| `DynamicMarketHook`    | Arc Mainnet (5042) | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0` | 2026-09-30 |         7,793 | `0x103be191…d25880c` | BEFORE_INITIALIZE, BEFORE_ADD_LIQUIDITY, BEFORE_SWAP, AFTER_SWAP (`0x28C0`) | ✓ solc 0.8.26 rebuild matches on-chain bytecode |
+
+## Base Mainnet (8453) — superseded 2026-09-29
+
+`DynamicMarketHook` was first deployed on Base 2026-09-23 at the same address
+(same deployer, nonce and CREATE2 salt) with the same bytecode hash. That
+deployment is no longer registered anywhere in the app.
 
 ## Pinned source commits
 

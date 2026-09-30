@@ -63,9 +63,8 @@ type Periphery = (typeof MARKETS_PERIPHERY_BY_CHAIN)[typeof ARC_CHAIN_ID];
 /** The cached read every caller should use (route and agent alike). */
 export async function readMarketPositions(owner: `0x${string}`): Promise<MarketPositionRow[]> {
   const client = getRpcClient(ARC_CHAIN_ID);
-  // Markets deployment is env-driven (Arc Mainnet deployment pending —
-  // see docs/tasks/v2-roadmap.md); without it, balances still report but
-  // positions stay unmarked.
+  // Per-chain registry (markets-contracts.ts); on a chain with no entry
+  // balances still report but positions stay unmarked.
   const deployment = MARKETS_BY_CHAIN[ARC_CHAIN_ID];
   const periphery = MARKETS_PERIPHERY_BY_CHAIN[ARC_CHAIN_ID];
   return sharedCache.getOrCompute(positionsCacheKey(owner), POSITIONS_CACHE_MS, () =>

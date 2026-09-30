@@ -342,7 +342,7 @@ const schema = z.object({
 
   /** ERC-8183 AgenticCommerce job/escrow contract. Agent-to-agent commerce
    *  tools (create/fund/settle jobs with USDC escrow) execute against it
-   *  from the agent's Circle wallet. Base Mainnet deployment pending — see
+   *  from the agent's Circle wallet. Arc Mainnet deployment pending — see
    *  docs/tasks/v2-roadmap.md; absent → commerce tools are disabled. */
   AGENTIC_COMMERCE_ADDRESS: z
     .string()

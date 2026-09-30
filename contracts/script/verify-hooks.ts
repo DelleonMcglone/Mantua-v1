@@ -2,13 +2,14 @@
  * P5-001 — Hook deployment verification.
  *
  * For each hook in the suite, fetch the on-chain bytecode at its
- * configured Base Mainnet address, record a keccak256 hash for
+ * configured Arc Mainnet address, record a keccak256 hash for
  * change-detection, and decode the permission flags encoded in the
  * lower 14 bits of the hook's CREATE2 address (per Uniswap v4
  * Hooks.sol).
  *
- * No hook is deployed on Arc Mainnet (5042) yet, so every expected address
- * comes from an env var; the 2026-09-23 Base deployment is superseded:
+ * Every expected address comes from an env var (the Dynamic Market Hook
+ * is live on Arc Mainnet (5042) since 2026-09-30 — the address is
+ * pinned in server/src/lib/v4-contracts.ts; the other two are pending):
  *
  *   STABLE_PROTECTION_HOOK_ADDRESS
  *   DYNAMIC_FEE_HOOK_ADDRESS
