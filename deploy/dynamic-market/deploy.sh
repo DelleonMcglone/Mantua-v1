@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# H-009 — Deploy the Dynamic Market Hook stack to Base Mainnet, then the
-# periphery, with the preflight the runbook requires baked in.
+# H-009 — Deploy the Dynamic Market Hook stack to Arc Mainnet (5042), then
+# the periphery, with the preflight the runbook requires baked in.
 #
 #   deploy/dynamic-market/deploy.sh hook        # PoolManager + Registry + Hook (mined CREATE2)
 #   deploy/dynamic-market/deploy.sh periphery   # PoolSwapTest, LP router, StateView, V4Quoter, PositionManager
@@ -8,11 +8,14 @@
 # Reads (public values only — never a private key):
 #   MARKET_OPERATOR     operator address (registers pools, pauses, rotates roles)
 #   MARKET_RESOLVER     keeper address = the market resolver key (spec §0.1)
-#   BASESCAN_API_KEY    for --verify
 #   POOL_MANAGER        (periphery only) the PoolManager the hook step printed
 #   DEPLOYER_ACCOUNT    keystore name (default: mantua-deployer) — its password is
 #                       prompted by cast/forge, never read from the environment
-#   BASE_RPC_URL        (default: https://mainnet.base.org; use the dedicated one)
+#   ARC_RPC_URL         (default: https://rpc.mainnet.arc.io; use the dedicated one)
+#
+# Gas on Arc is paid in USDC: the deployer's native balance IS its USDC
+# balance (18-decimal view). The whole stack costs well under $1 at Arc's
+# ~20 gwei. Verification goes to Arcscan (Blockscout) — no API key.
 #
 # The broadcast is gated behind an explicit "yes" after the preflight prints
 # the deployer address, its balance, and the dry-run gas estimate.
@@ -26,8 +29,10 @@ fi
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT/contracts"
-RPC="${BASE_RPC_URL:-https://mainnet.base.org}"
+RPC="${ARC_RPC_URL:-https://rpc.mainnet.arc.io}"
 ACCOUNT="${DEPLOYER_ACCOUNT:-mantua-deployer}"
+VERIFIER_URL="https://explorer.arc.io/api"
+CHAIN_ID=5042
 
 # A placeholder left in an export ("0x...", "...") must fail here, not inside
 # forge after the password prompt.
@@ -36,7 +41,6 @@ need_addr() {
   need "$1"
   [[ "${!1}" =~ ^0x[0-9a-fA-F]{40}$ ]] || { echo "$1 is not a 40-hex address: '${!1}'" >&2; exit 2; }
 }
-need BASESCAN_API_KEY
 if [[ "$MODE" == "hook" ]]; then
   need_addr MARKET_OPERATOR; need_addr MARKET_RESOLVER
   SCRIPT=script/DeployDynamicMarket.s.sol
@@ -47,17 +51,18 @@ fi
 
 echo "== chain check"
 CHAIN=$(cast chain-id --rpc-url "$RPC")
-[[ "$CHAIN" == "8453" ]] || { echo "RPC $RPC is chain $CHAIN, not Base Mainnet (8453)" >&2; exit 2; }
+[[ "$CHAIN" == "$CHAIN_ID" ]] || { echo "RPC $RPC is chain $CHAIN, not Arc Mainnet ($CHAIN_ID)" >&2; exit 2; }
 
 echo "== deployer (keystore '$ACCOUNT' — password prompt)"
 DEPLOYER=$(cast wallet address --account "$ACCOUNT")
-BAL=$(cast balance "$DEPLOYER" --rpc-url "$RPC" --ether)
-echo "   $DEPLOYER  balance: $BAL ETH"
-# The hook step is ~8.2M gas; at Base's usual sub-0.1 gwei that is well under
-# 0.001 ETH, but the simulation and the broadcast both refuse an unfunded
-# sender, so stop here with the instruction instead of after the password.
-if [[ "$(cast balance "$DEPLOYER" --rpc-url "$RPC")" == "0" ]]; then
-  echo "deployer $DEPLOYER has 0 ETH on Base — send ~0.01 ETH to it, then rerun" >&2
+BAL_WEI=$(cast balance "$DEPLOYER" --rpc-url "$RPC")
+BAL_USDC=$(cast --to-unit "$BAL_WEI" ether)
+echo "   $DEPLOYER  balance: $BAL_USDC USDC (gas)"
+# The hook step is ~8.2M gas; at Arc's ~20 gwei (USDC) that is about $0.17,
+# but the simulation and the broadcast both refuse an unfunded sender, so
+# stop here with the instruction instead of after the password.
+if [[ "$BAL_WEI" == "0" ]]; then
+  echo "deployer $DEPLOYER has 0 USDC on Arc — send ~2 USDC to it (bridge via CCTP or an exchange that supports Arc), then rerun" >&2
   exit 2
 fi
 
@@ -82,16 +87,19 @@ grep -q "Script ran successfully" /tmp/mantua-deploy-dryrun.log || {
 }
 
 echo
-read -r -p "Broadcast to Base Mainnet from $DEPLOYER? Type 'yes' to continue: " OK
+read -r -p "Broadcast to Arc Mainnet from $DEPLOYER? Type 'yes' to continue: " OK
 [[ "$OK" == "yes" ]] || { echo "aborted"; exit 1; }
 
-echo "== broadcast + verify"
+echo "== broadcast + verify (Arcscan / Blockscout)"
+# A verification failure must not hide a successful broadcast: the
+# transactions land first; verify.sh re-verifies any contract on its own.
 forge script "$SCRIPT" \
   --rpc-url "$RPC" \
   --account "$ACCOUNT" \
   --sender "$DEPLOYER" \
   --broadcast \
-  --verify --etherscan-api-key "$BASESCAN_API_KEY"
+  --verify --verifier blockscout --verifier-url "$VERIFIER_URL" \
+  || echo "!! broadcast/verify step returned non-zero — check the receipts above; re-verify with deploy/dynamic-market/verify.sh" >&2
 
 echo
 echo "== done. Next:"
@@ -102,6 +110,7 @@ if [[ "$MODE" == "hook" ]]; then
   2. POOL_MANAGER=<PoolManager> $0 periphery
   3. Probe: cast call <Hook> "poolManager()(address)" --rpc-url $RPC
             cast call <Hook> "registry()(address)"    --rpc-url $RPC
+  4. If Arcscan shows any contract unverified: deploy/dynamic-market/verify.sh <path:Name> <address> [ctor-args]
 EOF
 else
   cat <<EOF

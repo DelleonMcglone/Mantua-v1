@@ -20,14 +20,15 @@ import {MarketFactory} from "../src/markets/MarketFactory.sol";
 /// Env (PUBLIC addresses only — never a private key):
 ///   MARKET_OPERATOR  — Resolver operator (manual override + role rotation)
 ///   MARKET_RESOLVER  — automated settlement signer (keeper key, spec §0.1)
-///   USDC             — collateral token; defaults to canonical Base Mainnet USDC.
+///   USDC             — collateral token; defaults to Arc Mainnet USDC (0x3600…0000,
+///                      the 6-decimal ERC-20 view of the native gas balance).
 contract DeployMarkets is Script {
-    address internal constant BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    address internal constant ARC_USDC = 0x3600000000000000000000000000000000000000;
 
     function run() external {
         address operator = vm.envAddress("MARKET_OPERATOR");
         address signer = vm.envAddress("MARKET_RESOLVER");
-        address usdc = vm.envOr("USDC", BASE_USDC);
+        address usdc = vm.envOr("USDC", ARC_USDC);
 
         require(operator != address(0) && signer != address(0), "zero role address");
         // setFactory is operator-only and must land in this same broadcast —

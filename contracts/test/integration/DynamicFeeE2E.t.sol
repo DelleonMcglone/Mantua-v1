@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {BaseFork} from "./BaseFork.t.sol";
+import {ArcFork} from "./ArcFork.t.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {IHooks} from "@uniswap/v4-core/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -29,7 +29,7 @@ interface IDynamicFee {
 /**
  * P5-010 — DynamicFee end-to-end swap test.
  *
- * Forks Base Mainnet, deploys mock 18-decimal tokens, registers a fresh
+ * Forks Arc Mainnet, deploys mock 18-decimal tokens, registers a fresh
  * pool against the live TWAP-based DynamicFee hook (dynamic-fee at
  * commit 62710d6), pranks the hook's owner() to call configurePool
  * with a 5-minute TWAP window, then runs swaps to confirm the fee
@@ -40,10 +40,10 @@ interface IDynamicFee {
  * Tighter per-zone fee assertions require a controlled history of
  * observations and are deferred to the follow-up test below.
  *
- * The hook has no Base Mainnet deployment yet — until
+ * The hook has no Arc Mainnet deployment yet — until
  * `DYNAMIC_FEE_HOOK_ADDRESS` is set, every test here skips.
  */
-contract DynamicFeeE2E is BaseFork {
+contract DynamicFeeE2E is ArcFork {
     using PoolIdLibrary for PoolKey;
 
     uint160 internal constant SQRT_PRICE_1_1 = 79228162514264337593543950336;
@@ -58,8 +58,8 @@ contract DynamicFeeE2E is BaseFork {
         super.setUp();
         // Hook-dependent setup only runs once the mainnet deploy lands;
         // tests call _requireHook and skip until then.
-        if (DYNAMIC_FEE_HOOK == address(0)) return;
-        IPoolManager manager = IPoolManager(V4_POOL_MANAGER_BASE);
+        if (DYNAMIC_FEE_HOOK == address(0) || V4_POOL_MANAGER == address(0)) return;
+        IPoolManager manager = IPoolManager(V4_POOL_MANAGER);
         swapRouter = new PoolSwapTest(manager);
         liqRouter = new PoolModifyLiquidityTest(manager);
 
@@ -100,6 +100,7 @@ contract DynamicFeeE2E is BaseFork {
 
     function test_swapsExecute_duringTwapWarmup() public {
         _requireHook(DYNAMIC_FEE_HOOK);
+        _requirePoolManager();
         swapRouter.swap(
             poolKey,
             SwapParams({zeroForOne: true, amountSpecified: -1e16, sqrtPriceLimitX96: TickMath.MIN_SQRT_PRICE + 1}),

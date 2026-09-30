@@ -14,7 +14,7 @@ import {HookMiner} from "../src/lib/HookMiner.sol";
 import {StableProtectionHook} from "stable-protection/StableProtectionHook.sol";
 
 /// @title  DeployStableProtection
-/// @notice Deploys StableProtectionHook to Base Mainnet (8453) against the
+/// @notice Deploys StableProtectionHook to Arc Mainnet (5042) against the
 ///         canonical Uniswap v4 PoolManager. Parameterized: PoolManager
 ///         address comes from an env var so the same script can target any
 ///         chain where v4 is deployed.
@@ -28,14 +28,10 @@ import {StableProtectionHook} from "stable-protection/StableProtectionHook.sol";
 ///           - PoolManager via env (was: hardcoded for another chain)
 ///           - No mock stablecoins / liquidity / test swap — pool creation
 ///             runs separately via the existing client flow, using the
-///             canonical Base Mainnet USDC/EURC. Keeps this script focused
+///             Arc Mainnet USDC/EURC. Keeps this script focused
 ///             on a single deliverable: hook deployed at a verified address.
 ///           - solc 0.8.27 to match the monorepo's foundry.toml.
 contract DeployStableProtection is Script {
-    /// @dev Canonical v4 PoolManager on Base Mainnet (8453). Verified
-    ///      against developers.uniswap.org/contracts/v4/deployments.
-    ///      Override via `POOL_MANAGER` env var.
-    address constant DEFAULT_POOL_MANAGER_BASE = 0x498581fF718922c3f8e6A244956aF099B2652b2b;
 
     /// @dev Standard CREATE2 deterministic deployer used by `forge script
     ///      --broadcast`. Same address on every chain.
@@ -52,7 +48,11 @@ contract DeployStableProtection is Script {
     function run() external returns (address hookAddr) {
         // ── parameters ─────────────────────────────────────────────────────
         uint256 pk = vm.envUint("PRIVATE_KEY");
-        address poolManager = vm.envOr("POOL_MANAGER", DEFAULT_POOL_MANAGER_BASE);
+        // Arc has no canonical Uniswap v4 PoolManager (checked 2026-09-29):
+        // the target is Mantua's own — DeployDynamicMarket.s.sol's — so it
+        // is required, never defaulted.
+        address poolManager = vm.envAddress("POOL_MANAGER");
+        require(poolManager != address(0), "POOL_MANAGER must be set (no canonical v4 on Arc)");
 
         console2.log("Network chain ID:", block.chainid);
         console2.log("PoolManager:", poolManager);

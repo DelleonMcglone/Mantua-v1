@@ -7,9 +7,8 @@
  * lower 14 bits of the hook's CREATE2 address (per Uniswap v4
  * Hooks.sol).
  *
- * DynamicMarketHook is deployed on Base Mainnet (8453) and its address is
- * the default below; the other hooks are not yet, so their expected
- * addresses come from env vars (which also override the default):
+ * No hook is deployed on Arc Mainnet (5042) yet, so every expected address
+ * comes from an env var; the 2026-09-23 Base deployment is superseded:
  *
  *   STABLE_PROTECTION_HOOK_ADDRESS
  *   DYNAMIC_FEE_HOOK_ADDRESS
@@ -40,11 +39,11 @@ interface HookConfig {
   expectedPermissions?: string[];
 }
 
-const BASE_CHAIN_ID = 8453;
+const ARC_CHAIN_ID = 5042;
 
-/** Base Mainnet RPC — override with BASE_RPC_URL for a non-rate-limited
+/** Arc Mainnet RPC — override with ARC_RPC_URL for a non-rate-limited
  *  endpoint (the public default is fine for bytecode checks). */
-const BASE_RPC = process.env["BASE_RPC_URL"] ?? "https://mainnet.base.org";
+const ARC_RPC = process.env["ARC_RPC_URL"] ?? "https://rpc.mainnet.arc.io";
 
 function envAddress(name: string): `0x${string}` | null {
   const raw = process.env[name]?.trim();
@@ -62,9 +61,9 @@ const HOOKS: HookConfig[] = [
     pinnedCommit: "1282b899b6f68d27e28d65194dc75661f23476af",
     addressEnvVar: "STABLE_PROTECTION_HOOK_ADDRESS",
     address: envAddress("STABLE_PROTECTION_HOOK_ADDRESS"),
-    chainId: BASE_CHAIN_ID,
-    chainName: "Base",
-    rpcUrl: BASE_RPC,
+    chainId: ARC_CHAIN_ID,
+    chainName: "Arc",
+    rpcUrl: ARC_RPC,
     expectedPermissions: ["BEFORE_INITIALIZE", "BEFORE_SWAP", "AFTER_SWAP"],
   },
   {
@@ -73,9 +72,9 @@ const HOOKS: HookConfig[] = [
     pinnedCommit: "62710d6d9b403557b073a702b5546bc10e75c0c6",
     addressEnvVar: "DYNAMIC_FEE_HOOK_ADDRESS",
     address: envAddress("DYNAMIC_FEE_HOOK_ADDRESS"),
-    chainId: BASE_CHAIN_ID,
-    chainName: "Base",
-    rpcUrl: BASE_RPC,
+    chainId: ARC_CHAIN_ID,
+    chainName: "Arc",
+    rpcUrl: ARC_RPC,
     expectedPermissions: ["BEFORE_SWAP", "AFTER_SWAP"],
   },
   {
@@ -83,12 +82,10 @@ const HOOKS: HookConfig[] = [
     repo: "DelleonMcglone/Mantua-v1",
     pinnedCommit: "49fbc602569010c34c53505dd9eb427887f67ee9",
     addressEnvVar: "DYNAMIC_MARKET_HOOK_ADDRESS",
-    // Deployed 2026-09-23 (H-009); the env var still overrides.
-    address:
-      envAddress("DYNAMIC_MARKET_HOOK_ADDRESS") ?? "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
-    chainId: BASE_CHAIN_ID,
-    chainName: "Base",
-    rpcUrl: BASE_RPC,
+    address: envAddress("DYNAMIC_MARKET_HOOK_ADDRESS"),
+    chainId: ARC_CHAIN_ID,
+    chainName: "Arc",
+    rpcUrl: ARC_RPC,
     expectedPermissions: ["BEFORE_INITIALIZE", "BEFORE_ADD_LIQUIDITY", "BEFORE_SWAP", "AFTER_SWAP"],
   },
 ];
@@ -245,7 +242,7 @@ function renderMarkdown(results: VerifyResult[]): string {
   lines.push("## Notes");
   lines.push("");
   lines.push(
-    "Mantua targets Base Mainnet (8453) only. Hooks marked pending have no mainnet deployment yet — deploying them, then re-running this verification with the address env vars set, is a launch-gating step.",
+    "Mantua targets Arc Mainnet (5042) only. Hooks marked pending have no Arc deployment yet — deploying them, then re-running this verification with the address env vars set, is a launch-gating step.",
   );
   lines.push("");
   return lines.join("\n");

@@ -22,8 +22,16 @@ quote_style = "double"
 number_underscore = "thousands"
 
 [rpc_endpoints]
-base = "https://mainnet.base.org"
-base_fork = "http://127.0.0.1:8545"
+# Arc Mainnet (5042) — USDC is the gas token. Use a dedicated provider URL
+# (ARC_RPC_URL) for anything beyond a read; the public host is rate-limited.
+arc = "https://rpc.mainnet.arc.io"
+arc_fork = "http://127.0.0.1:8545"
+# Arc Testnet (5042002) — development only, never a production code path.
+arc_testnet = "https://rpc.testnet.arc.io"
 
+# Arcscan is Blockscout: `forge verify-contract --verifier blockscout
+# --verifier-url https://explorer.arc.io/api` needs no API key. The entry
+# keeps `--chain arc` resolvable; see deploy/dynamic-market/verify.sh.
 [etherscan]
-base = { key = "${BASESCAN_API_KEY}", chain = 8453, url = "https://api.etherscan.io/v2/api?chainid=8453" }
+arc = { key = "", chain = 5042, url = "https://explorer.arc.io/api" }
+arc_testnet = { key = "", chain = 5042002, url = "https://explorer.testnet.arc.io/api" }

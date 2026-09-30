@@ -14,10 +14,19 @@ storage works (tested live), the CREATE2 factory and Permit2 are present,
 there is no canonical Uniswap v4 on Arc (this stack brings its own
 `PoolManager`), gas is ~20 gwei paid in USDC (whole stack under $1), and
 Arcscan is Blockscout (`--verifier blockscout`, no API key). The deploy
-tooling below is still Base-targeted and is retargeted in the follow-up
-(H-009).
+tooling below targets Arc; the Base-era notes are kept as history.
 
-**Pre-deploy gate, run 2026-09-12 (H-009 prep):** with `contracts/lib`
+**Arc fork gate, run 2026-09-30:** `MarketLifecycleForkE2E` passes against
+the live Arc Mainnet fork with a 6-decimal mock collateral. Arc's real USDC
+(`0x3600…0000`) reads correctly on a standard Foundry fork but its
+transfers move native value through Arc's protocol path, which vanilla
+anvil cannot emulate (`TRANSFER_FROM_FAILED`). Running the suite with the
+real token needs Circle's
+[`arc-foundry`](https://github.com/circlefin/arc-foundry) (`arc-forge`,
+`arc-anvil`) — an owner-gated install, then
+`ARC_RPC_URL=… arc-forge test --root contracts --match-contract MarketLifecycleForkE2E`.
+
+**Pre-deploy gate (Base era, run 2026-09-12 — historical):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the
 live Base Mainnet fork — 238 passed / 0 failed / 8 skipped (the skips are
 the StableProtection / DynamicFee E2Es and baselines, which skip while
@@ -27,7 +36,7 @@ ran). A no-key fork simulation of `DeployDynamicMarket.s.sol` ran end to
 end: permission bits `10432` (= `0x28C0`), estimated gas `8,163,960`,
 ≈ 0.00008 ETH at 0.01 gwei — budget 0.01 ETH still stands for headroom
 plus the periphery step. The earlier "blocked locally by RPC egress" note
-no longer applies from a machine that can reach `mainnet.base.org`.
+no longer applies from a machine that can reach `rpc.mainnet.arc.io`.
 `deploy.sh` wraps the preflight, the dry run, an explicit confirmation,
 and the broadcast.
 
@@ -86,8 +95,10 @@ asserts the deployed address equals the mined one and carries the right bits.
   (cd lib/v4-core && git submodule update --init --recursive --depth 1)
   (cd lib/v4-periphery && git submodule update --init --recursive --depth 1)
   ```
-- A Base Mainnet deployer funded with ETH for gas (bridge or transfer —
-  budget ~0.01 ETH for the three-contract deploy plus verification).
+- An Arc Mainnet deployer funded with **USDC — Arc's gas token**. Its
+  native balance is its USDC balance; ~2 USDC covers the whole stack with
+  headroom (the hook step is ~8.2M gas at ~20 gwei ≈ $0.17). Bridge via
+  CCTP or withdraw from an exchange that supports Arc.
 
 - **The deployer key in an encrypted keystore, not a plaintext variable.**
   `--interactive` prompts for the key so it never lands in shell history, a
@@ -120,8 +131,8 @@ the fork dry run with the gas estimate, and only broadcasts after you type
 `yes`:
 
 ```bash
-export MARKET_OPERATOR=0x...  MARKET_RESOLVER=0x...  BASESCAN_API_KEY=...
-export BASE_RPC_URL=https://<dedicated-provider>/...   # optional; default is the public host
+export MARKET_OPERATOR=0x...  MARKET_RESOLVER=0x...
+export ARC_RPC_URL=https://<dedicated-provider>/...    # optional; default is the public host
 deploy/dynamic-market/deploy.sh hook
 # then, with the PoolManager the hook step printed:
 POOL_MANAGER=0x... deploy/dynamic-market/deploy.sh periphery
@@ -133,12 +144,17 @@ remappings):
 
 ```bash
 cd contracts && forge script script/DeployDynamicMarket.s.sol \
-  --rpc-url https://mainnet.base.org \
+  --rpc-url https://rpc.mainnet.arc.io \
   --account mantua-deployer \
   --sender "$(cast wallet address --account mantua-deployer)" \
   --broadcast \
-  --verify --etherscan-api-key "$BASESCAN_API_KEY"
+  --verify --verifier blockscout --verifier-url https://explorer.arc.io/api
 ```
+
+If `--verify` fails for a contract that imports solmate (PoolManager,
+PositionManager — forge drops the file from the standard-JSON input), run
+`deploy/dynamic-market/verify.sh <path:Name> <address> [ctor-args]`, which
+completes the input and submits it to Blockscout directly.
 
 (`--via-ir --optimizer-runs 200` are already the project defaults in
 `contracts/foundry.toml`, so they're not repeated on the command line.)
@@ -148,7 +164,7 @@ never passed as an argument. `--sender` is required alongside it so the script
 simulates against the right address.
 
 `--via-ir --optimizer-runs 200` matches the rest of the repo (spec §39).
-BaseScan verification needs `BASESCAN_API_KEY` exported (spec §40; the
+Arcscan (Blockscout) verification needs no API key (spec §40; the
 `[etherscan] base` entry in `contracts/foundry.toml` covers chain 8453).
 
 The script asserts the mined address matches the deployed one and that the
@@ -236,7 +252,7 @@ for gas. The next sync-cron run creates, registers, initializes, and seeds.
    cast send $REGISTRY \
      "registerPool(bytes32,uint64,uint64,bool,uint8,bool)" \
      $MARKET_ID $KICKOFF $RESOLUTION $YES_IS_TOKEN0 6 $PLAYOFFS \
-     --rpc-url https://mainnet.base.org
+     --rpc-url https://rpc.mainnet.arc.io
    ```
 
    - `MARKET_ID` — from `server/src/lib/market-id.ts` (spec §0.4 / B0-004).
@@ -266,7 +282,7 @@ for gas. The next sync-cron run creates, registers, initializes, and seeds.
    cast call $HOOK \
      "quoteFee((address,address,uint24,int24,address),(bool,int256,uint160))" \
      "($CURRENCY0,$CURRENCY1,8388608,60,$HOOK)" "($ZERO_FOR_ONE,-1000000,0)" \
-     --rpc-url https://mainnet.base.org
+     --rpc-url https://rpc.mainnet.arc.io
    ```
 
    Expect `fee == 0` and `breakdown.playoffs == false` on a regular-season

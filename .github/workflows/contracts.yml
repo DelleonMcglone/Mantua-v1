@@ -1,9 +1,9 @@
-name: Contracts (Base Mainnet fork)
+name: Contracts (Arc Mainnet fork)
 
 # P9-002 — Foundry test suite for the contracts/ workspace.
 #
-# Runs on every PR / push to main against the live Base Mainnet chain
-# via fork. The fork URL is taken from the `BASE_RPC_URL`
+# Runs on every PR / push to main against the live Arc Mainnet chain
+# via fork. The fork URL is taken from the `ARC_RPC_URL`
 # secret if present; otherwise falls back to the public endpoint
 # (rate-limited but works for the small fanout these tests need).
 #
@@ -28,16 +28,16 @@ concurrency:
 
 jobs:
   forge-test:
-    name: forge test (Base Mainnet fork)
+    name: forge test (Arc Mainnet fork)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: contracts
 
     env:
-      # Public Base Mainnet endpoint for fork tests. Override via repo
-      # secret BASE_RPC_URL when rate-limit becomes an issue.
-      BASE_RPC_URL: ${{ secrets.BASE_RPC_URL || 'https://mainnet.base.org' }}
+      # Public Arc Mainnet endpoint for fork tests. Override via repo
+      # secret ARC_RPC_URL when rate-limit becomes an issue.
+      ARC_RPC_URL: ${{ secrets.ARC_RPC_URL || 'https://rpc.mainnet.arc.io' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -193,13 +193,13 @@ jobs:
         run: forge build --sizes
 
       # The full-lifecycle E2E + the hook-bytecode baseline are the
-      # gating tests. They run against current Base Mainnet state and
+      # gating tests. They run against current Arc Mainnet state and
       # exercise the entire user-facing flow (create → add → swap →
       # remove) as well as the hook deployments.
       #
       # Wrapped in a 3-attempt retry because the public
-      # `https://mainnet.base.org` endpoint occasionally returns
-      # Cloudflare 502s under fanout. Set the BASE_RPC_URL
+      # `https://rpc.mainnet.arc.io` endpoint occasionally returns
+      # Cloudflare 502s under fanout. Set the ARC_RPC_URL
       # secret to a dedicated provider (Alchemy / Infura / QuickNode
       # free tier) to drop the retry overhead.
       - name: Run gating fork tests (must pass)
@@ -217,7 +217,7 @@ jobs:
           done
           exit 1
 
-      # The remaining per-hook E2Es depend on live Base Mainnet state
+      # The remaining per-hook E2Es depend on live Arc Mainnet state
       # (DynamicFee TWAP warmup, etc.) and can flake on chain drift.
       # Run them as advisory so they surface in logs without blocking
       # the PR. RWAGate / AsyncLimitOrder tests were removed in PR

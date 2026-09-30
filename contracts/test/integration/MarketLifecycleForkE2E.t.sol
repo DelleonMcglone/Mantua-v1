@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
-import {BaseFork} from "./BaseFork.t.sol";
+import {ArcFork} from "./ArcFork.t.sol";
 import {ERC20} from "solmate/tokens/ERC20.sol";
+import {MockERC20} from "solmate/test/utils/mocks/MockERC20.sol";
 import {IPoolManager} from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";
 import {PoolKey} from "@uniswap/v4-core/src/types/PoolKey.sol";
@@ -22,15 +23,13 @@ import {MarketStateRegistry} from "../../src/hooks/dynamic-market/MarketStateReg
 import {IMarketStateRegistry as I} from "../../src/hooks/dynamic-market/IMarketStateRegistry.sol";
 
 /**
- * P-014 — full market lifecycle on a Base Mainnet fork, under the D-103
- * in-play trading semantics, with REAL mainnet USDC.
+ * P-014 — full market lifecycle on an Arc Mainnet fork, under the D-103
+ * in-play trading semantics.
  *
  * The local `test/e2e/FullLifecycle.t.sol` proves the same journey against
  * a mock USDC and a local PoolManager. This suite re-runs it in the
- * environment the deploy scripts actually target: forked Base Mainnet
- * (8453), the canonical USDC (`0x8335…2913`, a FiatToken proxy — six
- * decimals, upgradeable, blacklistable — none of which a MockERC20
- * exercises), and the stack wired exactly the way
+ * environment the deploy scripts actually target: forked Arc Mainnet
+ * (5042) at its live state, and the stack wired exactly the way
  * `DeployDynamicMarket.s.sol` + `DeployMarkets.s.sol` wire it:
  *
  *   - a DEDICATED PoolManager (DM-112 routing: the DM stack self-deploys
@@ -45,21 +44,33 @@ import {IMarketStateRegistry as I} from "../../src/hooks/dynamic-market/IMarketS
  * the implied probability → LP → trade both directions pre-kickoff → warp
  * past kickoff → **trade during the game succeeds** (the leg the old
  * kickoff-freeze design forbade) → resolver freezes on "final" → swaps
- * blocked but LP exit open → resolve → winning side redeems 1:1 real
- * USDC, losing side gets zero → every balance accounted, market solvent.
+ * blocked but LP exit open → resolve → winning side redeems 1:1
+ * collateral, losing side gets zero → every balance accounted, market
+ * solvent.
  *
- * Runs whenever the fork RPC is reachable (BaseFork conventions: no
+ * Collateral is a 6-decimal mock, not Arc's USDC (`0x3600…0000`). Arc's
+ * USDC is the ERC-20 view of the native gas balance: reads work on a
+ * standard Foundry fork (asserted below), but its transfers move native
+ * value through Arc's protocol-level path, which vanilla anvil/forge cannot
+ * emulate — `transferFrom` reverts `TRANSFER_FROM_FAILED` (observed
+ * 2026-09-30). Circle publishes `arc-foundry` (arc-forge / arc-anvil) for
+ * exactly these divergences; running this suite with the real token is the
+ * owner-gated step in the runbook once arc-foundry is installed.
+ *
+ * Runs whenever the fork RPC is reachable (ArcFork conventions: no
  * env-gated hook address is needed because the whole stack is deployed
  * inside the fork). From repo root:
  *
- *   BASE_RPC_URL=https://mainnet.base.org \
+ *   ARC_RPC_URL=https://rpc.mainnet.arc.io \
  *     forge test --root contracts --match-contract MarketLifecycleForkE2E -vv
  */
-contract MarketLifecycleForkE2E is BaseFork {
+contract MarketLifecycleForkE2E is ArcFork {
     using PoolIdLibrary for PoolKey;
 
     /// Canonical Base Mainnet USDC (FiatToken proxy) — the real collateral.
-    address internal constant BASE_USDC = 0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913;
+    /// Arc Mainnet USDC — the 6-decimal ERC-20 view of the native gas balance
+    /// (docs.arc.io/arc/references/contract-addresses).
+    address internal constant ARC_USDC = 0x3600000000000000000000000000000000000000;
 
     /// The four spec §7 permissions; the mined address must encode exactly these.
     uint160 internal constant PERMISSIONS =
@@ -95,16 +106,22 @@ contract MarketLifecycleForkE2E is BaseFork {
     ERC20 internal no;
 
     function setUp() public override {
-        super.setUp(); // fork Base Mainnet, assert chain id 8453
-        usdc = ERC20(BASE_USDC);
-        require(BASE_USDC.code.length > 0, "fork: USDC has no code");
-        assertEq(usdc.decimals(), 6, "canonical USDC must be 6dp");
+        super.setUp(); // fork Arc Mainnet, assert chain id 5042
+        // The real Arc USDC, read-only: present, 6dp, and a mirror of the
+        // native balance (vm.deal sets native; the ERC-20 view follows).
+        require(ARC_USDC.code.length > 0, "fork: USDC has no code");
+        assertEq(ERC20(ARC_USDC).decimals(), 6, "Arc USDC must be 6dp");
+        vm.deal(carol, 1e6 * 1e12);
+        assertEq(ERC20(ARC_USDC).balanceOf(carol), 1e6, "Arc USDC mirrors the native balance");
+        // Collateral under test: a 6dp mock (see the header for why).
+        MockERC20 mock = new MockERC20("USDC (fork mock)", "USDC", 6);
+        usdc = ERC20(address(mock));
 
         kickoff = uint64(block.timestamp + 1 days);
 
         // ── DeployDynamicMarket.s.sol, mirrored ──
         // deployCode rather than `new PoolManager`: v4-core pins PoolManager
-        // to solc =0.8.26 while the BaseFork harness requires ^0.8.27, so
+        // to solc =0.8.26 while the ArcFork harness requires ^0.8.27, so
         // the concrete import cannot share a compilation unit with this file.
         manager = IPoolManager(deployCode("PoolManager.sol:PoolManager", abi.encode(operator)));
         registry = new MarketStateRegistry(operator, signerKey);
@@ -131,9 +148,8 @@ contract MarketLifecycleForkE2E is BaseFork {
         swapRouter = new PoolSwapTest(IPoolManager(address(manager)));
         lpRouter = new PoolModifyLiquidityTest(IPoolManager(address(manager)));
 
-        // Real mainnet USDC, dealt.
-        deal(BASE_USDC, alice, 10_000e6);
-        deal(BASE_USDC, bob, 10_000e6);
+        mock.mint(alice, 10_000e6);
+        mock.mint(bob, 10_000e6);
     }
 
     function test_forkLifecycle_inPlayTradingFreezeOnFinalResolveRedeem() public {
@@ -158,7 +174,7 @@ contract MarketLifecycleForkE2E is BaseFork {
 
         // ── 3. Open the hooked pool at the implied probability (p = 0.50) ──
         (PoolKey memory key, bool yesIsToken0) =
-            MarketPoolBootstrap.poolKeyFor(market, BASE_USDC, LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, address(hook));
+            MarketPoolBootstrap.poolKeyFor(market, address(usdc), LPFeeLibrary.DYNAMIC_FEE_FLAG, 60, address(hook));
         PoolId poolId = key.toId();
         vm.prank(operator);
         registry.registerPool(poolId, kickoff, kickoff + 4 hours, yesIsToken0, 6, true);
