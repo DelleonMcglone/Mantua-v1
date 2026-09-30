@@ -31,9 +31,9 @@ const schema = z.object({
   ZERO_HASH_WEBHOOK_SECRET: z.string().min(1).optional(),
   /** D-112 — the USDC destination network for fiat deposits is CONFIG, not
    *  code. Zero Hash asset codes are `USDC.<NETWORK>`; this names the
-   *  network half. Whether Zero Hash can deliver USDC on Arc is an OPEN
-   *  question (F-001 is still in onboarding) — this variable plus Zero
-   *  Hash-side asset support is the entire switch. */
+   *  network half. Zero Hash delivers USDC on Arc (`USDC.ARC`, confirmed
+   *  2026-09-30, F-001) — this variable plus Zero Hash-side asset support
+   *  is the entire switch, so it stays env-driven. */
   FIAT_USDC_NETWORK: z.string().min(1).default("ARC"),
   PLAID_CLIENT_ID: z.string().min(1).optional(),
   PLAID_SECRET: z.string().min(1).optional(),
