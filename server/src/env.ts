@@ -340,10 +340,11 @@ const schema = z.object({
    */
   X402_SPORTS_INTEL_ALLOWLIST: z.string().optional(),
 
-  /** ERC-8183 AgenticCommerce job/escrow contract. Agent-to-agent commerce
-   *  tools (create/fund/settle jobs with USDC escrow) execute against it
-   *  from the agent's Circle wallet. Arc Mainnet deployment pending — see
-   *  docs/tasks/v2-roadmap.md; absent → commerce tools are disabled. */
+  /** ERC-8183 AgenticCommerce job/escrow contract (the proxy). Agent-to-agent
+   *  commerce tools (create/fund/settle jobs with USDC escrow) execute against
+   *  it from the agent's Circle wallet. Arc Mainnet deploy is ready but
+   *  audit-gated — deploy/agentic-commerce/README.md; absent → commerce tools
+   *  are disabled. */
   AGENTIC_COMMERCE_ADDRESS: z
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)

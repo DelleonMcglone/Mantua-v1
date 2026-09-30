@@ -17,6 +17,9 @@ forge install OpenZeppelin/openzeppelin-contracts --no-git
 forge install Uniswap/v4-core --no-git
 forge install Uniswap/v4-periphery --no-git
 forge install transmissions11/solmate --no-git
+# AgenticCommerce (ERC-8183): the vendored reference implementation + OZ upgradeable, both pinned
+forge install OpenZeppelin/openzeppelin-contracts-upgradeable@v5.7.0 --no-git
+forge install erc-8183/base-contracts@142e669 --no-git
 
 # Pull hook submodules (once per clone)
 git submodule update --init --recursive
