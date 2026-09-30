@@ -80,8 +80,8 @@ contract MarketLifecycleForkE2E is ArcFork {
     // each token ordering (v4 price is token1-per-token0; at p = 0.5 one YES
     // is 0.5 USDC, so the ratio is 0.5 or 2 depending on which side sorted
     // first). Chosen at runtime because YES's address is nonce-dependent.
-    uint160 internal constant SQRT_HALF_X96 = 56022770974786139918731938227;
-    uint160 internal constant SQRT_TWO_X96 = 112045541949572279837463876454;
+    uint160 internal constant SQRT_HALF_X96 = 56_022_770_974_786_139_918_731_938_227;
+    uint160 internal constant SQRT_TWO_X96 = 112_045_541_949_572_279_837_463_876_454;
 
     address internal operator = makeAddr("fork_operator");
     address internal signerKey = makeAddr("fork_signer"); // keeper = resolver key (spec §0.1)
@@ -111,11 +111,22 @@ contract MarketLifecycleForkE2E is ArcFork {
         // native balance (vm.deal sets native; the ERC-20 view follows).
         require(ARC_USDC.code.length > 0, "fork: USDC has no code");
         assertEq(ERC20(ARC_USDC).decimals(), 6, "Arc USDC must be 6dp");
-        vm.deal(carol, 1e6 * 1e12);
-        assertEq(ERC20(ARC_USDC).balanceOf(carol), 1e6, "Arc USDC mirrors the native balance");
-        // Collateral under test: a 6dp mock (see the header for why).
-        MockERC20 mock = new MockERC20("USDC (fork mock)", "USDC", 6);
-        usdc = ERC20(address(mock));
+        // A throwaway address, not an actor: under FORK_REAL_USDC the real
+        // token IS the collateral, and this balance would otherwise leak
+        // into the conservation check at the end.
+        address probe = makeAddr("fork_usdc_mirror_probe");
+        vm.deal(probe, 1e6 * 1e12);
+        assertEq(ERC20(ARC_USDC).balanceOf(probe), 1e6, "Arc USDC mirrors the native balance");
+        // Collateral under test: Arc's real USDC under Circle's arc-foundry
+        // (FORK_REAL_USDC=1 — its EVM routes the ERC-20 transfers through
+        // the native balance), a 6dp mock under vanilla Foundry (see the
+        // header for why). Same suite, same assertions either way.
+        if (_realUsdc()) {
+            usdc = ERC20(ARC_USDC);
+        } else {
+            MockERC20 mock = new MockERC20("USDC (fork mock)", "USDC", 6);
+            usdc = ERC20(address(mock));
+        }
 
         kickoff = uint64(block.timestamp + 1 days);
 
@@ -148,8 +159,23 @@ contract MarketLifecycleForkE2E is ArcFork {
         swapRouter = new PoolSwapTest(IPoolManager(address(manager)));
         lpRouter = new PoolModifyLiquidityTest(IPoolManager(address(manager)));
 
-        mock.mint(alice, 10_000e6);
-        mock.mint(bob, 10_000e6);
+        _fund(alice, 10_000e6);
+        _fund(bob, 10_000e6);
+    }
+
+    /// FORK_REAL_USDC=1 selects Arc's real USDC as collateral (arc-foundry only).
+    function _realUsdc() internal view returns (bool) {
+        try vm.envBool("FORK_REAL_USDC") returns (bool real) {
+            return real;
+        } catch {}
+        return false;
+    }
+
+    /// Collateral for an actor: a native deal on Arc (the ERC-20 view is the
+    /// same balance at 18dp), a mint on the mock.
+    function _fund(address who, uint256 usdc6) internal {
+        if (_realUsdc()) vm.deal(who, usdc6 * 1e12);
+        else MockERC20(address(usdc)).mint(who, usdc6);
     }
 
     function test_forkLifecycle_inPlayTradingFreezeOnFinalResolveRedeem() public {
@@ -163,14 +189,14 @@ contract MarketLifecycleForkE2E is ArcFork {
         // ── 2. Split both sides: real USDC escrowed 1:1 ──
         vm.startPrank(alice);
         usdc.approve(address(market), type(uint256).max);
-        market.split(2_000e6);
+        market.split(2000e6);
         vm.stopPrank();
         vm.startPrank(bob);
         usdc.approve(address(market), type(uint256).max);
         market.split(500e6);
         vm.stopPrank();
-        assertEq(usdc.balanceOf(address(market)), 2_500e6, "collateral escrowed 1:1");
-        assertEq(market.outstandingSets(), 2_500e6);
+        assertEq(usdc.balanceOf(address(market)), 2500e6, "collateral escrowed 1:1");
+        assertEq(market.outstandingSets(), 2500e6);
 
         // ── 3. Open the hooked pool at the implied probability (p = 0.50) ──
         (PoolKey memory key, bool yesIsToken0) =
@@ -191,7 +217,7 @@ contract MarketLifecycleForkE2E is ArcFork {
         yes.approve(address(lpRouter), type(uint256).max);
         usdc.approve(address(lpRouter), type(uint256).max);
         lpRouter.modifyLiquidity(
-            key, ModifyLiquidityParams({tickLower: -12000, tickUpper: 12000, liquidityDelta: 1e9, salt: 0}), ""
+            key, ModifyLiquidityParams({tickLower: -12_000, tickUpper: 12_000, liquidityDelta: 1e9, salt: 0}), ""
         );
         vm.stopPrank();
 
@@ -225,7 +251,7 @@ contract MarketLifecycleForkE2E is ArcFork {
         // split/merge stay open while trading is open (D-103).
         vm.prank(bob);
         market.split(25e6);
-        assertEq(market.outstandingSets(), 2_525e6);
+        assertEq(market.outstandingSets(), 2525e6);
 
         // A stranger cannot force the freeze during the event window.
         vm.expectRevert(Market.TooEarlyToFreeze.selector);
@@ -259,7 +285,7 @@ contract MarketLifecycleForkE2E is ArcFork {
         // LP exit must stay open during the halt (spec §23).
         vm.prank(alice);
         lpRouter.modifyLiquidity(
-            key, ModifyLiquidityParams({tickLower: -12000, tickUpper: 12000, liquidityDelta: -1e9, salt: 0}), ""
+            key, ModifyLiquidityParams({tickLower: -12_000, tickUpper: 12_000, liquidityDelta: -1e9, salt: 0}), ""
         );
 
         // ── 8. Resolve YES via the Resolver's signer path ──

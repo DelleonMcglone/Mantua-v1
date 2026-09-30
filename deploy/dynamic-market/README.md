@@ -18,14 +18,22 @@ Arcscan is Blockscout (`--verifier blockscout`, no API key). The deploy
 tooling below targets Arc; the Base-era notes are kept as history.
 
 **Arc fork gate, run 2026-09-30:** `MarketLifecycleForkE2E` passes against
-the live Arc Mainnet fork with a 6-decimal mock collateral. Arc's real USDC
-(`0x3600…0000`) reads correctly on a standard Foundry fork but its
-transfers move native value through Arc's protocol path, which vanilla
-anvil cannot emulate (`TRANSFER_FROM_FAILED`). Running the suite with the
-real token needs Circle's
-[`arc-foundry`](https://github.com/circlefin/arc-foundry) (`arc-forge`,
-`arc-anvil`) — an owner-gated install, then
-`ARC_RPC_URL=… arc-forge test --root contracts --match-contract MarketLifecycleForkE2E`.
+the live Arc Mainnet fork twice over — with a 6-decimal mock collateral
+under vanilla Foundry (what CI runs), and with **Arc's real USDC**
+(`0x3600…0000`) under Circle's
+[`arc-foundry`](https://github.com/circlefin/arc-foundry) v0.8.0-2, whose
+EVM routes the token's transfers through the native balance (vanilla anvil
+reverts them with `TRANSFER_FROM_FAILED`). Install the prebuilt binaries as
+`arc-forge` / `arc-anvil` / `arc-cast` (the release README's steps), then:
+
+```bash
+FORK_REAL_USDC=1 FOUNDRY_PROFILE=arc arc-forge test --root contracts --match-contract MarketLifecycleForkE2E
+```
+
+`FORK_REAL_USDC=1` swaps the collateral for the real token and funds the
+actors with `vm.deal` (the ERC-20 view is the native balance at 18dp);
+`FOUNDRY_PROFILE=arc` selects the Arc EVM (`[profile.arc]` in
+`contracts/foundry.toml`).
 
 **Pre-deploy gate (Base era, run 2026-09-12 — historical):** with `contracts/lib`
 populated per the prerequisites, the full suite passed locally against the
