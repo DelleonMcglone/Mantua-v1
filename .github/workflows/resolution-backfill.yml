@@ -1,0 +1,49 @@
+# One-off settlement backfill for a past window (R-012 follow-up).
+#
+# `/api/cron/resolution` runs daily on Vercel against the CURRENT slate, so a
+# game whose final was missed while the feed was dark (2026-09-26 → 09-30:
+# the Sportradar trial quota) is never revisited. The route accepts
+# `?dates=YYYYMMDD-YYYYMMDD` (ESPN honours the window; Sportradar sweeps the
+# current slate and is skipped by the provider chain when it is out of
+# quota), which settles those rows — freezes, resolves, voids — from the DB
+# side. No signer is involved unless MARKET_SIGNER_PRIVATE_KEY is set in
+# production, so on the closed-markets deployment this only updates rows.
+#
+# Manual only (`workflow_dispatch`), same secret pattern as live-sync.yml:
+# the repo Actions secret CRON_SECRET must equal Vercel's production value.
+name: resolution-backfill
+
+on:
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: "UTC window to settle, YYYYMMDD-YYYYMMDD (inclusive, max 14 days)"
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: resolution-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate the window
+        env:
+          DATES: ${{ inputs.dates }}
+        run: |
+          if ! [[ "$DATES" =~ ^[0-9]{8}-[0-9]{8}$ ]]; then
+            echo "dates must look like 20260924-20260929, got: $DATES" >&2
+            exit 2
+          fi
+      - name: Settlement sweep over the window
+        env:
+          DATES: ${{ inputs.dates }}
+        run: |
+          curl -sS -f -m 280 \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://test-mantua.vercel.app/api/cron/resolution?dates=$DATES" \
+            | head -c 4000
