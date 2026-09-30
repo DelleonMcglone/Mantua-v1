@@ -176,3 +176,41 @@ product:**
 4. Negotiate the production agreement (D-102 carries the comparison and
    the SportsDataIO lever); on signature set `SPORTRADAR_ENV=production`
    with the production key.
+
+## Quota incident and cross-provider identity (R-012, 2026-09-30)
+
+**What happened.** cron-job.org began firing `/api/cron/live-sync` every
+five minutes for real on 2026-09-23. Each tick made one `current_week`
+schedule call plus up to two play-by-play calls against the TRIAL key —
+~300 calls a day against a cap of 1,000 per rolling 30 days. The window
+was exhausted on 2026-09-26; from then on every tick got `HTTP 429` three
+times, `refreshSlate` threw `ProviderUnavailableError`, the route answered
+502, and the P-012 halt paused in-play buys for four days while the ESPN
+adapter sat idle. Nothing fell through to ESPN because `providerFor` picks
+Sportradar whenever the key is set — and falling through was never safe:
+`events` rows are keyed by `(provider, provider_event_id)`, market ids
+hash that id, and ESPN spells three NFL teams differently (WSH/JAX/LAR vs
+WAS/JAC/LA), so an ESPN slate would have persisted every game twice.
+
+**What changed.**
+
+- `team-alias.ts` — one canonical abbreviation per team; `teamKey` maps
+  ESPN's WSH/JAX/LAR onto Sportradar's WAS/JAC/LA (the persisted spelling).
+- `event-match.ts` + `events.provider_ids` (migration 0027) — a second
+  provider's event refreshes the row the first provider owns when league,
+  both team keys and kickoff (±1h) agree; each describing provider leaves
+  its own id in `provider_ids`, so later polls under that id (finals,
+  `loadStoredEvents`) find the same row. The owner and the market id never
+  change.
+- `slate-fallback.ts` + `providerChainFor` / `liveProviderChainFor` — the
+  daily sync and settlement try Sportradar then ESPN; the five-minute live
+  tick reads **ESPN only on a trial key** (Sportradar's quota is reserved
+  for the ~10 daily reference/schedule calls) and Sportradar→ESPN on a
+  production key. The tick reports `provider` and `skippedProviders`.
+
+**Runbook addendum.** A trial key cannot serve the live tick; do not raise
+`liveProviderChainFor` to Sportradar without `SPORTRADAR_ENV=production`.
+The exhausted window rolls off ~2026-10-23; until then every Sportradar
+read 429s and the chains serve ESPN, which is expected and logged
+(`sports: slate served by fallback`). cron-job.org may have auto-disabled
+the job after a week of 502s — check the job's status after deploying.

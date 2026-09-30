@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
-import { activeBreakerState, providerFor } from "../lib/sports/active-provider.ts";
-import { feedFreshnessSnapshot, refreshNextSlate, refreshSlate } from "../lib/sports/ingest.ts";
+import { activeBreakerState, providerChainFor } from "../lib/sports/active-provider.ts";
+import { feedFreshnessSnapshot, refreshNextSlate } from "../lib/sports/ingest.ts";
+import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
@@ -91,16 +92,20 @@ cronSportsSyncRouter.get(
     for (const league of LEAGUES) {
       try {
         // D-102/S-003: Sportradar (licensed) where configured and covering
-        // the league; ESPN (prototyping fallback) otherwise. Selection is
-        // per league — NFL can be on Sportradar while WNBA stays on ESPN.
-        const provider = providerFor(league);
+        // the league, ESPN behind it (R-012) — a primary that is down or
+        // out of quota no longer fails the tick. The adapter that served
+        // the slate serves the rest of the tick too.
         const perChain: Record<string, unknown> = {};
         const nowSeconds = Math.floor(Date.now() / 1000);
         // One slate fetch per league feeds ingestion; planning happens
         // below, per chain, FROM the canonical rows this upsert persists
         // (P-002/041 rule: consumers read the DB, providers only feed
         // ingestion — the feed contributes labels and opening odds only).
-        const refresh = await refreshSlate(provider, league, nowSeconds);
+        const {
+          served: provider,
+          refresh,
+          skipped,
+        } = await refreshSlateWithFallback(providerChainFor(league), league, nowSeconds);
         const eventsPersisted: unknown = await upsertEvents(
           db,
           refresh.provider,
@@ -165,6 +170,8 @@ cronSportsSyncRouter.get(
         }
 
         results[league] = {
+          provider: refresh.provider,
+          skippedProviders: skipped,
           events: eventsPersisted,
           nextWeekEvents: nextEventsPersisted,
           reference,

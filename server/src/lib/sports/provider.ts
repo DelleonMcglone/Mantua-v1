@@ -15,6 +15,8 @@
  * (NFL + WNBA), DM-107 (ESPN primary).
  */
 
+import { canonicalAbbreviation } from "./team-alias.ts";
+
 /** Leagues a provider can be asked for. Matches `SportId` on the client. */
 export type LeagueSlug = "nfl" | "wnba";
 
@@ -273,11 +275,13 @@ export class ProviderUnavailableError extends Error {}
  *
  * Built from the league and the team abbreviation rather than the provider's
  * numeric id, because those ids differ per provider while abbreviations are
- * effectively standard. Namespaced by league so a shared abbreviation across
- * sports cannot collide.
+ * effectively standard — the few that are not (WSH/WAS, JAX/JAC, LAR/LA)
+ * go through team-alias.ts so every provider lands on one key (R-012).
+ * Namespaced by league so a shared abbreviation across sports cannot
+ * collide.
  */
 export function teamKey(league: LeagueSlug, abbreviation: string): string {
-  return `${league}:${abbreviation.trim().toUpperCase()}`;
+  return `${league}:${canonicalAbbreviation(league, abbreviation)}`;
 }
 
 /**

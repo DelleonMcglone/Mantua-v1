@@ -62,6 +62,31 @@ export function providerFor(league: LeagueSlug): SportsDataProvider {
   return espn;
 }
 
+/**
+ * R-012 — the providers to try, in order, for a daily/settlement read:
+ * the licensed primary first, ESPN behind it. A primary that is down (or,
+ * on a trial key, out of quota) no longer darkens the feed — the
+ * cross-provider event match makes the fallback's rows land on the same
+ * games. Never empty: ESPN is always last.
+ */
+export function providerChainFor(league: LeagueSlug): SportsDataProvider[] {
+  const primary = providerFor(league);
+  return primary === espn ? [espn] : [primary, espn];
+}
+
+/**
+ * R-012 — the providers for the five-minute live tick. A Sportradar TRIAL
+ * key is capped at 1,000 calls per rolling 30 days; the live tick alone
+ * makes ~300 a day, which is how the feed went dark on 2026-09-26. On a
+ * trial key the tick reads ESPN only and leaves the quota to the daily
+ * sync, reference data and settlement (~10 calls a day). On a production
+ * key Sportradar serves live, with ESPN behind it.
+ */
+export function liveProviderChainFor(league: LeagueSlug): SportsDataProvider[] {
+  if (env.SPORTRADAR_ENV !== "production") return [espn];
+  return providerChainFor(league);
+}
+
 /** Breaker state across every active adapter, for health reporting. */
 export function activeBreakerState(): Record<
   string,
