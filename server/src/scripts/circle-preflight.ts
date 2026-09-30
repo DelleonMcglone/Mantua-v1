@@ -55,7 +55,7 @@ async function main(): Promise<number> {
   }
   ok("CIRCLE_ENTITY_SECRET present (64 hex chars, value never logged)");
   if (/^TEST_API_KEY:/i.test(env.CIRCLE_API_KEY)) {
-    bad("This is a TEST key — the agent would run on testnet, not Base Mainnet.");
+    bad("This is a TEST key — the agent would run on testnet, not Arc Mainnet.");
     failed = true;
   }
 
@@ -72,7 +72,7 @@ async function main(): Promise<number> {
 
   console.log("\nLive checks");
   // C-017 — captured for the Gas Station section: a policy can only sponsor
-  // transactions whose wallet set is live and holds BASE wallets.
+  // transactions whose wallet set is live and holds ARC wallets.
   let walletSetLive = false;
   let baseWallets = false;
   try {
@@ -92,11 +92,11 @@ async function main(): Promise<number> {
     const blockchains = new Set(
       (wallets.data?.wallets ?? []).map((w) => w.blockchain).filter(Boolean),
     );
-    baseWallets = blockchains.has("BASE");
+    baseWallets = blockchains.has("ARC");
     if (blockchains.size > 0) {
       const list = [...blockchains].join(", ");
-      if (baseWallets) ok(`Wallets on BASE (also: ${list})`);
-      else bad(`No BASE wallets — found ${list}. The app provisions on BASE.`);
+      if (baseWallets) ok(`Wallets on ARC (also: ${list})`);
+      else bad(`No ARC wallets — found ${list}. The app provisions on ARC.`);
     }
   } catch (err) {
     if (err instanceof CircleUnavailableError) bad(err.message);
@@ -110,12 +110,12 @@ async function main(): Promise<number> {
     ok(`Policy id recorded (UUID, boot-validated): ${policyId}`);
     if (walletSetLive && baseWallets) {
       ok(
-        "Sponsorship dependencies verified live: wallet set reachable and holds BASE wallets — " +
+        "Sponsorship dependencies verified live: wallet set reachable and holds ARC wallets — " +
           "Gas Station auto-sponsors those SCA transactions from the policy that is ACTIVE " +
-          "and default for Base.",
+          "and default for Arc.",
       );
     } else {
-      bad("Policy's live dependencies unverified — wallet set / BASE wallet checks above failed.");
+      bad("Policy's live dependencies unverified — wallet set / ARC wallet checks above failed.");
       failed = true;
     }
     console.log(
@@ -124,12 +124,12 @@ async function main(): Promise<number> {
         "    does NOT appear under this policy means the recorded id is not the one actually\n" +
         "    sponsoring the code. Circle exposes no policy-read API (management is\n" +
         "    console-only), so also confirm in Console → Gas Station that the policy is\n" +
-        "    ACTIVE and is the default policy for Base — transactions use only the\n" +
+        "    ACTIVE and is the default policy for Arc — transactions use only the\n" +
         "    network's default policy.",
     );
   } else {
     bad(
-      "No CIRCLE_GAS_STATION_POLICY_ID — agent transactions are unsponsored (production refuses to create them). In Console → Gas Station, create a policy for this wallet set on Base, ACTIVATE it, and make it the default policy for Base — then record its id.",
+      "No CIRCLE_GAS_STATION_POLICY_ID — agent transactions are unsponsored (production refuses to create them). In Console → Gas Station, create a policy for this wallet set on Arc, ACTIVATE it, and make it the default policy for Arc — then record its id.",
     );
     failed = true;
   }

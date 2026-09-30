@@ -20,14 +20,14 @@ So this task ships everything that _surrounds_ the credentials — schema,
 validation, safe storage, failure modes, verification — and hands the console
 work to the operator as the runbook below.
 
-| Part                                            | Owner        | Status     |
-| ----------------------------------------------- | ------------ | ---------- |
-| Env schema, format validation, boot-time checks | code         | ✅ done    |
-| `.env.example`, `.gitignore` hardening          | code         | ✅ done    |
-| Wallet-set hard-fail in production              | code         | ✅ done    |
-| Credential preflight script                     | code         | ✅ done    |
-| Circle account + API key + entity secret        | **operator** | ⬜ pending |
-| Wallet set + Gas Station policy                 | **operator** | ⬜ pending |
+| Part                                            | Owner        | Status                  |
+| ----------------------------------------------- | ------------ | ----------------------- |
+| Env schema, format validation, boot-time checks | code         | ✅ done                 |
+| `.env.example`, `.gitignore` hardening          | code         | ✅ done                 |
+| Wallet-set hard-fail in production              | code         | ✅ done                 |
+| Credential preflight script                     | code         | ✅ done                 |
+| Circle account + API key + entity secret        | **operator** | ✅ 2026-09-30 (mainnet) |
+| Wallet set + Gas Station policy                 | **operator** | ✅ 2026-09-30 (Arc)     |
 
 ## Operator runbook
 
@@ -38,8 +38,8 @@ work to the operator as the runbook below.
    gated behind it; testnet works without.
 3. **Create an API key** → copy it once (it is not shown again). Format is
    `PREFIX:ID:SECRET`.
-   - Use a **`LIVE_API_KEY`** for Base Mainnet. A `TEST_API_KEY` silently puts
-     the agent on testnet while the rest of the app is on 8453 — boot
+   - Use a **`LIVE_API_KEY`** for Arc Mainnet. A `TEST_API_KEY` silently puts
+     the agent on testnet while the rest of the app is on 5042 — boot
      validation and the preflight both flag this.
    - Scope it to the minimum the app needs (Wallets read/write); keep separate
      keys per environment so staging can be revoked independently.
@@ -114,9 +114,9 @@ rather than do this silently.
 Sponsorship is console-side policy, not a key:
 
 1. Console → **Gas Station** → create a policy.
-2. Scope it to **Base (mainnet)** and to the wallet set from step 3.
+2. Scope it to **Arc (mainnet)** and to the wallet set from step 3.
 3. Fund / configure the spend limits per your risk appetite.
-4. **Activate the policy** and make it the **default policy for Base** —
+4. **Activate the policy** and make it the **default policy for Arc** —
    transactions use only the network's default policy; an inactive or
    non-default policy sponsors nothing (and deactivating one later stops
    sponsorship the same way).
@@ -137,7 +137,7 @@ correct on an L2).
 
 ### 5. USDC flows
 
-No extra credentials. USDC on Base Mainnet is the canonical
+No extra credentials. USDC on Arc Mainnet (`0x3600…0000`, also the gas token) is the canonical
 `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (6dp) already in
 `server/src/lib/tokens.ts`; Gateway/CCTP flows authenticate with the same
 Wallets API key. Fund the agent wallet with real USDC — there are no faucets
@@ -161,8 +161,8 @@ npm run circle:preflight -w @mantua/server
 ```
 
 Checks credential shapes (never printing values), authenticates to Circle,
-confirms the wallet set is reachable and holds `BASE` wallets, and verifies
-the Gas Station policy's live dependencies (wallet set reachable, `BASE`
+confirms the wallet set is reachable and holds `ARC` wallets, and verifies
+the Gas Station policy's live dependencies (wallet set reachable, `ARC`
 wallets present). Circle exposes no policy-read API — active/default status
 is console-only — so the script prints that confirmation step explicitly
 alongside the `refId` provenance note. Exit 0 = usable.
