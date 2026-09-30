@@ -1,13 +1,18 @@
-# One-off settlement backfill for a past window (R-012 follow-up).
+# One-off backfill for a past window (R-012 follow-up).
 #
-# `/api/cron/resolution` runs daily on Vercel against the CURRENT slate, so a
-# game whose final was missed while the feed was dark (2026-09-26 → 09-30:
-# the Sportradar trial quota) is never revisited. The route accepts
-# `?dates=YYYYMMDD-YYYYMMDD` (ESPN honours the window; Sportradar sweeps the
-# current slate and is skipped by the provider chain when it is out of
-# quota), which settles those rows — freezes, resolves, voids — from the DB
-# side. No signer is involved unless MARKET_SIGNER_PRIVATE_KEY is set in
-# production, so on the closed-markets deployment this only updates rows.
+# Both daily crons sweep the CURRENT slate, so a game whose final was missed
+# while the feed was dark (2026-09-26 → 09-30: the Sportradar trial quota)
+# is never revisited. Two calls, both taking `?dates=YYYYMMDD-YYYYMMDD`
+# (ESPN honours the window; a provider that cannot window serves its
+# current slate):
+#
+#   1. /api/cron/live-sync?dates=…    — STATUS backfill: re-ingests the
+#      window so those rows get their final status and scores (this is
+#      what clears "live games" that ended days ago). Must succeed.
+#   2. /api/cron/resolution?dates=…  — SETTLEMENT sweep over the window.
+#      Answers 503 RESOLUTION_DISABLED (with the dry-run plan) until
+#      MARKET_SIGNER_PRIVATE_KEY is set in production — expected while
+#      markets are closed; reported, never fatal.
 #
 # Manual only (`workflow_dispatch`), same secret pattern as live-sync.yml:
 # the repo Actions secret CRON_SECRET must equal Vercel's production value.
@@ -39,11 +44,24 @@ jobs:
             echo "dates must look like 20260924-20260929, got: $DATES" >&2
             exit 2
           fi
-      - name: Settlement sweep over the window
+      - name: Status backfill over the window (live-sync)
         env:
           DATES: ${{ inputs.dates }}
         run: |
           curl -sS -f -m 280 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://test-mantua.vercel.app/api/cron/resolution?dates=$DATES" \
+            "https://test-mantua.vercel.app/api/cron/live-sync?dates=$DATES" \
             | head -c 4000
+      - name: Settlement sweep over the window (resolution)
+        env:
+          DATES: ${{ inputs.dates }}
+        run: |
+          code=$(curl -sS -m 280 -o body.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://test-mantua.vercel.app/api/cron/resolution?dates=$DATES")
+          echo "HTTP $code"; head -c 4000 body.json; echo
+          case "$code" in
+            200|207) ;;
+            503) echo "::notice::resolution is disabled (no signer in production) — settlement runs once MARKET_SIGNER_PRIVATE_KEY is set" ;;
+            *) exit 1 ;;
+          esac

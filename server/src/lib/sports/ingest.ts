@@ -253,8 +253,9 @@ export async function refreshSlate(
   league: LeagueSlug,
   nowSeconds: number = Math.floor(Date.now() / 1000),
   chainId?: number,
+  dates?: string,
 ): Promise<SlateRefreshResult> {
-  const slate = await provider.getSlate(league);
+  const slate = await provider.getSlate(league, dates);
   const marketsPlanned = planSlate(slate.events, nowSeconds, chainId);
 
   if (slate.delayed) {

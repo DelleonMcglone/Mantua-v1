@@ -13,11 +13,13 @@ import {
   type SportsDataProvider,
 } from "./provider.ts";
 
+const datesSeen: Record<string, string | undefined> = {};
 function provider(name: string, behaviour: "ok" | "unavailable" | "throws"): SportsDataProvider {
   return {
     name,
     leagues: ["nfl"],
-    getSlate(league: LeagueSlug): Promise<ProviderSlate> {
+    getSlate(league: LeagueSlug, dates?: string): Promise<ProviderSlate> {
+      datesSeen[name] = dates;
       if (behaviour === "unavailable") {
         return Promise.reject(new ProviderUnavailableError(`${name}: HTTP 429`));
       }
@@ -63,5 +65,19 @@ void describe("refreshSlateWithFallback", () => {
 
   void it("refuses an empty chain", async () => {
     await assert.rejects(refreshSlateWithFallback([], "nfl", 0), /no provider configured/);
+  });
+});
+
+void describe("refreshSlateWithFallback — backfill window", () => {
+  void it("hands the dates window to every provider it tries", async () => {
+    await refreshSlateWithFallback(
+      [provider("sportradar", "unavailable"), provider("espn", "ok")],
+      "nfl",
+      0,
+      undefined,
+      "20260924-20260929",
+    );
+    assert.equal(datesSeen["sportradar"], "20260924-20260929");
+    assert.equal(datesSeen["espn"], "20260924-20260929");
   });
 });

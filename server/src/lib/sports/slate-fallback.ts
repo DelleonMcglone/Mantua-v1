@@ -34,13 +34,14 @@ export async function refreshSlateWithFallback(
   league: LeagueSlug,
   nowSeconds: number,
   chainId?: number,
+  dates?: string,
 ): Promise<ServedSlate> {
   if (chain.length === 0) throw new Error(`no provider configured for ${league}`);
   const skipped: string[] = [];
   let lastErr: unknown = null;
   for (const provider of chain) {
     try {
-      const refresh = await refreshSlate(provider, league, nowSeconds, chainId);
+      const refresh = await refreshSlate(provider, league, nowSeconds, chainId, dates);
       if (skipped.length > 0) {
         logger.warn({ league, served: provider.name, skipped }, "sports: slate served by fallback");
       }
