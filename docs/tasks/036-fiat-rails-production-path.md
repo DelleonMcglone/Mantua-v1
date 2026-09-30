@@ -1,5 +1,7 @@
 # 036 — Fiat rails production path (F-002/F-003/F-004/F-006/F-009)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** 🟢 code-complete / mock- and sandbox-tested — awaiting commercial credentials
 **Branch:** `036-fiat-rails-production-path`
 

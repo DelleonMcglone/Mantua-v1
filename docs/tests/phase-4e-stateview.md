@@ -1,7 +1,7 @@
 # Phase 4e — StateView (live slot0)
 
 This slice replaces the price-at-mint approximation with a live read of
-`StateView.getSlot0` on Base mainnet. Two consumers:
+`StateView.getSlot0` on Arc mainnet. Two consumers:
 
 - `POST /api/liquidity/remove/calldata` — server reads slot0 from the
   position's PoolKey before computing slippage bounds.
@@ -17,8 +17,8 @@ building calldata.
 
 Same as `phase-4-liquidity.md`, plus:
 
-- Set `BASE_RPC_URL` in `server/.env` to a paid endpoint
-  (Alchemy / QuickNode). The default `https://mainnet.base.org` is
+- Set `ARC_RPC_URL` in `server/.env` to a paid endpoint
+  (Alchemy / QuickNode). The default `https://rpc.mainnet.arc.io` is
   fine for dev but rate-limits aggressively.
 
 ## Live remove (live price)

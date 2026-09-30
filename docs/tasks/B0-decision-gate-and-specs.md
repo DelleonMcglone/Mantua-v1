@@ -1,5 +1,7 @@
 # Phase B0 — Decision Gate & Specs
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Master: `docs/tasks/sports-pivot.md` — PHASE B0 (W1, 🔴 P0)
 > Snapshot: 2026-09-03 · 6 ✅ · 1 🟡
 

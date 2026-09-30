@@ -34,7 +34,7 @@ now runs as a test so it cannot silently regress.
 | Audit log                 | Fills, agent actions, strategy transitions, and Terms acceptances are durable rows keyed by user; the activity spine reads them back rather than recomputing                                                                                                              | `lib/activity.test.ts`, `activity-e2e.test.ts`; `routes/legal.test.ts` (idempotent acceptance)                                     |
 | Freeze integrity          | Unchanged: the hook and the service sweep freeze on the same clock; the consumer path surfaces `TRADING_HALTED` as copy and the quote route refuses a fee above the 0.70% ceiling                                                                                         | `client/src/features/markets/trade-errors.test.ts`, `market-trade-core.test.ts`; `client/e2e/errors.spec.ts`                       |
 | Injection hardening       | Provider text is sanitized at the serializer; agent read tools treat fetched data as untrusted and the loop refuses instructions found in it                                                                                                                              | `lib/agent/untrusted.test.ts`, `injection-security.test.ts`; `lib/sports/public-slate.test.ts`                                     |
-| Chain boundary            | Every trade status lookup and calldata carries `chainId: 8453`; the client's read transport is a fixed public list and the wallet signs only what the server built                                                                                                        | `routes/market-trade-status.test.ts`; `client/src/lib/privy/wallet-client.ts`                                                      |
+| Chain boundary            | Every trade status lookup and calldata carries `chainId: 5042`; the client's read transport is a fixed public list and the wallet signs only what the server built                                                                                                        | `routes/market-trade-status.test.ts`; `client/src/lib/privy/wallet-client.ts`                                                      |
 
 No rail regressed. One rail widened: legal acceptance is a new write and
 sits behind `requireAuth` + `writeRateLimiter` + the kill switch like
@@ -54,7 +54,7 @@ subset on the hosted SPA.
 **Content-Security-Policy ships in report-only mode.**
 `server/src/lib/security/csp.ts` lists every third-party origin the SPA
 loads (Privy and its Turnstile challenge, the WalletConnect relay, verify
-and secure frames, Plaid Link, Google Fonts, the two public Base RPC
+and secure frames, Plaid Link, Google Fonts, the public Arc RPC
 hosts), each with its reason, and renders the
 `Content-Security-Policy-Report-Only` value that `vercel.json` carries; a
 test keeps the two identical and forbids `'unsafe-eval'`, inline scripts,
@@ -80,7 +80,7 @@ dependency upgrade task, not a launch-gate fix.
 | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | `ws` (memory disclosure / fragment DoS) via `@privy-io/react-auth`                                          | Browser bundle; `ws` is the Node implementation and is not used in the browser build                | Accept for launch; closes with the `@privy-io/react-auth` 3.42 upgrade in the SDK bump task |
 | `axios` prototype pollution via `@coinbase/cdp-sdk`                                                         | Server, agent bridge only; requests are built from typed fields, never from user objects            | Accept; bump with the CDP SDK when its range allows                                         |
-| Circle adapters (`@circle-fin/*`) via `@solana/web3.js`, `@coral-xyz/anchor`, `toml`                        | Server; the Solana adapter is never instantiated (Base only)                                        | Accept; no fix available upstream; tracked                                                  |
+| Circle adapters (`@circle-fin/*`) via `@solana/web3.js`, `@coral-xyz/anchor`, `toml`                        | Server; the Solana adapter is never instantiated (Arc only)                                         | Accept; no fix available upstream; tracked                                                  |
 | `fast-uri`, `hono`, `js-cookie`, `socket.io-parser`, `nanoid`, `brace-expansion`, `browserslist`, `postcss` | Dev tooling or unused transitive paths (no Hono server, no socket.io, no cookie library in the app) | Accept; carried by the dependency upgrade task                                              |
 | `vite` (Windows `server.fs.deny` bypass, `launch-editor` UNC)                                               | Dev server only, Windows only                                                                       | Accept; bump to 8.3 with the next tooling update                                            |
 

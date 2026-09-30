@@ -1,5 +1,7 @@
 # 026 — x402 + unified-balance closeout (C-007, C-008)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ done 2026-09-04 · **Branch:** `026-x402-unified-balance-closeout`
 
 Closes the two remaining Phase-1 rows from the circle-custody wave ledger
@@ -58,7 +60,7 @@ branch ships:
 - `server/src/routes/x402-service.test.ts` — 3 tests over a real express
   server on an ephemeral port: 503 `X402_SELLER_DISABLED` with no facilitator
   traffic when unset; a wired paywall answering an unpaid request with 402 +
-  a `PAYMENT-REQUIRED` header (`exact` / `eip155:8453` / `payTo` = seller /
+  a `PAYMENT-REQUIRED` header (`exact` / `eip155:5042` / `payTo` = seller /
   `$0.01` = 10000 atomic) when set; unrelated paths untouched.
 
 Mock style follows the repo's seam-free `node:test` approach: no source edits
@@ -73,8 +75,8 @@ handshake is answered locally, so the suites are hermetic.
 
 ## C-008 — unified USDC balance service: verification trace + verdict
 
-Claim under test: *"Unified USDC balance service: consolidated balance across
-supported chains (feeds Portfolio §6)"* — ledger row filed 🟡 stale-as-filed
+Claim under test: _"Unified USDC balance service: consolidated balance across
+supported chains (feeds Portfolio §6)"_ — ledger row filed 🟡 stale-as-filed
 ("exists, agent-side … no user-facing surface, no tests").
 
 **Trace (route → hook → tab), verified in this tree:**
@@ -82,7 +84,7 @@ supported chains (feeds Portfolio §6)"* — ledger row filed 🟡 stale-as-file
 1. **Service** — `server/src/lib/unified-balance.ts` `getUnifiedBalances()`
    aggregates the agent wallet's USDC across chains via the Unified Balance
    Kit (`kit.getBalances`), returning `{provisioned, address, totalUsdc,
-   breakdown: [{chain, amount}]}`.
+breakdown: [{chain, amount}]}`.
 2. **Route** — `server/src/routes/agent-unified-balance.ts`
    `GET /api/agent/unified-balance` (auth-gated; mounted in
    `server/src/app.ts:89`), with graceful 503

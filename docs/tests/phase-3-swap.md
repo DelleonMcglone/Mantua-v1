@@ -5,7 +5,7 @@ P3-008. Run after `npm install` + Privy login + at least small balances funded o
 ## Setup
 
 1. `server/.env` populated with `UNISWAP_TRADING_API_KEY`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `DATABASE_URL` pointing to a real Postgres (Neon dev branch is fine).
-2. `client/.env.local` populated with `VITE_PRIVY_APP_ID`, `VITE_API_BASE_URL=http://localhost:3001`, `VITE_BASE_RPC_URL` (Alchemy / QuickNode recommended).
+2. `client/.env.local` populated with `VITE_PRIVY_APP_ID`, `VITE_API_BASE_URL=http://localhost:3001`, `VITE_ARC_RPC_URL` (Alchemy / QuickNode recommended).
 3. `npm run db:generate -w @mantua/server && npm run db:migrate -w @mantua/server` to materialize the Drizzle schema (incl. `daily_wallet_spend`, `mantua_audit_log` tables).
 4. `npm run dev` at the root → Vite on `https://localhost:5173`, Express on `http://localhost:3001`.
 5. Log in with the test wallet via Privy. Confirm header shows the truncated wallet address.
@@ -25,7 +25,7 @@ Run a small swap (≤$5) for each pair, both directions where the market exists.
 - [ ] LINK → USDC
 - [ ] cbBTC → ETH
 
-For each: amount input → quote returns within 1s → click Review swap → confirmation modal renders with `<from-amount> <from-token> → <to-amount> <to-token>` and slippage line → click Sign & swap → wallet popup → after receipt: BaseScan link visible, status = Done.
+For each: amount input → quote returns within 1s → click Review swap → confirmation modal renders with `<from-amount> <from-token> → <to-amount> <to-token>` and slippage line → click Sign & swap → wallet popup → after receipt: Arcscan link visible, status = Done.
 
 ## Error states (P3-007)
 
@@ -36,7 +36,7 @@ For each: amount input → quote returns within 1s → click Review swap → con
 - [ ] **Slippage double-confirm.** Set slippage to `200` (2%). Quote succeeds with `slippageWarning: "double_confirm"`. Confirmation modal requires two clicks before "Sign & swap" fires.
 - [ ] **Kill-switch.** Set `MANTUA_KILL_SWITCH=1` in `server/.env`, restart server. Quote attempts return 503; UI shows "Mantua write operations are temporarily disabled." Set back to 0.
 - [ ] **User rejects in wallet.** Reach the Sign step, then click Reject in the wallet popup. UI surfaces "Transaction rejected." and resets to idle.
-- [ ] **Wrong chain.** Force the wallet onto Polygon, then try to swap. The viem bridge auto-switches to Base; if the wallet refuses, the UI throws and the swap doesn't proceed.
+- [ ] **Wrong chain.** Force the wallet onto Polygon, then try to swap. The viem bridge auto-switches to Arc; if the wallet refuses, the UI throws and the swap doesn't proceed.
 
 ## Database side-effects (P1-001 + P1-008 + P3-006)
 

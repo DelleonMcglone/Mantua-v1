@@ -12,13 +12,13 @@ are a parallel lane (045); everything here is the off-chain half.
 
 ## Seam table — writer → table → reader → status
 
-| Writer (new)                                                    | Table / column                              | Reader (already shipped)                                                                 | Status |
-| --------------------------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------------------------- | ------ |
-| verified-fill path (`routes/market-fills.ts`)                   | `market_prices` (source `fill`)             | `history.ts` price series, `market-metrics.ts`, agent `get_market_price`/`get_market_history`, detail chart | ✅ wired |
-| `snapshotMarketPoolPrices` (market-metrics.ts) ← sync cron      | `market_prices` (source `pool`, + liquidity) | same readers                                                                              | ✅ wired |
-| verified-fill path                                              | `market_positions` (aggregate per market/wallet/side) | portfolio P/L, `market-metrics.ts` open interest                                          | ✅ wired |
-| `settleResolvedPositions` (markets-onchain.ts) ← sync cron      | `market_positions.settled_at/settlement_price`, `redeemed_at/redeem_tx_hash` (agent wallets) | redeemable API (claimables), portfolio realized P/L                                       | ✅ wired |
-| `upsertMarketRows` (store.ts)                                    | `markets.provider/provider_event_id` (binding) | anyone recomputing the keccak preimage                                                    | ✅ wired |
+| Writer (new)                                               | Table / column                                                                               | Reader (already shipped)                                                                                    | Status   |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------- |
+| verified-fill path (`routes/market-fills.ts`)              | `market_prices` (source `fill`)                                                              | `history.ts` price series, `market-metrics.ts`, agent `get_market_price`/`get_market_history`, detail chart | ✅ wired |
+| `snapshotMarketPoolPrices` (market-metrics.ts) ← sync cron | `market_prices` (source `pool`, + liquidity)                                                 | same readers                                                                                                | ✅ wired |
+| verified-fill path                                         | `market_positions` (aggregate per market/wallet/side)                                        | portfolio P/L, `market-metrics.ts` open interest                                                            | ✅ wired |
+| `settleResolvedPositions` (markets-onchain.ts) ← sync cron | `market_positions.settled_at/settlement_price`, `redeemed_at/redeem_tx_hash` (agent wallets) | redeemable API (claimables), portfolio realized P/L                                                         | ✅ wired |
+| `upsertMarketRows` (store.ts)                              | `markets.provider/provider_event_id` (binding)                                               | anyone recomputing the keccak preimage                                                                      | ✅ wired |
 
 ## 1. P-011 — price-tick recording (`market_prices` had ZERO writers)
 
@@ -126,12 +126,12 @@ are a parallel lane (045); everything here is the off-chain half.
     `status === "scheduled"`.
   - `MarketDetail.tsx` / `use-market-trade.ts`: no kickoff gating of their
     own (the sidebar quotes whatever the server allows).
-  All now gate on the shared `isTradableStatus` (scheduled OR in_progress;
-  final/void closed) in market-trade-core.ts, and the footer copy reads
-  "Trade before or during the game — trading closes when the game goes
-  final."
+    All now gate on the shared `isTradableStatus` (scheduled OR in_progress;
+    final/void closed) in market-trade-core.ts, and the footer copy reads
+    "Trade before or during the game — trading closes when the game goes
+    final."
 - **Explorer link removed** from `MarketDetail.tsx`'s activity tab
-  (`const EXPLORER = "https://basescan.org/tx/"` + its render) — chain
+  (`const EXPLORER = "https://explorer.arc.io/tx/"` + its render) — chain
   branding out of user UI per P-010/D-104; the ops surface is 044's lane.
 
 ## 5. P-002 — binding + plan-from-canonical
@@ -184,7 +184,7 @@ are a parallel lane (045); everything here is the off-chain half.
 
 Checked explicitly after rebasing onto 044:
 
-- **Settlement sweep** — 044 only *delays* when `markets.state` flips to
+- **Settlement sweep** — 044 only _delays_ when `markets.state` flips to
   RESOLVED/INVALID (the dispute window gates the on-chain submit; the
   `drizzleResolutionLog.record` write is unchanged). The sweep is triggered
   by that state, so a market parked in its dispute window is simply not yet

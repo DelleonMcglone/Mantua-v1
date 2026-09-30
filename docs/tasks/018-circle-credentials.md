@@ -1,5 +1,7 @@
 # 018 — Circle credentials: Wallets, USDC flows, Paymaster (B-018)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** 🟡 scaffolding shipped, credentials pending operator action
 **Branch:** `018-circle-credentials`
 

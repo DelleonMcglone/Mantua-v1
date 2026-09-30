@@ -19,7 +19,7 @@ Work these before any marketplace thought — every intake rejection so far in
 Circle's flow traces to one of them:
 
 - [ ] **Dedicated payout wallet.** A controlled EOA that receives USDC on
-      Base Mainnet. Options, in order of preference:
+      Arc Mainnet. Options, in order of preference:
   1. A **fresh dedicated EOA** whose key lives in a secrets manager and is
      used for nothing else — cleanest sanctions-screening story, cleanest
      accounting (every `agent_x402_sale` row maps to one wallet).
@@ -115,7 +115,7 @@ Discovery API.
 
 Gateway-rail payments accumulate in the seller's **Gateway balance** and
 batch-settle onchain. Check and withdraw with `GatewayClient` from the
-already-installed `@circle-fin/x402-batching` package (chain name for Base
+already-installed `@circle-fin/x402-batching` package (chain name for Arc
 Mainnet is `"base"`):
 
 ```ts

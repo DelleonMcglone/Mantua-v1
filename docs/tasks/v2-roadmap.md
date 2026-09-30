@@ -1,7 +1,9 @@
-# Mantua AI v2 - Base Mainnet Task List
+# Mantua AI v2 - Arc Mainnet Task List
+
+> **Chain note (2026-09-30):** this roadmap predates the move to **Arc Mainnet (5042)** on 2026-09-29. Present-tense chain facts below are updated; per-row history that names Base is kept as the record of what happened there. Current source of truth: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
 
 > **Build:** Full rebuild from scratch
-> **Network:** Base Mainnet (Chain ID: 8453) ONLY
+> **Network:** Arc Mainnet (Chain ID: 5042) ONLY — revised 2026-09-29, was Base Mainnet (8453)
 > **Launch:** Public mainnet launch — no allowlist gating
 > **Design:** Full UI/UX overhaul — see design files (`Mantua Prototype.html` + README) for the authoritative spec. The old Hyperliquid-inspired teal (#14b8a6) palette from v1 is superseded.
 > **Last Updated:** 2026-04-26 (decisions locked: D-002 hooks override, D-003 AI security analysis, D-004–D-010/D-013/D-014 accepted, D-011/D-012 risk-accepted)
@@ -10,21 +12,21 @@
 
 ## 🎯 OVERHAUL OBJECTIVE
 
-Rebuild Mantua AI from scratch as a production-grade, AI-powered DeFi platform on Base Mainnet. Every feature must work end-to-end with verifiable on-chain transactions. No placeholders. No TODOs. Test everything. Mainnet-safe from day one.
+Rebuild Mantua AI from scratch as a production-grade, AI-powered DeFi platform on Arc Mainnet. Every feature must work end-to-end with verifiable on-chain transactions. No placeholders. No TODOs. Test everything. Mainnet-safe from day one.
 
 ---
 
 ## 🔗 Supported Network
 
-| Network      | Chain ID | Status      | Block Explorer        |
-| ------------ | -------- | ----------- | --------------------- |
-| Base Mainnet | 8453     | 🚧 To build | https://basescan.org/ |
+| Network     | Chain ID | Status      | Block Explorer           |
+| ----------- | -------- | ----------- | ------------------------ |
+| Arc Mainnet | 5042     | 🚧 To build | https://explorer.arc.io/ |
 
 **No testnets.** All development against mainnet forks (Anvil) during dev; real mainnet for staging/prod.
 
 ---
 
-## 🪙 Supported Tokens (Base Mainnet)
+## 🪙 Supported Tokens (Arc Mainnet)
 
 | Token                | Symbol | Address                                      | Decimals | CoinGecko ID         |
 | -------------------- | ------ | -------------------------------------------- | -------- | -------------------- |
@@ -33,7 +35,7 @@ Rebuild Mantua AI from scratch as a production-grade, AI-powered DeFi platform o
 | USD Coin             | USDC   | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | 6        | usd-coin             |
 | Euro Coin            | EURC   | `0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42` | 6        | euro-coin            |
 
-> ⚠️ Token addresses above are Base Mainnet canonical addresses — verify each against the issuer's official docs before hardcoding (P1-002). The registry lives in `server/src/lib/tokens.ts`.
+> ⚠️ Token addresses above were the Base Mainnet canonical addresses; the Arc set (USDC `0x3600…0000`, EURC, cirBTC) lives in the registry — verify each against the issuer's official docs before hardcoding (P1-002). The registry lives in `server/src/lib/tokens.ts`.
 
 ---
 
@@ -773,9 +775,9 @@ Output: {
 
 ---
 
-## ✅ PHASE 9: E2E Testing & Launch (Base Mainnet)
+## ✅ PHASE 9: E2E Testing & Launch (Arc Mainnet)
 
-Mantua v2 ships on **Base Mainnet (8453)** — the single supported chain.
+Mantua v2 ships on **Arc Mainnet (5042)** — the single supported chain (revised 2026-09-29; was Base).
 Real user funds are in play from day one, so the Phase 1 safety rails,
 the security sign-off, and the hook redeployment/verification below are
 all launch-gating.
@@ -1053,13 +1055,13 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 
 ## ⚠️ Critical Implementation Rules
 
-1. **Base Mainnet only** — the live target is Base Mainnet (chain ID 8453); `MANTUA_NETWORK` defaults to `mainnet`. Any other chain ID is rejected at the boundary. No Anvil in production code paths.
+1. **Arc Mainnet only** — the live target is Arc Mainnet (chain ID 5042); `MANTUA_NETWORK` defaults to `mainnet`. Any other chain ID is rejected at the boundary. No Anvil in production code paths.
 2. **Chain ID matches `MANTUA_NETWORK`** — read from `useChainId()` and reject mismatches
 3. **NEVER hardcode token prices** — Dune's hardcoded placeholder prices (ETH=$2000 etc.) were a v1 expedient; v2 pulls live prices
 4. **NEVER duplicate swap/liquidity logic** — single shared module, used by UI and agent
 5. **ALWAYS confirm transactions on-chain** — wait for receipt before UI "success"
 6. **ALWAYS store transactions in DB** before showing success state
-7. **ALWAYS show BaseScan link** for every transaction
+7. **ALWAYS show an Arcscan link** for every transaction
 8. **File length max 150 lines** — split into modules
 9. **No TODOs** — every shipped feature fully implemented
 10. **No `any` types** — TypeScript strict mode enforced
@@ -1129,7 +1131,7 @@ Launch Gate rows are L-001 … L-018; the repository's ledger maps them in
 
 | Resource                | URL                                                                                                     |
 | ----------------------- | ------------------------------------------------------------------------------------------------------- |
-| Base Mainnet explorer   | https://basescan.org/                                                                                   |
+| Arc Mainnet explorer    | https://explorer.arc.io/                                                                                |
 | Privy dashboard         | https://dashboard.privy.io                                                                              |
 | Privy React docs        | https://docs.privy.io/basics/react/quickstart                                                           |
 | Uniswap Trading API     | https://docs.uniswap.org/api/trading/overview                                                           |

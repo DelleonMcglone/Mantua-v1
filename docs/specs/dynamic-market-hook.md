@@ -4,8 +4,8 @@
 > **Task:** 005 — Dynamic Market Hook
 > **Resolves:** DM-110
 > **Unblocks:** Phase B2 — market pages, pool listing
-> **Target:** Base Mainnet
-> **Chain ID:** 8453
+> **Target:** Arc Mainnet (revised 2026-09-29; was Base)
+> **Chain ID:** 5042
 
 ---
 
@@ -26,7 +26,7 @@ interface. Verified by `test_outcomeTokensInheritCollateralDecimals` in
 six. The registry should still store the value so a future non-6dp collateral
 cannot silently break notional maths.
 
-Base's native gas token (ETH) is 18 decimals; outcome tokens never touch that
+Arc's native gas token is USDC itself (an 18-decimal view of the 6-decimal ERC-20 balance); outcome tokens never touch that
 side. Only gas math is 18-dp.
 
 **Keeper identity: the market resolver key** (owner decision, 2026-08-17). The
@@ -68,14 +68,14 @@ The spec deliberately supplied no numbers. These were chosen by the owner and
 fill the §27 bounds. All are immutable after deployment; §44 makes it a failure
 condition if any path can raise `MAX_FEE` or `ABS_MAX_TRADE`.
 
-| Constant        | Value      | Meaning           | Why                                                                                                                                                                                                                                 |
-| --------------- | ---------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~`BASE_FEE`~~  | ~~`3_000`~~ | ~~0.30%~~        | **Superseded by D-105 (§0.6):** `REGULAR_SEASON_FEE = 0`, `MIN_RATE = 1_000` (0.10%)                                                                                                                                                |
-| ~~`MAX_FEE`~~   | ~~`50_000`~~ | ~~5.00%~~       | **Superseded by D-105 (§0.6):** `MAX_RATE = 7_000` (0.70%), the immutable ceiling; §22 clamps a stale playoff market here                                                                                                             |
-| `ABS_MAX_TRADE` | `10_000e6` | $10,000 USDC      | Large enough not to bind in normal flow, small enough that the §35 "above cap → reverts" test is reachable                                                                                                                          |
-| `MIN_TRADE_CAP` | `100e6`    | $100 USDC         | The §21 floor, and where §22 clamps a stale market                                                                                                                                                                                  |
-| `STALE_AFTER`   | `900`      | 15 minutes        | Keeper cadence tolerance before §22 fail-closed behaviour engages                                                                                                                                                                   |
-| `MAX_EVENT_DURATION` | `43_200` | 12-hour backstop | **D-103 in-play trading** (supersedes `FREEZE_LEAD = 0`, which froze at kickoff). Trading runs through the game; the halt is the keeper's `FINAL` write, and this backstop — `kickoff + MAX_EVENT_DURATION`, keeper-independent — guarantees the halt even with the service down. Must equal `Market.MAX_EVENT_DURATION`, so the hook halts swaps at the same instant the market's permissionless `freeze()` unlocks (asserted in `Market.t.sol`) |
+| Constant             | Value        | Meaning          | Why                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------- | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~`BASE_FEE`~~       | ~~`3_000`~~  | ~~0.30%~~        | **Superseded by D-105 (§0.6):** `REGULAR_SEASON_FEE = 0`, `MIN_RATE = 1_000` (0.10%)                                                                                                                                                                                                                                                                                                                                                              |
+| ~~`MAX_FEE`~~        | ~~`50_000`~~ | ~~5.00%~~        | **Superseded by D-105 (§0.6):** `MAX_RATE = 7_000` (0.70%), the immutable ceiling; §22 clamps a stale playoff market here                                                                                                                                                                                                                                                                                                                         |
+| `ABS_MAX_TRADE`      | `10_000e6`   | $10,000 USDC     | Large enough not to bind in normal flow, small enough that the §35 "above cap → reverts" test is reachable                                                                                                                                                                                                                                                                                                                                        |
+| `MIN_TRADE_CAP`      | `100e6`      | $100 USDC        | The §21 floor, and where §22 clamps a stale market                                                                                                                                                                                                                                                                                                                                                                                                |
+| `STALE_AFTER`        | `900`        | 15 minutes       | Keeper cadence tolerance before §22 fail-closed behaviour engages                                                                                                                                                                                                                                                                                                                                                                                 |
+| `MAX_EVENT_DURATION` | `43_200`     | 12-hour backstop | **D-103 in-play trading** (supersedes `FREEZE_LEAD = 0`, which froze at kickoff). Trading runs through the game; the halt is the keeper's `FINAL` write, and this backstop — `kickoff + MAX_EVENT_DURATION`, keeper-independent — guarantees the halt even with the service down. Must equal `Market.MAX_EVENT_DURATION`, so the hook halts swaps at the same instant the market's permissionless `freeze()` unlocks (asserted in `Market.t.sol`) |
 
 Fees are in v4 pips — `1_000_000` = 100%, so `3_000` = 0.30%. Note this differs
 from the basis-point convention used for probability and confidence (§10, §12),
@@ -168,7 +168,7 @@ liquidity incentives, or control LP withdrawal.
 - On-chain derivation of market state
 - Fee-decomposition events
 - Multi-pool state management
-- Base Mainnet deployment
+- Arc Mainnet deployment
 
 #### Out of scope
 
@@ -517,7 +517,7 @@ configured risk maximum and the trade-size cap toward its minimum.
 ## 16. Fee Calculation
 
 > **Superseded by D-105 (§0.6).** The fee is `0` for a regular-season pool.
-> For a playoff pool the *rate* is `MIN_RATE` plus four bounded premiums
+> For a playoff pool the _rate_ is `MIN_RATE` plus four bounded premiums
 > (liquidity, volatility, activity, uncertainty; shares 25% each of the
 > `MAX_RATE − MIN_RATE` headroom), clamped to `[MIN_RATE, MAX_RATE]`, and
 > the pip fee returned to v4 is `rate × (1 − p)`. The text below describes
@@ -791,9 +791,9 @@ The exact ABI should be finalized during implementation to minimize event cost
 while preserving all information required by the UI.
 
 > **As shipped (D-105):** `MarketFeeUpdated(PoolId indexed poolId,
-> Breakdown breakdown, uint24 effectiveFee)` where `Breakdown` is
+Breakdown breakdown, uint24 effectiveFee)` where `Breakdown` is
 > `{minRate, liquidityPremium, volatilityPremium, activityPremium,
-> uncertaintyPremium, rate, probabilityBps, playoffs, stale}` — the four
+uncertaintyPremium, rate, probabilityBps, playoffs, stale}` — the four
 > drivers, the rate, the price the fee was shaped by, and the season flag.
 
 ## 30. Required Contracts
@@ -964,7 +964,7 @@ keeper degrades pricing, and the time backstop still closes the market.
 
 ## 37. Deployment
 
-Target Base Mainnet, chain ID 8453. Deploy against the canonical Base Mainnet
+Target Arc Mainnet, chain ID 5042. Arc has no canonical Uniswap v4, so deploy against Mantua's own
 Uniswap v4 stack:
 
 ```text
@@ -1000,13 +1000,13 @@ installed as part of the contract development environment.
 
 ## 40. Verification
 
-Verify against BaseScan (`https://basescan.org`) using `--verifier etherscan`
-with a BaseScan API key.
+Verify against Arcscan (`https://explorer.arc.io`, Blockscout) using `--verifier blockscout`;
+no API key is needed.
 
 ## 41. Backend Integration
 
 Record the deployment in `server/src/lib/v4-contracts.ts` (env-driven
-address), then verify `getV4StackForHook()` routes to the Base Mainnet
+address), then verify `getV4StackForHook()` routes to the Arc Mainnet
 deployment correctly.
 
 The backend must use the actual deployed addresses. No addresses may be
@@ -1101,9 +1101,9 @@ Complete only when all of the following are true:
 - No `tx.origin`.
 - No `delegatecall`.
 - No unbounded loops.
-- Canonical Base Mainnet v4 stack addresses are confirmed.
+- Mantua's own PoolManager address on Arc is confirmed (no canonical v4 on Arc).
 - Hook is CREATE2 deployed.
-- BaseScan verification succeeds.
+- Arcscan verification succeeds.
 - Deployment registry is updated.
 - `getV4StackForHook()` routes correctly.
 - `docs/architecture.md` is updated.
@@ -1121,7 +1121,7 @@ Complete only when all of the following are true:
 - [x] Confirm OutcomeToken decimals — 6, see §0.1
 - [x] Determine decimal scaling requirement — none, see §0.1
 - [x] Configure keeper identity — market resolver key, see §0.1
-- [ ] Confirm Base Mainnet addresses for the v4 stack
+- [ ] Confirm the Arc Mainnet addresses for Mantua's own v4 stack
 - [x] Install required Foundry dependencies — see §0.2
 
 **Contracts**

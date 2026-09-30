@@ -1,5 +1,7 @@
 # Sports Pivot — Carried-Forward Scope Reconciliation
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Task:** B0-006 in `docs/tasks/sports-pivot.md`.
 **Premise:** the pivot builds on the existing repo and "everything in that repo
 still ships". This document says, per area, what survives untouched, what is

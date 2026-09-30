@@ -111,4 +111,4 @@ Prototype does not show focus states explicitly. v2 adds:
 
 ## Chain lock
 
-Single chain — Base Mainnet (8453). The prototype shows a network dropdown but only Base is selectable. v2 keeps the dropdown for future-proofing but enforces Base at every boundary (Privy, viem, server validation).
+Single chain — Arc Mainnet (5042). The prototype shows a network dropdown but only Arc is selectable. v2 keeps the dropdown for future-proofing but enforces Arc at every boundary (Privy, viem, server validation).

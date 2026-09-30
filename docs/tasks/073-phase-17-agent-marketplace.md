@@ -1,5 +1,7 @@
 # Task 073 — Agent Marketplace + Agent-Native Services (Phase 17, MP-001 … MP-011)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Numbering follows the owner's master list of 2026-09-16
 > (`docs/tasks/mantua-v1-task-list.md`), where Phase 17 is "Circle Agent
 > Marketplace + Agent-Native Services". Task number **073** is the next

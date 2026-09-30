@@ -66,17 +66,15 @@ tail -1000 /private/tmp/mantua-server.log | grep -E 'ECONNREFUSED|timeout|503'
 tail -10000 /private/tmp/mantua-server.log | grep '0xbaac'
 ```
 
-**On-chain incidents (Base Mainnet):**
+**On-chain incidents (Arc Mainnet):**
 
 - Mantua hooks (Stable Protection, gated to USDC/EURC; Dynamic Fee, any
   pair): mainnet deployment pending — addresses come from the
   `STABLE_PROTECTION_HOOK_ADDRESS` / `DYNAMIC_FEE_HOOK_ADDRESS` env
   overrides once deployed. See
   `docs/security/hook-deployments.md`.
-- v4 PoolManager (Base): `0x498581fF718922c3f8e6A244956aF099B2652b2b`.
-- v4 Quoter (Base): `0x0d5e0F971ED27FBfF6c2837bf31316121532048D`.
-- v4 StateView (Base): `0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71`.
-- BaseScan: `https://basescan.org/address/<addr>`.
+- Arc has no canonical Uniswap v4. Market pools run on Mantua's own PoolManager / Quoter / StateView — addresses in `deploy/dynamic-market/README.md` once the Arc deploy lands.
+- Arcscan (Blockscout): `https://explorer.arc.io/address/<addr>`.
 
 For mid-incident on-chain spelunking, write a one-off `tsx` script
 under `server/` that imports `baseRpcClient` from
@@ -97,6 +95,7 @@ User-facing status post format (Twitter/X + status page):
 > We'll update this thread every \[15 / 30 / 60\] minutes until resolved.
 
 Key principles:
+
 - **Lead with status word** in brackets. Subscribers filter on it.
 - **Always disclose write status** — that's the question users have.
 - **Set update cadence**. If you say "every 15 minutes", post every
@@ -105,6 +104,7 @@ Key principles:
 - **No speculation about cause** until you've isolated it.
 
 For a critical incident (funds at risk, contract bug, etc.), also:
+
 - DM major LPs directly (positions > $100k, listed in Linear "VIPs")
 - Post in #incidents Slack channel with the full diagnosis chain
 
@@ -154,6 +154,7 @@ Within 48 hours of resolution, write a postmortem in
 **Author:** <on-call>
 
 ## Timeline (UTC)
+
 - HH:MM — first signal
 - HH:MM — kill switch activated
 - HH:MM — root cause identified
@@ -161,24 +162,29 @@ Within 48 hours of resolution, write a postmortem in
 - HH:MM — kill switch lifted
 
 ## What happened
+
 2-3 paragraphs. Plain language.
 
 ## Root cause
+
 The actual technical cause. Files, commits, env vars, etc.
 
 ## What worked
+
 - The kill switch fired in <X> seconds
-- BaseScan / on-chain readbacks were accurate
+- Arcscan / on-chain readbacks were accurate
 - ...
 
 ## What didn't
+
 - Alert fired N minutes after first user report
 - ...
 
 ## Action items
-| Item | Owner | Due |
-| ---- | ----- | --- |
-| Add alert for X | @who | YYYY-MM-DD |
+
+| Item            | Owner | Due        |
+| --------------- | ----- | ---------- |
+| Add alert for X | @who  | YYYY-MM-DD |
 ```
 
 Postmortems land in main as their own PR; reviewed by everyone on

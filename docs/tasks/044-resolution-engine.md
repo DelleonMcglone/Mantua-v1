@@ -1,5 +1,7 @@
 # 044 — Resolution engine (D-104: P-005 / P-010)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ done 2026-09-06
 **Branch:** `044-resolution-engine`
 
@@ -102,7 +104,7 @@ New internal router, mounted in `app.ts`, authenticated with
   release distinguishes "no row" (404) from "no hold" (409). Both write a
   success audit row carrying the note.
 - `POST /api/ops/resolution/override` — `{marketId, action: resolve|void,
-  outcome? (required for resolve), note}`. Refuses: no signer (503
+outcome? (required for resolve), note}`. Refuses: no signer (503
   `RESOLUTION_DISABLED`), unknown market (404), market not OPEN/FROZEN
   (409 `MARKET_NOT_RESOLVABLE` — RESOLVED/SETTLED/INVALID would
   double-resolve). Executes through the SAME submitter machinery as the
