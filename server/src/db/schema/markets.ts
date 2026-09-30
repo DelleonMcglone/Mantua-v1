@@ -229,6 +229,11 @@ export const events = pgTable(
     awayScore: integer("away_score"),
     /** When the ingest worker last saw this event (B3-005). */
     lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+    /** Every provider that has described this game, name → its event id
+     *  (R-012). `(provider, providerEventId)` above stays the canonical
+     *  identity; this is how a second provider's slate refreshes the same
+     *  row instead of duplicating it (event-match.ts). */
+    providerIds: jsonb("provider_ids").$type<Record<string, string>>().notNull().default({}),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -238,6 +243,14 @@ export const events = pgTable(
     unique("events_provider_event_uq").on(t.provider, t.providerEventId),
     index("events_league_starts_idx").on(t.leagueId, t.startsAt),
     index("events_status_idx").on(t.status),
+    // The cross-provider match: same league, same two teams, kickoff
+    // within the tolerance (event-match.ts).
+    index("events_league_teams_starts_idx").on(
+      t.leagueId,
+      t.homeTeamKey,
+      t.awayTeamKey,
+      t.startsAt,
+    ),
   ],
 );
 

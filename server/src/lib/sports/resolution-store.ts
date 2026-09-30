@@ -10,7 +10,7 @@
  * the chain has not done.
  */
 
-import { and, desc, eq, inArray, isNull, lt, ne, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
 import {
   events,
@@ -28,6 +28,7 @@ import {
   observationFor,
 } from "./resolution-confidence.ts";
 import type { StoredEventSnapshot } from "./resolution-freshness.ts";
+import { providerIdFor } from "./event-match.ts";
 import type {
   DisputeWindowGate,
   DisputeWindowState,
@@ -277,9 +278,14 @@ export async function loadStoredEvents(
 ): Promise<Map<string, StoredEventSnapshot>> {
   const out = new Map<string, StoredEventSnapshot>();
   if (providerEventIds.length === 0) return out;
+  // R-012 — a row this provider owns, or one it has described under its
+  // own id (provider_ids) while another provider owns it.
+  const ids = [...providerEventIds];
   const rows = await db
     .select({
+      provider: events.provider,
       providerEventId: events.providerEventId,
+      providerIds: events.providerIds,
       status: events.status,
       homeScore: events.homeScore,
       awayScore: events.awayScore,
@@ -287,10 +293,15 @@ export async function loadStoredEvents(
     })
     .from(events)
     .where(
-      and(eq(events.provider, provider), inArray(events.providerEventId, [...providerEventIds])),
+      or(
+        and(eq(events.provider, provider), inArray(events.providerEventId, ids)),
+        inArray(sql<string>`${events.providerIds} ->> ${provider}`, ids),
+      ),
     );
   for (const r of rows) {
-    out.set(r.providerEventId, {
+    const key = providerIdFor(r, provider);
+    if (key === null) continue;
+    out.set(key, {
       status: r.status,
       homeScore: r.homeScore,
       awayScore: r.awayScore,

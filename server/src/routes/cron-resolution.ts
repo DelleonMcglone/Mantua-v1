@@ -3,7 +3,7 @@ import { db } from "../db/client.ts";
 import { env } from "../env.ts";
 import { logAudit } from "../lib/audit.ts";
 import { logger } from "../lib/logger.ts";
-import { providerFor } from "../lib/sports/active-provider.ts";
+import { providerChainFor, providerFor } from "../lib/sports/active-provider.ts";
 import { executeResolution, planResolution } from "../lib/sports/resolution.ts";
 import { checkFeedFreshness } from "../lib/sports/resolution-freshness.ts";
 import {
@@ -52,16 +52,27 @@ async function resolutionSlateFor(
   league: LeagueSlug,
   dates: string | null,
 ): Promise<ProviderSlate> {
-  const provider = resolutionProviderFor(league);
-  if (dates !== null && provider.name !== "espn") {
-    logger.warn(
-      { league, provider: provider.name, dates },
-      "resolution: ?dates= backfill is only honoured by the espn adapter — sweeping the current slate",
-    );
+  // R-012: the primary first, ESPN behind it. A stored event polled under
+  // the fallback's id still resolves to the same row (provider_ids), so
+  // the S-022 reconciliation precheck keeps its footing.
+  let lastErr: unknown = null;
+  for (const provider of providerChainFor(league)) {
+    if (dates !== null && provider.name !== "espn") {
+      logger.warn(
+        { league, provider: provider.name, dates },
+        "resolution: ?dates= backfill is only honoured by the espn adapter — sweeping the current slate",
+      );
+    }
+    const getSlate: (league: LeagueSlug, dates?: string) => Promise<ProviderSlate> =
+      provider.getSlate.bind(provider);
+    try {
+      return await getSlate(league, dates ?? undefined);
+    } catch (err) {
+      lastErr = err;
+      logger.warn({ league, provider: provider.name, err }, "resolution: slate provider failed");
+    }
   }
-  const getSlate: (league: LeagueSlug, dates?: string) => Promise<ProviderSlate> =
-    provider.getSlate.bind(provider);
-  return getSlate(league, dates ?? undefined);
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
 
 /**

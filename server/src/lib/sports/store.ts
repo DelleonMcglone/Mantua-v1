@@ -52,6 +52,7 @@ import {
   type TeamRecordPlan,
 } from "./ingest.ts";
 import { MAX_EVENT_DURATION_SECONDS } from "./strategies.ts";
+import { KICKOFF_MATCH_TOLERANCE_MS, findCanonicalMatch, withProviderId } from "./event-match.ts";
 import { canonicalToPublicSlate, type PublicSlate } from "./public-slate.ts";
 
 /** The catalog the covered leagues hang off. Mirrors DM-105. */
@@ -130,9 +131,22 @@ export async function upsertEvents(
   const result: UpsertResult = { inserted: 0, updated: 0, sideConflicts: [] };
 
   for (const e of batch) {
-    const existing = await db.query.events.findFirst({
-      where: and(eq(events.provider, provider), eq(events.providerEventId, e.providerEventId)),
-    });
+    // R-012 — identity in three steps: the row this provider owns, then a
+    // row another provider owns that this provider has described before
+    // (its id is in provider_ids), then a row another provider owns for
+    // the same two teams around the same kickoff (event-match.ts). The
+    // matched row keeps its owner; this provider only leaves its id.
+    const existing =
+      (await db.query.events.findFirst({
+        where: and(eq(events.provider, provider), eq(events.providerEventId, e.providerEventId)),
+      })) ??
+      (await db.query.events.findFirst({
+        where: and(
+          eq(events.leagueId, leagueId),
+          sql`${events.providerIds} ->> ${provider} = ${e.providerEventId}`,
+        ),
+      })) ??
+      (await findCrossProviderRow(db, leagueId, provider, e));
     // The two teams ride along with every slate row (name, abbreviation,
     // logo) so the board can show real marks: the slate feed is the only
     // team source an ESPN-only deployment has. Idempotent on (league, key).
@@ -147,6 +161,7 @@ export async function upsertEvents(
           leagueId,
           provider,
           providerEventId: e.providerEventId,
+          providerIds: { [provider]: e.providerEventId },
           homeTeam: e.home.name,
           awayTeam: e.away.name,
           homeTeamKey: e.home.key,
@@ -192,6 +207,7 @@ export async function upsertEvents(
         // were persisted from the slate.
         ...(homeTeamId && !existing.homeTeamId ? { homeTeamId } : {}),
         ...(awayTeamId && !existing.awayTeamId ? { awayTeamId } : {}),
+        providerIds: withProviderId(existing.providerIds, provider, e.providerEventId),
         lastPolledAt: new Date(),
         updatedAt: sql`now()`,
       })
@@ -200,6 +216,36 @@ export async function upsertEvents(
   }
 
   return result;
+}
+
+/** The league's rows for the same two teams around the kickoff, matched
+ *  by event-match.ts. The keys are already canonical (team-alias.ts). */
+async function findCrossProviderRow(
+  db: DB,
+  leagueId: string,
+  provider: string,
+  e: ProviderEvent,
+): Promise<typeof events.$inferSelect | null> {
+  const startsAt = new Date(e.startsAt * 1000);
+  const candidates = await db
+    .select()
+    .from(events)
+    .where(
+      and(
+        eq(events.leagueId, leagueId),
+        eq(events.homeTeamKey, e.home.key),
+        eq(events.awayTeamKey, e.away.key),
+        sql`${events.startsAt} between ${new Date(startsAt.getTime() - KICKOFF_MATCH_TOLERANCE_MS)} and ${new Date(startsAt.getTime() + KICKOFF_MATCH_TOLERANCE_MS)}`,
+      ),
+    );
+  const match = findCanonicalMatch(candidates, {
+    provider,
+    providerEventId: e.providerEventId,
+    homeTeamKey: e.home.key,
+    awayTeamKey: e.away.key,
+    startsAtMs: startsAt.getTime(),
+  });
+  return match ? (candidates.find((c) => c.id === match.id) ?? null) : null;
 }
 
 // ─── Reference data: teams, players, injuries (S-003) ───────────────────────

@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
-import { activeBreakerState, providerFor } from "../lib/sports/active-provider.ts";
-import { feedFreshnessSnapshot, refreshSlate } from "../lib/sports/ingest.ts";
+import { activeBreakerState, liveProviderChainFor } from "../lib/sports/active-provider.ts";
+import { feedFreshnessSnapshot } from "../lib/sports/ingest.ts";
+import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import { refreshPlayByPlay, upsertEvents } from "../lib/sports/store.ts";
 import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
@@ -48,8 +49,14 @@ cronLiveSyncRouter.get(
 
     for (const league of LEAGUES) {
       try {
-        const provider = providerFor(league);
-        const refresh = await refreshSlate(provider, league, nowSeconds);
+        // R-012: ESPN on a trial Sportradar key (quota), Sportradar with
+        // ESPN behind it on a production key; the adapter that served the
+        // slate also serves this tick's play-by-play.
+        const {
+          served: provider,
+          refresh,
+          skipped,
+        } = await refreshSlateWithFallback(liveProviderChainFor(league), league, nowSeconds);
         // Task 071 (MX-004) — statuses before the write, so a kickoff or a
         // final is a transition this tick observed, not a re-read.
         const before = await eventStatuses(
@@ -71,7 +78,14 @@ cronLiveSyncRouter.get(
           logger.warn({ league, err }, "live-sync: play-by-play pass failed");
           playByPlay = { error: err instanceof Error ? err.message : String(err) };
         }
-        results[league] = { delayed: refresh.delayed, events: persisted, playByPlay, gameAlerts };
+        results[league] = {
+          provider: refresh.provider,
+          skippedProviders: skipped,
+          delayed: refresh.delayed,
+          events: persisted,
+          playByPlay,
+          gameAlerts,
+        };
       } catch (err) {
         failures += 1;
         logger.error({ league, err }, "live-sync: league failed");
