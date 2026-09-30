@@ -1,12 +1,15 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createPublicKey, verify } from "node:crypto";
+import { createECDH, createPublicKey, verify } from "node:crypto";
 import {
+  b64url,
   fromB64url,
   generateVapidKeys,
+  padScalar,
   pushAudience,
   VAPID_TOKEN_TTL_SECONDS,
   vapidAuthorization,
+  vapidSigningKey,
 } from "./vapid.ts";
 
 void describe("VAPID (RFC 8292, MX-004)", () => {
@@ -65,5 +68,27 @@ void describe("VAPID (RFC 8292, MX-004)", () => {
       "https://updates.push.services.mozilla.com",
     );
     assert.ok(VAPID_TOKEN_TTL_SECONDS <= 24 * 3600);
+  });
+});
+
+void describe("VAPID key generation — fixed-width scalar", () => {
+  void it("pads a scalar whose top byte is zero back to 32 bytes (the 1-in-256 flake)", () => {
+    // A valid P-256 scalar with a leading zero byte: Node returns it as 31
+    // bytes from getPrivateKey(); un-padded it fails the 32-byte check.
+    const scalar = Buffer.concat([Buffer.alloc(1, 0), Buffer.alloc(31, 0x42)]);
+    const ecdh = createECDH("prime256v1");
+    ecdh.setPrivateKey(scalar);
+    assert.equal(ecdh.getPrivateKey().length, 31, "Node strips the leading zero");
+    const padded = padScalar(ecdh.getPrivateKey());
+    assert.equal(padded.length, 32);
+    assert.ok(padded.equals(scalar));
+    // And the padded encoding is what the signing key accepts.
+    const key = vapidSigningKey(b64url(padded));
+    assert.equal(key.asymmetricKeyType, "ec");
+  });
+
+  void it("leaves a full-width scalar alone", () => {
+    const full = Buffer.alloc(32, 0x07);
+    assert.ok(padScalar(full).equals(full));
   });
 });
