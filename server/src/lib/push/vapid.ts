@@ -31,7 +31,22 @@ export function fromB64url(text: string): Buffer {
 export function generateVapidKeys(): { publicKey: string; privateKey: string } {
   const ecdh = createECDH("prime256v1");
   ecdh.generateKeys();
-  return { publicKey: b64url(ecdh.getPublicKey()), privateKey: b64url(ecdh.getPrivateKey()) };
+  return {
+    publicKey: b64url(ecdh.getPublicKey()),
+    privateKey: b64url(padScalar(ecdh.getPrivateKey())),
+  };
+}
+
+/**
+ * Node's `ECDH.getPrivateKey()` returns the scalar as a minimal big-endian
+ * integer — a scalar whose top byte is zero comes back as 31 bytes (about
+ * one key in 256). RFC 8292 / JWK `d` wants the fixed 32-byte encoding, and
+ * `vapidSigningKey` rightly refuses anything else, so a generated key must
+ * be padded before it is ever printed or stored.
+ */
+export function padScalar(scalar: Buffer): Buffer {
+  if (scalar.length >= 32) return scalar;
+  return Buffer.concat([Buffer.alloc(32 - scalar.length, 0), scalar]);
 }
 
 /** The private scalar as a signing key, with its public point recomputed. */
