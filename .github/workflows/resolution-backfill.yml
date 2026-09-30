@@ -48,6 +48,7 @@ jobs:
         env:
           DATES: ${{ inputs.dates }}
         run: |
+          set -o pipefail
           curl -sS -f -m 280 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             "https://test-mantua.vercel.app/api/cron/live-sync?dates=$DATES" \

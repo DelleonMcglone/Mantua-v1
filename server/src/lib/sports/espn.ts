@@ -239,6 +239,24 @@ export function parseSlate(payload: unknown, league: LeagueSlug): ProviderEvent[
 
 const ESPN_HOSTS = ["https://site.api.espn.com", "https://site.web.api.espn.com"] as const;
 
+/**
+ * `YYYYMMDD-YYYYMMDD` → every day in the window as `YYYYMMDD` (inclusive).
+ * A single day (or anything not in range form) comes back as itself. The
+ * slate route caps ranges at 31 days before they get here.
+ */
+export function expandDateRange(dates: string): string[] {
+  const m = /^(\d{4})(\d{2})(\d{2})-(\d{4})(\d{2})(\d{2})$/.exec(dates);
+  if (!m) return [dates];
+  const start = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  const end = Date.UTC(Number(m[4]), Number(m[5]) - 1, Number(m[6]));
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return [dates];
+  const out: string[] = [];
+  for (let t = start; t <= end && out.length <= 31; t += 86_400_000) {
+    out.push(new Date(t).toISOString().slice(0, 10).replaceAll("-", ""));
+  }
+  return out;
+}
+
 export class EspnProvider implements SportsDataProvider {
   readonly name = "espn";
   readonly leagues = ["nfl"] as const;
@@ -255,10 +273,26 @@ export class EspnProvider implements SportsDataProvider {
 
   async getSlate(league: LeagueSlug, dates?: string): Promise<ProviderSlate> {
     // `dates` is a pre-validated YYYYMMDD-YYYYMMDD range (see the slate
-    // route); ESPN's scoreboard accepts it on every league. Omitted = the
-    // provider default, which is today for daily leagues (WNBA) but the
-    // CURRENT SCHEDULE WEEK for the NFL — midweek that is mostly finished
-    // games, so surfaces that want upcoming games must pass a range.
+    // route). ESPN's scoreboard does NOT accept the range form for the
+    // NFL (HTTP 400, verified 2026-09-30) — only a single day — so a range
+    // is served as one request per day and merged. Omitted = the provider
+    // default, which is today for daily leagues (WNBA) but the CURRENT
+    // SCHEDULE WEEK for the NFL — midweek that is mostly finished games, so
+    // surfaces that want a specific window must pass one.
+    const days = dates ? expandDateRange(dates) : null;
+    if (days && days.length > 1) {
+      const slates = await Promise.all(days.map((day) => this.getSlate(league, day)));
+      const byId = new Map<string, ProviderEvent>();
+      for (const s of slates) for (const e of s.events) byId.set(e.providerEventId, e);
+      return {
+        provider: this.name,
+        league,
+        events: [...byId.values()],
+        delayed: slates.some((s) => s.delayed),
+        // The oldest fetch bounds the freshness of the merged window.
+        fetchedAt: Math.min(...slates.map((s) => s.fetchedAt)),
+      };
+    }
     const suffix = dates ? `?dates=${dates}` : "";
     const path = `/apis/site/v2/sports/${LEAGUE_PATH[league]}/scoreboard${suffix}`;
     const res = await this.http.get<unknown>(
