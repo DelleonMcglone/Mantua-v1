@@ -1,5 +1,7 @@
 # 028 — Market redemption (C-011 GAP-3)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Gap record: `docs/tasks/023-usdc-denomination-flow.md` → GAP-3
 > Branch: `028-market-redemption`
 > Status: **code-complete** — end-to-end verification blocked on the Base

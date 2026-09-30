@@ -1,5 +1,7 @@
 # 027 — Gasless user transactions (C-005 / C-006, D-111)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Decision record: `docs/decisions/v2-open-decisions.md` → D-111
 > Branch: `027-gasless-user-transactions`
 > Status: **C-005 🟡 code-complete behind flag** (`VITE_GASLESS_ENABLED`, OFF by

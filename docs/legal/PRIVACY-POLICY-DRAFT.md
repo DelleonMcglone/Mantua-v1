@@ -15,7 +15,7 @@
 
 **Updated 2026-08-16** for the sports-prediction-market pivot: market
 positions and resolution records added to §2, sports data providers added to
-§3, chain references per DM-104 (now Base Mainnet).
+§3, chain references per DM-104 (now Arc Mainnet).
 
 ## 1. Scope
 
@@ -87,7 +87,7 @@ Sports data flows **inbound only**: we fetch public schedules and scores, and
 no user identifier is attached to those requests. A provider cannot learn who
 holds a position from our traffic.
 
-The swap path for market pools uses the **on-chain v4 Quoter** on Base
+The swap path for market pools uses the **on-chain v4 Quoter** on Arc
 Mainnet. No third-party trading API is in the data flow for market pools;
 base pairs route per DM-112.
 

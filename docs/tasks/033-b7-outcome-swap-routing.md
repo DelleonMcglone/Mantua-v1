@@ -1,5 +1,7 @@
 # 033 — B7 outcome-token swaps + DM-112 routing split (B7-003 / B7-005)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ done 2026-09-05
 **Branch:** `033-b7-outcome-swap-routing`
 
@@ -26,11 +28,11 @@ code path keys off the existing per-chain config maps
 Decided by `resolveSwapRoute(tokenIn, tokenOut, chainId)` in
 `server/src/lib/swap-route.ts` — token **addresses** in, route out:
 
-| Pair                                              | Route              | Stack + execution                                                                    | Entry points                                             |
-| ------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------ | -------------------------------------------------------- |
-| outcome (YES) token ↔ USDC (or anything)          | `market-pool`      | Dynamic Market PoolManager + market periphery PoolSwapTest (`getV4StackForHook`)      | `/api/markets/trade/calldata`, strategy executor, agent  |
-| base pair — USDC / EURC / cbBTC, any combination  | `universal-router` | canonical PoolManager via UniversalRouter + Permit2 (task 031)                        | `/api/v4/swap/calldata`, agent swap                      |
-| base pair, no-hook fallback                       | `universal-router` | Uniswap Trading API (`lib/uniswap.ts`) — documented fallback, same classification     | `/api/quote` + `/api/swap/calldata`                      |
+| Pair                                             | Route              | Stack + execution                                                                 | Entry points                                            |
+| ------------------------------------------------ | ------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| outcome (YES) token ↔ USDC (or anything)         | `market-pool`      | Dynamic Market PoolManager + market periphery PoolSwapTest (`getV4StackForHook`)  | `/api/markets/trade/calldata`, strategy executor, agent |
+| base pair — USDC / EURC / cbBTC, any combination | `universal-router` | canonical PoolManager via UniversalRouter + Permit2 (task 031)                    | `/api/v4/swap/calldata`, agent swap                     |
+| base pair, no-hook fallback                      | `universal-router` | Uniswap Trading API (`lib/uniswap.ts`) — documented fallback, same classification | `/api/quote` + `/api/swap/calldata`                     |
 
 Classification rule: both addresses in the chain's token registry ⇒
 `universal-router`; anything else ⇒ `market-pool`. Outcome tokens are

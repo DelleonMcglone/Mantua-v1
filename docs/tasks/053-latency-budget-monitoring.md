@@ -1,5 +1,7 @@
 # Task 053 — Latency budget, metrics, alerts (Phase 7, R-003/R-010)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Owner directive 2026-09-12 (Phase 7 ⚡, 🔴). "Define and enforce p95
 > targets for quote, trade submit, and confirmation during live games" and
 > "real-time dashboards for trade success rate, confirmation latency, feed

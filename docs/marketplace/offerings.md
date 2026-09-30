@@ -19,7 +19,7 @@
 2. **Probe.** An unpaid request returns `402` with a `PAYMENT-REQUIRED` header
    offering **both rails in one `accepts` array** — Circle Gateway
    nanopayments (gasless, sub-cent, batch-settled) and vanilla onchain x402
-   (`exact` scheme, USDC on Base Mainnet, `eip155:8453`).
+   (`exact` scheme, USDC on Arc Mainnet, `eip155:5042`).
 3. **Pay.** The agent picks its rail. For the sports-intelligence service the
    middleware checks the payer against the allowlist **before** settlement —
    a refused payer gets `403 x402_payer_not_authorized` and is never charged.
@@ -86,7 +86,7 @@ and the server holds no keys and executes nothing. Typed refusals
 unchanged — a purchased refusal is a definitive answer.
 
 Portfolio & exposure — _Mantua portfolio & exposure._ "Positions, portfolio
-value, and exposure for any Base address — public chain state only."
+value, and exposure for any Arc address — public chain state only."
 Deliberately limited to what is already public on-chain: an agent can read a
 wallet's exposure without any identity handshake.
 

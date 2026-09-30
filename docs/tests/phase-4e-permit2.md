@@ -14,10 +14,10 @@ Same as `phase-4-liquidity.md`. No new env vars.
 
 ## Permit2 typed-data fields (reference)
 
-- **Domain**: `{ name: "Permit2", chainId: 8453, verifyingContract: 0x000000000022D473030F116dDEE9F6B43aC78BA3 }` — three fields (no `version`). Permit2's EIP-712 deliberately omits version; signing with it would fail to verify.
+- **Domain**: `{ name: "Permit2", chainId: 5042, verifyingContract: 0x000000000022D473030F116dDEE9F6B43aC78BA3 }` — three fields (no `version`). Permit2's EIP-712 deliberately omits version; signing with it would fail to verify.
 - **Spender**: PositionManager (`0x7c5f5a4bbd8fd63184577525326123b519429bdc`). Multicall is `delegatecall`, so when `permitBatch` forwards to Permit2, Permit2 sees `msg.sender == PositionManager`. PM is the spender that gets approved.
 - **Amount**: `type(uint160).max` — Permit2 caps at uint160. Coupled with a 30-min expiration this is "infinite for the next 30 min".
-- **Expiration / sigDeadline**: now + 30 min. Long enough for slow Base blocks + retries; short enough that a leaked sig can't drain a wallet days later.
+- **Expiration / sigDeadline**: now + 30 min. Long enough for Arc blocks + retries; short enough that a leaked sig can't drain a wallet days later.
 - **Nonce**: per (owner, token, spender). Read fresh from `permit2.allowance(owner, token, PM).nonce` on every signing — Permit2 increments on `permit()`, NOT on `transferFrom`. Stale nonce → revert.
 
 ## E2E checklist
@@ -28,14 +28,14 @@ After server + client are up and the user is logged in via Privy:
   - Wallet prompts: ERC-20 `approve(permit2, max)` for USDC. One tx, expect ~50k gas.
   - Wallet prompts: ERC-20 `approve(permit2, max)` for cbBTC. One tx.
   - Wallet prompts: PermitBatch typed-data signature (no gas).
-  - Wallet prompts: tx — calldata is `multicall([permitBatch, modifyLiquidities])` to PositionManager. Inspect via DevTools or BaseScan: function selector should be `0xac9650d8` (`multicall(bytes[])`).
+  - Wallet prompts: tx — calldata is `multicall([permitBatch, modifyLiquidities])` to PositionManager. Inspect via DevTools or Arcscan: function selector should be `0xac9650d8` (`multicall(bytes[])`).
   - Receipt: success, position appears in Positions tab.
   - DB: `portfolio_transactions.params` has the standard fields; `mantua_audit_log` has `action=add_liquidity / outcome=success`.
 
 - [ ] **Same wallet, second add within 30 minutes**:
   - No ERC-20 approve prompts (Permit2 already infinite-approved).
   - No typed-data signature prompt — server sees `permit2.allowance(...).expiration > now + 5 min` and returns `permit2: null`.
-  - Single tx: bare `modifyLiquidities` (selector `0xdd46508f`), no multicall wrapper. Inspect via BaseScan to confirm.
+  - Single tx: bare `modifyLiquidities` (selector `0xdd46508f`), no multicall wrapper. Inspect via Arcscan to confirm.
 
 - [ ] **Same wallet, second add after 30 minutes** (force expiration):
   - No ERC-20 approves (still infinite).
@@ -50,7 +50,7 @@ After server + client are up and the user is logged in via Privy:
 
 - [ ] **Full-exit remove (post-bugfix)**:
   - Open Positions, click Remove, set 100% → confirm.
-  - Wallet signs a `modifyLiquidities` whose `actions` blob starts with byte `0x03` (`BURN_POSITION`), then `0x11` (`TAKE_PAIR`), then optionally `0x14` (`SWEEP`) for native side. Verify on BaseScan calldata decoder.
+  - Wallet signs a `modifyLiquidities` whose `actions` blob starts with byte `0x03` (`BURN_POSITION`), then `0x11` (`TAKE_PAIR`), then optionally `0x14` (`SWEEP`) for native side. Verify on Arcscan calldata decoder.
   - Receipt success. The PositionManager NFT is burned (Transfer event with `to == address(0)`).
   - DB: `portfolio_transactions.params.isFullExit=true`, `positions.status=closed`.
 

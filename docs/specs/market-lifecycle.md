@@ -3,7 +3,7 @@
 **Task:** B0-002 in `docs/tasks/sports-pivot.md`; in-play revision per D-103
 (task 045).
 **Depends on:** DM-101 (outcome-token AMM), DM-102 (binary ERC-20 pair),
-DM-104 (Base Mainnet), DM-106 (moneyline only). Reasoning for each in
+DM-104 (Arc Mainnet, revised 2026-09-29), DM-106 (moneyline only). Reasoning for each in
 `docs/decisions/sports-pivot-decisions.md`.
 **Resolution authority:** decided — D-104 in
 `docs/decisions/v2-open-decisions.md`. The `Resolver` contract holds two
@@ -43,13 +43,13 @@ is allowed to live.
 
 ## 2. States
 
-| State      | Trading  | Split / merge | Redeem   | Entered when                                                                                                        |
-| ---------- | -------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------- |
-| `OPEN`     | yes \*   | yes \*        | no       | market created; **runs through the game** (in-play trading, D-103)                                                   |
-| `FROZEN`   | no       | no            | no       | resolver freezes on final (data-driven, B4-002); or **anyone**, once `startsAt + MAX_EVENT_DURATION` (12 h) passes |
-| `RESOLVED` | no       | no            | yes      | resolver submits an outcome (B4-001)                                                                                 |
-| `SETTLED`  | no       | no            | yes      | all outstanding sets redeemed                                                                                        |
-| `INVALID`  | no       | no            | yes, 1:1 | game postponed, cancelled, or abandoned                                                                              |
+| State      | Trading | Split / merge | Redeem   | Entered when                                                                                                       |
+| ---------- | ------- | ------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `OPEN`     | yes \*  | yes \*        | no       | market created; **runs through the game** (in-play trading, D-103)                                                 |
+| `FROZEN`   | no      | no            | no       | resolver freezes on final (data-driven, B4-002); or **anyone**, once `startsAt + MAX_EVENT_DURATION` (12 h) passes |
+| `RESOLVED` | no      | no            | yes      | resolver submits an outcome (B4-001)                                                                               |
+| `SETTLED`  | no      | no            | yes      | all outstanding sets redeemed                                                                                      |
+| `INVALID`  | no      | no            | yes, 1:1 | game postponed, cancelled, or abandoned                                                                            |
 
 \* The time backstop caps the window even inside `OPEN`: past
 `startsAt + MAX_EVENT_DURATION` the hook halts swaps, `isTradeable()` reports
@@ -206,15 +206,15 @@ the other side.
 
 ## 4. Failure modes
 
-| Failure                            | Behaviour                                                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Provider down during the game      | Trading stays open but clamped (stale-keeper: fee → `MAX_FEE`, cap → `MIN_TRADE_CAP`); server-side quoting halts (P-012)                   |
-| Provider down at the final         | Market stays `OPEN` until the backstop: at `startsAt + MAX_EVENT_DURATION` the hook halts swaps and `freeze()` becomes permissionless      |
-| Provider down after freeze         | Market stays `FROZEN`; resolution waits; manual override available                                                                         |
-| Providers disagree on the final    | Flagged for review (B3-008); no automatic resolution                                                                                       |
-| Game postponed                     | `INVALID` per §3.7                                                                                                                         |
-| Pool has no liquidity              | Market is not listed; `split`/`merge` still work                                                                                           |
-| Resolver submits the wrong outcome | Not recoverable on-chain. Incident runbook (B10-009)                                                                                       |
+| Failure                            | Behaviour                                                                                                                             |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider down during the game      | Trading stays open but clamped (stale-keeper: fee → `MAX_FEE`, cap → `MIN_TRADE_CAP`); server-side quoting halts (P-012)              |
+| Provider down at the final         | Market stays `OPEN` until the backstop: at `startsAt + MAX_EVENT_DURATION` the hook halts swaps and `freeze()` becomes permissionless |
+| Provider down after freeze         | Market stays `FROZEN`; resolution waits; manual override available                                                                    |
+| Providers disagree on the final    | Flagged for review (B3-008); no automatic resolution                                                                                  |
+| Game postponed                     | `INVALID` per §3.7                                                                                                                    |
+| Pool has no liquidity              | Market is not listed; `split`/`merge` still work                                                                                      |
+| Resolver submits the wrong outcome | Not recoverable on-chain. Incident runbook (B10-009)                                                                                  |
 
 The last row is the residual risk behind D-104 and the plan's Risk 2. D-104
 adds a mandatory dispute window (`RESOLUTION_DISPUTE_WINDOW_SECONDS`) between

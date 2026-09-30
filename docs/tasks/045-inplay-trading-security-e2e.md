@@ -1,5 +1,7 @@
 # 045 — In-play trading, markets security review, mainnet-fork E2E
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ done 2026-09-06
 **Branch:** `045-inplay-trading-security-e2e`
 **Closes:** P-004 (in-play semantics), P-013 (markets security review),
@@ -15,22 +17,22 @@ no `client/`.
 ## 1. Semantics diff — the freeze model
 
 The shipped design closed trading at kickoff on two independent clocks. D-103
-replaced that with trading that runs *through* the event, closing on data with
+replaced that with trading that runs _through_ the event, closing on data with
 a time backstop underneath.
 
-| Surface                       | Old (shipped)                                       | New (D-103)                                                                                                       |
-| ----------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `Market.freeze()`             | Permissionless, at `startsAt`. No early path at all | **Resolver-only** from `startsAt` (data-driven, on final); **permissionless** from `startsAt + MAX_EVENT_DURATION` |
-| `Market.MAX_EVENT_DURATION`   | —                                                   | New `public constant` = **12 hours**. Constant, not immutable: the factory passes no duration and no NFL game nears it |
-| `Market.isTradeable()`        | `state == OPEN`                                     | `state == OPEN && now < startsAt + MAX_EVENT_DURATION` — an un-frozen zombie past the backstop no longer reports tradeable |
-| `Resolver.freeze(marketId)`   | Permissionless forward                              | **`onlyAuthorized`** (signer or operator) — see §3, this was a real hole                                          |
-| Hook swap gate                | `RiskPolicy.isFrozen(kickoff, now)` — pure time     | `eventState == FINAL` **or** `RiskPolicy.isPastBackstop(kickoff, now)`                                            |
-| `RiskPolicy.FREEZE_LEAD = 0`  | Halt exactly at kickoff                             | **Removed.** Replaced by `MAX_EVENT_DURATION = 12 hours`, asserted equal to `Market.MAX_EVENT_DURATION`           |
-| `split` / `merge`             | Closed at kickoff (with trading)                    | **Open while trading is open** — full collateral makes set-minting against a known score harmless; still close at freeze |
-| Registry `kickoffTimestamp`   | Immutable, no setter                                | **Unchanged** — still immutable, now anchoring the backstop and the fee dynamics rather than the halt              |
-| Resolve                       | Requires FROZEN                                     | **Unchanged** — resolve-before-freeze still rejected                                                              |
-| Void                          | From OPEN or FROZEN                                 | **Unchanged**                                                                                                     |
-| LP exit during halt           | Always open (no `BEFORE_REMOVE_LIQUIDITY` bit)      | **Unchanged** — re-asserted in both E2Es                                                                          |
+| Surface                      | Old (shipped)                                       | New (D-103)                                                                                                                |
+| ---------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `Market.freeze()`            | Permissionless, at `startsAt`. No early path at all | **Resolver-only** from `startsAt` (data-driven, on final); **permissionless** from `startsAt + MAX_EVENT_DURATION`         |
+| `Market.MAX_EVENT_DURATION`  | —                                                   | New `public constant` = **12 hours**. Constant, not immutable: the factory passes no duration and no NFL game nears it     |
+| `Market.isTradeable()`       | `state == OPEN`                                     | `state == OPEN && now < startsAt + MAX_EVENT_DURATION` — an un-frozen zombie past the backstop no longer reports tradeable |
+| `Resolver.freeze(marketId)`  | Permissionless forward                              | **`onlyAuthorized`** (signer or operator) — see §3, this was a real hole                                                   |
+| Hook swap gate               | `RiskPolicy.isFrozen(kickoff, now)` — pure time     | `eventState == FINAL` **or** `RiskPolicy.isPastBackstop(kickoff, now)`                                                     |
+| `RiskPolicy.FREEZE_LEAD = 0` | Halt exactly at kickoff                             | **Removed.** Replaced by `MAX_EVENT_DURATION = 12 hours`, asserted equal to `Market.MAX_EVENT_DURATION`                    |
+| `split` / `merge`            | Closed at kickoff (with trading)                    | **Open while trading is open** — full collateral makes set-minting against a known score harmless; still close at freeze   |
+| Registry `kickoffTimestamp`  | Immutable, no setter                                | **Unchanged** — still immutable, now anchoring the backstop and the fee dynamics rather than the halt                      |
+| Resolve                      | Requires FROZEN                                     | **Unchanged** — resolve-before-freeze still rejected                                                                       |
+| Void                         | From OPEN or FROZEN                                 | **Unchanged**                                                                                                              |
+| LP exit during halt          | Always open (no `BEFORE_REMOVE_LIQUIDITY` bit)      | **Unchanged** — re-asserted in both E2Es                                                                                   |
 
 ### Who can freeze, when — exactly
 
@@ -92,14 +94,14 @@ freeze/backstop surface reviewed explicitly.
 
 **Verdict: 0 HIGH.** Findings by severity:
 
-| ID   | Severity      | Finding                                                                                               | Status                          |
-| ---- | ------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| —    | (fixed)       | Permissionless `Resolver.freeze()` forward handed the resolver-only early-freeze window to any caller  | **Fixed + regression-tested**   |
-| M-01 | MEDIUM        | Hook halt (`FINAL` write) and market freeze are two different writes by the same service — a half-operating service leaves a decided market trading until the stale clamp + backstop | Open — **ops requirement**, needs owner acceptance |
-| L-01 | LOW           | `redeemInvalid` burns a lone odd token unit for zero payout (rounds to the vault)                      | Open, documented                |
-| L-02 | LOW           | `createMarket` is permissionless; a squatter could pre-create a canonical id with a wrong `startsAt`, which now also mis-anchors the backstop | Open, pre-existing; generator should verify `startsAt` before listing |
-| I-01 | Informational | Losing-side tokens survive redemption by design                                                        | Open, documented                |
-| I-02 | Informational | Resolver can freeze-then-resolve with no on-chain delay (dispute window is server-side, D-104)          | Open, carries B10-007 I-01      |
+| ID   | Severity      | Finding                                                                                                                                                                              | Status                                                                |
+| ---- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| —    | (fixed)       | Permissionless `Resolver.freeze()` forward handed the resolver-only early-freeze window to any caller                                                                                | **Fixed + regression-tested**                                         |
+| M-01 | MEDIUM        | Hook halt (`FINAL` write) and market freeze are two different writes by the same service — a half-operating service leaves a decided market trading until the stale clamp + backstop | Open — **ops requirement**, needs owner acceptance                    |
+| L-01 | LOW           | `redeemInvalid` burns a lone odd token unit for zero payout (rounds to the vault)                                                                                                    | Open, documented                                                      |
+| L-02 | LOW           | `createMarket` is permissionless; a squatter could pre-create a canonical id with a wrong `startsAt`, which now also mis-anchors the backstop                                        | Open, pre-existing; generator should verify `startsAt` before listing |
+| I-01 | Informational | Losing-side tokens survive redemption by design                                                                                                                                      | Open, documented                                                      |
+| I-02 | Informational | Resolver can freeze-then-resolve with no on-chain delay (dispute window is server-side, D-104)                                                                                       | Open, carries B10-007 I-01                                            |
 
 ### The bug this task found and fixed
 
@@ -162,33 +164,33 @@ PoolManager (task 032, finding 3).
 
 The journey, one continuous test:
 
-| Stage | What it proves |
-| ----- | -------------- |
-| Create market | Factory deploys against real USDC as collateral |
-| Split both sides | Real USDC escrowed 1:1; `outstandingSets` == vault balance |
-| Open hooked pool at implied p | `MarketPoolBootstrap.poolKeyFor` + registry registration + init at p = 0.50, price computed for whichever ordering YES sorted into |
-| LP | Liquidity added through the hook's `beforeAddLiquidity` gate |
-| Trade both directions pre-kickoff | Buy YES for USDC, sell a quarter back — dynamic fee applies both ways |
-| **Warp past kickoff → trade in-play** | **The leg the old design forbade.** Keeper marks `LIVE`; the swap succeeds and delivers YES; `market.isTradeable()` is true; `split` still works mid-game |
-| Stranger cannot freeze | `TooEarlyToFreeze` inside the event window |
-| Resolver freeze on "final" | Keeper writes `FINAL`, resolver freezes; **swaps revert, `split` reverts, LP exit succeeds** |
-| Resolve | Signer path, `FROZEN → RESOLVED` |
-| Redeem | Winning YES → 1:1 real USDC for both holders; a NO-only holder gets `NothingToRedeem` |
-| Accounting | Vault holds exactly `outstandingSets`; `outstandingSets == yes.totalSupply()`; `collateralSurplus() >= 0`; **every USDC unit conserved** across actors + vault + pool |
+| Stage                                 | What it proves                                                                                                                                                        |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Create market                         | Factory deploys against real USDC as collateral                                                                                                                       |
+| Split both sides                      | Real USDC escrowed 1:1; `outstandingSets` == vault balance                                                                                                            |
+| Open hooked pool at implied p         | `MarketPoolBootstrap.poolKeyFor` + registry registration + init at p = 0.50, price computed for whichever ordering YES sorted into                                    |
+| LP                                    | Liquidity added through the hook's `beforeAddLiquidity` gate                                                                                                          |
+| Trade both directions pre-kickoff     | Buy YES for USDC, sell a quarter back — dynamic fee applies both ways                                                                                                 |
+| **Warp past kickoff → trade in-play** | **The leg the old design forbade.** Keeper marks `LIVE`; the swap succeeds and delivers YES; `market.isTradeable()` is true; `split` still works mid-game             |
+| Stranger cannot freeze                | `TooEarlyToFreeze` inside the event window                                                                                                                            |
+| Resolver freeze on "final"            | Keeper writes `FINAL`, resolver freezes; **swaps revert, `split` reverts, LP exit succeeds**                                                                          |
+| Resolve                               | Signer path, `FROZEN → RESOLVED`                                                                                                                                      |
+| Redeem                                | Winning YES → 1:1 real USDC for both holders; a NO-only holder gets `NothingToRedeem`                                                                                 |
+| Accounting                            | Vault holds exactly `outstandingSets`; `outstandingSets == yes.totalSupply()`; `collateralSurplus() >= 0`; **every USDC unit conserved** across actors + vault + pool |
 
 **Run command and result** (2026-09-06, public endpoint, no `.env` RPC
 configured locally):
 
 ```bash
-cd contracts && BASE_RPC_URL=https://mainnet.base.org \
+cd contracts && ARC_RPC_URL=https://rpc.mainnet.arc.io \
   forge test --match-contract MarketLifecycleForkE2E -vv
 # [PASS] test_forkLifecycle_inPlayTradingFreezeOnFinalResolveRedeem() (gas: 3710249)
 # Suite result: ok. 1 passed; 0 failed; 0 skipped
 ```
 
-**Flakiness caveat.** `https://mainnet.base.org` is the rate-limited public
+**Flakiness caveat.** `https://rpc.mainnet.arc.io` is the rate-limited public
 endpoint and returns Cloudflare 502s under fanout; CI already wraps the fork
-job in a 3-attempt retry for this reason and reads `BASE_RPC_URL` from a
+job in a 3-attempt retry for this reason and reads `ARC_RPC_URL` from a
 secret when set. This test forks at `latest` (BaseFork convention) and deploys
 everything it touches, so it depends on mainnet only for the USDC contract and
 chain id — it has no dependency on live pool state and should not drift.
@@ -208,27 +210,27 @@ branch point (`Market.t.sol` 30→35, `Resolver.t.sol` 16→20,
 `isFrozen` block replaced), plus several rewritten in place and the invariant
 handler widened.
 
-| File | Change |
-| ---- | ------ |
-| `test/markets/Market.t.sol` | `test_freezeRejectedBeforeKickoff` → `…OnBothPaths` (resolver *and* stranger rejected pre-kickoff); `test_freezeIsPermissionlessAfterKickoff` → **`test_freezeIsPermissionlessAfterTheBackstop`**; **+`test_resolverFreezesFromKickoff`**, **+`test_strangerCannotFreezeDuringTheEventWindow`** (the anti-griefing property), **+`test_tradingStaysOpenDuringTheGame`** (split/merge mid-event), **+`test_isTradeableFalsePastBackstopEvenBeforeAnyoneFreezes`**, **+`test_backstopMatchesTheHook`** (cross-layer constant equality); every freeze in the resolve/redeem helpers routed through the resolver |
-| `test/markets/Resolver.t.sol` | `test_freezeByIdIsPermissionlessAfterKickoff` → **`test_signerFreezesByIdFromKickoff`** + `…operatorFreezes…`; **+`test_strangerCannotFreezeThroughTheResolver`** (the fixed hole), **+`test_freezeBeforeKickoffStillRejectedByTheMarket`**, **+`test_backstopFreezeIsPermissionlessOnTheMarketItself`**; all existing freeze call sites now prank an authorized key |
-| `test/markets/MarketInvariant.t.sol` | Handler `freeze()` → `freeze(bool viaBackstop)` so the fuzzer reaches **both** freeze paths. 128k calls, 0 reverts, all four solvency invariants green |
-| `test/hooks/dynamic-market/RiskPolicy.t.sol` | `isFrozen` block → **`isPastBackstop`** block: silent pre-kickoff, **silent during the game**, fires exactly at `kickoff + 12h`, no overflow near `uint64` max, monotonic; `FREEZE_LEAD` assertion → `MAX_EVENT_DURATION` |
-| `test/hooks/dynamic-market/DynamicMarketHook.t.sol` | `test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate` → **`test_swapRevertsAtBackstopWithoutAnyKeeperUpdate`** (edge case 15 preserved, moved to the backstop); **+`test_swapAllowedAtAndAfterKickoff`**, **+`test_swapAllowedInPlayEvenWithKeeperOffline`** (stale clamps the fee but must not halt), **+`test_swapRevertsOnceEventIsFinal`** |
-| `test/e2e/FullLifecycle.t.sol` | Renamed to `…TradeInPlayFreezeResolveRedeem`; **gained the in-game leg** — warp past kickoff, keeper `LIVE`, mid-game swap succeeds, mid-game `split` succeeds, stranger's freeze rejected, then keeper `FINAL` + resolver freeze, swaps and split blocked, LP exit open, resolve → redeem → solvent-empty |
-| `test/integration/MarketLifecycleForkE2E.t.sol` | **New** (§4) |
+| File                                                | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `test/markets/Market.t.sol`                         | `test_freezeRejectedBeforeKickoff` → `…OnBothPaths` (resolver _and_ stranger rejected pre-kickoff); `test_freezeIsPermissionlessAfterKickoff` → **`test_freezeIsPermissionlessAfterTheBackstop`**; **+`test_resolverFreezesFromKickoff`**, **+`test_strangerCannotFreezeDuringTheEventWindow`** (the anti-griefing property), **+`test_tradingStaysOpenDuringTheGame`** (split/merge mid-event), **+`test_isTradeableFalsePastBackstopEvenBeforeAnyoneFreezes`**, **+`test_backstopMatchesTheHook`** (cross-layer constant equality); every freeze in the resolve/redeem helpers routed through the resolver |
+| `test/markets/Resolver.t.sol`                       | `test_freezeByIdIsPermissionlessAfterKickoff` → **`test_signerFreezesByIdFromKickoff`** + `…operatorFreezes…`; **+`test_strangerCannotFreezeThroughTheResolver`** (the fixed hole), **+`test_freezeBeforeKickoffStillRejectedByTheMarket`**, **+`test_backstopFreezeIsPermissionlessOnTheMarketItself`**; all existing freeze call sites now prank an authorized key                                                                                                                                                                                                                                         |
+| `test/markets/MarketInvariant.t.sol`                | Handler `freeze()` → `freeze(bool viaBackstop)` so the fuzzer reaches **both** freeze paths. 128k calls, 0 reverts, all four solvency invariants green                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `test/hooks/dynamic-market/RiskPolicy.t.sol`        | `isFrozen` block → **`isPastBackstop`** block: silent pre-kickoff, **silent during the game**, fires exactly at `kickoff + 12h`, no overflow near `uint64` max, monotonic; `FREEZE_LEAD` assertion → `MAX_EVENT_DURATION`                                                                                                                                                                                                                                                                                                                                                                                    |
+| `test/hooks/dynamic-market/DynamicMarketHook.t.sol` | `test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate` → **`test_swapRevertsAtBackstopWithoutAnyKeeperUpdate`** (edge case 15 preserved, moved to the backstop); **+`test_swapAllowedAtAndAfterKickoff`**, **+`test_swapAllowedInPlayEvenWithKeeperOffline`** (stale clamps the fee but must not halt), **+`test_swapRevertsOnceEventIsFinal`**                                                                                                                                                                                                                                                                |
+| `test/e2e/FullLifecycle.t.sol`                      | Renamed to `…TradeInPlayFreezeResolveRedeem`; **gained the in-game leg** — warp past kickoff, keeper `LIVE`, mid-game swap succeeds, mid-game `split` succeeds, stranger's freeze rejected, then keeper `FINAL` + resolver freeze, swaps and split blocked, LP exit open, resolve → redeem → solvent-empty                                                                                                                                                                                                                                                                                                   |
+| `test/integration/MarketLifecycleForkE2E.t.sol`     | **New** (§4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 ## 6. Gates
 
 All from `contracts/`:
 
-| Gate | Command | Result |
-| ---- | ------- | ------ |
-| Build | `forge build` | ✅ clean (0 errors) |
-| Non-fork tests | `forge test --no-match-path "test/integration/*"` | ✅ **209 passed / 0 failed** |
-| Full suite | `BASE_RPC_URL=https://mainnet.base.org forge test` | ✅ **211 passed / 0 failed / 8 skipped** (skips are the pre-existing env-gated hook tests awaiting `STABLE_PROTECTION_HOOK_ADDRESS` etc.) |
-| Fork E2E | `BASE_RPC_URL=… forge test --match-contract MarketLifecycleForkE2E -vv` | ✅ 1 passed (gas 3,710,249) |
-| Slither | `contracts/script/security/run-slither.sh` | ✅ 0 High, 9 Medium (all triaged false positives), 18 Low/Info |
+| Gate           | Command                                                                | Result                                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Build          | `forge build`                                                          | ✅ clean (0 errors)                                                                                                                       |
+| Non-fork tests | `forge test --no-match-path "test/integration/*"`                      | ✅ **209 passed / 0 failed**                                                                                                              |
+| Full suite     | `ARC_RPC_URL=https://rpc.mainnet.arc.io forge test`                    | ✅ **211 passed / 0 failed / 8 skipped** (skips are the pre-existing env-gated hook tests awaiting `STABLE_PROTECTION_HOOK_ADDRESS` etc.) |
+| Fork E2E       | `ARC_RPC_URL=… forge test --match-contract MarketLifecycleForkE2E -vv` | ✅ 1 passed (gas 3,710,249)                                                                                                               |
+| Slither        | `contracts/script/security/run-slither.sh`                             | ✅ 0 High, 9 Medium (all triaged false positives), 18 Low/Info                                                                            |
 
 ## 7. Bugs found
 

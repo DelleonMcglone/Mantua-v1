@@ -1,5 +1,7 @@
 # Task 049 — Dynamic Market Hook fee model (Phase 5, H-001 … H-017)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Owner directive 2026-09-11 (Phase 5 🪝, 🔴). Adjust the Dynamic Market
 > Hook to Mantua's fee model and formula, prove it with unit / property /
 > fuzz / scenario tests, run the AI-assisted security pass, prepare the Base

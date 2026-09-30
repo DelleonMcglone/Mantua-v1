@@ -23,7 +23,7 @@ simply stays dark.
     JSON `accepts[]`); `wrapFetchWithPayment` (`@x402/fetch`) signs an
     **EIP-3009 `transferWithAuthorization`** with the buyer EOA and retries.
     The facilitator settles on-chain — the buyer wallet needs **USDC only, no
-    gas**. Rail: Base Mainnet (`eip155:8453`).
+    gas**. Rail: Arc Mainnet (`eip155:5042`).
 - Two agent tools in `server/src/lib/agent-chat.ts`:
   - `search_paid_services({ keyword })` — discover paid endpoints (no payment).
   - `call_paid_service({ url, data?, method? })` — price pre-flight → budget
@@ -40,7 +40,7 @@ touches the agent wallet's balances or its daily cap.
 1. **Buyer wallet** — defaults to `MANTUA_ADMIN_PRIVATE_KEY` (the same EOA the
    x402 seller is paid to, so seller revenue funds buyer spend). To use a
    dedicated key instead, set `X402_BUYER_PRIVATE_KEY`.
-2. **Fund it** with USDC on Base Mainnet. No ETH needed — the facilitator
+2. **Fund it** with USDC on Arc Mainnet. No separate gas token is needed (USDC is Arc's gas token) — the facilitator
    settles the EIP-3009 authorization on-chain. Most marketplace services cost
    $0.001–0.05/call, so a few dollars of USDC goes a long way.
 3. **Enable it** — in `server/.env` (and the Vercel env for prod):
@@ -57,7 +57,7 @@ touches the agent wallet's balances or its daily cap.
 
 Mantua is also an x402 **seller**: `GET /api/x402/analyst-brief` returns the
 agent's live analyst brief (pegs, market pulse, narratives, TVL movers) for a
-**$0.01 USDC** micro-payment, settled on Base Mainnet via the public x402
+**$0.01 USDC** micro-payment, settled on Arc Mainnet via the public x402
 facilitator. Payment is the auth — no login. Enable by setting
 `X402_SELLER_ADDRESS` (the 0x address that receives the USDC) in the server env;
 unset → the endpoint reports 503.
@@ -65,7 +65,7 @@ unset → the endpoint reports 503.
 1. **See the paywall** (no payment):
    ```bash
    curl -i https://mantua.ai/api/x402/analyst-brief
-   # → HTTP 402 with an accepts[] payment requirement (exact / eip155:8453 / USDC)
+   # → HTTP 402 with an accepts[] payment requirement (exact / eip155:5042 / USDC)
    ```
 2. **Agent-to-agent via chat**: tell the Mantua agent
    `call the paid service at https://mantua.ai/api/x402/analyst-brief`

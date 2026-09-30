@@ -126,7 +126,7 @@ doing so would close this.
 | **Access controls**          | Satisfactory | Three roles, separated: PoolManager (callbacks), keeper (three fields), operator (registration/pause/roles). `onlyPoolManager` on all four callbacks; direct-call rejection tested for each. Two-step operator transfer. No `owner` god-role.                                                   |
 | **Complexity management**    | Satisfactory | Eight files, each ≤150 lines, each with a purpose statement. Pure maths isolated in `MarketMath`; policy constants isolated in `RiskPolicy`; no inheritance beyond one interface.                                                                                                               |
 | **Decentralisation**         | Weak         | A single keeper key drives model inputs and a single operator key controls registration and pause; both are EOAs today. This is inherent to the design at v1 and is acknowledged in spec §2.1 and Risk 2 of the pivot plan, not a defect in this code.                                          |
-| **Documentation**            | Satisfactory | Every module carries a purpose statement and spec cross-references; every non-obvious choice states its reason (rational decay, saturating add, absent stubs, and the freeze constant — `FREEZE_LEAD = 0` as reviewed, now `MAX_EVENT_DURATION = 12 hours` per D-103/045).                                                                                                               |
+| **Documentation**            | Satisfactory | Every module carries a purpose statement and spec cross-references; every non-obvious choice states its reason (rational decay, saturating add, absent stubs, and the freeze constant — `FREEZE_LEAD = 0` as reviewed, now `MAX_EVENT_DURATION = 12 hours` per D-103/045).                      |
 | **Transaction ordering**     | Moderate     | Fee and cap depend on pool price, so a swap can be sandwiched to move the fee it pays. Bounded by `[BASE_FEE, MAX_FEE]`, and the directional adjustment charges the risk-increasing side, which penalises exactly that behaviour. Not eliminated.                                               |
 | **Low-level manipulation**   | Satisfactory | No `assembly`, no `delegatecall`, no `tx.origin`, no `selfdestruct`, no raw `call`. Verified by grep across the module.                                                                                                                                                                         |
 | **Testing and verification** | Satisfactory | 134 tests. All 16 §33 edge cases covered explicitly. 128k-call invariant campaign with **0 reverts**, plus a 100k deterministic sweep asserting the fee band.                                                                                                                                   |
@@ -135,33 +135,33 @@ doing so would close this.
 
 ## 4. §44 failure conditions — checked one by one
 
-| Condition                                      | Result | Evidence                                                                                     |
-| ---------------------------------------------- | ------ | -------------------------------------------------------------------------------------------- |
-| Keeper can increase `MAX_FEE`                  | PASS   | `constant` in a library; no setter exists anywhere                                           |
-| Keeper can increase `ABS_MAX_TRADE`            | PASS   | Same                                                                                         |
-| Unregistered pool can initialize               | PASS   | `test_unregisteredPoolCannotInitialize`                                                      |
-| Static-fee pool can use the hook               | PASS   | `test_staticFeePoolIsRejected`                                                               |
-| User can invoke callbacks directly             | PASS   | Four direct-call rejection tests                                                             |
+| Condition                                      | Result | Evidence                                                                                                                                                                                                                                      |
+| ---------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Keeper can increase `MAX_FEE`                  | PASS   | `constant` in a library; no setter exists anywhere                                                                                                                                                                                            |
+| Keeper can increase `ABS_MAX_TRADE`            | PASS   | Same                                                                                                                                                                                                                                          |
+| Unregistered pool can initialize               | PASS   | `test_unregisteredPoolCannotInitialize`                                                                                                                                                                                                       |
+| Static-fee pool can use the hook               | PASS   | `test_staticFeePoolIsRejected`                                                                                                                                                                                                                |
+| User can invoke callbacks directly             | PASS   | Four direct-call rejection tests                                                                                                                                                                                                              |
 | Freeze depends on a keeper update              | PASS   | Reviewed as `test_swapRevertsAfterKickoffWithoutAnyKeeperUpdate`; renamed by 045 to `test_swapRevertsAtBackstopWithoutAnyKeeperUpdate` when the halt moved from kickoff to the 12 h backstop — no keeper write ever occurs, in either version |
-| Stale keeper state bricks the market           | PASS   | `test_staleKeeperStateChargesMaxFeeWithoutReverting`                                         |
-| LPs cannot remove liquidity during a halt      | PASS   | No `BEFORE_REMOVE_LIQUIDITY` bit; the function is not implemented                            |
-| `BEFORE_REMOVE_LIQUIDITY` enabled              | PASS   | `test_forbiddenPermissionsAreNotEncoded`                                                     |
-| `BEFORE_SWAP_RETURNS_DELTA` enabled            | PASS   | Same; `beforeSwap` returns `ZERO_DELTA`                                                      |
-| Fee below `BASE_FEE`                           | PASS   | `clampFee`; 128k invariant + 100k sweep                                                      |
-| Fee above `MAX_FEE`                            | PASS   | Same                                                                                         |
-| Trade above the cap succeeds                   | PASS   | `test_swapAboveTheCapReverts`                                                                |
-| Halted market accepts a swap                   | PASS   | Five halt tests (frozen, paused, global pause, resolved, void)                               |
-| Zero liquidity causes unintended revert        | PASS   | `test_zeroLiquidityIsMaximumImbalanceNotARevert`, `test_zeroLiquidityCapIsTheMinimum`        |
-| Token ordering changes market math incorrectly | PASS   | Both orderings tested; `test_wrongOrderingSaturatesRatherThanMirroring` documents the hazard |
-| Keeper inputs accepted outside bounds          | PASS   | Two rejection tests; bounds checked _before_ storage                                         |
-| Uses `tx.origin` / `delegatecall`              | PASS   | Grep-verified absent                                                                         |
-| Unbounded loop in a callback                   | PASS   | Grep-verified: no loop anywhere in the module                                                |
-| Any file exceeds 150 lines                     | PASS   | Largest is 150 (`MarketStateRegistry`); hook is 144                                          |
-| Any TODO or placeholder remains                | PASS   | Grep-verified absent                                                                         |
-| Deployment does not satisfy `0x28C0`           | PASS   | Deployed 2026-08-17 at `0xbb5D…E8c0`; bits asserted in-tx and re-derived from the address    |
-| Backend routing wrong                          | PASS   | `getV4StackForHook` resolves the hook to its own stack; live pools probed post-deploy        |
-| Tests miss a specified edge case               | PASS   | All 16 mapped to named tests                                                                 |
-| 100k-call fee invariant fails                  | PASS   | Passes at 100k sweep and 128k campaign                                                       |
+| Stale keeper state bricks the market           | PASS   | `test_staleKeeperStateChargesMaxFeeWithoutReverting`                                                                                                                                                                                          |
+| LPs cannot remove liquidity during a halt      | PASS   | No `BEFORE_REMOVE_LIQUIDITY` bit; the function is not implemented                                                                                                                                                                             |
+| `BEFORE_REMOVE_LIQUIDITY` enabled              | PASS   | `test_forbiddenPermissionsAreNotEncoded`                                                                                                                                                                                                      |
+| `BEFORE_SWAP_RETURNS_DELTA` enabled            | PASS   | Same; `beforeSwap` returns `ZERO_DELTA`                                                                                                                                                                                                       |
+| Fee below `BASE_FEE`                           | PASS   | `clampFee`; 128k invariant + 100k sweep                                                                                                                                                                                                       |
+| Fee above `MAX_FEE`                            | PASS   | Same                                                                                                                                                                                                                                          |
+| Trade above the cap succeeds                   | PASS   | `test_swapAboveTheCapReverts`                                                                                                                                                                                                                 |
+| Halted market accepts a swap                   | PASS   | Five halt tests (frozen, paused, global pause, resolved, void)                                                                                                                                                                                |
+| Zero liquidity causes unintended revert        | PASS   | `test_zeroLiquidityIsMaximumImbalanceNotARevert`, `test_zeroLiquidityCapIsTheMinimum`                                                                                                                                                         |
+| Token ordering changes market math incorrectly | PASS   | Both orderings tested; `test_wrongOrderingSaturatesRatherThanMirroring` documents the hazard                                                                                                                                                  |
+| Keeper inputs accepted outside bounds          | PASS   | Two rejection tests; bounds checked _before_ storage                                                                                                                                                                                          |
+| Uses `tx.origin` / `delegatecall`              | PASS   | Grep-verified absent                                                                                                                                                                                                                          |
+| Unbounded loop in a callback                   | PASS   | Grep-verified: no loop anywhere in the module                                                                                                                                                                                                 |
+| Any file exceeds 150 lines                     | PASS   | Largest is 150 (`MarketStateRegistry`); hook is 144                                                                                                                                                                                           |
+| Any TODO or placeholder remains                | PASS   | Grep-verified absent                                                                                                                                                                                                                          |
+| Deployment does not satisfy `0x28C0`           | PASS   | Deployed 2026-08-17 at `0xbb5D…E8c0`; bits asserted in-tx and re-derived from the address                                                                                                                                                     |
+| Backend routing wrong                          | PASS   | `getV4StackForHook` resolves the hook to its own stack; live pools probed post-deploy                                                                                                                                                         |
+| Tests miss a specified edge case               | PASS   | All 16 mapped to named tests                                                                                                                                                                                                                  |
+| 100k-call fee invariant fails                  | PASS   | Passes at 100k sweep and 128k campaign                                                                                                                                                                                                        |
 
 ---
 
@@ -191,7 +191,7 @@ doing so would close this.
 
 ## 6. Not done
 
-- **B2-005 deployment** — needs a funded Base Mainnet deployer key and the
+- **B2-005 deployment** — needs a funded Arc Mainnet deployer key (USDC is the gas token) and the
   CREATE2 salt mine. No mainnet contract has been deployed and no address
   recorded.
 - **Human audit** — required before real value is at risk.

@@ -73,7 +73,7 @@ step:
 
 **On a deployment**, the same drills are one env flip each — the runbook's
 existing levers: stop the `live-sync` workflow (drill 1), point a preview's
-`BASE_RPC_URL` at an unreachable dedicated host (drill 2), `SET
+`ARC_RPC_URL` at an unreachable dedicated host (drill 2), `SET
 mantua:kill-switch 1` in Upstash (drill 3), block the provider host at the
 network edge (drill 4) — and `GET /api/status` + `/api/ops/alerts` are the
 observation points. Recovery is the reverse flip. Schedule: once before

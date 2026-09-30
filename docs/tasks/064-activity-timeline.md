@@ -1,5 +1,7 @@
 # Task 064 — The Activity timeline and the chainless-branding sweep (Phase 9, PF-018/PF-019/PF-020 client half)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Owner directive 2026-09-12 ("continue with phase 9"). Ledger:
 > `docs/tasks/portfolio-activity.md`. Renders the spine lane 062 built.
 >
@@ -33,7 +35,7 @@ next one.
 
 **Chainless-branding sweep** (`chainless-branding.test.ts`): scans the
 consumer feature and shell sources with comments stripped for
-`basescan.org`, `BaseScan`, `Etherscan`, `on Base`, `Base Sepolia`,
+`explorer.arc.io`, `BaseScan`, `Etherscan`, `on Base`, `Base Sepolia`,
 `Base Mainnet`; two carve-outs are listed in the test (the bridge's
 destination chains, the deposit surface's network line). It failed on
 first run against the hard-coded explorer URL in the agent chat's burn

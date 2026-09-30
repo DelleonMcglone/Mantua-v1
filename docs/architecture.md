@@ -42,7 +42,7 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 - **Branching (B-011):** one branch per task document, named to match —
   task docs live in `docs/tasks/NNN-short-slug.md` and the branch carries
   the same `NNN-short-slug` name. See `docs/tasks/011-branch-management.md`.
-- **Chain lock:** Base Mainnet only (chain ID 8453). Privy `supportedChains` and viem clients are configured with Base only; any other chain ID is rejected at the boundary. The `useBaseWalletClient` hook (`client/src/lib/privy/wallet-client.ts`) attempts an automatic chain switch and throws if the wallet remains off-Base.
+- **Chain lock:** Arc Mainnet only (chain ID 5042; decided 2026-09-29, previously Base). Privy `supportedChains` and viem clients are configured with Arc only; any other chain ID is rejected at the boundary. The `useBaseWalletClient` hook (`client/src/lib/privy/wallet-client.ts`) attempts an automatic chain switch and throws if the wallet remains off-Base.
 - **Two-process dev:** `npm run dev` at the root spawns client (Vite, HTTPS via self-signed cert) and server (Express) in parallel. Each has its own port. Frontend talks to backend via a base URL from env.
 - **HTTPS in dev:** Privy's Web Crypto API key sharding silently fails over plain HTTP outside `localhost`. The Vite dev server runs HTTPS by default via `@vitejs/plugin-basic-ssl`. The browser will warn about the self-signed cert on first load — that's expected; click through. Staging/prod use real TLS (Vercel handles this for the frontend).
 - **Single shared logic:** Critical Phase 3 / Phase 4 modules (swap, liquidity) are written once on the server and exposed via API endpoints; the agent (Phase 6) calls the same endpoints. No client-side duplication of swap-construction logic.
@@ -75,13 +75,13 @@ numbers and Plaid access tokens must never reach the browser, app database,
 logs, analytics, or LLM context. Plaid products required before production are
 Auth, Balance, Identity, and Identity Match.
 
-| Product surface      | Behind the scenes                                                               | Owner / boundary                                            |
-| -------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Connect bank account | Plaid Link → processor token → Zero Hash external account                       | Plaid + Zero Hash                                           |
-| Deposit dollars      | ACH/RTP debit → Zero Hash conversion → USDC delivered to the user’s Base wallet | Zero Hash; Circle provides wallet infrastructure where used |
-| Trade                | User signs a Base transaction through Privy; Mantua routes market activity      | User / Privy / Base                                         |
-| Withdraw dollars     | USDC conversion → ACH/RTP credit to the linked account                          | Zero Hash                                                   |
-| Direct USDC          | User trades from their connected Base wallet without a bank link                | User / Privy / Base                                         |
+| Product surface      | Behind the scenes                                                              | Owner / boundary                                            |
+| -------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| Connect bank account | Plaid Link → processor token → Zero Hash external account                      | Plaid + Zero Hash                                           |
+| Deposit dollars      | ACH/RTP debit → Zero Hash conversion → USDC delivered to the user’s Arc wallet | Zero Hash; Circle provides wallet infrastructure where used |
+| Trade                | User signs an Arc transaction through Privy; Mantua routes market activity     | User / Privy / Arc                                          |
+| Withdraw dollars     | USDC conversion → ACH/RTP credit to the linked account                         | Zero Hash                                                   |
+| Direct USDC          | User trades from their connected Arc wallet without a bank link                | User / Privy / Arc                                          |
 
 The product wording intentionally excludes wallets, bridges, private keys,
 network names, and gas from cash screens. It says only **Deposit**, **Trade**,
@@ -99,7 +99,7 @@ contacting a bank or minting USDC. `live` deliberately fails closed until all of
 the following are completed:
 
 1. Zero Hash agreement, participant/platform code, production API access, and
-   explicit Base-USDC availability are confirmed.
+   explicit Arc-USDC availability are confirmed.
 2. Plaid production approval and the Zero Hash processor integration are
    enabled; credentials are stored in the deployment secrets manager.
 3. Provider request signing, webhook signature verification, idempotency keys,
@@ -137,7 +137,7 @@ Mantua runs **two wallets per user**, owned by different actors:
 
 The implemented provider is **Circle Developer-Controlled Wallets**
 (`@circle-fin/developer-controlled-wallets`, `server/src/lib/circle/`) —
-SCA accounts on Base, blockchain id `"BASE"`, provisioned per user into a
+SCA accounts on Arc, blockchain id `"ARC"`, provisioned per user into a
 wallet set (`agent_wallets` Drizzle table). This supersedes the earlier
 CDP-SDK plan for P6-003; the wallet-boundary and cap design above are
 provider-independent and carried over unchanged (see D-110 for the
@@ -161,8 +161,8 @@ Who holds which key, stated from the code:
    user's wallet — never on Mantua's server. The server only ever receives
    signed transactions/messages; signing happens in the browser through the
    wallet's EIP-1193 provider, bridged to viem in
-   `client/src/lib/privy/wallet-client.ts`. Privy is chain-locked to Base
-   Mainnet 8453 (`defaultChain`/`supportedChains` = `[base]` from
+   `client/src/lib/privy/wallet-client.ts`. Privy is chain-locked to Arc
+   Mainnet 5042 (`defaultChain`/`supportedChains` = `[arc]` from
    `client/src/lib/chains.ts`).
 2. **Agent custody — Circle Developer-Controlled Wallets.** SCA accounts on
    blockchain `"BASE"` (`server/src/lib/agent-wallet.ts`). The custody root is
@@ -241,7 +241,7 @@ PD-007 — things the prototype shows differently from how v2 will ship, with ra
 - **Focus-visible rings.** Prototype doesn't show keyboard focus. v2 adds a 2px accent-purple ring on every `:focus-visible` (in `client/src/index.css`) per WCAG 2.1 AA.
 - **Density settings location.** Prototype exposes density in the Settings panel. v2 also persists it in the Settings panel; the underlying mechanism is `html[data-density]` driven by a `useTheme`-style hook (lands when the Settings panel is built, Phase 6).
 - **Self-hosted fonts (planned).** Prototype + v2 currently load Inter + JetBrains Mono via Google Fonts. Phase 9 moves them to Vercel-edge fonts to drop the third-party fetch and tighten CSP.
-- **Network dropdown shows only Base.** The prototype renders a multi-network picker; we render the same control for visual consistency, but only Base is selectable (chain-lock).
+- **Network dropdown shows only Arc.** The prototype renders a multi-network picker; we render the same control for visual consistency, but only Base is selectable (chain-lock).
 
 ### Confirmation modal seam (P1-005)
 
@@ -260,29 +260,29 @@ await submitSwap(...);
 
 ## AgentKit agent (`agent/` workspace)
 
-Coinbase **AgentKit `0.10.4`** (TypeScript) agent on **Base Mainnet (8453)**
+Coinbase **AgentKit `0.10.4`** (TypeScript) agent on **Arc Mainnet (5042)**
 via `ViemWalletProvider`. Isolated as its own workspace so it can pin **zod
 3.25.76** + **viem 2.38.3** (AgentKit-compatible) without disturbing the
 server's zod v4 / viem 2.48.4. CDP-native action providers
 (`cdpApiActionProvider`, `deploy_token`) are intentionally not registered — the
 agent's surface is the small allowlisted action set below.
 
-**Chain:** id `8453`, RPC `https://mainnet.base.org` (override via
-`BASE_RPC_URL`), explorer `https://basescan.org` (BaseScan).
+**Chain:** id `5042`, RPC `https://rpc.mainnet.arc.io` (override via
+`ARC_RPC_URL`), explorer `https://explorer.arc.io` (Arcscan, Blockscout).
 
-**Gas.** Base uses native ETH (18 decimals) for gas; token balances, transfers,
+**Gas.** Arc uses USDC itself as the gas token — the native balance is the 18-decimal view of the same USDC the 6-decimal ERC-20 reports (`server/src/lib/native-usdc.ts`); token balances, transfers,
 and ERC-8183 escrow use each token's ERC-20 interface (USDC/EURC 6 dp, cbBTC
 8 dp). Unit helpers are centralized in `agent/src/lib/decimals.ts`, with
 conversion tests both ways.
 
 **Contract addresses** (loaded from env, never hardcoded in source):
 
-| Standard | Contract                       | Address                                      | Source                                                           |
-| -------- | ------------------------------ | -------------------------------------------- | ---------------------------------------------------------------- |
-| ERC-8183 | AgenticCommerce (job + escrow) | env-driven, optional — no default            | Base Mainnet deployment pending — see `docs/tasks/v2-roadmap.md` |
-| token    | USDC ERC-20 (6-dp)             | `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` | Circle USDC contract addresses (Base)                            |
-| token    | EURC ERC-20 (6-dp)             | `0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42` | Circle EURC contract addresses (Base)                            |
-| token    | cbBTC ERC-20 (8-dp)            | `0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf` | Coinbase cbBTC contract addresses (Base)                         |
+| Standard | Contract                       | Address                                      | Source                                                          |
+| -------- | ------------------------------ | -------------------------------------------- | --------------------------------------------------------------- |
+| ERC-8183 | AgenticCommerce (job + escrow) | env-driven, optional — no default            | Arc Mainnet deployment pending — see `docs/tasks/v2-roadmap.md` |
+| token    | USDC ERC-20 (6-dp)             | `0x3600000000000000000000000000000000000000` | Arc contract addresses (docs.arc.io) — also the gas token       |
+| token    | EURC ERC-20 (6-dp)             | `0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1` | Arc contract addresses (docs.arc.io)                            |
+| token    | cirBTC ERC-20 (8-dp)           | `0x171A4217b86A807A64eB94757Db6849fb4bDbAA0` | Arc contract addresses (docs.arc.io)                            |
 
 **Funding.** The agent wallet needs a little ETH for gas plus whatever token
 budget the user allocates. The `check_balances` action warns on low gas.
@@ -292,7 +292,7 @@ any other asset is rejected with a clear error.
 
 ## v2 reusability audit — keep/replace decisions (2026-09-02)
 
-Five-area audit of the inherited v2 code after the Base Mainnet migration:
+Five-area audit of the inherited v2 code after the Base Mainnet migration (2026-09-02; the chain has since moved to Arc, 2026-09-29):
 swap, liquidity, wallet layer, safety rails, design system. Each area was
 read end-to-end with file:line evidence; verdicts are **KEEP** (production-
 usable as-is), **REFACTOR** (usable after named changes), **REPLACE** (wrong
@@ -337,7 +337,7 @@ mainnet blockers.
 
 Circle's `"BASE"` blockchain enum is verified correct against the installed
 SDK. The custody split is: user wallets non-custodial via Privy (correctly
-locked to Base at the SDK boundary — KEEP), agent wallets Circle DCW with the
+locked to one chain at the SDK boundary — KEEP), agent wallets Circle DCW with the
 entity secret as full custody.
 
 | Component                               | Verdict          | Why                                                                                                                                                                                                                               | Effort |
@@ -423,7 +423,7 @@ single-use confirmation id, a fresh simulation — with the cap + allowlist
 
 End-to-end read of docs.polymarket.com (via its llms.txt page index; source
 URLs inline). Venue divergence from Mantua is total — Polygon / ERC-1155 CTF
-tokens / CLOB / pUSD collateral vs Base / ERC-20 outcome tokens / Uniswap v4
+tokens / CLOB / pUSD collateral vs Arc / ERC-20 outcome tokens / Uniswap v4
 AMM / native USDC — but the _economic_ conventions transfer intact. Verdicts:
 **adopt** (use as-is), **adapt** (translate to the AMM design), **N/A**.
 
@@ -658,7 +658,7 @@ marked as the owner's with the artifact that would close it.
   fake of the six exports the client uses plus an EIP-1193 provider that
   signs with a fixed address. The API is answered by Playwright routes in
   `e2e/harness.ts` from `e2e/fixtures.ts`, in the shipped wire shapes, and the chain by
-  `e2e/rpc-mock.ts` behind `VITE_BASE_RPC_URL=/__e2e/rpc`. Nothing else
+  `e2e/rpc-mock.ts` behind `VITE_ARC_RPC_URL=/__e2e/rpc`. Nothing else
   is mocked, so a spec that passes has exercised the same components,
   hooks, and transports a user does. Decision D-117: a live backend in CI
   was rejected (secrets, a database, and a chain for every PR) in favour
@@ -946,7 +946,7 @@ new.
 
 **Identity and creation.** `computeComboMarketId(sortedLegIds)`
 (`server/src/lib/market-id.ts`, spec `docs/specs/market-id.md`) — order
-independent, distinct from every moneyline id, chain-mixed off Base. The
+independent, distinct from every moneyline id, chain-mixed off Arc. The
 market's `startsAt` is the latest leg kickoff (the 12 h backstop outlives
 every leg), its label the legs joined, its opening price Π leg prices, its
 season flag on if any leg is a playoff game. `POST /api/combos/prepare`
@@ -1478,7 +1478,7 @@ Task list: `docs/tasks/sports-pivot.md`. Closed 2026-08-16 unless noted.
 | DM-101 | Market mechanism           | Outcome-token AMM — YES/NO ERC-20 against USDC in v4 pools                     | Reuses the existing pool/hook/routing stack; gives the hook a lifecycle to attach to; price maps to implied probability                                                                                 |
 | DM-102 | Conditional token standard | Purpose-built binary ERC-20 pair per market, USDC-collateralised 1:1           | Binary moneylines need two outcomes; ERC-20 drops into v4 and existing balance code without shims                                                                                                       |
 | DM-103 | Resolution authority       | **OPEN** — needs owner sign-off                                                | Trust model, not an implementation detail; reaches into Terms and Market Integrity                                                                                                                      |
-| DM-104 | Chain                      | Base Mainnet (8453)                                                            | Single supported chain; hook + market contracts await mainnet deployment (see `docs/security/hook-deployments.md`)                                                                                      |
+| DM-104 | Chain                      | Arc Mainnet (5042) — revised 2026-09-29, was Base                              | Single supported chain; hook + market contracts await mainnet deployment (see `docs/security/hook-deployments.md`)                                                                                      |
 | DM-105 | League coverage            | NFL + WNBA covered; NBA/MLB/NHL/Soccer show "Coming soon"                      | Owner decision. Bounds B3 data work; `coverage` field in `features/markets/sports.ts` drives nav and pages                                                                                              |
 | DM-106 | Market types               | Moneyline at launch; totals W4 (P2); spreads deferred                          | Moneyline is the only genuinely binary type, so the only one fitting DM-102 without new design                                                                                                          |
 | DM-107 | Settlement data source     | ESPN primary; second provider W3                                               | Covers both leagues, no key; unsupported-endpoint risk mitigated by adapter interface, second source, and manual override                                                                               |

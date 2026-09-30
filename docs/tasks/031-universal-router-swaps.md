@@ -1,5 +1,7 @@
 # 031 — UniversalRouter/Permit2 swap execution path
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ done 2026-09-05
 **Branch:** `031-universal-router-swaps`
 

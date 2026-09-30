@@ -16,7 +16,7 @@ Until a hook is deployed and wired, its address resolves to `null` (env-overrida
 degrades gracefully. Mainnet launch checklist:
 
 1. Deploy `StableProtectionHook`, `DynamicFee`, and `DynamicMarketHook` against
-   the canonical Base Mainnet Uniswap v4 stack (PoolManager
+   Mantua's own Uniswap v4 PoolManager on Arc (there is no canonical v4 there; PoolManager
    `0x498581fF718922c3f8e6A244956aF099B2652b2b`).
 2. Verify each deployment: bytecode size + hash against the pinned source
    commit, and the hook permission bits encoded in the address.
@@ -39,5 +39,5 @@ degrades gracefully. Mainnet launch checklist:
 
 Earlier verified deployments on the pre-launch test networks (Base Sepolia
 84532 and Arc Testnet 5042002, last run 2026-08-22T15:06:40.144Z) are
-superseded now that Mantua targets Base Mainnet only; those networks are no
+superseded now that Mantua targets Arc Mainnet only; those networks are no
 longer supported and their addresses must not be wired into the app.

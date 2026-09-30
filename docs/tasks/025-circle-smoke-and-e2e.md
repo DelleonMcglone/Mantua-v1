@@ -1,5 +1,7 @@
 # 025 — Circle smoke + E2E test coverage (C-012, C-013, C-014)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** ✅ code complete 2026-09-04 · **Branch:** `025-circle-smoke-and-e2e`
 
 Closes the three Phase-1 Circle test-coverage tasks. Two of the four layers
@@ -7,12 +9,12 @@ run today; the other two are credential-gated and armed to run the moment the
 pending Circle-side entity-secret reset lands (see
 `docs/tasks/018-circle-credentials.md`).
 
-| Layer | Task | Needs | Ran now? |
-| --- | --- | --- | --- |
-| Offline chain-identifier smoke | C-014 | nothing | ✅ yes — all identifiers found |
-| Sponsorship / execute failure-mode units | C-012 | nothing (mocked client) | ✅ yes — green in `npm test` |
-| Live identifier round-trip | C-014 | `CIRCLE_API_KEY` + `CIRCLE_ENTITY_SECRET` | ⏸ awaits credentials (auto-runs inside `circle:id-smoke` once set) |
-| Testnet E2E flow | C-013 | `CIRCLE_API_KEY` + `CIRCLE_ENTITY_SECRET` (+ `CIRCLE_WALLET_SET_ID`, `DATABASE_URL`) | ⏸ awaits credentials — prints SKIPPED and exits 0 today |
+| Layer                                    | Task  | Needs                                                                                | Ran now?                                                           |
+| ---------------------------------------- | ----- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
+| Offline chain-identifier smoke           | C-014 | nothing                                                                              | ✅ yes — all identifiers found                                     |
+| Sponsorship / execute failure-mode units | C-012 | nothing (mocked client)                                                              | ✅ yes — green in `npm test`                                       |
+| Live identifier round-trip               | C-014 | `CIRCLE_API_KEY` + `CIRCLE_ENTITY_SECRET`                                            | ⏸ awaits credentials (auto-runs inside `circle:id-smoke` once set) |
+| Testnet E2E flow                         | C-013 | `CIRCLE_API_KEY` + `CIRCLE_ENTITY_SECRET` (+ `CIRCLE_WALLET_SET_ID`, `DATABASE_URL`) | ⏸ awaits credentials — prints SKIPPED and exits 0 today            |
 
 ## C-014 — chain-identifier smoke (`npm run circle:id-smoke -w @mantua/server`)
 
@@ -22,9 +24,9 @@ every Circle boundary and each SDK family spells them differently (DCW
 app passes as a plain string.
 
 - **Offline layer (always runs, no network):** validates every identifier the
-  app assumes against the *installed* SDKs in `node_modules/@circle-fin/*`:
+  app assumes against the _installed_ SDKs in `node_modules/@circle-fin/*`:
   - DCW `Blockchain` contains `"BASE"` — re-asserted **at compile time**
-    (a typed `const` the typecheck gate enforces) *and* against the runtime
+    (a typed `const` the typecheck gate enforces) _and_ against the runtime
     enum. This programmatically re-asserts the earlier audit finding.
   - Every name `lib/agent-bridge.ts` passes to Bridge Kit (`Base`,
     `Ethereum`, `Arbitrum`, `Avalanche`, `Optimism`, `Polygon`) exists in the
@@ -53,8 +55,8 @@ Extended `server/src/lib/circle/sponsorship.test.ts` and
 existing `setCircleClientForTesting` seam (same style as the pre-existing
 tests). New coverage:
 
-- **Unsponsored-in-production refusal** now also asserts the SDK is *never
-  invoked* (guard, not API error), covers the ABI arm, and holds under a
+- **Unsponsored-in-production refusal** now also asserts the SDK is _never
+  invoked_ (guard, not API error), covers the ABI arm, and holds under a
   10-wide concurrent burst (every create rejects with
   `SponsorshipNotConfiguredError`, zero SDK calls).
 - **Sponsorship ref propagation** through the full `executeAgentCalldata`

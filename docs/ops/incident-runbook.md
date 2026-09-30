@@ -254,11 +254,11 @@ signed and did not see confirm, across reloads.
 
 **RPC.** `GET /api/status` → `rpc.healthy` / `rpc.detail`. `"primary … failing — on fallback"` means
 the dedicated primary is rate-limited or down and reads are riding a
-fallback: check the provider dashboard, then `BASE_RPC_FALLBACK_URLS`.
+fallback: check the provider dashboard, then `ARC_RPC_FALLBACK_URLS`.
 `"all N RPC hosts failing"` is a full outage of blockchain reads —
 trades still settle on-chain, but balances, prices and the fill verifier
 cannot read; the banner says so. **Production refuses a public host**
-(`mainnet.base.org` etc.) in `BASE_RPC_URL`: the boot log prints the fix.
+(`rpc.mainnet.arc.io` etc.) in `ARC_RPC_URL`: the boot log prints the fix.
 Never "fix" an RPC incident by pointing production at a public host —
 that is the failure mode this rule exists for (TD-007).
 
@@ -308,7 +308,7 @@ wallet id rather than Create Wallets; it reproduces the address regardless
 of the platform default.
 
 **If a spend already landed at an address with no wallet:** derive the
-wallet for that chain from the Base wallet id — the funds are recoverable as
+wallet for that chain from the Arc wallet id — the funds are recoverable as
 long as the derivation matches (v3). Check the Circle console for the
 wallet's `scaCore` before deriving.
 

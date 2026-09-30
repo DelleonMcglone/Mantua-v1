@@ -66,7 +66,7 @@ Each rail, where it is enforced, and the test or live check that proves it:
   trading wait on the v4 periphery deploy; triggers persist with audit
   rather than guessing a venue.
 - Human audit and a second-model review remain recommended before the
-  Base Mainnet contract deployment (this sign-off predates it).
+  Arc Mainnet contract deployment (this sign-off predates it).
 - Slither/Semgrep CI runs remain a follow-up from the B2-007 review.
 
 ---
@@ -166,7 +166,7 @@ still do not compile standalone in this environment and remain uncovered.
   leg**: trade after kickoff succeeds, then resolver freeze on final,
   swaps blocked / LP exit open, resolve, redeem, solvent-empty.
 - `contracts/test/integration/MarketLifecycleForkE2E.t.sol` — the same
-  journey on a **Base Mainnet fork with real USDC**, over a
+  journey on a **mainnet fork with real USDC** (Base at the time; since 2026-09-30 the fork is Arc Mainnet with a 6-dp mock collateral — Arc's native USDC needs arc-foundry), over a
   CREATE2-mined hook and the deploy scripts' own wiring.
 
 ## A6. What this addendum does not do
@@ -190,7 +190,7 @@ Review: [`dynamic-market-fee-review.md`](./dynamic-market-fee-review.md) —
 share; L-04 sell-side telemetry valuation), two informational. Slither
 re-run unchanged from the P-013 baseline. Tests: 236 local contract tests
 (hooks, e2e, markets) green including the 100k-call invariant sweep and an
-on-chain fee proof in `FullLifecycle.t.sol`; the Base Mainnet fork suites
+on-chain fee proof in `FullLifecycle.t.sol`; the mainnet fork suites (Arc since 2026-09-30)
 could not run in the review environment (RPC egress blocked) and must be
 run before deploy.
 
@@ -232,7 +232,7 @@ the `ws` and `axios` entries is a separate task.
 It does not re-sign the ship gate. Still outstanding and unchanged: M-01
 written acceptance, the L-03 note, and the human audit and second-model
 review before the mainnet deploy. Two items A7 left open have moved: the
-fork suites run green in CI on a Base Mainnet fork (`contracts.yml`, ledger
+fork suites run green in CI on an Arc Mainnet fork (Base before 2026-09-30) (`contracts.yml`, ledger
 G-003), and a Content-Security-Policy now ships in report-only mode with a
 report endpoint (`launch-gate-review.md` §3) — enforcement waits on a clean
 report window. The ledger in `docs/tasks/launch-gate.md` carries the rest

@@ -5,7 +5,7 @@ P4-010. Run after `npm install` + Privy login + a funded wallet (small amounts o
 ## Setup
 
 1. `server/.env` populated with `UNISWAP_TRADING_API_KEY`, `PRIVY_APP_ID`, `PRIVY_APP_SECRET`, `DATABASE_URL` pointing to a real Postgres.
-2. `client/.env.local` populated with `VITE_PRIVY_APP_ID`, `VITE_API_BASE_URL=http://localhost:3001`, `VITE_BASE_RPC_URL` (Alchemy / QuickNode recommended).
+2. `client/.env.local` populated with `VITE_PRIVY_APP_ID`, `VITE_API_BASE_URL=http://localhost:3001`, `VITE_ARC_RPC_URL` (Alchemy / QuickNode recommended).
 3. `npm run db:generate -w @mantua/server && npm run db:migrate -w @mantua/server`.
 4. `npm run dev` at the root → Vite on `https://localhost:5173`, Express on `http://localhost:3001`.
 5. Log in via Privy. Confirm header shows the wallet address.
@@ -13,7 +13,7 @@ P4-010. Run after `npm install` + Privy login + a funded wallet (small amounts o
 ## Phase 4a — Pool list + detail (P4-001 + P4-002)
 
 - [ ] Switch to **Liquidity** tab — pool list loads from DefiLlama with TVL / Vol 24h / APY columns; sorted by TVL desc.
-- [ ] Click any pool — detail page renders header (back arrow + symbol + fee tier), 4 stat cells (TVL, APY, Vol 24h, Vol 7d), chart, underlying-token BaseScan links.
+- [ ] Click any pool — detail page renders header (back arrow + symbol + fee tier), 4 stat cells (TVL, APY, Vol 24h, Vol 7d), chart, underlying-token Arcscan links.
 - [ ] Toggle range (7D / 30D / 90D / 1Y / ALL) — chart re-fetches and re-renders smoothly.
 - [ ] Toggle metric (TVL / APY) — chart switches series.
 - [ ] Theme toggle in header — chart text/border colors flip with the rest of the UI.
@@ -26,7 +26,7 @@ P4-010. Run after `npm install` + Privy login + a funded wallet (small amounts o
 - [ ] Switch to USDC/EURC → fee tier auto-defaults to 0.01% (stable/stable).
 - [ ] Set ETH/cbBTC at 1 ETH / 0.05 cbBTC → click **Create pool** → confirmation modal opens with full description.
 - [ ] Confirm → wallet popup signs `PoolManager.initialize` tx.
-- [ ] Receipt: BaseScan link visible, button shows **Pool created**, plus a follow-up **"Add liquidity to this pool →"** button.
+- [ ] Receipt: Arcscan link visible, button shows **Pool created**, plus a follow-up **"Add liquidity to this pool →"** button.
 - [ ] DB: `pools` row inserted with the canonical `pool_key_hash`; `mantua_audit_log` entry with `action=create_pool`.
 - [ ] Try the same pair+fee combination again — second attempt reverts on-chain (already initialized); UI shows the revert message.
 
@@ -38,14 +38,14 @@ After create-pool success:
 - [ ] Click **Add liquidity** → confirmation modal; click **Approve & add**.
 - [ ] If USDC has no prior PositionManager allowance: wallet popup signs an approval tx first; status shows **"Checking token approvals…"**, receipt visible as a separate **Approval tx ↗** link.
 - [ ] Then signs the modifyLiquidities tx; status shows **"Waiting for confirmation…"**.
-- [ ] Receipt: BaseScan link, status **"Liquidity added"**.
+- [ ] Receipt: Arcscan link, status **"Liquidity added"**.
 - [ ] DB: `portfolio_transactions` row with `action=add_liquidity`, the swap params blob, `usd_value`, and the captured `tokenId`. `positions` row inserted with `token_id`, tick range, liquidity. `mantua_audit_log` entry.
 - [ ] Set slippage to 200 bps → confirmation modal requires double-confirm.
 - [ ] Set slippage to 600 bps → server returns 400 with `ADD_LIQUIDITY_INVALID`.
 
 ## Phase 4d — Remove liquidity (P4-006 → P4-008)
 
-- [ ] Switch to **Positions** tab → see the position from the previous step. Row shows `ETH/USDC · 0.05% · token #N · liquidity X`, plus an "opened tx" BaseScan link.
+- [ ] Switch to **Positions** tab → see the position from the previous step. Row shows `ETH/USDC · 0.05% · token #N · liquidity X`, plus an "opened tx" Arcscan link.
 - [ ] Click **Remove** → modal opens. Title shows `Remove liquidity · ETH/USDC`, subtitle shows `Token #N · liquidity X`.
 - [ ] Default percentage 50%, slippage 50 bps. Click **Remove** → confirmation modal → **Remove**.
 - [ ] Wallet popup signs the modifyLiquidities tx (DECREASE_LIQUIDITY + TAKE_PAIR). Receipt visible.

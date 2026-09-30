@@ -31,16 +31,16 @@ p95 targets, milliseconds, measured at the edge of Express
 budget logs a structured `latency_budget_exceeded` event with `key`, `ms`,
 `budgetMs`, `status`.
 
-| Key            | Route                              | p95 budget | Why                                                                                |
-| -------------- | ---------------------------------- | ---------- | ---------------------------------------------------------------------------------- |
-| `quote`        | `POST /api/markets/trade/quote`    | 800        | 5 serial RPC hops on a dedicated endpoint + 1 DB read; the ticket debounces 400 ms |
-| `calldata`     | `POST /api/markets/trade/calldata` | 1 200      | the quote path + the cap check/record                                              |
-| `fill`         | `POST /api/markets/fills`          | 2 500      | two receipt reads + insert + bookkeeping                                           |
-| `trade_status` | `GET /api/markets/trade/status`    | 600        | one or two receipt reads                                                           |
-| `status`       | `GET /api/status`                  | 300        | one cached aggregate; the banner's source                                          |
-| `slate`        | `GET /api/sports/slate`            | 500        | cached canonical read + cached live-odds overlay                                   |
-| `positions`    | `GET /api/markets/positions`       | 1 500      | cached per wallet; cold path ~3 RPC reads per market row                           |
-| `confirmation` | client receipt wait                | 8 000      | Base blocks ~2 s; four blocks. Measured by the load test, not the middleware       |
+| Key            | Route                              | p95 budget | Why                                                                                                                          |
+| -------------- | ---------------------------------- | ---------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `quote`        | `POST /api/markets/trade/quote`    | 800        | 5 serial RPC hops on a dedicated endpoint + 1 DB read; the ticket debounces 400 ms                                           |
+| `calldata`     | `POST /api/markets/trade/calldata` | 1 200      | the quote path + the cap check/record                                                                                        |
+| `fill`         | `POST /api/markets/fills`          | 2 500      | two receipt reads + insert + bookkeeping                                                                                     |
+| `trade_status` | `GET /api/markets/trade/status`    | 600        | one or two receipt reads                                                                                                     |
+| `status`       | `GET /api/status`                  | 300        | one cached aggregate; the banner's source                                                                                    |
+| `slate`        | `GET /api/sports/slate`            | 500        | cached canonical read + cached live-odds overlay                                                                             |
+| `positions`    | `GET /api/markets/positions`       | 1 500      | cached per wallet; cold path ~3 RPC reads per market row                                                                     |
+| `confirmation` | client receipt wait                | 8 000      | Arc finality is sub-second; the budget keeps four Base-era blocks of headroom. Measured by the load test, not the middleware |
 
 Paging on latency: p95 over budget with ≥ 20 samples in the window →
 **warn**; over 2× budget → **critical**.

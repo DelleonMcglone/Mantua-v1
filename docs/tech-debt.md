@@ -10,7 +10,7 @@ condition for closure.
 
 **Gap:** The external-positions enrichment path (`server/src/lib/external-positions.ts`)
 issues live calls to `PositionManager.getPoolAndPositionInfo` and
-`getPositionLiquidity` on Base Mainnet. The PR ships with **only** unit
+`getPositionLiquidity` on Arc Mainnet. The PR ships with **only** unit
 coverage of the `decodePositionInfo` bit-decoder
 (`server/src/lib/v4-position-info.test.ts`). The subgraph fetch, the
 on-chain enrichment, and the merge with DB rows have **not** been
@@ -25,7 +25,7 @@ here in lieu of a fork test.
 **Closure condition:** Stand up an Anvil mainnet-fork harness (Foundry-
 based) and add an integration test that:
 
-1. Pins to a recent Base block where a known wallet holds at least one v4
+1. Pins to a recent Arc block where a known wallet holds at least one v4
    position opened outside Mantua.
 2. Mocks the subgraph response (or seeds a local subgraph) with that
    wallet's tokenIds.
@@ -36,22 +36,22 @@ based) and add an integration test that:
 
 ---
 
-## TD-002 — Stable Protection deployment to Base Mainnet not yet executed
+## TD-002 — Stable Protection deployment to Arc Mainnet not yet executed
 
 **Slice:** Phase 5b-3 (Stable Protection redeploy preparation)
 
 **Gap:** [PR #25](https://github.com/DelleonMcglone/Mantua-Intelligence/pull/25)
-verified that no Mantua hook lives on Base Mainnet (8453). Stable
+verified that no Mantua hook lives on Arc Mainnet (5042). Stable
 Protection needs to be deployed there; until then the hook address stays
 `null` (env-overridable via `STABLE_PROTECTION_HOOK_ADDRESS`) and the
 Stable Protection swap path degrades gracefully. The parameterized
 deploy script exists, but the deploy itself has not been run: the
-deployer wallet, Base ETH, and BaseScan API key are manual prerequisites
+deployer wallet, USDC (Arc gas), and Arcscan API key are manual prerequisites
 that aren't accessible from CI / Claude Code.
 
 **Why accepted:** Foundry deploy with a real signer and live RPC is a
 manual operator action by design. Automating it would require trusted
-CI access to a funded Base Mainnet wallet — out of scope.
+CI access to a funded Arc Mainnet wallet — out of scope.
 
 **Closure condition:** Run the deploy procedure in
 [`contracts/script/README.md`](../contracts/script/README.md), capture
@@ -60,13 +60,13 @@ the deployed address, and ship the follow-up PR that:
 1. Sets the `STABLE_PROTECTION_HOOK_ADDRESS` env override (and records
    it in `server/src/lib/v4-contracts.ts`).
 2. Re-runs `npm run verify:hooks` so Stable Protection's row in
-   `docs/security/hook-deployments.md` shows Base Mainnet (8453) ✅.
+   `docs/security/hook-deployments.md` shows Arc Mainnet (5042) ✅.
 3. Updates `docs/security/sign-off.md` to mark the bytecode-verified
-   column ✅ for Stable Protection on Base Mainnet.
-4. Updates `contracts/README.md` hook table (add the Base Mainnet row).
+   column ✅ for Stable Protection on Arc Mainnet.
+4. Updates `contracts/README.md` hook table (add the Arc Mainnet row).
 
 **Owner:** Phase 5 owner (TBD). Blocks: any Stable Protection pool
-creation on Base Mainnet.
+creation on Arc Mainnet.
 
 ---
 
@@ -147,10 +147,10 @@ call a host stub `window.__mantuaChatAction(a)`. Affected so far:
    has no way to change it.
 3. **Send Tokens flow** — P6-004 ships `POST /api/agent/send` (lookup
    agent wallet → resolve token → cap check → CDP transfer →
-   BaseScan tx URL) but the chat-mode "Send Tokens" card stays inert.
+   Arcscan tx URL) but the chat-mode "Send Tokens" card stays inert.
    Needed: recipient input, token picker, amount input, confirmation
    step (via `useConfirmedAction`), tx-success state showing the
-   BaseScan link.
+   Arcscan link.
 4. **Swap Tokens flow** — P6-005 ships `POST /api/agent/swap`
    (lookup → cap → quote → Permit2 sign → calldata → CDP-signed send
    → record). Single server-side request with no client round-trips,
@@ -158,7 +158,7 @@ call a host stub `window.__mantuaChatAction(a)`. Affected so far:
    2-call orchestration the user-side swap uses. Needed: tokenIn /
    tokenOut pickers, amount input, optional slippage override,
    confirmation, tx-success showing input/output amounts +
-   BaseScan link.
+   Arcscan link.
 5. **Add/Remove Liquidity flow** — P6-006 ships
    `POST /api/agent/liquidity/{add,remove}`. Add does the full
    Permit2-approve-once + sign-batch + multicall(permitBatch +
@@ -213,7 +213,7 @@ call a host stub `window.__mantuaChatAction(a)`. Affected so far:
     shortcut), **LP Positions** (driven by `GET /api/positions`,
     hook badges via address-to-name mapping), **History** (Swap /
     Pool / Deposits filtered from the `transactions` array client-
-    side, BaseScan link per row); a **Hide Small Balances** toggle
+    side, Arcscan link per row); a **Hide Small Balances** toggle
     that PATCHes `/api/preferences` and re-renders the Balances list
     filtered to balances ≥ $1; a **user/agent wallet switcher**
     that flips the data source between `GET /api/portfolio` and
@@ -260,7 +260,7 @@ whatever value was set via API (default $100, or whatever a manual
    - A cap-edit field or modal (number input, validate against
      `HARD_DAILY_CAP_USD = $50k`, optimistic UI, error toast on 400).
    - A Send-flow modal/sub-step (recipient address input, token
-     picker, amount input, confirmation, tx-success with BaseScan
+     picker, amount input, confirmation, tx-success with Arcscan
      link).
 2. Port the designs into `client/src/features/agent/` following the
    existing `chat.jsx` → `AgentPanel.tsx` port style.
@@ -310,7 +310,7 @@ asks for the full E2E:
    my agent balance"_ → `query`/`wallet`; _"buy a horse"_ →
    `reject`).
 3. **Phase 7 analytics — 10 representative queries** (P7-006) drive
-   `GET /api/analytics?type=...`: list pools (Base), single pool by
+   `GET /api/analytics?type=...`: list pools (Arc), single pool by
    id, chart for a known pool (30-day), two protocol-by-slug lookups
    (e.g. `uniswap`, `aave-v3`), two chain dex_volume lookups (e.g.
    `base`, `ethereum`), three token_price queries with mixed key
@@ -331,11 +331,11 @@ documented here in lieu of a real test.
 1. TD-004 closes (UIs land); TD-003 closes (per-ticket integration
    harness exists).
 2. Stand up an E2E scaffold that:
-   a. Provisions a fresh test agent wallet (Base Mainnet or an Anvil
+   a. Provisions a fresh test agent wallet (Arc Mainnet or an Anvil
    fork of it) and funds it with a small, dedicated USDC + ETH budget.
    b. Drives the chat-mode UI through Playwright (or equivalent),
    executing each of the 6 cards end-to-end and asserting the
-   resulting BaseScan tx confirms.
+   resulting Arcscan tx confirms.
    c. Drives the autonomous-mode UI with the 5 representative
    instructions, asserts the parsed intent shape, and (where
    executable) that the action also lands on-chain.
@@ -413,7 +413,7 @@ outages where the fallback would have kept the command bar working.
 in production.
 
 **Gap:** The code side is done: `env.ts` fails the production boot when
-`BASE_RPC_URL` is a public host, `BASE_RPC_FALLBACK_URLS` lists dedicated
+`ARC_RPC_URL` is a public host, `ARC_RPC_FALLBACK_URLS` lists dedicated
 fallbacks, the public backstop is off in production, and per-host health
 feeds `/api/status`. What does not exist is the provider account: no
 Alchemy / QuickNode / Infura / paid-dRPC key is set in Vercel, so the next
@@ -427,12 +427,12 @@ survives every warning.
 
 **Closure condition:**
 
-1. Open a Base Mainnet endpoint at a dedicated provider (free tiers are
+1. Open a Arc Mainnet endpoint at a dedicated provider (free tiers are
    fine to start; the load test in task 054 sizes the paid tier).
-2. Set `BASE_RPC_URL` to it in Vercel (production + preview) and, ideally,
-   a second provider in `BASE_RPC_FALLBACK_URLS`.
+2. Set `ARC_RPC_URL` to it in Vercel (production + preview) and, ideally,
+   a second provider in `ARC_RPC_FALLBACK_URLS`.
 3. Deploy; confirm `GET /api/status` reports `rpc.healthy: true` and the
-   boot log carries no `BASE_RPC_URL` issue.
-4. Set the same URL as the repo secret `BASE_RPC_URL` for `contracts.yml`.
+   boot log carries no `ARC_RPC_URL` issue.
+4. Set the same URL as the repo secret `ARC_RPC_URL` for `contracts.yml`.
 
 **Owner:** operator (owner). Blocks: the production deploy of task 052.

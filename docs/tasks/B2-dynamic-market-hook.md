@@ -1,5 +1,7 @@
 # Phase B2 — Dynamic Market Hook
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 > Master: `docs/tasks/sports-pivot.md` — PHASE B2 (W2, 🔴 P0)
 > Snapshot: 2026-09-03 · 8 ✅
 

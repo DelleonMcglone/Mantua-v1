@@ -1,5 +1,7 @@
 # 038 — Canonical sports data + Mantua market-data layer (S-005/S-006/S-007/S-008/S-010)
 
+> **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
+
 **Status:** 🟢 schema + read layer complete — ingestion wiring landed in task 041 (`041-ingestion-tools-wiring.md`)
 **Branch:** `038-canonical-market-data`
 
@@ -12,29 +14,29 @@ the new tables — ingestion wiring belongs to the sibling ingest task.
 
 ## S-row coverage map (gap analysis)
 
-| S-row | Data item                          | Where it lives                                                                     | Status before 038 | 038 delta                                             |
-| ----- | ---------------------------------- | ---------------------------------------------------------------------------------- | ----------------- | ----------------------------------------------------- |
-| S-005 | Schedule / live scores / finals    | `events` (status, scores, startsAt, lastPolledAt)                                   | ✅ existed (0009)  | —                                                     |
-| S-005 | Live game state on the event       | `events.status/homeScore/awayScore` (Polymarket convention: live state on event)    | ✅ existed         | —                                                     |
-| S-005 | **Play-by-play**                   | **`game_plays`** (new)                                                              | ❌ hole            | New table, append-only, unique (event, provider, seq) |
-| S-006 | Team catalog                       | `teams` (key, names, logo, provider link)                                           | ✅ existed (0009)  | —                                                     |
-| S-006 | **Standings / records**            | **`team_records`** (new): W-L-T, ranks, PF/PA, streak, home/away record strings     | ❌ hole (only the provider's display `record` string passed through the slate) | New table, unique (team, season, seasonType) |
-| S-007 | Player catalog + injuries          | `players`, `injuries`                                                               | ✅ existed (0009)  | —                                                     |
-| S-007 | **Team season stat aggregates**    | **`team_records.stats` jsonb** — same (team, season) dimension, no extra table      | ❌ hole            | jsonb + typed reader `teamSeasonStats`                |
-| S-007 | **Player season stats**            | **`players.season_stats` jsonb**, keyed by season label                             | ❌ hole            | New column + typed reader `playerSeasonStats`         |
-| S-008 | Recent games for a team            | finished `events` rows                                                              | data existed, no read path | `getRecentGames` (history.ts)                 |
-| S-008 | Head-to-head                       | finished `events` rows                                                              | no read path      | `getHeadToHead`                                       |
-| S-008 | Home/away splits                   | finished `events` rows                                                              | no read path      | `getHomeAwaySplits`                                   |
-| S-008 | Situational trends                 | finished `events` + `markets.openingProbability` (favorite/underdog off OUR lines)  | no read path      | `getSituationalTrends`                                |
-| S-008 | Historical Mantua market prices    | `market_prices` joined markets → events/teams                                       | data existed, no read path | `getMarketPriceHistory`, `getTeamMarketPriceHistory` |
-| S-010 | Current price + history            | `market_prices` (fallback `markets.openingProbability`)                             | recorded, unserved | market-metrics.ts `price` block                      |
-| S-010 | Volume (24h/total)                 | `market_fills` USDC aggregates                                                      | recorded, unserved | `volume` block                                        |
-| S-010 | Open interest                      | unredeemed `market_positions` + YES-token totalSupply (RPC, null pre-deployment)    | recorded, unserved | `openInterest` block                                  |
-| S-010 | Trading activity                   | `market_fills` counts/recency/unique traders                                        | recorded, unserved | `activity` block                                      |
-| S-010 | Position concentration             | BaseScan token-holders read (the market-detail holders pattern)                     | pattern existed    | `concentration` block (null best-effort)              |
-| S-010 | Liquidity                          | `market_prices.liquidityRaw` capture + live v4 StateView `getLiquidity`             | recorded, unserved | `liquidity` block — **null pre-deployment** (MARKETS_PERIPHERY_BY_CHAIN empty) |
-| S-010 | Time-to-kickoff / resolution       | `events.startsAt`, `markets.frozenAt/resolvedAt`                                    | data existed       | `timing` block                                        |
-| S-010 | Market status                      | `markets.state` + event status                                                      | existed            | surfaced on the snapshot                              |
+| S-row | Data item                       | Where it lives                                                                     | Status before 038                                                              | 038 delta                                                                      |
+| ----- | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| S-005 | Schedule / live scores / finals | `events` (status, scores, startsAt, lastPolledAt)                                  | ✅ existed (0009)                                                              | —                                                                              |
+| S-005 | Live game state on the event    | `events.status/homeScore/awayScore` (Polymarket convention: live state on event)   | ✅ existed                                                                     | —                                                                              |
+| S-005 | **Play-by-play**                | **`game_plays`** (new)                                                             | ❌ hole                                                                        | New table, append-only, unique (event, provider, seq)                          |
+| S-006 | Team catalog                    | `teams` (key, names, logo, provider link)                                          | ✅ existed (0009)                                                              | —                                                                              |
+| S-006 | **Standings / records**         | **`team_records`** (new): W-L-T, ranks, PF/PA, streak, home/away record strings    | ❌ hole (only the provider's display `record` string passed through the slate) | New table, unique (team, season, seasonType)                                   |
+| S-007 | Player catalog + injuries       | `players`, `injuries`                                                              | ✅ existed (0009)                                                              | —                                                                              |
+| S-007 | **Team season stat aggregates** | **`team_records.stats` jsonb** — same (team, season) dimension, no extra table     | ❌ hole                                                                        | jsonb + typed reader `teamSeasonStats`                                         |
+| S-007 | **Player season stats**         | **`players.season_stats` jsonb**, keyed by season label                            | ❌ hole                                                                        | New column + typed reader `playerSeasonStats`                                  |
+| S-008 | Recent games for a team         | finished `events` rows                                                             | data existed, no read path                                                     | `getRecentGames` (history.ts)                                                  |
+| S-008 | Head-to-head                    | finished `events` rows                                                             | no read path                                                                   | `getHeadToHead`                                                                |
+| S-008 | Home/away splits                | finished `events` rows                                                             | no read path                                                                   | `getHomeAwaySplits`                                                            |
+| S-008 | Situational trends              | finished `events` + `markets.openingProbability` (favorite/underdog off OUR lines) | no read path                                                                   | `getSituationalTrends`                                                         |
+| S-008 | Historical Mantua market prices | `market_prices` joined markets → events/teams                                      | data existed, no read path                                                     | `getMarketPriceHistory`, `getTeamMarketPriceHistory`                           |
+| S-010 | Current price + history         | `market_prices` (fallback `markets.openingProbability`)                            | recorded, unserved                                                             | market-metrics.ts `price` block                                                |
+| S-010 | Volume (24h/total)              | `market_fills` USDC aggregates                                                     | recorded, unserved                                                             | `volume` block                                                                 |
+| S-010 | Open interest                   | unredeemed `market_positions` + YES-token totalSupply (RPC, null pre-deployment)   | recorded, unserved                                                             | `openInterest` block                                                           |
+| S-010 | Trading activity                | `market_fills` counts/recency/unique traders                                       | recorded, unserved                                                             | `activity` block                                                               |
+| S-010 | Position concentration          | BaseScan token-holders read (the market-detail holders pattern)                    | pattern existed                                                                | `concentration` block (null best-effort)                                       |
+| S-010 | Liquidity                       | `market_prices.liquidityRaw` capture + live v4 StateView `getLiquidity`            | recorded, unserved                                                             | `liquidity` block — **null pre-deployment** (MARKETS_PERIPHERY_BY_CHAIN empty) |
+| S-010 | Time-to-kickoff / resolution    | `events.startsAt`, `markets.frozenAt/resolvedAt`                                   | data existed                                                                   | `timing` block                                                                 |
+| S-010 | Market status                   | `markets.state` + event status                                                     | existed                                                                        | surfaced on the snapshot                                                       |
 
 ## Schema delta — migration `0013_canonical_sports_stats.sql`
 
@@ -43,7 +45,7 @@ journal entry appended (idx 13). Verified: full 0000→0013 chain applies to
 a scratch Postgres via psql, and 0013 re-applies as a clean no-op.
 
 - **`game_plays`** — append-only play-by-play. `(event_id, provider,
-  sequence)` unique makes re-ingest idempotent; `(event_id, sequence)`
+sequence)` unique makes re-ingest idempotent; `(event_id, sequence)`
   index serves the "plays for this game in order" read. Provider extras
   ride a `detail` jsonb.
 - **`team_records`** — standings/record snapshot per (team, season,
