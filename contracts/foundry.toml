@@ -13,6 +13,13 @@ optimizer_runs = 200
 via_ir = true
 fs_permissions = [{ access = "read", path = "./" }]
 
+# Circle's arc-foundry (`arc-forge`, `arc-anvil`): `FOUNDRY_PROFILE=arc` selects
+# the Arc EVM, which routes Arc's native-USDC ERC-20 transfers through the
+# native balance — vanilla Foundry cannot (TRANSFER_FROM_FAILED). Used by the
+# real-USDC fork run: FORK_REAL_USDC=1 FOUNDRY_PROFILE=arc arc-forge test …
+[profile.arc]
+network = "arc"
+
 [fmt]
 line_length = 120
 tab_width = 4
