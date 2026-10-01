@@ -2,7 +2,7 @@
 
 > **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
 
-**Status:** 🟢 code-complete / mock- and sandbox-tested — awaiting commercial credentials
+**Status:** ❌ **CLOSED 2026-10-01 — superseded by D-123 (no fiat rails; Zero Hash dropped by owner decision).** Historical: the code below was mock-tested and never received credentials; it stays dark (`FIAT_RAILS_MODE=disabled`) until a removal PR
 **Branch:** `036-fiat-rails-production-path`
 
 Production-path code for the Phase 2 fiat rails (D-101: Zero Hash is the

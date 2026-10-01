@@ -31,6 +31,7 @@
 | D-107 | Social platform for agent posting (AE-001)                                                                                 | ✅ CLOSED 2026-09-18 — X (Twitter) via API v2 under an OAuth 1.0a user-context signature; ONE deployment account (four env values: app key/secret, access token/secret) through which every opted-in agent posts under its own handle; missing credentials → recorded dry runs; per-agent OAuth is the recorded next step; the login shared in the task prompt is unused, unstored, and should be rotated                                                                                                                                              | High (shipped, task 070)                                    | Operator provisions the X app and account credentials                                                    |
 | D-119 | Combo (parlay) mechanism (CB-001)                                                                                          | ✅ CLOSED 2026-09-19 — **a combo is a market**: a conjunction market created through the existing factory (id = keccak over the sorted leg ids), priced by its own YES/USDC pool with the Dynamic Market Hook fee, bought with the same single swap, settled by the resolver from the legs' on-chain outcomes (any lost → NO; every non-void won → YES; all void → INVALID; a void leg drops out). No new contract, no batching, no counterparty desk; legs priced as independent, correlated legs refused in code                                     | High (shipped, task 072)                                    | Operator seeds combo pools (`COMBO_SEED_USDC`, `COMBO_MAX_OPEN_MARKETS`)                                 |
 | D-120 | Institutional custody model (IC-001)                                                                                       | ✅ CLOSED 2026-09-20 — **an institution is a segregated Circle wallet set**: members' agent wallets created in it, withdrawals only to verified custodian addresses under dual control (second person verifies destinations and approves withdrawals at or above the threshold), institution-wide per-trade and daily caps, enforced at `checkSpendingCap`, `sendFromAgentWallet` and the wallet provisioner; the custodian of the principal is recorded, not integrated                                                                               | High (shipped, task 074)                                    | Operator sets `MANTUA_OPS_KEY`; Gas Station policy + screening per institution set in the Circle Console |
+| D-123 | No fiat rails: Zero Hash dropped, USDC-only funding (F-001…F-009)                                                          | Mantua stays a purely onchain market; no regulated ramp in the transaction path; fiat adapter stays dark, removal scheduled                                                                                                                                                                                                                                                                                                                                                                                                                            | High                                                        | Owner decision 2026-10-01                                                                                |
 | D-122 | Jurisdictional posture and geofencing at Arc Mainnet launch (L-004)                                                        | Attestation in Terms §1, no IP geofence at launch; counsel engagement (D-012) deferred by owner; Terms/Privacy re-versioned 2026-10-01                                                                                                                                                                                                                                                                                                                                                                                                                 | High                                                        | Owner sign-off 2026-10-01                                                                                |
 | D-121 | Home page restructure: landing page removed, `/` is home (HP-002)                                                          | ✅ CLOSED 2026-09-20 — **one front door**: the standalone marketing landing page is deleted, `/` resolves straight to the board for every visitor; logged out is board-first with the login gate deferred to the point of trade (unchanged, already-tested behavior — now reachable with zero clicks), never a gated shell; the landing footer's surviving content (docs link, socials, copyright, the legal links L-004/L-005 depend on) moves verbatim into a new home-page footer, the marketing content above it dropped (inventoried in task 075) | High (shipped, task 075)                                    | None                                                                                                     |
 | D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                                                                                                                                          | High (process)                                              | Owner decision after 2026-09-17                                                                          |
@@ -1281,3 +1282,52 @@ geofence the memo asks for, re-version.
 
 **Owner items.** None beyond this record; the version bump ships in the
 same change.
+
+---
+
+## D-123 — No fiat rails: Zero Hash dropped, funding is USDC on-chain ✅ CLOSED 2026-10-01
+
+**Decision (owner, 2026-10-01, in session):** "We aren't going to use
+Zero Hash for compliant account / funding / withdrawal infrastructure. The
+goal is to make Mantua a genuinely onchain programmable sports market; I
+would not introduce Zero Hash into the transaction path simply because it
+provides regulated infrastructure."
+
+**What this changes.**
+
+- D-101 (Zero Hash selected as the fiat on/off-ramp) is **superseded**.
+  F-001, F-002, F-003, F-004, F-006 and F-009 are dropped, not pending:
+  no commercial agreement, no Cert credentials, no Plaid keys, no
+  `fiat:e2e`. The fiat ledger `docs/tasks/036-fiat-rails-production-path.md`
+  is closed as historical.
+- Funding and withdrawal are the direct USDC path (F-008, shipped): a
+  wallet transfer in, a wallet transfer out, on Arc. Circle's Gateway /
+  CCTP bridging for a user arriving with USDC on another chain stays as
+  built (C-wave); nothing fiat-shaped sits between the user and the
+  market.
+- F-005 (no chain vocabulary during deposit/withdraw) and F-007 (the
+  compliance boundary note in `docs/architecture.md`) stay ✅ as written,
+  re-read against a USDC-only product: there is no KYC/AML handoff because
+  there is no ramp partner.
+
+**Consequences to act on.**
+
+1. **Code:** `FIAT_RAILS_MODE` stays `disabled` (its default); the Zero
+   Hash / Plaid adapters and the `/api/fiat/*` routes remain dark. Their
+   removal is a follow-up PR so the surface the audit record describes
+   stays recognisable until then; `ZERO_HASH_*` / `PLAID_*` env vars are
+   never set in production.
+2. **Terms:** the shipped Terms (version `2026-10-01`) still describe
+   "dollars via a connected bank account" converted by payments partners
+   (Funding section). That text is now inaccurate and needs a counsel-free
+   wording change plus a version bump — **owner to confirm** before the
+   next re-ask, since every user re-accepts on a bump.
+3. **Positioning:** the product is USDC-in, USDC-out. Anyone without USDC
+   acquires it elsewhere; the app does not sell dollars.
+
+**Why.** The owner's product thesis: a programmable on-chain market whose
+transaction path is entirely on-chain. A regulated ramp in that path
+would add a custodial, KYC-gated step the thesis rejects, for a capability
+(dollar funding) the thesis does not require.
+
+**Owner items.** Decide on the Terms wording change (consequence 2).
