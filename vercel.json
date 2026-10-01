@@ -10,6 +10,19 @@
       "maxDuration": 300
     }
   },
+  "redirects": [
+    {
+      "source": "/((?!api/).*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "mantua.ai"
+        }
+      ],
+      "destination": "https://www.mantua.ai/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
