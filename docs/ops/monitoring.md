@@ -113,12 +113,27 @@ The API emits everything as structured pino JSON to stdout, which Vercel
 captures per invocation. To get cross-instance dashboards and a pager:
 
 1. **Vendor: Better Stack** (owner decision 2026-09-24 — logs and on-call
-   paging in one account). Sign up, create a Telemetry **source** for
-   Vercel, and connect it: either Better Stack's Vercel integration or
-   Vercel → Project → Settings → Log Drains with the source's drain URL
-   (JSON, production environment). Confirm lines arrive, then add the
-   alert rules in step 4 and an on-call contact (phone/SMS) under
-   Better Stack's incident settings.
+   paging in one account). Two layers, in this order:
+
+   **a. The pager (free tier, no Vercel plan dependency).** The API serves
+   `GET /api/ops/alerts/probe` with no auth: `200 {ok:true}` while no
+   critical alert is open, `503 {ok:false, critical:[ids]}` the moment one
+   is (M-01's `frozen_not_final` included). Only ids and counts leave the
+   box. In Better Stack → Uptime → Monitors → create: URL
+   `https://www.mantua.ai/api/ops/alerts/probe`, check every 1 min (3 on
+   the free tier), alert when "URL doesn't return 2xx", confirmation
+   period 0, then set the on-call contact (phone/SMS) under the escalation
+   policy. That is the R-010 pager; the three critical rows above all
+   surface through it.
+
+   **b. Logs (needs Vercel Pro — log drains are not on Hobby).** Create a
+   Telemetry **source** for Vercel and connect it: Better Stack's Vercel
+   integration or Vercel → Project → Settings → Log Drains with the
+   source's drain URL (JSON, production environment). Confirm lines
+   arrive, then add the per-field rules in step 4 for the warn-level
+   notifications and the dashboards in step 3. Until then the live-sync
+   workflow's run log carries the `alert` lines.
+
 2. Route on `event`: `alert` (by `severity`), `latency_budget_exceeded`
    (by `key`), and the request logs' `res.statusCode`/`responseTime` for
    the p95 panels.

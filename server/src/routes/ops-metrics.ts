@@ -88,6 +88,22 @@ export function createOpsMetricsRouter(overrides: Partial<OpsDeps> = {}): Router
     res.json({ generatedAt: deps.now(), count: alerts.length, alerts });
   });
 
+  /**
+   * R-010 — the pager probe. Unauthenticated on purpose: an uptime monitor
+   * (Better Stack Uptime, free tier, phone/SMS) polls it and pages on a
+   * non-2xx. 200 = no critical alert open; 503 = at least one. Only alert
+   * ids and counts leave the box — no titles, details or market data.
+   */
+  router.get("/api/ops/alerts/probe", async (_req: Request, res: Response) => {
+    const alerts = evaluateAlerts(await buildAlertInput(deps));
+    const critical = alerts.filter((a) => a.severity === "critical").map((a) => a.id);
+    const warn = alerts.filter((a) => a.severity === "warn").length;
+    res.setHeader("Cache-Control", "no-store");
+    res
+      .status(critical.length === 0 ? 200 : 503)
+      .json({ ok: critical.length === 0, critical, warn });
+  });
+
   return router;
 }
 
