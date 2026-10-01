@@ -237,3 +237,120 @@ G-003), and a Content-Security-Policy now ships in report-only mode with a
 report endpoint (`launch-gate-review.md` §3) — enforcement waits on a clean
 report window. The ledger in `docs/tasks/launch-gate.md` carries the rest
 as 🟡 rows.
+
+# Addendum — 2026-10-01: Arc Mainnet deploy and written acceptances (L-003)
+
+Scope: everything that shipped between B4 and the Arc Mainnet deploy, the
+written acceptances L-003 asks the owner for, and one new finding (K-01)
+that surfaced while preparing them. This addendum does **not** re-sign the
+ship gate; see C8 for what stands between here and open markets.
+
+## C1. What changed since B
+
+| Change                                                                                                                     | Where                                           | Security-relevant detail                                                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Launch chain moved to **Arc Mainnet (5042)**, Base stripped (B-002/B-003/B-005)                                            | PRs #87–#89                                     | One `SupportedChainId`; chain identity never reaches the UI; USDC is the gas token (18-dp native view of the same 6-dp balance, converted at the edge).                                                                                                                                                     |
+| Full Dynamic Market stack deployed on Arc (H-009 / L-018)                                                                  | PRs #90, #91; `deploy/dynamic-market/README.md` | Hook `0xb23d…28c0` bytecode hash `0x103be191…d25880c` is byte-identical to the build A7 was reviewed against; permission bits `0x28C0` asserted in-tx and re-checked; all 11 contracts source-verified on Arcscan (Sourcify exact matches). Operator = keeper = deployer `0x4EF8…12C3` (DM-103, unchanged). |
+| Circle mainnet credentials, Gas Station policy on Arc (C-001/C-005/C-006/C-017)                                            | PR #94; `docs/tasks/018-circle-credentials.md`  | Live key + entity secret stored as _sensitive_ in Vercel; recovery files kept offline. Sponsored transaction proven: the agent SCA paid zero gas (tx `0x1b9e52f2…ac51`). The agent-wallet custody boundary (D-008/D-110) is unchanged.                                                                      |
+| Provider outage fix: cross-provider event identity + fallback (R-012)                                                      | PRs #92, #100, #101                             | New `events.provider_ids` column; a second provider may refresh a row but never changes its owner or market id. ESPN serves the live tick while the Sportradar key is a trial.                                                                                                                              |
+| Seller gates un-darked (MP-003) **by owner decision ahead of the D-012 counsel sign-off**                                  | Vercel env, 2026-10-01                          | Six x402 services answer 402; payout = operator EOA on Arc. One bug found live and fixed: the Gateway scheme clobbered the vanilla rail's EIP-3009 domain (PR #103).                                                                                                                                        |
+| AgenticCommerce: the ERC-8183 reference vendored, deploy script + lifecycle tests                                          | PR #102                                         | **Not deployed.** Third-party escrow (`erc-8183/base-contracts@142e669`, MIT, UUPS) with no audit on record; the broadcast is held behind this gate. Server ABI pinned to the compiled artifact.                                                                                                            |
+| Dedicated Arc RPC in production (R-006); x402 boot rejection and VAPID key-length bugs fixed; resolution-backfill workflow | PRs #97, #99, #98/#100                          | No rail change.                                                                                                                                                                                                                                                                                             |
+
+## C2. Rails re-verified
+
+Unchanged from B1/B2: security headers, route-guard audit and secret scan
+run with the unit suite (1,314 server tests green on 2026-09-30; the one
+local failure is the secret scan reading an untracked `.env`). New guards
+since B: `agent-commerce.test.ts` (server ABI ↔ compiled ERC-8183
+artifact), `active-provider-chain*.test.ts` (a trial Sportradar key never
+serves the live tick), `x402-service.test.ts` boot-hygiene, and the
+paywall test now models the real Gateway facilitator's kind `extra`.
+
+## C3. M-01 — status, and a new finding it exposes
+
+The monitoring M-01 asked for now exists: `frozen_not_final` is a
+**critical** alert evaluated on every live-sync tick (5-minute grace;
+`docs/ops/monitoring.md` §M-01) and surfaced on `/api/ops/alerts`. The
+pager vendor (R-010) is still unconnected, so today it is a log line.
+
+Preparing the ordering half of the mitigation ("write `FINAL` before
+`Resolver.freeze()`") surfaced that it cannot be implemented yet:
+
+- **K-01 — no keeper writes to the registry (Medium, new).** The server
+  registers pools (`registerPool`) but nothing ever calls
+  `MarketStateRegistry.updateMarket(poolId, modelProbability, confidence,
+eventState)`. Per spec §22 a never-written pool is stale from the
+  moment it is registered, so with markets open every pool would trade in
+  the fail-closed regime permanently: playoff rate pinned at `MAX_RATE`
+  (0.70%), trade cap pinned at `MIN_TRADE_CAP` ($100) for every pool, the
+  deviation premium excluded, and the data-driven `FINAL` halt (§23)
+  never firing — leaving only the 12-hour backstop and `Resolver.freeze()`
+  to stop trading on a decided game. No user collateral is at risk and
+  the backstop still bounds the window (§6), but the pricing model the
+  fee review signed off on would not be the one running.
+  **Disposition: engineering, not acceptance** — a keeper tick (same
+  signer key as the resolver, DM-103) that posts probability / confidence
+  / event state for every registered pool inside `STALE_AFTER`, and
+  writes `FINAL` before the freeze. Must land before
+  `MARKET_SIGNER_PRIVATE_KEY` is set.
+
+**Owner acceptance of M-01:** ⬜ pending — to be given once K-01 has
+landed and the frozen-but-not-final alert pages a human (R-010).
+
+## C4. L-03 — owner's note
+
+L-03 (volatility griefing can lift the playoff rate by ≤ 0.15% while it
+lasts; bounded, self-defeating, decays) is accepted for launch on the
+reviewer's reasoning in `dynamic-market-fee-review.md`: the griefer pays
+the fee they raise, the effect is capped by the driver's quarter share of
+the headroom, and the regular season runs at 0% where it cannot apply.
+
+**Owner's note:** ⬜ pending — reply "L-03 accepted" (or dictate wording).
+
+## C5. Decisions recorded for the record
+
+- **D-012 seller-revenue posture — seller env flipped before counsel
+  sign-off (owner decision, 2026-10-01).** Exposure: paid API access to
+  read/quote/calldata services, settled to an EOA the owner controls;
+  trading itself remains closed. Counsel review (L-004 / MP-003) is still
+  open and should confirm or reverse this.
+- **AgenticCommerce stays undeployed** until the human audit covers the
+  vendored escrow. No acceptance is requested for it in this addendum.
+- **Dependency posture** unchanged from B3 (17 high advisories, each
+  triaged in `launch-gate-review.md` §4, none on a request path with
+  attacker-controlled input).
+
+## C6. CSP report window
+
+Still report-only. On 2026-10-01 the production log window carried zero
+`/api/csp-report` submissions and zero violation lines; the window is
+hours, not the dogfood week §7 asks for, so enforcement waits.
+
+## C7. Human audit — scope and handover
+
+Still outstanding (owner engages the auditor). Handover package, all in
+the repo or recorded above: the four review documents in
+`docs/security/`; Slither baselines in `docs/security/slither/`; the
+deployed addresses, bytecode hash and verification links
+(`deploy/dynamic-market/README.md`, `docs/security/hook-deployments.md`);
+the contract suites (`forge test`, incl. the 100k-call invariant sweep)
+and the Arc fork E2E on real USDC (`FORK_REAL_USDC=1 FOUNDRY_PROFILE=arc
+arc-forge test --match-contract MarketLifecycleForkE2E`); the vendored
+ERC-8183 at `contracts/lib/base-contracts` (142e669) with
+`AgenticCommerceDeploy.t.sol`. Suggested scope in priority order: the
+hook + registry + RiskPolicy with K-01's keeper in place, Resolver /
+MarketFactory / Market, the server's signing paths (`markets-onchain.ts`,
+`agent-commerce.ts`, `circle/execute.ts`), then the vendored escrow.
+
+## C8. What this addendum does not do
+
+It does not re-sign the ship gate. Before markets open, in order:
+
+1. **K-01** — the keeper tick lands and is proven on a fork and on Arc.
+2. **M-01** written acceptance (C3) and the **L-03** note (C4).
+3. **R-010** — the frozen-but-not-final alert reaches a pager.
+4. The **human audit** (C7); the second-model review from A7/B4 is
+   superseded by it.
+5. Then `MARKET_SIGNER_PRIVATE_KEY` is set and funded (G-017 rehearsal,
+   L-007/L-008).
