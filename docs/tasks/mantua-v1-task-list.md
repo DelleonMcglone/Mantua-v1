@@ -157,19 +157,15 @@ Completed:   264   (+23 partial 🟡)
 
 ## 🏦 PHASE 2: Fiat Rails — Plaid + On/Off-Ramp 🔴
 
+> **D-123 (2026-10-01):** no fiat rails — Zero Hash dropped by owner decision; Mantua is USDC in, USDC out, on-chain. The six ramp rows (F-001–F-004, F-006, F-009) were removed from this phase; F-005, F-007 and F-008 remain as shipped.
+
 > Kalshi-like onboarding: users fund with regular bank accounts. Don't make Mantua a bank — orchestrate the regulated stack: Plaid handles the bank connection, an on/off-ramp handles USD ↔ USDC, Circle provides USDC/wallet/agent/financial infrastructure, Arc handles onchain market activity. Users should never need to understand wallets, bridges, gas, private keys, or blockchain networks — just **Deposit → Trade → Withdraw**.
 
-| ID    | Task                                                                                                                                                                                                                                                                                               | Status |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
-| F-001 | Select regulated fiat on/off-ramp provider (D-101) — Zero Hash was selected 2026-09, USDC-on-Arc delivery confirmed 2026-09-30. **Dropped 2026-10-01 by owner decision D-123:** Mantua stays a purely on-chain market; no regulated ramp enters the transaction path. No agreement, no credentials | ❌     |
-| F-002 | Integrate **Plaid** for secure bank-account connection — **dropped 2026-10-01 (D-123)**; adapter stays dark pending removal                                                                                                                                                                        | ❌     |
-| F-003 | Deposit flow: Plaid-linked bank → USD → ramp → USDC → Circle wallet — **dropped 2026-10-01 (D-123)**; funding is the direct USDC path (F-008)                                                                                                                                                      | ❌     |
-| F-004 | Withdraw flow: USDC → ramp → USD → bank — **dropped 2026-10-01 (D-123)**; withdrawal is the direct USDC path (F-008)                                                                                                                                                                               | ❌     |
-| F-005 | Hide all intermediate steps: no wallets, bridges, gas, private keys, or blockchain networks visible during deposit/withdraw                                                                                                                                                                        | ✅     |
-| F-006 | Deposit/withdraw status tracking for the fiat rails — **dropped 2026-10-01 (D-123)**; the on-chain transfer path carries its own confirmation states                                                                                                                                               | ❌     |
-| F-007 | Compliance handoff: KYC/AML lives with the ramp provider; document the boundary in `docs/architecture.md`                                                                                                                                                                                          | ✅     |
-| F-008 | Direct USDC deposit/withdraw path for crypto-native users (bypass fiat rails)                                                                                                                                                                                                                      | ✅     |
-| F-009 | E2E test: bank connect → deposit → balance credited → withdraw → bank receipt (sandbox) — **dropped 2026-10-01 (D-123)**; `fiat:e2e` never runs                                                                                                                                                    | ❌     |
+| ID    | Task                                                                                                                        | Status |
+| ----- | --------------------------------------------------------------------------------------------------------------------------- | ------ |
+| F-005 | Hide all intermediate steps: no wallets, bridges, gas, private keys, or blockchain networks visible during deposit/withdraw | ✅     |
+| F-007 | Compliance handoff: KYC/AML lives with the ramp provider; document the boundary in `docs/architecture.md`                   | ✅     |
+| F-008 | Direct USDC deposit/withdraw path for crypto-native users (bypass fiat rails)                                               | ✅     |
 
 ---
 
