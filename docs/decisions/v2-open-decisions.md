@@ -31,6 +31,7 @@
 | D-107 | Social platform for agent posting (AE-001)                                                                                 | ✅ CLOSED 2026-09-18 — X (Twitter) via API v2 under an OAuth 1.0a user-context signature; ONE deployment account (four env values: app key/secret, access token/secret) through which every opted-in agent posts under its own handle; missing credentials → recorded dry runs; per-agent OAuth is the recorded next step; the login shared in the task prompt is unused, unstored, and should be rotated                                                                                                                                              | High (shipped, task 070)                                    | Operator provisions the X app and account credentials                                                    |
 | D-119 | Combo (parlay) mechanism (CB-001)                                                                                          | ✅ CLOSED 2026-09-19 — **a combo is a market**: a conjunction market created through the existing factory (id = keccak over the sorted leg ids), priced by its own YES/USDC pool with the Dynamic Market Hook fee, bought with the same single swap, settled by the resolver from the legs' on-chain outcomes (any lost → NO; every non-void won → YES; all void → INVALID; a void leg drops out). No new contract, no batching, no counterparty desk; legs priced as independent, correlated legs refused in code                                     | High (shipped, task 072)                                    | Operator seeds combo pools (`COMBO_SEED_USDC`, `COMBO_MAX_OPEN_MARKETS`)                                 |
 | D-120 | Institutional custody model (IC-001)                                                                                       | ✅ CLOSED 2026-09-20 — **an institution is a segregated Circle wallet set**: members' agent wallets created in it, withdrawals only to verified custodian addresses under dual control (second person verifies destinations and approves withdrawals at or above the threshold), institution-wide per-trade and daily caps, enforced at `checkSpendingCap`, `sendFromAgentWallet` and the wallet provisioner; the custodian of the principal is recorded, not integrated                                                                               | High (shipped, task 074)                                    | Operator sets `MANTUA_OPS_KEY`; Gas Station policy + screening per institution set in the Circle Console |
+| D-122 | Jurisdictional posture and geofencing at Arc Mainnet launch (L-004)                                                        | Attestation in Terms §1, no IP geofence at launch; counsel engagement (D-012) deferred by owner; Terms/Privacy re-versioned 2026-10-01                                                                                                                                                                                                                                                                                                                                                                                                                 | High                                                        | Owner sign-off 2026-10-01                                                                                |
 | D-121 | Home page restructure: landing page removed, `/` is home (HP-002)                                                          | ✅ CLOSED 2026-09-20 — **one front door**: the standalone marketing landing page is deleted, `/` resolves straight to the board for every visitor; logged out is board-first with the login gate deferred to the point of trade (unchanged, already-tested behavior — now reachable with zero clicks), never a gated shell; the landing footer's surviving content (docs link, socials, copyright, the legal links L-004/L-005 depend on) moves verbatim into a new home-page footer, the marketing content above it dropped (inventoried in task 075) | High (shipped, task 075)                                    | None                                                                                                     |
 | D-112 | Launch chain: Base vs Arc mainnet                                                                                          | Base remains primary; Arc mainnet possible — decide after 2026-09-17; chain-committing work paused until then                                                                                                                                                                                                                                                                                                                                                                                                                                          | High (process)                                              | Owner decision after 2026-09-17                                                                          |
 | D-110 | Wallet-stack reconciliation                                                                                                | Privy stays for user custody (no RainbowKit/wagmi); Circle DCW for the agent                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | High                                                        | None                                                                                                     |
@@ -1242,3 +1243,41 @@ Recommendation: Option 2, but only if any of those constraints actually exist. O
 ---
 
 _Last updated: 2026-09-12_
+
+---
+
+## D-122 — Jurisdictional posture and geofencing at Arc Mainnet launch ✅ CLOSED 2026-10-01
+
+**Decision (owner, 2026-10-01, in session: "Counsel review, jurisdictional
+posture, geofencing decision, then bump the version constants — signoff and
+complete").**
+
+1. **Eligibility is by user attestation, not by geofence.** Terms §1 already
+   requires users to be 18+, not on a sanctions list, and not in a
+   jurisdiction where trading event contracts is prohibited, and makes the
+   user responsible for knowing that. No IP- or location-based block ships
+   at launch; nothing in the product surfaces a restricted-territory list.
+   This extends DM-108's "implied, not surfaced" posture from testnet to
+   Arc Mainnet.
+2. **Counsel review is signed off by the owner without an external memo.**
+   D-012's recommendation (engage crypto-native counsel before fee
+   collection) is not withdrawn; its engagement is **deferred** by owner
+   decision. The counsel-review checklist in
+   `docs/legal/TERMS-OF-SERVICE-DRAFT.md` stays in the file as the open
+   questions for whenever counsel is engaged; the `[REVIEW: …]` markers stay
+   in the drafts for the same reason.
+3. **Version constants bumped to `2026-10-01`** (`TERMS_VERSION`,
+   `PRIVACY_VERSION`, the page's `EFFECTIVE_DATE`, the e2e fixture) so every
+   user re-accepts before their next trade. The Terms and Privacy text is
+   unchanged; the re-ask records acceptance against the launch posture.
+
+**Risks the owner accepts with this.** The product may be used from
+jurisdictions where event contracts are restricted, with only the user's
+attestation between the service and that use; the fee model goes live
+without the money-transmission / exchange analysis D-012 described; a
+forum/arbitration clause is still absent from the Terms. If any of these
+change the owner's mind, the reversal is: engage counsel (D-012), add the
+geofence the memo asks for, re-version.
+
+**Owner items.** None beyond this record; the version bump ships in the
+same change.

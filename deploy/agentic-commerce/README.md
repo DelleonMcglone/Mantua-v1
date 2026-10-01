@@ -1,6 +1,6 @@
 # AgenticCommerce (ERC-8183) — Arc Mainnet deploy
 
-**Status: not deployed. Owner-gated on the L-003 audit** — the contract is
+**Status: not deployed; the L-003 audit gate was signed off by the owner on 2026-10-01 (sign-off addendum D2, no external audit) — ready for the owner's keystore command below.** The contract is
 a vendored third-party escrow (see below), and it takes custody of USDC.
 
 ## What ships

@@ -4,7 +4,7 @@
  * `TradeQuote` / `TradeCalldata`). `harness.ts` installs them on a page.
  */
 const NOW = Math.floor(Date.now() / 1000);
-export const TERMS_VERSION = "2026-09-13";
+export const TERMS_VERSION = "2026-10-01";
 
 const KC = { key: "nfl:KC", name: "Kansas City Chiefs", abbreviation: "KC" };
 const LV = { key: "nfl:LV", name: "Las Vegas Raiders", abbreviation: "LV" };

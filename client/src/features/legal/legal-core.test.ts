@@ -3,8 +3,8 @@ import { test } from "node:test";
 import { termsGate } from "./legal-core.ts";
 
 const current = {
-  version: "2026-09-13",
-  acceptedVersion: "2026-09-13",
+  version: "2026-10-01",
+  acceptedVersion: "2026-10-01",
   acceptedAt: "x",
   current: true,
 };

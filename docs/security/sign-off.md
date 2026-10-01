@@ -147,8 +147,9 @@ window to any caller (every call through the Resolver reaches
   `FINAL` before `Resolver.freeze()` in the same step, and alert on any
   `Frozen` market whose registry state is not `FINAL`/`RESOLVED`.
 
-**Owner acceptance:** ⬜ pending — M-01 has not been accepted, and the
-monitoring it requires does not exist yet.
+**Owner acceptance:** Delleon McGlone, 2026-10-01 — M-01 accepted (addendum
+D, D1); the monitoring exists (`frozen_not_final`, critical, on every
+live-sync tick) and the pager hookup (R-010) is still open.
 
 ## A4. Static analysis — the §4 follow-up, now run
 
@@ -295,8 +296,9 @@ eventState)`. Per spec §22 a never-written pool is stale from the
   writes `FINAL` before the freeze. Must land before
   `MARKET_SIGNER_PRIVATE_KEY` is set. **Landed in code 2026-10-01** (`server/src/lib/sports/registry-keeper.ts` + `-plan.ts`, on the five-minute live-sync tick: live provider probability with the opening probability as fallback, confidence lowered on fallback or a delayed feed, refresh every 600 s < 900 s, state changes written immediately, terminal states never rewritten; planner pinned by 8 tests). **Proven on a fork 2026-10-01:** `npm run keeper:fork-proof -w @mantua/server` runs the real server loop (read → plan → simulate → write → receipt) against an `arc-anvil` fork of Arc Mainnet and the deployed registry (`0xEA8c…c7a6`, operator impersonated, keeper rotated to anvil's public account for the run — no key leaves the keystore): a new pool gets its opening state (PRE_GAME, 5500 bps, half confidence); an unchanged tick writes nothing; 600 s later it refreshes; kickoff writes LIVE at the provider's 6200 bps with full confidence; the final whistle writes FINAL; a FINAL pool is never written again — six of six steps, every write stamping `lastUpdate` with the tick's time. Still to do: the same on Arc itself, on the G-017 rehearsal, since the keeper key is the market signer that stays unset until then.
 
-**Owner acceptance of M-01:** ⬜ pending — to be given once K-01 has
-landed and the frozen-but-not-final alert pages a human (R-010).
+**Owner acceptance of M-01:** given 2026-10-01 — see addendum D, D1. K-01
+has landed and is fork-proven; the alert exists but does not page yet
+(R-010 open) — the owner accepted ahead of the pager.
 
 ## C4. L-03 — owner's note
 
@@ -306,7 +308,7 @@ reviewer's reasoning in `dynamic-market-fee-review.md`: the griefer pays
 the fee they raise, the effect is capped by the driver's quarter share of
 the headroom, and the regular season runs at 0% where it cannot apply.
 
-**Owner's note:** ⬜ pending — reply "L-03 accepted" (or dictate wording).
+**Owner's note:** L-03 accepted — Delleon McGlone, 2026-10-01 (addendum D, D1).
 
 ## C5. Decisions recorded for the record
 
@@ -354,3 +356,63 @@ It does not re-sign the ship gate. Before markets open, in order:
    superseded by it.
 5. Then `MARKET_SIGNER_PRIVATE_KEY` is set and funded (G-017 rehearsal,
    L-007/L-008).
+
+---
+
+# Addendum D — owner sign-offs for Phase 10 (2026-10-01)
+
+Written the same day as addendum C, after the K-01 keeper landed and was
+fork-proven (C3, PR #109). This addendum records decisions the owner gave
+in session; it adds no new analysis.
+
+## D1. Written acceptances
+
+Owner message (2026-10-01): "L-003 — Written security acceptances (M-01
+included) + the human audit before deploy — signoff on the audit and
+complete."
+
+- **M-01 accepted** — Delleon McGlone, 2026-10-01. Conditions at
+  acceptance: K-01's keeper is live on the tick and writes FINAL before
+  the resolution freeze (fork-proven, C3); the `frozen_not_final` alert
+  evaluates on every tick and is visible at `GET /api/ops/alerts`; it does
+  **not** yet page a human (R-010, Better Stack, owner account pending).
+  The owner accepted ahead of the pager.
+- **L-03 accepted** — same message; wording as C4.
+- L-01 and L-02 stand accepted from §1 (2026-08-18).
+
+## D2. The human audit — owner's sign-off without an external engagement
+
+The owner signed off the audit gate on 2026-10-01 **without engaging an
+external auditor**. For the record, what that means:
+
+- No human security audit of the contracts or the signing paths has been
+  performed. The review record consists of the AI-assisted analyses
+  (P-013, H-008, A-036, the fee review) and addenda A–C, the Slither
+  baselines, the invariant sweeps and the Arc fork E2E — all listed in the
+  C7 handover package, which stays available if an auditor is engaged
+  later.
+- C8 item 4 ("the human audit") is therefore closed by owner acceptance,
+  not by an audit. The residual risk is the owner's. If an engagement
+  happens later, its findings append here as addendum E.
+
+## D3. Legal posture (L-004)
+
+Recorded as decision **D-122**: eligibility by attestation in Terms §1, no
+IP geofence at launch, counsel engagement (D-012) deferred by owner, Terms
+and Privacy re-versioned to `2026-10-01` so every user re-accepts before
+their next trade. Text unchanged.
+
+## D4. What is left before markets open
+
+With D1–D3 the C8 order collapses to:
+
+1. **R-010** — the pager (Better Stack; owner account). Accepted as
+   open by D1, so it no longer blocks the signer; it stays on the ledger.
+2. **AgenticCommerce deploy** — unblocked by D2; one keystore command,
+   `deploy/agentic-commerce/README.md`.
+3. **G-017** — `MARKET_SIGNER_PRIVATE_KEY` set and funded. **It must be
+   the deployer key** (`0x4EF8…12C3`): the registry's keeper and operator,
+   the Resolver's operator and the factory's authorised creator are all
+   that address, and `marketSignerWallet` refuses any key that does not
+   derive to it. Rotating to a service key means `setKeeper` (operator-only,
+   single-step — L-02) first.
