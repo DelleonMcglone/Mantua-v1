@@ -5,6 +5,7 @@
  * the run, plus the per-tick assertion. Used by scripts/keeper-fork-proof.ts.
  */
 import { spawn } from "node:child_process";
+import { resolveArcAnvil } from "./arc-anvil-bin.ts";
 import { createPublicClient, createWalletClient, http, keccak256, toHex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { arc } from "../arc-chain.ts";
@@ -26,7 +27,7 @@ const dm =
 
 /** Spawn `arc-anvil` forking Arc Mainnet; resolves to a stop() once it answers. */
 export async function startArcFork(): Promise<() => void> {
-  const bin = process.env["ARC_ANVIL"] ?? "arc-anvil";
+  const bin = process.env["ARC_ANVIL"] ?? resolveArcAnvil();
   const fork = process.env["KEEPER_FORK_URL"] ?? "https://rpc.mainnet.arc.io";
   const args = ["--fork-url", fork, "--port", String(FORK_PORT), "--chain-id", "5042", "--silent"];
   const child = spawn(bin, args, { stdio: "ignore" });
