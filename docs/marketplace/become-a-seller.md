@@ -152,7 +152,9 @@ ledger.
 > **Go-live record (2026-10-01):** steps 2–3 done by owner decision ahead of
 > counsel sign-off — `X402_SELLER_ADDRESS` = operator EOA `0x4EF8…12C3`,
 > `X402_SELLER_SERVICES` = the six payment-gated ids; 402 handshake verified
-> on every enabled route (both rails, Arc USDC). Steps 4–6 open.
+> on every enabled route (both rails, Arc USDC). Step 4 done 2026-10-01 —
+> intake form submitted (six endpoints, payout wallet = operator EOA).
+> Steps 5–6 wait on Circle's review.
 
 ## Go-live sequence (human, after counsel sign-off)
 
