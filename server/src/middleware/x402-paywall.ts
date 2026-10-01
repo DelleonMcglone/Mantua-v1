@@ -235,6 +235,28 @@ const VANILLA_USDC_DOMAIN = { name: "USDC", version: "2" };
  */
 const VANILLA_MAX_TIMEOUT_SECONDS = GATEWAY_AUTH_VALIDITY_WINDOW_SECONDS + 1;
 
+/**
+ * GatewayEvmScheme registers on "eip155:*", so core hands it BOTH rails'
+ * requirements to enhance — and its enhancement merges the Gateway
+ * facilitator's supported-kind `extra` ({name: "GatewayWalletBatched",
+ * version, verifyingContract, …}) into whatever it is given. On the Gateway
+ * row that is the point; on the vanilla row it clobbers the EIP-3009 signing
+ * domain (`name: "USDC", version: "2"`), so a vanilla client signs the wrong
+ * domain and its payment can never verify. Seen live on 2026-10-01: both
+ * `accepts` rows advertised the Gateway domain. The vanilla row is left
+ * exactly as configured; only the Gateway row is enhanced.
+ */
+class DualRailEvmScheme extends GatewayEvmScheme {
+  override async enhancePaymentRequirements(
+    requirements: PaymentRequirements,
+    supportedKind: Parameters<GatewayEvmScheme["enhancePaymentRequirements"]>[1],
+    extensionKeys: Parameters<GatewayEvmScheme["enhancePaymentRequirements"]>[2],
+  ): Promise<PaymentRequirements> {
+    if (requirements.extra["name"] === VANILLA_USDC_DOMAIN.name) return requirements;
+    return super.enhancePaymentRequirements(requirements, supportedKind, extensionKeys);
+  }
+}
+
 function darkResponse(res: Response): void {
   res.status(503).json({
     error: "Service not configured (X402_SELLER_ADDRESS / X402_SELLER_SERVICES).",
@@ -359,7 +381,7 @@ export function x402ServiceChain(def: X402ServiceDef, deps: X402PaywallDeps): Re
         },
       },
       new DualRailFacilitator(vanilla, gateway),
-      [{ network: "eip155:*", server: new GatewayEvmScheme() }],
+      [{ network: "eip155:*", server: new DualRailEvmScheme() }],
     );
   } catch (err) {
     // Fail-safe: a broken paywall config must 503 dark, never crash boot.

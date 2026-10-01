@@ -48,7 +48,17 @@ assert.ok(SPORTS_DEF, "catalog must define sports-intelligence");
 
 // The paywall syncs supported payment kinds from the facilitator on first
 // use. Serve that handshake locally (any non-local URL); everything local
-// (the ephemeral test server) goes to the real fetch.
+// (the ephemeral test server) goes to the real fetch. The kind carries the
+// `extra` the real Gateway facilitator returns — GatewayEvmScheme merges it
+// into every requirement it enhances, which is exactly the behaviour the
+// vanilla-row assertions below guard against.
+const GATEWAY_KIND_EXTRA = {
+  name: "GatewayWalletBatched",
+  version: "1",
+  verifyingContract: "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee",
+  minValiditySeconds: 604_800,
+  assets: [{ symbol: "USDC", address: "0x3600000000000000000000000000000000000000", decimals: 6 }],
+};
 const realFetch = globalThis.fetch;
 let facilitatorHits = 0;
 globalThis.fetch = (input, init): Promise<Response> => {
@@ -57,7 +67,9 @@ globalThis.fetch = (input, init): Promise<Response> => {
     facilitatorHits++;
     return Promise.resolve(
       Response.json({
-        kinds: [{ x402Version: 2, scheme: "exact", network: "eip155:5042" }],
+        kinds: [
+          { x402Version: 2, scheme: "exact", network: "eip155:5042", extra: GATEWAY_KIND_EXTRA },
+        ],
         extensions: [],
         signers: {},
       }),
@@ -249,6 +261,11 @@ void describe("dual-rail paywall (MP-004)", () => {
     assert.equal(gateway.network, "eip155:5042");
     assert.equal(gateway.amount, "5000");
     assert.equal(gateway.extra?.name, "GatewayWalletBatched");
+    assert.equal(
+      (gateway.extra as { verifyingContract?: string }).verifyingContract,
+      GATEWAY_KIND_EXTRA.verifyingContract,
+      "the Gateway row carries the facilitator's verifyingContract",
+    );
     assert.equal(gateway.maxTimeoutSeconds, 604900);
     assert.equal(facilitatorHits, 1, "only the supported-kind sync touches the facilitator");
   });
