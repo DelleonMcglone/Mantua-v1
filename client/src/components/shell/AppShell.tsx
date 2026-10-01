@@ -11,6 +11,7 @@ interface AppShellProps {
   onLogin?: (() => void) | undefined;
   onSignup?: (() => void) | undefined;
   onDisconnect?: (() => void) | undefined;
+  walletSetup?: { status: "idle" | "creating" | "failed"; onRetry: () => void } | undefined;
   onOpenProfile?: (() => void) | undefined;
   onOpenAgent?: (() => void) | undefined;
   /** Optional click handler for the logo / wordmark — used to send
@@ -48,6 +49,7 @@ export function AppShell({
   onLogin,
   onSignup,
   onDisconnect,
+  walletSetup,
   onOpenProfile,
   onOpenAgent,
   onLogoClick,
@@ -67,6 +69,7 @@ export function AppShell({
         onLogin={onLogin}
         onSignup={onSignup}
         onDisconnect={onDisconnect}
+        walletSetup={walletSetup}
         onOpenProfile={onOpenProfile}
         onOpenAgent={onOpenAgent}
         onLogoClick={onLogoClick}

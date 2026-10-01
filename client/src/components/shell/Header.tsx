@@ -3,7 +3,7 @@ import { Sun, Moon, Menu, LifeBuoy } from "lucide-react";
 import { useTheme } from "@/hooks/use-theme.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Logo } from "./Logo.tsx";
-import { WalletMenu } from "./WalletMenu.tsx";
+import { HeaderAccount, type WalletSetup } from "./HeaderAccount.tsx";
 import { LeagueBar, type NavDestination } from "./MarketNav.tsx";
 import type { SportId } from "@/features/markets/sports.ts";
 import { MobileNavSheet } from "./MobileNavSheet.tsx";
@@ -16,6 +16,9 @@ interface HeaderProps {
   onLogin?: (() => void) | undefined;
   onSignup?: (() => void) | undefined;
   onDisconnect?: (() => void) | undefined;
+  /** Signed in but no wallet yet: the header says so and offers a way out
+   *  instead of login buttons that would do nothing. */
+  walletSetup?: WalletSetup | undefined;
   /** Profile button target — the profile/portfolio page (B6-008). */
   onOpenProfile?: (() => void) | undefined;
   /** Agent panel target, for the spending-cap menu item (B6-012). */
@@ -44,6 +47,7 @@ export function Header({
   onLogin,
   onSignup,
   onDisconnect,
+  walletSetup,
   onOpenProfile,
   onOpenAgent,
   onLogoClick,
@@ -97,23 +101,15 @@ export function Header({
           <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
             <Icon className="h-[18px] w-[18px]" />
           </Button>
-          {walletAddress && onDisconnect ? (
-            <WalletMenu
-              walletAddress={walletAddress}
-              onDisconnect={onDisconnect}
-              onOpenProfile={onOpenProfile}
-              onOpenAgent={onOpenAgent}
-            />
-          ) : (
-            <>
-              <Button variant="ghost" className="px-2.5 md:px-4" onClick={onLogin}>
-                Log in
-              </Button>
-              <Button variant="primary" className="px-3 md:px-4" onClick={onSignup}>
-                Sign up
-              </Button>
-            </>
-          )}
+          <HeaderAccount
+            walletAddress={walletAddress}
+            onLogin={onLogin}
+            onSignup={onSignup}
+            onDisconnect={onDisconnect}
+            walletSetup={walletSetup}
+            onOpenProfile={onOpenProfile}
+            onOpenAgent={onOpenAgent}
+          />
         </div>
       </div>
       {/* The league sub-header: every league with its logo, NFL live, the

@@ -101,6 +101,12 @@ export function useWallets() {
   return { ready: true, wallets: authenticated ? [wallet] : [] };
 }
 
+/** The shim's signed-in user always has a wallet, so creation is never
+ *  called; it exists because the app imports it (features/auth). */
+export function useCreateWallet() {
+  return { createWallet: () => Promise.resolve(wallet) };
+}
+
 export function getAccessToken(): Promise<string | null> {
   return Promise.resolve(store.authenticated ? "e2e-token" : null);
 }
