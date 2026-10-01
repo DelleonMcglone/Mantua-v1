@@ -4,10 +4,11 @@
 > page `client/src/components/legal/TermsPage.tsx` (+ `TermsProductSections.tsx`).
 > The page is what users accept; this file carries the same text in
 > plain form with the counsel-review markers `[REVIEW: …]`. It is **not**
-> legal advice. Version **2026-09-13** (task 067, G-012) — the version
+> legal advice. Version **2026-10-01** (task 067, G-012; re-versioned on the
+> owner's L-004 sign-off, D-122 — text unchanged, every user re-accepts) — the version
 > users accept is recorded per `docs/tasks/launch-gate.md` G-014.
 
-**Effective date:** September 13, 2026 (the page's `EFFECTIVE_DATE`).
+**Effective date:** October 1, 2026 (the page's `EFFECTIVE_DATE`).
 
 ## 1. Agreement and eligibility
 
@@ -123,7 +124,7 @@ channel until a support inbox exists.
 
 ## Counsel review checklist
 
-- [ ] Jurisdictional opt-in and geo posture (DM-108)
+- [x] Jurisdictional opt-in and geo posture (DM-108) — owner sign-off 2026-10-01, D-122: attestation in §1, no IP geofence at launch
 - [ ] Clickwrap sufficiency of the recorded in-ticket acceptance
 - [ ] Event-contract regulatory characterisation in target markets
 - [ ] Resolver discretion, review window, override, void settlement

@@ -10,8 +10,8 @@ export type LegalDoc = (typeof LEGAL_DOCS)[number];
 
 /** Effective 2026-09-13: fee model, dispute window, in-play trading,
  *  sponsored transactions, agent autonomy, bank rails. */
-export const TERMS_VERSION = "2026-09-13";
-export const PRIVACY_VERSION = "2026-09-13";
+export const TERMS_VERSION = "2026-10-01";
+export const PRIVACY_VERSION = "2026-10-01";
 
 export const CURRENT_VERSIONS: Record<LegalDoc, string> = {
   terms: TERMS_VERSION,

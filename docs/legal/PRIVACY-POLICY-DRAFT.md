@@ -10,8 +10,9 @@
 > footer. The two were written independently and merged on 2026-08-16 —
 > keep them in step: any change here needs the matching edit there.
 
-**Effective date:** August 15, 2026 (matches `EFFECTIVE_DATE` in
-`client/src/components/legal/LegalPage.tsx`)
+**Effective date:** October 1, 2026 (matches `EFFECTIVE_DATE` in
+`client/src/components/legal/LegalPage.tsx`; version `2026-10-01` — re-versioned
+on the owner's L-004 sign-off, D-122, text unchanged, every user re-accepts)
 
 **Updated 2026-08-16** for the sports-prediction-market pivot: market
 positions and resolution records added to §2, sports data providers added to

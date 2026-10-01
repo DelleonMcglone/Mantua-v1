@@ -137,12 +137,12 @@ Review: [`dynamic-market-fee-review.md`](dynamic-market-fee-review.md)
 baseline; no detector fires on the new `MarketFeeFormula.sol`,
 `MarketFeeCalculator.sol`, or `RiskPolicy.sol`.
 
-| ID   | Finding                                                          | Severity | Status                                                                         |
-| ---- | ---------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------ |
-| L-03 | Volatility griefing can lift the rate by ≤ 0.15% while it lasts  | Low      | Open — bounded, self-defeating, decays; accepted for launch pending owner note |
-| L-04 | Sell-side `fee_usdc_raw` telemetry valued at the pre-trade price | Low      | Accepted — analytics only                                                      |
-| I-03 | Pip rate on the input equals the full rate as `p → 0`            | Info     | Documented                                                                     |
-| I-04 | Rate varies with `p` through the model-deviation driver          | Info     | Documented                                                                     |
+| ID   | Finding                                                          | Severity | Status                                                                                   |
+| ---- | ---------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| L-03 | Volatility griefing can lift the rate by ≤ 0.15% while it lasts  | Low      | Accepted — owner note 2026-10-01 (sign-off addendum D1); bounded, self-defeating, decays |
+| L-04 | Sell-side `fee_usdc_raw` telemetry valued at the pre-trade price | Low      | Accepted — analytics only                                                                |
+| I-03 | Pip rate on the input equals the full rate as `p → 0`            | Info     | Documented                                                                               |
+| I-04 | Rate varies with `p` through the model-deviation driver          | Info     | Documented                                                                               |
 
 The previous fee-band statements in this file and in `sign-off.md`
 (`BASE_FEE` 0.30%, `MAX_FEE` 5.00%) are superseded by D-105

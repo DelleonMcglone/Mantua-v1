@@ -15,7 +15,7 @@ interface Props {
 /**
  * Terms of Use. Written for this product: a non-custodial interface to
  * on-chain sports prediction markets and Uniswap v4 pools, where the user
- * signs every transaction themselves. Effective 2026-09-13 (task 067): the
+ * signs every transaction themselves. Effective 2026-10-01 (task 067; re-versioned on the owner's L-004 sign-off, D-122): the
  * fee model, the resolution review window, in-play trading, sponsored
  * transactions, bank funding, and agent autonomy. Draft — not reviewed by
  * counsel, and the dispute section still needs a forum.
