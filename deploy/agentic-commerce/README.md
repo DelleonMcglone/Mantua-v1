@@ -1,7 +1,6 @@
 # AgenticCommerce (ERC-8183) — Arc Mainnet deploy
 
-**Status: not deployed; the L-003 audit gate was signed off by the owner on 2026-10-01 (sign-off addendum D2, no external audit) — ready for the owner's keystore command below.** The contract is
-a vendored third-party escrow (see below), and it takes custody of USDC.
+**Status: deployed on Arc Mainnet 2026-10-01** (owner keystore, block 23770188) and verified on Sourcify. Production address: proxy `0xC8972dd832f4465ad068c754062B01d2f7216b8D`. See _Deployment record_ at the end. The contract is a vendored third-party escrow (see below), and it takes custody of USDC.
 
 ## What ships
 
@@ -46,3 +45,32 @@ lib/base-contracts/contracts/ERC8183.sol:ERC8183 <impl>` and the proxy
 3. Set `AGENTIC_COMMERCE_ADDRESS=<proxy>` in Vercel production (the address is
    allow-listed as an agent target through `circle/allowed-targets.ts`).
 4. Record proxy + implementation here.
+
+## Deployment record (2026-10-01)
+
+Deployer / treasury / admin: `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`.
+Payment token: Arc USDC `0x3600000000000000000000000000000000000000`.
+
+**In use — set as `AGENTIC_COMMERCE_ADDRESS`:**
+
+| Contract                 | Address                                      | Tx                                                                   |
+| ------------------------ | -------------------------------------------- | -------------------------------------------------------------------- |
+| ERC8183 (implementation) | `0x44C6169851917A394b92670E6275110F90Ee3674` | `0xa712af08c92d9d107b00aecc44f0d72e0a593bc1b2db157cca0798c433b200ac` |
+| ERC1967Proxy             | `0xC8972dd832f4465ad068c754062B01d2f7216b8D` | `0x4193a2425e9870bf98d37dac49971f31c1b7454e262f7ac13cc439bdfb0dc6df` |
+| `setPaymentTokenAllowed` | —                                            | `0x9ffee3ab7f510b64960a7e55d6571515e37f07eda539aad121e60575445da2db` |
+
+Block 23770188 (2026-10-01 21:04:13 UTC), deployer nonces 12–14. Probed
+after deploy: `platformTreasury()` = deployer, `allowedPaymentTokens(USDC)`
+= true, `jobCounter()` = 0, ERC-1967 implementation slot = the
+implementation above, deployer holds `DEFAULT_ADMIN_ROLE`. Both contracts
+`Pass - match` on Sourcify (solc 0.8.35).
+
+**Duplicate — not used.** The broadcast command ran a second time about
+ninety seconds later (block 23770348, nonces 15–17), producing an
+identical, fully initialised second stack: implementation
+`0x870Ec84f3fE90D8935161C6d0Ad83F61bC8703A5`, proxy
+`0x15be58C4Aa4C90151A1E86c9681B25B88D56ca7C`. It holds no funds, has no
+jobs, is owned by the same admin, and nothing references it. It is
+verified on Sourcify so nobody mistakes it for something unknown. It can
+be left alone, or paused by the admin (`pause()`) for tidiness. Cost of
+the duplicate: about 0.19 USDC of gas.
