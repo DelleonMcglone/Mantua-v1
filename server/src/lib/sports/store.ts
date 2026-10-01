@@ -172,6 +172,7 @@ export async function upsertEvents(
           status: e.status === "unknown" ? "scheduled" : e.status,
           homeScore: e.homeScore ?? null,
           awayScore: e.awayScore ?? null,
+          homeWinProbabilityBps: e.homeWinProbabilityBps ?? null,
           lastPolledAt: new Date(),
         })
         .onConflictDoNothing();
@@ -202,6 +203,9 @@ export async function upsertEvents(
         ...(e.status !== "unknown" ? { status: e.status } : {}),
         homeScore: e.homeScore ?? existing.homeScore,
         awayScore: e.awayScore ?? existing.awayScore,
+        // Keep the last probability the feed published; ESPN's scoreboard
+        // only carries it pre-game and in play.
+        homeWinProbabilityBps: e.homeWinProbabilityBps ?? existing.homeWinProbabilityBps,
         startsAt: new Date(e.startsAt * 1000),
         // Backfill the relational links on rows ingested before teams
         // were persisted from the slate.
@@ -1165,4 +1169,62 @@ export async function readFrozenNotFinal(
     eventStatus: r.eventStatus,
     frozenForMs: r.frozenAt ? Math.max(0, now.getTime() - r.frozenAt.getTime()) : 0,
   }));
+}
+
+// ─── Registry keeper candidates (K-01) ──────────────────────────────────────
+
+export interface KeeperCandidateRow {
+  marketId: `0x${string}`;
+  poolId: `0x${string}`;
+  outcomeIndex: number;
+  marketState: string;
+  openingProbability: number | null;
+  eventStatus: string;
+  startsAt: Date;
+  homeWinProbabilityBps: number | null;
+}
+
+/**
+ * Every market on the chain with a registered pool that may still need a
+ * keeper write: open or frozen rows (resolved/settled/invalid markets are
+ * terminal on-chain and never written again). The planner decides what to
+ * write; this is only the join.
+ */
+export async function listKeeperCandidates(db: DB, chainId: number): Promise<KeeperCandidateRow[]> {
+  const rows = await db
+    .select({
+      marketId: markets.marketId,
+      poolId: markets.poolId,
+      outcomeIndex: markets.outcomeIndex,
+      marketState: markets.state,
+      openingProbability: markets.openingProbability,
+      eventStatus: events.status,
+      startsAt: events.startsAt,
+      homeWinProbabilityBps: events.homeWinProbabilityBps,
+    })
+    .from(markets)
+    .innerJoin(events, eq(markets.eventId, events.id))
+    .where(
+      and(
+        eq(markets.chainId, chainId),
+        sql`${markets.poolId} is not null`,
+        sql`${markets.state} not in ('RESOLVED', 'SETTLED', 'INVALID')`,
+      ),
+    );
+  return rows.flatMap((r) =>
+    r.poolId
+      ? [
+          {
+            marketId: r.marketId as `0x${string}`,
+            poolId: r.poolId as `0x${string}`,
+            outcomeIndex: r.outcomeIndex,
+            marketState: r.marketState,
+            openingProbability: r.openingProbability === null ? null : Number(r.openingProbability),
+            eventStatus: r.eventStatus,
+            startsAt: r.startsAt,
+            homeWinProbabilityBps: r.homeWinProbabilityBps,
+          },
+        ]
+      : [],
+  );
 }

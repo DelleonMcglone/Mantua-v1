@@ -293,7 +293,7 @@ eventState)`. Per spec §22 a never-written pool is stale from the
   signer key as the resolver, DM-103) that posts probability / confidence
   / event state for every registered pool inside `STALE_AFTER`, and
   writes `FINAL` before the freeze. Must land before
-  `MARKET_SIGNER_PRIVATE_KEY` is set.
+  `MARKET_SIGNER_PRIVATE_KEY` is set. **Landed in code 2026-10-01** (`server/src/lib/sports/registry-keeper.ts` + `-plan.ts`, on the five-minute live-sync tick: live provider probability with the opening probability as fallback, confidence lowered on fallback or a delayed feed, refresh every 600 s < 900 s, state changes written immediately, terminal states never rewritten; planner pinned by 8 tests). Still to do: the on-chain proof on the G-017 rehearsal, since the keeper key is the market signer that stays unset until then.
 
 **Owner acceptance of M-01:** ⬜ pending — to be given once K-01 has
 landed and the frozen-but-not-final alert pages a human (R-010).
