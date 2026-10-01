@@ -1,8 +1,23 @@
 {
+  "hooks/dynamic-fee": {
+    "rev": "8e0f3eb8519f4c836b5fd55e738ebefc5dfc06e2"
+  },
+  "hooks/stable-protection": {
+    "rev": "a099eb314a6e2603d0ec53cf00b69fb3197b465e"
+  },
+  "lib/base-contracts": {
+    "rev": "142e669"
+  },
   "lib/forge-std": {
     "tag": {
       "name": "v1.16.2",
       "rev": "bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
+    }
+  },
+  "lib/openzeppelin-contracts-upgradeable": {
+    "tag": {
+      "name": "v5.7.0",
+      "rev": "14f52c54d3a1eefbda3d4071efba24d3c1e07e8a"
     }
   }
 }

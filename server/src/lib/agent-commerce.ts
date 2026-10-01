@@ -1,4 +1,4 @@
-import { encodeFunctionData, parseUnits } from "viem";
+import { encodeFunctionData, formatUnits, parseUnits } from "viem";
 import { env } from "../env.ts";
 import { explorerTxUrl } from "./agent-send.ts";
 import { AgentWalletNotFoundError, getAgentWallet } from "./agent-wallet.ts";
@@ -33,9 +33,11 @@ const ZERO_BYTES32 = `0x${"0".repeat(64)}` as const;
 /** Default job expiry: 7 days. */
 const DEFAULT_EXPIRES_IN_SECONDS = 604_800;
 
-// Local copy of the ERC-8183 ABI. Was a mirror of the standalone agent/
-// workspace, which was deleted before it ever shipped (C-018).
-const AGENTIC_COMMERCE_ABI = [
+// The ERC-8183 ABI slice the server drives, matching the vendored reference
+// implementation the deploy script ships (contracts/lib/base-contracts at
+// commit 142e669 — see contracts/script/DeployAgenticCommerce.s.sol). The
+// parity test pins it against the compiled artifact.
+export const AGENTIC_COMMERCE_ABI = [
   {
     type: "function",
     name: "createJob",
@@ -43,11 +45,12 @@ const AGENTIC_COMMERCE_ABI = [
     inputs: [
       { name: "provider", type: "address" },
       { name: "evaluator", type: "address" },
-      { name: "expiredAt", type: "uint256" },
+      { name: "expiredAt", type: "uint48" },
       { name: "description", type: "string" },
       { name: "hook", type: "address" },
+      { name: "providerAgentId", type: "uint256" },
     ],
-    outputs: [{ name: "jobId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",
@@ -55,6 +58,8 @@ const AGENTIC_COMMERCE_ABI = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "jobId", type: "uint256" },
+      { name: "expectedToken", type: "address" },
+      { name: "expectedBudget", type: "uint256" },
       { name: "optParams", type: "bytes" },
     ],
     outputs: [],
@@ -75,16 +80,47 @@ const AGENTIC_COMMERCE_ABI = [
     name: "jobCounter",
     stateMutability: "view",
     inputs: [],
-    outputs: [{ type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",
-    name: "jobHasBudget",
+    name: "getJob",
     stateMutability: "view",
     inputs: [{ name: "jobId", type: "uint256" }],
-    outputs: [{ name: "hasBudget", type: "bool" }],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "client", type: "address" },
+          { name: "status", type: "uint8" },
+          { name: "provider", type: "address" },
+          { name: "expiredAt", type: "uint48" },
+          { name: "evaluator", type: "address" },
+          { name: "submittedAt", type: "uint48" },
+          { name: "budget", type: "uint256" },
+          { name: "hook", type: "address" },
+          { name: "paymentToken", type: "address" },
+          { name: "providerAgentId", type: "uint256" },
+          { name: "description", type: "string" },
+          { name: "settledAmount", type: "uint256" },
+          { name: "payoutReceiver", type: "address" },
+        ],
+      },
+    ],
   },
 ] as const;
+
+/** ERC-8183 `JobStatus`, in enum order. */
+export const JOB_STATUS = [
+  "open",
+  "funded",
+  "submitted",
+  "completed",
+  "rejected",
+  "expired",
+] as const;
+export type JobStatusName = (typeof JOB_STATUS)[number];
 
 /** The AgenticCommerce contract, or a clean error while the Arc Mainnet
  *  deployment is pending (docs/tasks/v2-roadmap.md). */
@@ -126,28 +162,35 @@ export async function createJobFromAgentWallet(args: {
   const contract = commerceAddress(chainId);
   const client = getRpcClient(chainId);
   const wallet = await requireWallet(args.privyUserId, chainId);
-  const expiredAt = BigInt(
-    Math.floor(Date.now() / 1000) + (args.expiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS),
-  );
+  const expiredAt =
+    Math.floor(Date.now() / 1000) + (args.expiresInSeconds ?? DEFAULT_EXPIRES_IN_SECONDS);
   const callData = encodeFunctionData({
     abi: AGENTIC_COMMERCE_ABI,
     functionName: "createJob",
-    args: [args.provider, args.evaluator, expiredAt, args.description, args.hook ?? ZERO_ADDRESS],
+    // providerAgentId is the optional ERC-8004 identity; Mantua does not
+    // register agents there, so 0.
+    args: [
+      args.provider,
+      args.evaluator,
+      expiredAt,
+      args.description,
+      args.hook ?? ZERO_ADDRESS,
+      0n,
+    ],
   });
   const { txHash } = await executeAgentCalldata({
     walletId: wallet.circleWalletId,
     to: contract,
     callData,
   });
-  // jobCounter increments on create; the new job's id is counter - 1. Wait
-  // for the receipt first so the read reflects this tx.
+  // ERC-8183 assigns `++jobCounter`, so the new job's id IS the counter
+  // after this tx. Wait for the receipt first so the read reflects it.
   await client.waitForTransactionReceipt({ hash: txHash });
-  const count = await client.readContract({
+  const jobId = await client.readContract({
     address: contract,
     abi: AGENTIC_COMMERCE_ABI,
     functionName: "jobCounter",
   });
-  const jobId = count > 0n ? count - 1n : count;
   await logAudit({
     walletAddress: wallet.address,
     action: "agent_commerce",
@@ -166,7 +209,7 @@ export async function createJobFromAgentWallet(args: {
     txHash,
     explorerUrl: explorerTxUrl(txHash, chainId),
     contract,
-    expiresAt: new Date(Number(expiredAt) * 1000).toISOString(),
+    expiresAt: new Date(expiredAt * 1000).toISOString(),
     next: "The provider agent must set the job's budget; then fund the escrow with fund_job.",
   };
 }
@@ -191,6 +234,25 @@ export async function fundJobFromAgentWallet(args: {
   const usdc = getToken("USDC", chainId);
   const units = parseUnits(args.amountUsdc, usdc.decimals);
   if (units <= 0n) throw new Error("amountUsdc must be positive");
+  // `fund` echoes the stored token and budget back to the contract, which
+  // rejects any mismatch (front-running guard). Read them first so the
+  // amount the user confirmed is exactly what gets escrowed — no more.
+  const job = await getRpcClient(chainId).readContract({
+    address: contract,
+    abi: AGENTIC_COMMERCE_ABI,
+    functionName: "getJob",
+    args: [BigInt(args.jobId)],
+  });
+  if (job.paymentToken.toLowerCase() !== usdc.address.toLowerCase()) {
+    throw new Error(
+      "This job's budget is not denominated in USDC — the provider must set it in USDC.",
+    );
+  }
+  if (job.budget !== units) {
+    throw new Error(
+      `amountUsdc must equal the budget the provider set (${formatUnits(job.budget, usdc.decimals)} USDC).`,
+    );
+  }
 
   // Escrow funding is spending: cap-checked before, ledger-recorded after.
   const usdValue = Number(args.amountUsdc);
@@ -205,7 +267,7 @@ export async function fundJobFromAgentWallet(args: {
   const callData = encodeFunctionData({
     abi: AGENTIC_COMMERCE_ABI,
     functionName: "fund",
-    args: [BigInt(args.jobId), EMPTY_BYTES],
+    args: [BigInt(args.jobId), usdc.address, units, EMPTY_BYTES],
   });
   const { txHash: fundTxHash } = await executeAgentCalldata({
     walletId: wallet.circleWalletId,
@@ -272,6 +334,10 @@ export interface JobStatusResult {
   jobId: string;
   exists: boolean;
   budgetSet: boolean;
+  /** ERC-8183 lifecycle state, when the job exists. */
+  status?: JobStatusName;
+  /** The budget the provider set, in USDC units (6dp), when set. */
+  budgetUsdc?: string;
   contract: string;
 }
 
@@ -288,14 +354,23 @@ export async function getJobStatus(
     abi: AGENTIC_COMMERCE_ABI,
     functionName: "jobCounter",
   });
-  const exists = id < count;
-  const budgetSet = exists
-    ? await client.readContract({
-        address: contract,
-        abi: AGENTIC_COMMERCE_ABI,
-        functionName: "jobHasBudget",
-        args: [id],
-      })
-    : false;
-  return { jobId, exists, budgetSet, contract };
+  // Ids are 1-based (`++jobCounter`): job 0 never exists.
+  const exists = id >= 1n && id <= count;
+  if (!exists) return { jobId, exists, budgetSet: false, contract };
+  const job = await client.readContract({
+    address: contract,
+    abi: AGENTIC_COMMERCE_ABI,
+    functionName: "getJob",
+    args: [id],
+  });
+  const budgetSet = job.budget > 0n;
+  const usdc = getToken("USDC", chainId);
+  return {
+    jobId,
+    exists,
+    budgetSet,
+    status: JOB_STATUS[job.status] ?? "open",
+    ...(budgetSet ? { budgetUsdc: formatUnits(job.budget, usdc.decimals) } : {}),
+    contract,
+  };
 }

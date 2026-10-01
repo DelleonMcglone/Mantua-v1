@@ -9,3 +9,7 @@ hooks/stable-protection/:@uniswap/v4-periphery/=hooks/stable-protection/lib/v4-p
 lib/v4-core/:solmate/=lib/solmate/
 lib/v4-periphery/:solmate/=lib/solmate/
 permit2/=lib/permit2/
+@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+erc8183/=lib/base-contracts/contracts/
+lib/base-contracts/:@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/
+lib/base-contracts/:@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
