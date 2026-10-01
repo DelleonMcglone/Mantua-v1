@@ -406,8 +406,11 @@ their next trade. Text unchanged.
 
 With D1–D3 the C8 order collapses to:
 
-1. **R-010** — the pager (Better Stack; owner account). Accepted as
-   open by D1, so it no longer blocks the signer; it stays on the ledger.
+1. **R-010** — the pager. _Live 2026-10-01:_ `GET /api/ops/alerts/probe`
+   (PR #111; 200 while nothing critical is open, 503 with the alert ids)
+   is polled every 3 minutes by a Better Stack Uptime monitor with
+   call/SMS escalation to the owner; the checks are visible in production
+   logs. M-01's `frozen_not_final` now pages a human.
 2. **AgenticCommerce deploy** — unblocked by D2; one keystore command,
    `deploy/agentic-commerce/README.md`.
 3. **G-017** — `MARKET_SIGNER_PRIVATE_KEY` set and funded. **It must be
