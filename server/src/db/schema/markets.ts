@@ -229,6 +229,9 @@ export const events = pgTable(
     awayScore: integer("away_score"),
     /** When the ingest worker last saw this event (B3-005). */
     lastPolledAt: timestamp("last_polled_at", { withTimezone: true }),
+    /** The provider's home-win probability in bps, when the feed carries one
+     *  (K-01): the registry keeper's live model probability. */
+    homeWinProbabilityBps: integer("home_win_probability_bps"),
     /** Every provider that has described this game, name → its event id
      *  (R-012). `(provider, providerEventId)` above stays the canonical
      *  identity; this is how a second provider's slate refreshes the same

@@ -6,6 +6,7 @@ import { feedFreshnessSnapshot } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import { refreshPlayByPlay, upsertEvents } from "../lib/sports/store.ts";
 import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
+import { runRegistryKeeper } from "../lib/sports/registry-keeper.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
 import { ARC_CHAIN_ID } from "../lib/chains.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
@@ -56,6 +57,7 @@ cronLiveSyncRouter.get(
     let failures = 0;
     const nowSeconds = Math.floor(Date.now() / 1000);
     const push = pushDeps(db);
+    let feedDelayed = false;
 
     for (const league of LEAGUES) {
       try {
@@ -94,6 +96,7 @@ cronLiveSyncRouter.get(
           logger.warn({ league, err }, "live-sync: play-by-play pass failed");
           playByPlay = { error: err instanceof Error ? err.message : String(err) };
         }
+        feedDelayed = feedDelayed || refresh.delayed;
         results[league] = {
           provider: refresh.provider,
           skippedProviders: skipped,
@@ -109,6 +112,20 @@ cronLiveSyncRouter.get(
         results[league] = { error: err instanceof Error ? err.message : String(err) };
       }
     }
+
+    // K-01 — the registry keeper: every registered pool gets its model
+    // probability / confidence / event state kept fresh inside §22's
+    // staleness window, and a game observed final is written FINAL here,
+    // before the daily resolution sweep freezes it (M-01 ordering).
+    const keeper: unknown = await runRegistryKeeper(
+      db,
+      ARC_CHAIN_ID,
+      nowSeconds,
+      feedDelayed,
+    ).catch((err: unknown) => {
+      logger.warn({ err }, "live-sync: registry keeper failed");
+      return { error: err instanceof Error ? err.message : String(err) };
+    });
 
     const priceSnapshot: unknown = await snapshotMarketPoolPrices(db, ARC_CHAIN_ID)
       .then((snap) => snap ?? "disabled (markets not deployed on this chain)")
@@ -153,6 +170,7 @@ cronLiveSyncRouter.get(
       ok: failures < LEAGUES.length,
       breakers: activeBreakerState(),
       feeds: feedFreshnessSnapshot(),
+      keeper,
       priceSnapshot,
       positionAlerts,
       alerts,
