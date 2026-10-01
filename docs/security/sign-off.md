@@ -293,7 +293,7 @@ eventState)`. Per spec §22 a never-written pool is stale from the
   signer key as the resolver, DM-103) that posts probability / confidence
   / event state for every registered pool inside `STALE_AFTER`, and
   writes `FINAL` before the freeze. Must land before
-  `MARKET_SIGNER_PRIVATE_KEY` is set. **Landed in code 2026-10-01** (`server/src/lib/sports/registry-keeper.ts` + `-plan.ts`, on the five-minute live-sync tick: live provider probability with the opening probability as fallback, confidence lowered on fallback or a delayed feed, refresh every 600 s < 900 s, state changes written immediately, terminal states never rewritten; planner pinned by 8 tests). Still to do: the on-chain proof on the G-017 rehearsal, since the keeper key is the market signer that stays unset until then.
+  `MARKET_SIGNER_PRIVATE_KEY` is set. **Landed in code 2026-10-01** (`server/src/lib/sports/registry-keeper.ts` + `-plan.ts`, on the five-minute live-sync tick: live provider probability with the opening probability as fallback, confidence lowered on fallback or a delayed feed, refresh every 600 s < 900 s, state changes written immediately, terminal states never rewritten; planner pinned by 8 tests). **Proven on a fork 2026-10-01:** `npm run keeper:fork-proof -w @mantua/server` runs the real server loop (read → plan → simulate → write → receipt) against an `arc-anvil` fork of Arc Mainnet and the deployed registry (`0xEA8c…c7a6`, operator impersonated, keeper rotated to anvil's public account for the run — no key leaves the keystore): a new pool gets its opening state (PRE_GAME, 5500 bps, half confidence); an unchanged tick writes nothing; 600 s later it refreshes; kickoff writes LIVE at the provider's 6200 bps with full confidence; the final whistle writes FINAL; a FINAL pool is never written again — six of six steps, every write stamping `lastUpdate` with the tick's time. Still to do: the same on Arc itself, on the G-017 rehearsal, since the keeper key is the market signer that stays unset until then.
 
 **Owner acceptance of M-01:** ⬜ pending — to be given once K-01 has
 landed and the frozen-but-not-final alert pages a human (R-010).
@@ -347,7 +347,7 @@ MarketFactory / Market, the server's signing paths (`markets-onchain.ts`,
 
 It does not re-sign the ship gate. Before markets open, in order:
 
-1. **K-01** — the keeper tick lands and is proven on a fork and on Arc.
+1. **K-01** — the keeper tick lands and is proven on a fork and on Arc. _Landed and fork-proven 2026-10-01 (C3); the Arc half rides G-017._
 2. **M-01** written acceptance (C3) and the **L-03** note (C4).
 3. **R-010** — the frozen-but-not-final alert reaches a pager.
 4. The **human audit** (C7); the second-model review from A7/B4 is

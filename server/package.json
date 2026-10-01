@@ -21,7 +21,8 @@
     "push:generate-keys": "tsx src/scripts/push-generate-keys.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "keeper:fork-proof": "tsx --env-file-if-exists=.env src/scripts/keeper-fork-proof.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

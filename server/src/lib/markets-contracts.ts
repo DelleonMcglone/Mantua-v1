@@ -86,6 +86,8 @@ export const POOL_MANAGER_INIT_ABI = parseAbi([
 export const REGISTRY_ABI = parseAbi([
   "function registerPool(bytes32 poolId, uint64 kickoffTimestamp, uint64 resolutionTimestamp, bool yesIsToken0, uint8 outcomeDecimals, bool playoffs)",
   "function isRegistered(bytes32 poolId) view returns (bool)",
+  "function keeper() view returns (address)",
+  "function setKeeper(address next)",
   // K-01 — the keeper's three permitted writes (spec §4.1) and the state the
   // hook reads (spec §4); `lastUpdate` is what §22 staleness measures from.
   "function updateMarket(bytes32 poolId, uint16 modelProbability, uint16 confidence, uint8 eventState)",

@@ -298,7 +298,12 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
 3. **Feed the keeper state.** Until the first `updateMarket`, the market reads
    as stale, so a playoff pool's rate sits at `MAX_RATE` (0.70%) and the cap
    at `MIN_TRADE_CAP` ($100); a regular-season pool stays at 0%. That is the
-   intended fail-closed posture (spec §22 / D-105), not a bug.
+   intended fail-closed posture (spec §22 / D-105), not a bug. The server's
+   keeper (`server/src/lib/sports/registry-keeper.ts`, K-01) writes the three
+   fields on every live-sync tick once `MARKET_SIGNER_PRIVATE_KEY` is set;
+   `npm run keeper:fork-proof -w @mantua/server` rehearses it against the
+   deployed registry on an `arc-anvil` fork (opening → refresh → LIVE → FINAL)
+   without any key leaving the keystore.
 
 4. **Probe the fee model** before opening the market to traders:
 
