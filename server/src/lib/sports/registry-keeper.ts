@@ -14,14 +14,28 @@
  * `Resolver.freeze()` — the hook halts on the data, the freeze follows.
  */
 import type { DB } from "../../db/client.ts";
+import type { Account, Chain, PublicClient, Transport, WalletClient } from "viem";
 import { logger } from "../logger.ts";
 import { ARC_CHAIN_ID, type SupportedChainId } from "../chains.ts";
 import { getRpcClient } from "../rpc-client.ts";
 import { DYNAMIC_MARKET_BY_CHAIN } from "../v4-contracts.ts";
 import { REGISTRY_ABI } from "../markets-contracts.ts";
 import { marketSignerWallet } from "./markets-onchain.ts";
-import { listKeeperCandidates } from "./store.ts";
+import { listKeeperCandidates, type KeeperCandidateRow } from "./store.ts";
 import { planKeeperWrites, type KeeperInput, type KeeperWrite } from "./registry-keeper-plan.ts";
+
+/**
+ * The three things the keeper touches, injectable so the fork proof
+ * (`npm run keeper:fork-proof`) and tests can run the real plan → simulate →
+ * write → receipt loop against anvil or a fake without a database or the
+ * production signer. Production passes nothing and gets the store, the
+ * chain's RPC client and `MARKET_SIGNER_PRIVATE_KEY`.
+ */
+export interface KeeperDeps {
+  wallet: WalletClient<Transport, Chain, Account> | null;
+  client: Pick<PublicClient, "readContract" | "simulateContract" | "waitForTransactionReceipt">;
+  candidates: (db: DB, chainId: SupportedChainId) => Promise<KeeperCandidateRow[]>;
+}
 
 export interface KeeperTickResult {
   candidates: number;
@@ -36,14 +50,15 @@ export async function runRegistryKeeper(
   chainId: SupportedChainId = ARC_CHAIN_ID,
   nowSeconds: number = Math.floor(Date.now() / 1000),
   feedDelayed = false,
+  deps: Partial<KeeperDeps> = {},
 ): Promise<KeeperTickResult | "disabled (no signer)" | "disabled (not deployed)"> {
   const dm = DYNAMIC_MARKET_BY_CHAIN[chainId];
   if (!dm) return "disabled (not deployed)";
-  const wallet = marketSignerWallet(chainId);
+  const wallet = deps.wallet === undefined ? marketSignerWallet(chainId) : deps.wallet;
   if (!wallet) return "disabled (no signer)";
 
-  const rows = await listKeeperCandidates(db, chainId);
-  const client = getRpcClient(chainId);
+  const rows = await (deps.candidates ?? listKeeperCandidates)(db, chainId);
+  const client: KeeperDeps["client"] = deps.client ?? getRpcClient(chainId);
   const inputs: KeeperInput[] = await Promise.all(
     rows.map(async (r) => {
       const s = await client.readContract({
