@@ -149,6 +149,11 @@ ledger.
 > key (settlement goes through the facilitator), only the earnings
 > withdrawal does. Keep it out of the repo, obviously.
 
+> **Go-live record (2026-10-01):** steps 2–3 done by owner decision ahead of
+> counsel sign-off — `X402_SELLER_ADDRESS` = operator EOA `0x4EF8…12C3`,
+> `X402_SELLER_SERVICES` = the six payment-gated ids; 402 handshake verified
+> on every enabled route (both rails, Arc USDC). Steps 4–6 open.
+
 ## Go-live sequence (human, after counsel sign-off)
 
 1. Counsel sign-off on the D-012 seller-revenue posture — recorded in the
