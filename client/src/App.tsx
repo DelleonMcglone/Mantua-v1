@@ -22,6 +22,8 @@ import {
   TermsPage,
 } from "./app-lazy.ts";
 import { usePrivy } from "@privy-io/react-auth";
+import { authView } from "@/lib/auth-view.ts";
+import { useEnsureWallet } from "@/features/auth/use-ensure-wallet.ts";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, type Intent } from "./lib/chat-intent.ts";
 import { agentInputEvent } from "./features/voice/spoken-command.ts";
@@ -142,6 +144,8 @@ function loadStoredRoute(): Route | null {
 
 export default function App() {
   const { ready, authenticated, logout, user } = usePrivy();
+  // A session with no wallet is repaired here, and shown as its own state.
+  const walletSetup = useEnsureWallet();
   // Task 070 — `/agents/<handle>` is the one URL the app answers directly:
   // a shared link must open the public record, not the home page.
   // Task 071 (MX-004 / MX-007) — a notification tap or a home-screen
@@ -405,6 +409,11 @@ export default function App() {
         onLogin={authenticated ? undefined : handleConnect}
         onSignup={authenticated ? undefined : handleConnect}
         onDisconnect={authenticated ? handleDisconnect : undefined}
+        walletSetup={
+          authView({ authenticated, walletAddress }) === "wallet-setup"
+            ? { status: walletSetup.status, onRetry: walletSetup.retry }
+            : undefined
+        }
         onOpenProfile={() => {
           setRoute({ kind: "profile" });
         }}
