@@ -1,0 +1,68 @@
+# Vercel's Git integration skipped the production build for two consecutive
+# `main` merges on 2026-09-30 / 2026-10-01 (the PR previews built, the main
+# push did not — a side effect of a dashboard rollback pinning production).
+# Production was deployed by hand each time. This guard makes the gap loud,
+# and self-heals when a Deploy Hook is configured:
+#
+#   1. Wait for Vercel's usual build window.
+#   2. Look for a Production GitHub Deployment on this commit (Vercel writes
+#      one per build it starts).
+#   3. None → if the VERCEL_DEPLOY_HOOK secret is set (Project Settings →
+#      Git → Deploy Hooks → branch `main`), fire it and re-check; otherwise
+#      fail the run so the gap is visible on the commit.
+#
+# The hook URL is a secret: anyone holding it can trigger builds. Set it with
+# `gh secret set VERCEL_DEPLOY_HOOK` (paste at the prompt), never in chat.
+name: vercel-production-guard
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  deployments: read
+
+concurrency:
+  group: vercel-production-guard-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel's build window
+        run: sleep 300
+      - name: Check for a Production deployment of this commit
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          count=$(gh api "repos/${{ github.repository }}/deployments?sha=${{ github.sha }}&per_page=10" \
+            -q '[.[] | select(.environment == "Production")] | length')
+          echo "production deployments for ${{ github.sha }}: $count"
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+      - name: Fire the Deploy Hook (self-heal)
+        if: steps.check.outputs.count == '0' && env.HOOK != ''
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          echo "::warning::Vercel did not start a production build for ${{ github.sha }} — triggering the deploy hook"
+          curl -sS -f -X POST "$HOOK" | head -c 400; echo
+          sleep 120
+      - name: Re-check (or fail loudly)
+        if: steps.check.outputs.count == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          count=$(gh api "repos/${{ github.repository }}/deployments?sha=${{ github.sha }}&per_page=10" \
+            -q '[.[] | select(.environment == "Production")] | length')
+          if [ "$count" = "0" ]; then
+            if [ -z "$HOOK" ]; then
+              echo "::error::No Vercel production deployment for ${{ github.sha }} and no VERCEL_DEPLOY_HOOK secret to self-heal with. Deploy by hand: vercel deploy --prod --archive=tgz --yes (from a clean main checkout)."
+            else
+              echo "::error::Deploy hook fired but Vercel still shows no production deployment for ${{ github.sha }} — check the Vercel dashboard."
+            fi
+            exit 1
+          fi
+          echo "production deployment present ($count)"
