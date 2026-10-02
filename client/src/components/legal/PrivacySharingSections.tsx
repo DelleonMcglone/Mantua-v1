@@ -18,8 +18,7 @@ export function SharingAndRetentionSections() {
           <li>
             <strong className="text-text">Service providers</strong> who run parts of the product on
             our behalf, and only to the extent they need it to perform that work: authentication and
-            wallets (Privy), the agent&rsquo;s custodied wallet (Circle), bank connections and
-            dollar transfers (Plaid and our licensed transfer partner), hosting and databases,
+            wallets (Privy), the agent&rsquo;s custodied wallet (Circle), hosting and databases,
             blockchain data, and the language-model provider (Anthropic) that answers the analyst
             and runs the agent.
           </li>
@@ -27,8 +26,7 @@ export function SharingAndRetentionSections() {
             <strong className="text-text">AI processing.</strong> When you ask the analyst or the
             agent a question, the text of your question, the conversation so far, and the market and
             game data needed to answer it are sent to the language-model provider. We do not send
-            your email address or bank details with it, and we do not use your conversations to
-            train models.
+            your email address with it, and we do not use your conversations to train models.
           </li>
           <li>
             <strong className="text-text">Legal and safety.</strong> When we reasonably believe
@@ -79,11 +77,6 @@ export function SharingAndRetentionSections() {
           <li>
             <strong className="text-text">Hedging strategies</strong> — until you disarm them, then
             archived for one year.
-          </li>
-          <li>
-            <strong className="text-text">Bank transfer records</strong> — the token, label, and
-            each transfer&rsquo;s status and amount — until you disconnect the bank, then archived
-            for two years as required for payments.
           </li>
           <li>
             <strong className="text-text">Terms acceptances</strong> — for as long as your account

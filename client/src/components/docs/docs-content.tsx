@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ARC_CHAIN_ID, CHAIN_INFO } from "@/lib/chains.ts";
 import { P, H, UL, OL, B, A, Note, Table } from "./docs-primitives.tsx";
 
 /**
@@ -25,7 +26,25 @@ export interface DocsGroup {
   pages: DocsPage[];
 }
 
-const BASE_EXPLORER = "https://basescan.org/address";
+const EXPLORER = `${CHAIN_INFO[ARC_CHAIN_ID].explorerUrl}/address`;
+const USDC_ADDRESS = "0x3600000000000000000000000000000000000000";
+
+/** [contract, role, address] — the deployed market stack (docs/security/hook-deployments.md). */
+const CONTRACT_ROWS: [string, string, string][] = [
+  [
+    "Dynamic Market Hook",
+    "Prices every trade and sets the fee",
+    "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
+  ],
+  [
+    "Market state registry",
+    "Per-market state the hook reads",
+    "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
+  ],
+  ["Pool manager", "Holds each market's pool", "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636"],
+  ["Market factory", "Creates each game's markets", "0x52e8c370Ff772408b925f8524f49BFd1B96Beb93"],
+  ["Resolver", "Settles markets from the result", "0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281"],
+];
 
 export const DOCS_GROUPS: DocsGroup[] = [
   {
@@ -90,16 +109,17 @@ export const DOCS_GROUPS: DocsGroup[] = [
 
             <H>2. Sign in</H>
             <P>
-              Any transaction needs a logged-in wallet. Sign in with email, a social account, a
-              passkey, or an external wallet; a wallet address is created or connected for you. Keep
-              your recovery method safe. We can never restore it, and we will never ask you for a
-              seed phrase or private key.
+              Any transaction needs a logged-in wallet. Sign in with email, a Google account, or an
+              external wallet; a wallet address is created or connected for you. Keep your recovery
+              method safe. We can never restore it, and we will never ask you for a seed phrase or
+              private key.
             </P>
 
             <H>3. Fund the wallet</H>
             <P>
-              Send USDC to your wallet address from an exchange or another wallet. Positions are
-              priced and settled in USDC.
+              Send USDC to your wallet address from an exchange or another wallet. USDC is the only
+              asset Mantua uses: positions are priced and settled in it, and you withdraw by sending
+              USDC back out.
             </P>
             <Note>
               <B>Transactions are sponsored.</B> You never need to hold ETH for gas: every trade is
@@ -135,8 +155,8 @@ export const DOCS_GROUPS: DocsGroup[] = [
           <>
             <P>
               A Uniswap v4 hook is a contract the pool calls at defined points in its lifecycle:
-              before and after a trade, or a liquidity change. Mantua ships one. Every market&apos;s
-              pool is created with it, so its rules are the market&apos;s rules.
+              before and after a trade. Mantua ships one. Every market&apos;s pool is created with
+              it, so its rules are the market&apos;s rules.
             </P>
 
             <H>How a market is built</H>
@@ -326,9 +346,19 @@ export const DOCS_GROUPS: DocsGroup[] = [
           <>
             <H>Deployed contracts</H>
             <P>
-              The Dynamic Market Hook, the market factory and the settlement contracts are pending
-              production deployment. Their addresses will be published here once live.
+              The contracts that run every market. Each is verified and its source can be read at
+              the link.
             </P>
+            <Table
+              head={["Contract", "Role", "Address"]}
+              rows={CONTRACT_ROWS.map(([name, role, address]) => [
+                name,
+                role,
+                <A key={address} href={`${EXPLORER}/${address}`}>
+                  {address.slice(0, 8)}…{address.slice(-6)}
+                </A>,
+              ])}
+            />
 
             <H>Settlement token</H>
             <Table
@@ -337,8 +367,8 @@ export const DOCS_GROUPS: DocsGroup[] = [
                 [
                   "USDC",
                   "6",
-                  <A key="u" href={`${BASE_EXPLORER}/0x3600000000000000000000000000000000000000`}>
-                    0x833589…2913
+                  <A key="u" href={`${EXPLORER}/${USDC_ADDRESS}`}>
+                    {USDC_ADDRESS.slice(0, 8)}…{USDC_ADDRESS.slice(-6)}
                   </A>,
                 ],
               ]}
@@ -367,8 +397,8 @@ export const DOCS_GROUPS: DocsGroup[] = [
               </li>
             </UL>
             <Note tone="warn">
-              Nobody from Mantua will ever ask for your seed phrase, private key, or passkey. Treat
-              any such request as an attack, wherever it comes from.
+              Nobody from Mantua will ever ask for your seed phrase or private key. Treat any such
+              request as an attack, wherever it comes from.
             </Note>
           </>
         ),
