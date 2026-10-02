@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { LeagueLogo } from "@/components/shell/LeagueLogo.tsx";
 import { Freshness } from "./Freshness.tsx";
+import type { GameOrder } from "./game-order.ts";
 import { SportChips } from "./SportChips.tsx";
 import type { Sport, SportId } from "./sports.ts";
 import type { Slate } from "./use-slate.ts";
@@ -20,6 +21,8 @@ export function LeagueHeader({
   onBack,
   onSelectWeek,
   onSelectSport,
+  order,
+  onToggleOrder,
 }: {
   sport: Sport;
   slate: Slate | undefined;
@@ -28,6 +31,8 @@ export function LeagueHeader({
   onBack: () => void;
   onSelectWeek: (option: WeekOption) => void;
   onSelectSport: (id: SportId) => void;
+  order: GameOrder;
+  onToggleOrder: () => void;
 }) {
   return (
     <div>
@@ -50,7 +55,13 @@ export function LeagueHeader({
             {slate && <Freshness source={slate} className="mt-1" />}
           </div>
         </div>
-        <WeekSelector options={weekOptions} active={week} onSelect={onSelectWeek} />
+        <WeekSelector
+          options={weekOptions}
+          active={week}
+          onSelect={onSelectWeek}
+          order={order}
+          onToggleOrder={onToggleOrder}
+        />
       </div>
       <SportChips active={sport.id} onSelect={onSelectSport} className="mt-3 md:hidden" />
     </div>

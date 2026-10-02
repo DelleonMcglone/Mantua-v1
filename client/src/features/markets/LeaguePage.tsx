@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTicketInSheet } from "@/hooks/use-media-query.ts";
 import { ComingSoon } from "./ComingSoon.tsx";
 import { defaultSelection, type Selection } from "./default-selection.ts";
+import { GAME_ORDER_KEY, orderEvents, parseGameOrder, type GameOrder } from "./game-order.ts";
 import { GamesList } from "./GamesList.tsx";
 import { LeagueHeader } from "./LeagueHeader.tsx";
 import { LiveGlance } from "./live/LiveGlance.tsx";
@@ -12,6 +13,14 @@ import { TradeSheet } from "./ticket/TradeSheet.tsx";
 import { TradeTicket } from "./ticket/TradeTicket.tsx";
 import { buildWeekOptions, type WeekOption } from "./week-options.ts";
 import { useSlate } from "./use-slate.ts";
+
+function readStoredOrder(): GameOrder {
+  try {
+    return parseGameOrder(window.localStorage.getItem(GAME_ORDER_KEY));
+  } catch {
+    return "earliest";
+  }
+}
 
 interface Props {
   sport: SportId;
@@ -68,12 +77,16 @@ export function LeaguePage({
   const slate = slates[active.id];
   // week.dates over-fetches (a UTC-day-padded superset — local-window.ts);
   // filter back down to the real local week the picker shows.
+  const [order, setOrder] = useState<GameOrder>(readStoredOrder);
   const events = useMemo(
     () =>
-      (slate?.events ?? []).filter((e) =>
-        isWithinLocalWindow(e.startsAt, week.start, week.endExclusive),
+      orderEvents(
+        (slate?.events ?? []).filter((e) =>
+          isWithinLocalWindow(e.startsAt, week.start, week.endExclusive),
+        ),
+        order,
       ),
-    [slate, week],
+    [slate, week, order],
   );
 
   const effective = useMemo<Selection | null>(
@@ -131,6 +144,16 @@ export function LeaguePage({
         week={week}
         onBack={onBack}
         onSelectSport={onSelectSport}
+        order={order}
+        onToggleOrder={() => {
+          const next: GameOrder = order === "earliest" ? "latest" : "earliest";
+          setOrder(next);
+          try {
+            window.localStorage.setItem(GAME_ORDER_KEY, next);
+          } catch {
+            // storage unavailable — the choice lasts for this visit only
+          }
+        }}
         onSelectWeek={(option) => {
           setWeek(option);
           setSelection(null);
