@@ -4,6 +4,7 @@ import { ApiError, api } from "@/lib/api.ts";
 import { usd as formatUsd } from "@/lib/format.ts";
 import { getTokens, type Token, type TokenSymbol } from "@/lib/tokens.ts";
 import { ARC_CHAIN_ID, type SupportedChainId } from "@/lib/chains.ts";
+import { onlyDisplayed } from "./display-symbols.ts";
 import { onUserBalances } from "./user-stream-bus.ts";
 import { frameIsFor } from "./user-stream-core.ts";
 
@@ -158,7 +159,7 @@ export function toDisplayAssets(
   chainId: SupportedChainId,
 ): DisplayAsset[] {
   const tokens = getTokens(chainId);
-  return balances.map((b) => {
+  return onlyDisplayed(balances).map((b) => {
     // `b.symbol` is a balance symbol that may not be in the registry, so
     // the lookup can miss — widen to `| undefined` for the `?? b.symbol`.
     const meta = tokens[b.symbol] as Token | undefined;
