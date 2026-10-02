@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
 import { activeBreakerState, providerChainFor } from "../lib/sports/active-provider.ts";
+import { refreshSeasonSchedule } from "../lib/sports/season-schedule.ts";
 import { feedFreshnessSnapshot, refreshNextSlate } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import {
@@ -169,7 +170,21 @@ cronSportsSyncRouter.get(
           playByPlay = { error: err instanceof Error ? err.message : String(err) };
         }
 
+        // The rest of the season, once a day, so the analyst can answer
+        // schedule questions (season-schedule.ts). It stores games the slate
+        // pass does not own and creates no market. Failure heals tomorrow.
+        let season: unknown = null;
+        if (league === "nfl") {
+          try {
+            season = await refreshSeasonSchedule(db, nowSeconds);
+          } catch (err) {
+            logger.warn({ league, err }, "sports-sync: season-schedule pass failed");
+            season = { error: err instanceof Error ? err.message : String(err) };
+          }
+        }
+
         results[league] = {
+          season,
           provider: refresh.provider,
           skippedProviders: skipped,
           events: eventsPersisted,
