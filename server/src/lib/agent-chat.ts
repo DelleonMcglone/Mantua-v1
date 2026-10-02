@@ -9,6 +9,7 @@ import { users } from "../db/schema/users.ts";
 import { logAudit } from "./audit.ts";
 import { logger } from "./logger.ts";
 import { describeWalletProvisionError } from "./agent-wallet-error.ts";
+import { userFacingToolError } from "./agent/tool-error-text.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
@@ -2712,12 +2713,15 @@ export async function* runAgentChat(
             mode,
           }),
         );
-        steps.push({ tool: tu.name, args, ok: false, error: errMsg });
-        yield { type: "tool_result", id: tu.id, tool: tu.name, ok: false, error: errMsg };
+        // The screen and the model get a plain sentence; the raw failure
+        // stays in the audit row above and the log line below.
+        const shown = userFacingToolError(errMsg);
+        steps.push({ tool: tu.name, args, ok: false, error: shown });
+        yield { type: "tool_result", id: tu.id, tool: tu.name, ok: false, error: shown };
         toolResults.push({
           type: "tool_result",
           tool_use_id: tu.id,
-          content: JSON.stringify({ error: errMsg }),
+          content: JSON.stringify({ error: shown }),
           is_error: true,
         });
         logger.warn({ err, tool: tu.name }, "agent tool execution failed");

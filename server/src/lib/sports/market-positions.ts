@@ -1,5 +1,4 @@
-import { desc, eq, isNotNull } from "drizzle-orm";
-import { parseAbi } from "viem";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "../../db/client.ts";
 import { events, leagues, marketFills, markets } from "../../db/schema/index.ts";
 import { getRpcClient } from "../rpc-client.ts";
@@ -11,6 +10,7 @@ import {
   STATE_VIEW_ABI,
 } from "../markets-contracts.ts";
 import { sqrtPriceX96ToProbability } from "../probability.ts";
+import { readOutcomeBalances } from "./outcome-balances.ts";
 
 /**
  * A wallet's outcome-token positions across recent markets, marked at the
@@ -29,8 +29,6 @@ export const POSITIONS_CACHE_MS = 10_000;
 export function positionsCacheKey(owner: string): string {
   return `positions:${owner.toLowerCase()}`;
 }
-
-const BALANCE_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export interface MarketPositionRow {
   marketId: string;
@@ -95,7 +93,7 @@ export async function computeMarketPositions(
     .from(markets)
     .innerJoin(events, eq(markets.eventId, events.id))
     .innerJoin(leagues, eq(events.leagueId, leagues.id))
-    .where(isNotNull(markets.yesToken))
+    .where(and(isNotNull(markets.yesToken), eq(markets.chainId, ARC_CHAIN_ID)))
     .orderBy(desc(markets.createdAt))
     .limit(40);
 
@@ -123,20 +121,15 @@ export async function computeMarketPositions(
   await Promise.all(
     rows.map(async (row) => {
       if (!row.yesToken || !row.noToken) return;
-      const [yesBal, noBal] = await Promise.all([
-        client.readContract({
-          address: row.yesToken as `0x${string}`,
-          abi: BALANCE_ABI,
-          functionName: "balanceOf",
-          args: [owner],
-        }),
-        client.readContract({
-          address: row.noToken as `0x${string}`,
-          abi: BALANCE_ABI,
-          functionName: "balanceOf",
-          args: [owner],
-        }),
-      ]);
+      const balances = await readOutcomeBalances(
+        client,
+        { yesToken: row.yesToken, noToken: row.noToken },
+        owner,
+      );
+      // A row whose tokens have no contract on this chain (an earlier
+      // deployment's market) is not a holdable position — skip it.
+      if (!balances) return;
+      const { yes: yesBal, no: noBal } = balances;
       if (yesBal === 0n && noBal === 0n) return;
 
       let yesProbBps: number | null = null;
