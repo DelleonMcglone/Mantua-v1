@@ -62,7 +62,7 @@ test("three taps to an executed trade, in a bottom sheet with Confirm under the 
 test("a Discover price tap deep-links straight into the sheet on that side", async ({ page }) => {
   await mockMobileApi(page, { termsAccepted: true });
   await launchApp(page);
-  await page.getByRole("button", { name: /^Browse all markets/ }).click();
+  await page.goto("/?open=discover");
   await page.getByRole("button", { name: "Trade Kansas City Chiefs", exact: true }).click();
   const sheet = page.getByTestId("trade-sheet");
   await expect(sheet).toBeVisible();

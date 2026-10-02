@@ -37,12 +37,12 @@ test("switching sport is one tap on the league page, and every chip is a touch t
   await expect(page.getByRole("heading", { name: "NBA markets coming soon" })).toBeVisible();
 });
 
-test("all markets are one tap from home, and the dock's mic and send are 44 px", async ({
+test("the markets page opens from its link, and the dock's mic and send are 44 px", async ({
   page,
 }) => {
   await mockMobileApi(page);
   await launchApp(page);
-  await page.getByRole("button", { name: /^Browse all markets/ }).click();
+  await page.goto("/?open=discover");
   await expect(page.getByRole("heading", { name: "Markets" })).toBeVisible();
   await expect(page.getByTestId("discover-row")).toHaveCount(1);
 

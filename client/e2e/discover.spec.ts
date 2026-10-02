@@ -28,7 +28,7 @@ test("filter chips edit the same filter object and a price tap opens the ticket 
 }) => {
   await mockApi(page);
   await launchApp(page);
-  await page.getByRole("button", { name: /^Browse all markets/ }).click();
+  await page.goto("/?open=discover");
   await expect(page.getByTestId("discover-title")).toHaveText("Open now");
 
   await page.getByRole("button", { name: "All", exact: true }).click();

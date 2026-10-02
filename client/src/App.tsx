@@ -728,9 +728,6 @@ function HomeFullPage({ setRoute }: { setRoute: (r: Route) => void }) {
           onTrade={(sport, eventId) => {
             setRoute({ kind: "market", sport: sport.id, selectEventId: eventId });
           }}
-          onDiscover={() => {
-            setRoute({ kind: "discover", filters: { status: "open" } });
-          }}
         />
       </div>
     </div>
