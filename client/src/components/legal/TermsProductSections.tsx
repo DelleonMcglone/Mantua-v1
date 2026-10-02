@@ -4,7 +4,7 @@ import { List, Section } from "./LegalPage.tsx";
  * Task 067 (G-012) — the Terms sections that describe the product as
  * shipped: markets and settlement (D-103 in-play trading, D-104 dispute
  * window and manual override, voids at 0.50), fees (D-105), sponsored
- * transactions (D-111), funding (bank rails via partners), and agents
+ * transactions (D-111), funding (USDC only, D-123), and agents
  * (Circle-custodied wallet, caps, D-114 modes). The counsel draft
  * `docs/legal/TERMS-OF-SERVICE-DRAFT.md` mirrors these sections.
  */
@@ -55,8 +55,7 @@ export function FeesAndCosts() {
       <p>
         Where we sponsor the cost of submitting your transaction, you pay nothing beyond the amount
         shown. Where sponsorship is unavailable, your wallet pays the underlying transaction cost;
-        it never flows to us. Bank transfers may carry a partner fee disclosed at the time of the
-        transfer.
+        it never flows to us.
       </p>
     </Section>
   );
@@ -66,12 +65,12 @@ export function FundingYourAccount() {
   return (
     <Section title="Funding your account">
       <p>
-        You fund your account with USDC, either by transferring it to your wallet address or by
-        connecting a bank account and transferring dollars, which our payments partners convert to
-        USDC and deliver to your wallet. Bank connections and dollar transfers are provided by
-        licensed third parties under their own terms; we never see your bank credentials and never
-        hold your dollars. A bank transfer may take one or more business days and may be reversed by
-        the partner before it lands.
+        Mantua works in one asset, USDC. You fund your account by sending USDC to your wallet
+        address, and you withdraw by sending USDC from your wallet to any address you choose. We do
+        not accept dollars, connect bank accounts, or convert between currencies; if you hold
+        dollars or another asset, you must obtain USDC elsewhere first. You are responsible for
+        sending to the correct address on the correct network: a transfer sent to the wrong address
+        or network generally cannot be recovered by you or by us.
       </p>
     </Section>
   );
@@ -81,10 +80,10 @@ export function AgentsAndAutomation() {
   return (
     <Section title="Agents and automated activity">
       <p>
-        You may enable an autonomous agent that researches, trades, hedges, and manages liquidity on
-        your behalf. The agent acts from its own wallet, held by a regulated custodian under that
-        custodian&rsquo;s terms; we hold neither its keys nor yours. You fund it explicitly and set
-        its daily spending limit, per-trade ceiling, leagues, and whether it may act unprompted.
+        You may enable an autonomous agent that researches, trades, and hedges on your behalf. The
+        agent acts from its own wallet, held by a regulated custodian under that custodian&rsquo;s
+        terms; we hold neither its keys nor yours. You fund it explicitly and set its daily spending
+        limit, per-trade ceiling, leagues, and whether it may act unprompted.
       </p>
       <List>
         <li>You are responsible for everything your agent does within the limits you set.</li>

@@ -14,10 +14,10 @@ interface Props {
 
 /**
  * Terms of Use. Written for this product: a non-custodial interface to
- * on-chain sports prediction markets and Uniswap v4 pools, where the user
- * signs every transaction themselves. Effective 2026-10-01 (task 067; re-versioned on the owner's L-004 sign-off, D-122): the
+ * on-chain sports prediction markets, where the user signs every
+ * transaction themselves. Effective 2026-10-02 (task 067; D-122, D-123): the
  * fee model, the resolution review window, in-play trading, sponsored
- * transactions, bank funding, and agent autonomy. Draft — not reviewed by
+ * transactions, USDC-only funding, and agent autonomy. Draft — not reviewed by
  * counsel, and the dispute section still needs a forum.
  */
 export function TermsPage({ onBack, onLaunch }: Props) {
@@ -48,7 +48,8 @@ export function TermsPage({ onBack, onLaunch }: Props) {
       <Section title="What the service is">
         <p>
           Mantua provides an interface to smart contracts deployed on public blockchains. Through
-          it, you can take positions in prediction markets, swap assets, and provide liquidity.
+          it, you can take positions in sports prediction markets. Mantua works in a single asset,
+          USDC.
         </p>
         <p>
           <strong className="text-text">We are non-custodial.</strong> We never take possession or
@@ -61,10 +62,10 @@ export function TermsPage({ onBack, onLaunch }: Props) {
 
       <Section title="Your account and wallet">
         <p>
-          You are responsible for your wallet, credentials, recovery phrases, passkeys, and for
-          everything that happens through your account. Keep them secure. We cannot restore lost
-          keys or reverse a transaction signed with them. Notify us promptly if you believe your
-          account has been compromised.
+          You are responsible for your wallet, credentials, recovery phrases, and for everything
+          that happens through your account. Keep them secure. We cannot restore lost keys or
+          reverse a transaction signed with them. Notify us promptly if you believe your account has
+          been compromised.
         </p>
       </Section>
 

@@ -21,23 +21,23 @@ export function AdviceRiskAndThirdParties() {
 
       <Section title="Risk">
         <p>
-          Trading event contracts and providing liquidity involve substantial risk, including total
-          loss of the assets you commit. A contract on the losing side pays nothing. Prices can move
-          sharply during a game, and a trade placed on live data may execute at a price that no
-          longer reflects the game. Markets can be thin, so a large order may move the price against
-          you. Beyond market risk, you accept the risks inherent to this technology: smart contract
-          bugs and exploits, data-source failure or manipulation, congestion and reorganization on
-          the settlement network, stablecoin depegs, impermanent loss, and failures at third-party
-          providers. Do not commit more than you can afford to lose.
+          Trading event contracts involves substantial risk, including total loss of the assets you
+          commit. A contract on the losing side pays nothing. Prices can move sharply during a game,
+          and a trade placed on live data may execute at a price that no longer reflects the game.
+          Markets can be thin, so a large order may move the price against you. Beyond market risk,
+          you accept the risks inherent to this technology: smart contract bugs and exploits,
+          data-source failure or manipulation, congestion and reorganization on the settlement
+          network, stablecoin depegs, and failures at third-party providers. Do not commit more than
+          you can afford to lose.
         </p>
       </Section>
 
       <Section title="Third-party services">
         <p>
           The service integrates third parties — wallet and authentication providers, blockchain
-          networks and data providers, oracles, and bridges. We do not control them and are not
-          responsible for their performance, availability, or terms. Your use of them may be
-          governed by their own agreements.
+          networks and data providers, and oracles. We do not control them and are not responsible
+          for their performance, availability, or terms. Your use of them may be governed by their
+          own agreements.
         </p>
       </Section>
     </>

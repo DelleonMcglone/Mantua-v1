@@ -4,11 +4,11 @@
 > page `client/src/components/legal/TermsPage.tsx` (+ `TermsProductSections.tsx`).
 > The page is what users accept; this file carries the same text in
 > plain form with the counsel-review markers `[REVIEW: …]`. It is **not**
-> legal advice. Version **2026-10-01** (task 067, G-012; re-versioned on the
-> owner's L-004 sign-off, D-122 — text unchanged, every user re-accepts) — the version
+> legal advice. Version **2026-10-02** (task 067, G-012; D-122 posture, D-123: USDC-only
+> funding, swap and liquidity wording removed — every user re-accepts) — the version
 > users accept is recorded per `docs/tasks/launch-gate.md` G-014.
 
-**Effective date:** October 1, 2026 (the page's `EFFECTIVE_DATE`).
+**Effective date:** October 2, 2026 (the page's `EFFECTIVE_DATE`).
 
 ## 1. Agreement and eligibility
 
@@ -27,8 +27,8 @@ trading event contracts is lawful where you are.
 ## 2. What the service is
 
 A non-custodial interface to smart contracts on a public blockchain:
-sports prediction markets (yes/no contracts on scheduled games), token
-swaps, and liquidity provision. We never take possession or control of
+sports prediction markets (yes/no contracts on scheduled games), in a
+single asset, USDC. We never take possession or control of
 your assets; you hold your keys and sign every transaction; submitted
 transactions generally cannot be reversed by you or by us.
 
@@ -62,17 +62,17 @@ transactions generally cannot be reversed by you or by us.
   and is the fee paid.
 - Sponsored transactions cost nothing beyond the shown amount; where
   sponsorship is unavailable the wallet pays the network cost, which
-  never flows to us. Bank transfers may carry a disclosed partner fee.
+  never flows to us.
 
 `[REVIEW: fee-change notice requirements; sponsored-gas characterisation.]`
 
 ## 5. Funding your account
 
-USDC by wallet transfer, or dollars via a connected bank account that
-licensed partners convert to USDC and deliver to the wallet. Partners
-hold bank credentials and dollars under their own terms; we hold neither.
-Transfers may take business days and may be reversed by the partner
-before landing.
+USDC only (D-123). Funding is a USDC transfer to the user's wallet address;
+withdrawal is a USDC transfer out to any address. No dollars, no bank
+connections, no currency conversion; anyone without USDC obtains it
+elsewhere. A transfer sent to the wrong address or network generally cannot
+be recovered by the user or by us.
 
 `[REVIEW: partner-terms incorporation by reference; money-transmission posture of the partner arrangement.]`
 
@@ -98,8 +98,8 @@ should assume they may not trade its markets.
 
 ## 8. No advice; risk
 
-Nothing is financial, investment, legal, or tax advice. Trading and
-liquidity provision can lose everything committed; a losing contract pays
+Nothing is financial, investment, legal, or tax advice. Trading
+can lose everything committed; a losing contract pays
 nothing; prices move sharply in play and a trade on live data may execute
 at a stale price; thin markets move against large orders; smart-contract,
 data-source, network, stablecoin, and third-party risks apply.
@@ -129,6 +129,6 @@ channel until a support inbox exists.
 - [ ] Event-contract regulatory characterisation in target markets
 - [ ] Resolver discretion, review window, override, void settlement
 - [ ] Fee model disclosure and change notice
-- [ ] Bank-rail partner terms and money-transmission posture
+- [x] Bank-rail partner terms and money-transmission posture — withdrawn: no bank rail (D-123)
 - [ ] Agent authorisation and custodian (Circle) terms
 - [ ] Forum / arbitration; liability cap; consumer carve-outs

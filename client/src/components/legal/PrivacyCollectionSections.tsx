@@ -14,20 +14,17 @@ export function CollectionSections() {
         <p>
           <strong className="text-text">Information you give us.</strong> When you create an account
           or sign in, our authentication provider processes an identifier you choose — typically an
-          email address, a social login, or a passkey — and returns a wallet address to us. If you
-          connect a bank account, our payments partners collect your bank login and account details
-          directly; we receive only an opaque token, a display label such as your bank&rsquo;s name
-          and the last digits of the account, and the status and dollar amount of each transfer. If
-          you contact support or sign up for updates, we receive whatever you include in that
-          message. When you accept our Terms, we record which version you accepted and when.
+          email address or a social login — and returns a wallet address to us. If you contact
+          support or sign up for updates, we receive whatever you include in that message. When you
+          accept our Terms, we record which version you accepted and when.
         </p>
         <p>
           <strong className="text-text">Blockchain and activity information.</strong> We record the
           public wallet addresses you connect and the on-chain activity associated with them in our
-          interface: positions taken, swaps, liquidity provided, transaction hashes, the agent
-          wallet&rsquo;s address and its actions, and the instructions, questions, and hedging
-          strategies you issue. Much of this originates on public networks and is not private
-          information — see the section on public blockchains below.
+          interface: positions taken, transaction hashes, the agent wallet&rsquo;s address and its
+          actions, and the instructions, questions, and hedging strategies you issue. Much of this
+          originates on public networks and is not private information — see the section on public
+          blockchains below.
         </p>
         <p>
           <strong className="text-text">Technical information.</strong> Like most web services, our

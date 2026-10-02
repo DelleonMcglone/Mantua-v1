@@ -10,9 +10,9 @@
 > footer. The two were written independently and merged on 2026-08-16 —
 > keep them in step: any change here needs the matching edit there.
 
-**Effective date:** October 1, 2026 (matches `EFFECTIVE_DATE` in
-`client/src/components/legal/LegalPage.tsx`; version `2026-10-01` — re-versioned
-on the owner's L-004 sign-off, D-122, text unchanged, every user re-accepts)
+**Effective date:** October 2, 2026 (matches `EFFECTIVE_DATE` in
+`client/src/components/legal/LegalPage.tsx`; version `2026-10-02` — USDC-only,
+D-123: bank, swap and liquidity wording removed; every user re-accepts)
 
 **Updated 2026-08-16** for the sports-prediction-market pivot: market
 positions and resolution records added to §2, sports data providers added to
@@ -22,7 +22,7 @@ positions and resolution records added to §2, sports data providers added to
 
 This Privacy Policy describes how Mantua handles information when you
 use the Service — an agent-driven sports prediction market where you open
-positions, provide liquidity, and run automated strategies. Mantua is a
+positions and run automated strategies. Mantua is a
 non-custodial interface — see the
 [Terms of Service](./TERMS-OF-SERVICE-DRAFT.md) for the relationship
 between you, Mantua, and the underlying smart contracts.
@@ -35,21 +35,19 @@ collect it.**
 
 ## 2. What we collect, why, and how long we keep it
 
-| Category              | What                                                                          | Why                                                                                         | Retention                                                               |
-| --------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Wallet address        | The public address you connect via Privy                                      | Required to authenticate API requests, build calldata, and read your on-chain balances      | Until you delete your account or 2 years of inactivity, whichever first |
-| Privy user ID         | The opaque DID Privy issues for your authenticated session                    | Required to bind your wallet to server-side records (positions, agent wallet, preferences)  | Same as above                                                           |
-| Transaction records   | Hash, timestamp, action, USD value at submission                              | Power the in-app activity history + portfolio analytics                                     | 2 years                                                                 |
-| Position records      | Pool key, tick range, liquidity at mint time                                  | Power the Positions tab + add / remove flows                                                | Until you close the position, then archived for 2 years                 |
-| Market positions      | Market ID, outcome side, size, entry price                                    | Power the portfolio's open-position view and P/L                                            | Until the market settles, then archived for 2 years                     |
-| Hedging strategies    | Trigger, action, size, cap, expiry, arm/execute timestamps                    | Run the strategy and give you its audit trail                                               | Until you disarm it, then archived for 1 year                           |
-| Preferences           | Slippage tolerance, hide-small-balances toggle, etc.                          | Persist your settings across sessions                                                       | Until you change them or delete your account                            |
-| Agent wallet metadata | The agent wallet's address and Circle wallet id (custodied by Circle)         | Power the agent surface                                                                     | Until you delete the agent wallet or your Mantua account                |
-| Bank connection       | Opaque partner token, bank label (name + last digits), transfer status/amount | Fund the account from a bank; show transfer status (task 067)                               | Until you disconnect the bank, then archived 2 years                    |
-| Terms acceptances     | Document, version, timestamp                                                  | Prove which Terms version you accepted (task 067, G-014)                                    | For as long as the account exists                                       |
-| AI conversations      | Your questions to the analyst/agent, the conversation, market data            | Answer the question / run the agent (sent to the language-model provider; not for training) | Conversation lifetime; audit log entries 1 year                         |
-| Server logs           | IP address, request path, status code, response time                          | Operational health + abuse detection                                                        | 30 days                                                                 |
-| Audit log             | Action attempted, outcome, reason (e.g. slippage rejection)                   | Security review + incident postmortems                                                      | 1 year                                                                  |
+| Category              | What                                                                  | Why                                                                                         | Retention                                                               |
+| --------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Wallet address        | The public address you connect via Privy                              | Required to authenticate API requests, build calldata, and read your on-chain balances      | Until you delete your account or 2 years of inactivity, whichever first |
+| Privy user ID         | The opaque DID Privy issues for your authenticated session            | Required to bind your wallet to server-side records (positions, agent wallet, preferences)  | Same as above                                                           |
+| Transaction records   | Hash, timestamp, action, USD value at submission                      | Power the in-app activity history + portfolio analytics                                     | 2 years                                                                 |
+| Market positions      | Market ID, outcome side, size, entry price                            | Power the portfolio's open-position view and P/L                                            | Until the market settles, then archived for 2 years                     |
+| Hedging strategies    | Trigger, action, size, cap, expiry, arm/execute timestamps            | Run the strategy and give you its audit trail                                               | Until you disarm it, then archived for 1 year                           |
+| Preferences           | Slippage tolerance, hide-small-balances toggle, etc.                  | Persist your settings across sessions                                                       | Until you change them or delete your account                            |
+| Agent wallet metadata | The agent wallet's address and Circle wallet id (custodied by Circle) | Power the agent surface                                                                     | Until you delete the agent wallet or your Mantua account                |
+| Terms acceptances     | Document, version, timestamp                                          | Prove which Terms version you accepted (task 067, G-014)                                    | For as long as the account exists                                       |
+| AI conversations      | Your questions to the analyst/agent, the conversation, market data    | Answer the question / run the agent (sent to the language-model provider; not for training) | Conversation lifetime; audit log entries 1 year                         |
+| Server logs           | IP address, request path, status code, response time                  | Operational health + abuse detection                                                        | 30 days                                                                 |
+| Audit log             | Action attempted, outcome, reason (e.g. slippage rejection)           | Security review + incident postmortems                                                      | 1 year                                                                  |
 
 We do **not** collect: your private keys, the contents of your other
 wallets, your real-world identity (we have no KYC), your IP-derived
@@ -65,7 +63,7 @@ category. See the Market Integrity policy for what the analysis is for.
 
 `[REVIEW: confirm retention windows match counsel's recommendation for the target jurisdictions and the residual-risk posture in P5-026.]`
 
-`[REVIEW (task 067): bank-connection data — Plaid and the transfer partner are the controllers of bank credentials; confirm the disclosure and the partner-privacy-policy references. AI processing — confirm the provider's data-use terms (no training) are accurately represented.]`
+`[REVIEW (task 067): AI processing — confirm the provider's data-use terms (no training) are accurately represented.]`
 
 ## 3. Third parties we share data with
 
@@ -76,7 +74,6 @@ update this document and announce the change in-app.
 | Provider                                                               | What they see                                                                                       | Their privacy policy                                                                 |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | Privy                                                                  | Your wallet address, the email you sign in with (if you use email login)                            | https://www.privy.io/privacy                                                         |
-| Coinbase Developer Platform (CDP)                                      | Your Mantua user ID, the agent wallet's address                                                     | https://www.coinbase.com/legal/privacy                                               |
 | CoinGecko                                                              | Token symbols + amounts (for USD pricing requests)                                                  | https://www.coingecko.com/en/privacy                                                 |
 | DefiLlama                                                              | Pool IDs (for analytics requests)                                                                   | https://defillama.com/privacy                                                        |
 | Hosting providers (Vercel / Railway / Neon — exact set TBD per P9-004) | Whatever an HTTPS request to Mantua's API surfaces                                                  | TBD                                                                                  |
@@ -88,9 +85,8 @@ Sports data flows **inbound only**: we fetch public schedules and scores, and
 no user identifier is attached to those requests. A provider cannot learn who
 holds a position from our traffic.
 
-The swap path for market pools uses the **on-chain v4 Quoter** on Arc
-Mainnet. No third-party trading API is in the data flow for market pools;
-base pairs route per DM-112.
+Trade quotes for market pools come from the **on-chain v4 Quoter**. No
+third-party trading API is in the data flow for market pools.
 
 We never sell your data. We never share it with advertisers.
 
@@ -99,14 +95,12 @@ We never sell your data. We never share it with advertisers.
 Added 2026-09-13 (task 067) — parties the shipped product uses that the
 2026-08 draft did not list:
 
-| Party                       | What they receive                                             | Why                                        |
-| --------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
-| Circle (Developer Wallets)  | Agent wallet provisioning and transaction requests            | The agent's custodied wallet               |
-| Plaid                       | Your bank login (directly, in their widget) → an opaque token | Bank connection                            |
-| Licensed transfer partner   | Transfer instructions (amount, direction) keyed to that token | Dollar ↔ USDC transfers                    |
-| Anthropic                   | Analyst/agent questions, conversation, market + game data     | Language-model answers and agent reasoning |
-| Sportradar / ESPN (inbound) | Nothing about you — requests carry no user identifier         | Schedules, scores, resolution data         |
-| Vercel, Neon, Upstash       | Hosting, database, rate-limit/kill-switch state               | Running the service                        |
+| Party                       | What they receive                                         | Why                                        |
+| --------------------------- | --------------------------------------------------------- | ------------------------------------------ |
+| Circle (Developer Wallets)  | Agent wallet provisioning and transaction requests        | The agent's custodied wallet               |
+| Anthropic                   | Analyst/agent questions, conversation, market + game data | Language-model answers and agent reasoning |
+| Sportradar / ESPN (inbound) | Nothing about you — requests carry no user identifier     | Schedules, scores, resolution data         |
+| Vercel, Neon, Upstash       | Hosting, database, rate-limit/kill-switch state           | Running the service                        |
 
 `[REVIEW: sub-processor list completeness; cross-border transfer basis for each.]`
 

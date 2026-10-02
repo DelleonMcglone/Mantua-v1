@@ -42,8 +42,8 @@ export function PrivacyPage({ onBack, onLaunch }: Props) {
         <p>
           We use technical and organizational measures intended to protect information in our
           systems. No method of transmission or storage is perfectly secure, and we cannot guarantee
-          absolute security. You are responsible for safeguarding your own wallet credentials,
-          recovery phrases, and passkeys. We will never ask you for a seed phrase or private key.
+          absolute security. You are responsible for safeguarding your own wallet credentials and
+          recovery phrases. We will never ask you for a seed phrase or private key.
         </p>
       </Section>
 

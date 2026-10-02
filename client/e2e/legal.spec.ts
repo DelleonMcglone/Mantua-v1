@@ -12,7 +12,7 @@ test("the Terms page carries the current version, the fee model, and the review 
   await page.goto("/");
   await page.getByRole("button", { name: "Terms of Use" }).first().click();
   await expect(page.getByRole("heading", { name: "Terms of Use" })).toBeVisible();
-  await expect(page.getByText("Effective October 1, 2026")).toBeVisible();
+  await expect(page.getByText("Effective October 2, 2026")).toBeVisible();
   const body = await page.locator("main").innerText();
   expect(body).toMatch(/0\.10% and 0\.70%/);
   expect(body).toMatch(/regular-season games carry no trading fee/i);

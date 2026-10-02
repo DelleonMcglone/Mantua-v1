@@ -4,4 +4,4 @@
  * on the published page (`components/legal/LegalPage.tsx`); all three move
  * together when the text changes materially.
  */
-export const TERMS_VERSION = "2026-10-01";
+export const TERMS_VERSION = "2026-10-02";
