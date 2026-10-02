@@ -10,6 +10,7 @@ import { logAudit } from "./audit.ts";
 import { logger } from "./logger.ts";
 import { describeWalletProvisionError } from "./agent-wallet-error.ts";
 import { userFacingToolError } from "./agent/tool-error-text.ts";
+import { onlyDisplayed } from "./display-symbols.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
@@ -262,8 +263,7 @@ const sportsToolsDb = makeSportsToolsDb(db);
 const RAW_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_portfolio",
-    description:
-      "Read the agent wallet's current token balances (USDC/EURC/cirBTC) and recent transactions. Read-only.",
+    description: "Read the agent wallet's current USDC balance and recent transactions. Read-only.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -654,7 +654,7 @@ const RAW_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_user_wallet",
     description:
-      "Read the USER's connected wallet balances (USDC/EURC/cirBTC + USD values) — distinct from the agent's own wallet. Use when advising whether the user should execute a transaction themselves (e.g. after an insufficient-agent-balance or spending-cap error). Read-only.",
+      "Read the USER's connected wallet USDC balance (+ USD value) — distinct from the agent's own wallet. Use when advising whether the user should execute a transaction themselves (e.g. after an insufficient-agent-balance or spending-cap error). Read-only.",
     input_schema: { type: "object", properties: {} },
   },
   {
@@ -1657,7 +1657,7 @@ async function executeTool(
       const p = await getAgentPortfolio(privyUserId, 50, chainId);
       return {
         address: p.address,
-        balances: p.balances.map((b) => ({
+        balances: onlyDisplayed(p.balances).map((b) => ({
           symbol: b.symbol,
           balance: formatUnits(BigInt(b.balanceRaw), b.decimals),
           usdValue: b.usdValue,
@@ -2086,7 +2086,7 @@ async function executeTool(
       );
       return {
         address: p.address,
-        balances: p.balances.map((b) => ({
+        balances: onlyDisplayed(p.balances).map((b) => ({
           symbol: b.symbol,
           balance: formatUnits(BigInt(b.balanceRaw), b.decimals),
           usdValue: b.usdValue,
@@ -2245,7 +2245,7 @@ async function executeTool(
       return {
         connected: true,
         address: userWalletAddress,
-        balances: p.balances.map((b) => ({
+        balances: onlyDisplayed(p.balances).map((b) => ({
           symbol: b.symbol,
           balance: formatUnits(BigInt(b.balanceRaw), b.decimals),
           usdValue: b.usdValue,
