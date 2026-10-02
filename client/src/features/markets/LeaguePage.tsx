@@ -93,8 +93,7 @@ export function LeaguePage({
   const detailEvent = detailId
     ? (events.find((e) => e.providerEventId === detailId) ?? null)
     : null;
-  if (active.coverage === "soon")
-    return <ComingSoon sport={sport} onSelectSport={onSelectSport} onBack={onBack} />;
+  if (active.coverage === "soon") return <ComingSoon sport={sport} onBack={onBack} />;
 
   const pick = (event: Selection["event"], outcomeIndex: 0 | 1) => {
     setSelection({ event, outcomeIndex });

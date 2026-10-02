@@ -20,8 +20,8 @@ import { formatRawAmount, isValidEvmAddress, parseAmountRaw } from "./withdraw-h
 
 const ERC20_TRANSFER = parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]);
 
-/** The withdrawable set — USDC first (the platform currency), then the rest. */
-const WITHDRAW_SYMBOLS: TokenSymbol[] = ["USDC", "EURC", "cirBTC"];
+/** The withdrawable set: USDC, the platform currency and the only asset shown. */
+const WITHDRAW_SYMBOLS: TokenSymbol[] = ["USDC"];
 
 type Phase =
   | { kind: "idle" }

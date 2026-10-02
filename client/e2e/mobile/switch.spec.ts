@@ -34,7 +34,7 @@ test("switching sport is one tap on the league page, and every chip is a touch t
   // coming-soon page rather than a market.
   await expect(chips.getByRole("button")).toHaveCount(12);
   await chips.locator("[data-sport-chip='nba']").click();
-  await expect(page.getByRole("heading", { name: "NBA — coming soon" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "NBA markets coming soon" })).toBeVisible();
 });
 
 test("all markets are one tap from home, and the dock's mic and send are 44 px", async ({

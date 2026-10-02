@@ -267,6 +267,16 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
     sendRef.current(initialMessage, initialSpoken === true);
   }, [initialMessage, initialSpoken]);
 
+  // Re-ask a question whose answer failed: drop the failed pair, then send it
+  // again, so the thread never shows the same question twice.
+  const retry = useCallback(
+    (text: string) => {
+      setMessages((prev) => prev.slice(0, -2));
+      send(text);
+    },
+    [send],
+  );
+
   const newChat = useCallback(() => {
     abortRef.current?.abort();
     sessionIdRef.current = undefined;
@@ -316,13 +326,24 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
           {messages.length === 0 ? (
             <EmptyState onPick={send} disabled={busy} />
           ) : (
-            messages.map((m) =>
-              m.role === "user" ? (
-                <UserBubble key={m.id} text={m.text} />
-              ) : (
-                <AssistantBubble key={m.id} msg={m} />
-              ),
-            )
+            messages.map((m, i) => {
+              if (m.role === "user") return <UserBubble key={m.id} text={m.text} />;
+              const asked = messages[i - 1];
+              const isLast = i === messages.length - 1;
+              return (
+                <AssistantBubble
+                  key={m.id}
+                  msg={m}
+                  {...(isLast && m.failed && asked.role === "user" && !busy
+                    ? {
+                        onRetry: () => {
+                          retry(asked.text);
+                        },
+                      }
+                    : {})}
+                />
+              );
+            })
           )}
           <div ref={endRef} />
         </div>
@@ -331,7 +352,7 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
   );
 }
 
-function AssistantBubble({ msg }: { msg: AssistantMsg }) {
+function AssistantBubble({ msg, onRetry }: { msg: AssistantMsg; onRetry?: () => void }) {
   const showThinking = msg.streaming && msg.text === "" && msg.steps.length === 0;
   return (
     <div className="flex flex-col gap-2.5 self-stretch">
@@ -358,6 +379,13 @@ function AssistantBubble({ msg }: { msg: AssistantMsg }) {
       {msg.failed && (
         <Banner tone="error" icon="⊘" title="Something went wrong">
           {msg.failed}
+          {onRetry && (
+            <div className="mt-2">
+              <Button variant="ghost" className="px-3" onClick={onRetry}>
+                Try again
+              </Button>
+            </div>
+          )}
         </Banner>
       )}
     </div>

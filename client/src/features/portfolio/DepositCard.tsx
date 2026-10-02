@@ -30,8 +30,8 @@ function NetworkWarning() {
 function AcceptedTokens() {
   return (
     <p className="text-[12px] leading-relaxed text-text-dim">
-      Accepted: <strong className="text-text">USDC</strong> (everything here is priced and settled
-      in it) — EURC and cirBTC also work as tradeable assets.
+      Accepted: <strong className="text-text">USDC</strong> — everything here is priced and settled
+      in it.
     </p>
   );
 }

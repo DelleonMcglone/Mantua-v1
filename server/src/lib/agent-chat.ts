@@ -8,6 +8,7 @@ import type { AuditAction } from "../db/schema/safety.ts";
 import { users } from "../db/schema/users.ts";
 import { logAudit } from "./audit.ts";
 import { logger } from "./logger.ts";
+import { describeWalletProvisionError } from "./agent-wallet-error.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
@@ -2574,11 +2575,19 @@ export async function* runAgentChat(
   // Ensure the agent wallet exists ON THE ACTIVE CHAIN so swap/send have
   // something to act on (the wallet is provisioned on first use). Kept for
   // the audit rows below — chat-driven actions are logged against it.
-  const agentWallet = await (deps.ensureWallet ?? getOrCreateAgentWallet)(
-    privyUserId,
-    walletAddress,
-    chainId,
-  );
+  let agentWallet: Awaited<ReturnType<typeof getOrCreateAgentWallet>>;
+  try {
+    agentWallet = await (deps.ensureWallet ?? getOrCreateAgentWallet)(
+      privyUserId,
+      walletAddress,
+      chainId,
+    );
+  } catch (err) {
+    const { message: userMessage, reason } = describeWalletProvisionError(err);
+    logger.error({ err, reason, chainId }, "agent chat: wallet provisioning failed");
+    yield { type: "error", message: userMessage };
+    return;
+  }
 
   const userDbId = await (deps.resolveUser ?? resolveUserId)(privyUserId);
   if (!userDbId) {

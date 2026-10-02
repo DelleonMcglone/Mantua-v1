@@ -22,7 +22,9 @@ import {
   TermsPage,
 } from "./app-lazy.ts";
 import { usePrivy } from "@privy-io/react-auth";
+import { ErrorBoundary } from "@/components/ErrorBoundary.tsx";
 import { authView } from "@/lib/auth-view.ts";
+import { continuesAnalystThread } from "@/lib/command-route.ts";
 import { useEnsureWallet } from "@/features/auth/use-ensure-wallet.ts";
 import type { TokenSymbol } from "./lib/tokens.ts";
 import { detectIntent as detectIntentImpl, type Intent } from "./lib/chat-intent.ts";
@@ -120,6 +122,9 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
 function sanitizeRouteForStorage(route: Route): Route | null {
   if (route.kind === "legal" || route.kind === "docs" || route.kind === "agent-public") return null;
   if (route.kind === "agent") return { kind: "agent" };
+  // A stored question would be re-asked on every refresh, spending one of
+  // the three free analyst questions each time.
+  if (route.kind === "analyze") return { kind: "analyze" };
   return route;
 }
 
@@ -364,8 +369,15 @@ export default function App() {
     // Freemium chat (owner decision 2026-08-18): logged-out users may ask
     // the ANALYST — three free questions, enforced server-side — but any
     // actionable command (trade, agent, portfolio…) demands login here.
+    const intent = detectIntent(text);
+    // One continuous thread, signed in or not: a question asked while the
+    // analyst is open is appended to it, never routed anew.
+    if (continuesAnalystThread(route.kind, intent)) {
+      window.dispatchEvent(new CustomEvent("mantua:analyze-input", { detail: text }));
+      return;
+    }
     if (!authenticated) {
-      const guest = detectIntent(text);
+      const guest = intent;
       // Browsing is free (B5-007): research, discovery, and league pages
       // open logged-out; anything that moves money asks for login.
       const browsing = new Set<Intent["kind"]>(["analyze", "discover", "market", "home"]);
@@ -376,17 +388,12 @@ export default function App() {
       setShowLogin(true);
       return;
     }
-    const intent = detectIntent(text);
     if (route.kind === "agent") {
       window.dispatchEvent(agentInputEvent({ text, spoken }));
       return;
     }
     if (intent?.kind === "agent") {
       setRoute({ kind: "agent", message: text, spoken });
-      return;
-    }
-    if (route.kind === "analyze" && (!intent || intent.kind === "analyze")) {
-      window.dispatchEvent(new CustomEvent("mantua:analyze-input", { detail: text }));
       return;
     }
     if (intent) {
@@ -628,11 +635,13 @@ function fullPage(
     case "agent":
       return (
         <PanelPage>
-          <AgentPanel
-            {...(route.message ? { initialMessage: route.message } : {})}
-            {...(route.spoken ? { initialSpoken: true } : {})}
-            onClose={home}
-          />
+          <ErrorBoundary onClose={home} label="Your agent">
+            <AgentPanel
+              {...(route.message ? { initialMessage: route.message } : {})}
+              {...(route.spoken ? { initialSpoken: true } : {})}
+              onClose={home}
+            />
+          </ErrorBoundary>
         </PanelPage>
       );
     case "social":
