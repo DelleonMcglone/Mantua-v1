@@ -31,7 +31,7 @@ export function WeekSelector({
   const previous = stepWeek(options, active, -1);
   const next = stepWeek(options, active, 1);
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5 md:shrink-0 md:justify-end">
       <button
         type="button"
         aria-label="Previous week"

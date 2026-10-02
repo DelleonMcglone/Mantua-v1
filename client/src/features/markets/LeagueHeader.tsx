@@ -36,7 +36,7 @@ export function LeagueHeader({
 }) {
   return (
     <div>
-      <div className="flex items-start justify-between gap-3 md:gap-4">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
         <div className="flex min-w-0 items-start gap-2 md:gap-3">
           <button
             type="button"
