@@ -39,7 +39,6 @@ export type ActivityFilter = "all" | ActivityCategory;
 export const ACTIVITY_FILTERS: { key: ActivityFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "trade", label: "Trades" },
-  { key: "liquidity", label: "Liquidity" },
   { key: "transfer", label: "Transfers" },
   { key: "agent", label: "Agent" },
   { key: "settlement", label: "Settlements" },
