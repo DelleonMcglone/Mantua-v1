@@ -1,11 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Search } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
+import { ChevronRight } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state.tsx";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs.tsx";
 import { api } from "@/lib/api.ts";
@@ -26,15 +20,12 @@ import { ClaimWinnings } from "@/features/markets/ClaimWinnings.tsx";
 import { MarketPositionsSection } from "./MarketPositionsSection.tsx";
 import { AssetIcon, type AssetSymbol } from "./asset-icons.tsx";
 import { toDisplayAssets, usePortfolio, type DisplayAsset } from "./use-portfolio.ts";
-import { FiatRailsTab } from "./FiatRailsTab.tsx";
-
-const SORTS = ["Descending", "Ascending", "Alphabetical"] as const;
-type Sort = (typeof SORTS)[number];
 
 /**
- * Assets card — matches prototype `AssetsCard` in shell.jsx: tabbed
- * Assets / Cash / Positions / Agent / Activity surface. Assets sub-view:
- * search, sort, PnL header, token rows. Positions sub-view: the market
+ * Assets card: a tabbed Assets / Positions / Agent / Activity surface.
+ * Assets sub-view: the holdings total and the USDC balance row. USDC is the
+ * account's cash, so there is no separate Cash tab, and with one asset there
+ * is nothing to search or sort. Positions sub-view: the market
  * (outcome-token) positions, claims and settled history.
  */
 interface AssetsCardProps {
@@ -44,9 +35,7 @@ interface AssetsCardProps {
 
 export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
   const chainId = ARC_CHAIN_ID;
-  const [tab, setTab] = useState<"assets" | "cash" | "positions" | "agent" | "activity">("assets");
-  const [q, setQ] = useState("");
-  const [sort, setSort] = useState<Sort>("Descending");
+  const [tab, setTab] = useState<"assets" | "positions" | "agent" | "activity">("assets");
   const portfolio = usePortfolio();
   const agent = useAgentPortfolio();
   // Phase 9 — the settled history and both wallets' market positions feed
@@ -91,24 +80,10 @@ export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
     return toDisplayAssets(agent.balances, chainId);
   }, [agent.agentAddress, agent.balances, chainId]);
 
-  const numVal = (s: string) => Number(s.replace(/[^\d.-]/g, "")) || 0;
-  const filtered = assets
-    .filter(
-      (a) =>
-        !q ||
-        a.symbol.toLowerCase().includes(q.toLowerCase()) ||
-        a.name.toLowerCase().includes(q.toLowerCase()),
-    )
-    .slice()
-    .sort((a, b) => {
-      if (sort === "Alphabetical") return a.name.localeCompare(b.name);
-      if (sort === "Ascending") return numVal(a.val) - numVal(b.val);
-      return numVal(b.val) - numVal(a.val);
-    });
+  const filtered = assets;
 
   const tabs = [
     { k: "assets" as const, label: "Assets", count: assets.length },
-    { k: "cash" as const, label: "Cash", count: 0 },
     { k: "positions" as const, label: "Positions", count: userMarkets.rows?.length ?? 0 },
     { k: "agent" as const, label: "Agent", count: agentAssets.length },
     // Phase 9 / PF-019 — the unified timeline; count is shown inside the tab.
@@ -163,50 +138,6 @@ export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
             </div>
           </div>
         )}
-        <div className="px-4 py-3.5 border-b border-border-soft flex items-center gap-2.5">
-          <Search className="h-4 w-4 text-text-dim" />
-          <div className="flex-1">
-            <div className="text-[13px] font-medium">Assets</div>
-            <input
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-              }}
-              placeholder="Search assets"
-              className="border-none bg-transparent outline-none text-[12px] text-text-dim w-full p-0 mt-0.5"
-            />
-          </div>
-        </div>
-
-        <div className="px-3.5 py-2.5 flex gap-2 items-center border-b border-border-soft relative">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="px-2.5 py-1 rounded-full border border-border bg-bg-elev text-text-dim text-[12px] inline-flex items-center gap-1"
-              >
-                {sort}
-                <ChevronDown className="h-3 w-3" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-[140px] rounded-sm shadow-lg">
-              {SORTS.map((s) => (
-                <DropdownMenuItem
-                  key={s}
-                  className={sort === s ? "bg-chip" : ""}
-                  onSelect={() => {
-                    setSort(s);
-                  }}
-                >
-                  {s}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <div className="flex-1" />
-          <div className="text-[12px] text-text-dim">PnL</div>
-        </div>
-
         <div className="max-h-[320px] overflow-auto">
           {!portfolio.walletAddress && (
             <EmptyState>Connect a wallet to see your balances.</EmptyState>
@@ -220,7 +151,7 @@ export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
           {portfolio.walletAddress &&
             !portfolio.loading &&
             !portfolio.error &&
-            filtered.length === 0 && <EmptyState>No matching balances.</EmptyState>}
+            filtered.length === 0 && <EmptyState>No balance yet.</EmptyState>}
           {filtered.map((a) => (
             <div
               key={a.symbol}
@@ -264,10 +195,6 @@ export function AssetsCard({ onSelectAsset }: AssetsCardProps = {}) {
             </div>
           ))}
         </div>
-      </TabsContent>
-
-      <TabsContent value="cash">
-        <FiatRailsTab />
       </TabsContent>
 
       <TabsContent value="positions">
@@ -321,7 +248,7 @@ function AgentTabBody({
     return <EmptyState tone="error">{agent.error}</EmptyState>;
   }
   if (!agent.agentAddress) {
-    return <EmptyState>Connect a wallet to view your agent.</EmptyState>;
+    return <EmptyState>Your agent wallet is not available right now.</EmptyState>;
   }
 
   return (

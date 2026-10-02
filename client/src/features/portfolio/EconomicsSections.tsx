@@ -27,7 +27,9 @@ export function SettledPositionsSection({ econ }: { econ: UsePortfolioEconomics 
       </h3>
       {s === null && (
         <p className="mt-1.5 text-[12.5px] text-text-dim">
-          {econ.loading ? "Loading…" : "Connect a wallet."}
+          {econ.loading
+            ? "Loading…"
+            : (econ.error ?? "Settled positions are not available right now.")}
         </p>
       )}
       {s && s.rows.length === 0 && (
