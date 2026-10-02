@@ -1,6 +1,7 @@
 import { Card } from "@/components/shell/Card.tsx";
 import { LeagueLogo } from "@/components/shell/LeagueLogo.tsx";
-import { isWithinLocalWindow, localDayWindow, paddedDatesRange } from "./local-window.ts";
+import { BOARD_LOOKAHEAD_DAYS, pickBoardEvents } from "./board-events.ts";
+import { localDayWindow, paddedDatesRange } from "./local-window.ts";
 import { Freshness } from "./Freshness.tsx";
 import { SPORTS, type Sport } from "./sports.ts";
 import { SlateList } from "./SlateList.tsx";
@@ -14,13 +15,12 @@ interface BoardProps {
   onOpenLeague: (sport: Sport) => void;
   /** Trade click — open the position panel for this game (B7-003). */
   onTrade: (sport: Sport, eventId: string) => void;
-  /** "All markets" — the cross-league Discover page (task 050, T-001). */
-  onDiscover?: (() => void) | undefined;
 }
 
 /**
  * B5-001 — the home board: today's games in the covered league (NFL), as
- * matchup cards. Fetched with an explicit today-only window rather than
+ * matchup cards — or, on a day without games, the next game day's, so the
+ * board is never empty while the schedule holds a future game. Fetched with an explicit today-only window rather than
  * the provider default, because the default NFL scoreboard is the current
  * schedule week — midweek that is mostly finished games. Scoped to
  * `coverage: "launch"` leagues only. Browsing is open to everyone — the login gate guards
@@ -33,11 +33,15 @@ interface BoardProps {
  * so an evening game never falls off the board and a late game from
  * yesterday never leaks onto it.
  */
-export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardProps) {
+export function Board({ onAnalyze, onOpenLeague, onTrade }: BoardProps) {
   const { start, endExclusive } = localDayWindow();
+  // One request covers today and the days ahead, so a day without games
+  // can show the next slate instead of an empty card.
+  const lookahead = new Date(start);
+  lookahead.setDate(start.getDate() + BOARD_LOOKAHEAD_DAYS);
   // Phase 7 / R-001 — one live stream (one connection) carries every
   // launch league; each card reads its league out of the shared state.
-  const today: SlateState = useSlate(paddedDatesRange(start, endExclusive));
+  const today: SlateState = useSlate(paddedDatesRange(start, lookahead));
   const launchSports = SPORTS.filter((s) => s.coverage === "launch");
 
   const handleAnalyze = (event: SlateEvent, sport: Sport) => {
@@ -52,14 +56,8 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
       {launchSports.map((sport) => {
         const state = today;
         const rawSlate = state.slates[sport.id];
-        const slate = rawSlate
-          ? {
-              ...rawSlate,
-              events: rawSlate.events.filter((e) =>
-                isWithinLocalWindow(e.startsAt, start, endExclusive),
-              ),
-            }
-          : undefined;
+        const pick = rawSlate ? pickBoardEvents(rawSlate.events, start, endExclusive) : null;
+        const slate = rawSlate && pick ? { ...rawSlate, events: pick.events } : undefined;
         return (
           <Card key={sport.id}>
             <button
@@ -89,6 +87,7 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
                 sport={sport}
                 slate={slate}
                 loading={state.loading}
+                nextDay={pick?.mode === "next" ? pick.day : null}
                 onAnalyze={handleAnalyze}
                 onTrade={(event, s) => {
                   onTrade(s, event.providerEventId);
@@ -98,15 +97,6 @@ export function Board({ onAnalyze, onOpenLeague, onTrade, onDiscover }: BoardPro
           </Card>
         );
       })}
-      {onDiscover && (
-        <button
-          type="button"
-          onClick={onDiscover}
-          className="rounded-md border border-dashed border-border-soft px-4 py-2.5 text-[13px] font-medium text-text-dim transition-colors hover:border-accent hover:text-text cursor-pointer"
-        >
-          Browse all markets — filter by league, team, time, liquidity →
-        </button>
-      )}
     </>
   );
 }

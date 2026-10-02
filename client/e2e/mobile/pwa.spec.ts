@@ -60,7 +60,8 @@ test("a notification or shortcut URL opens the named surface and cleans the addr
   await page.goto("/?open=discover");
   await expect(page.getByRole("heading", { name: "Markets" })).toBeVisible();
   await page.goto("/?source=pwa");
-  await expect(page.getByRole("button", { name: /^Browse all markets/ })).toBeVisible();
+  await expect(page.getByText("View markets →").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Browse all markets/ })).toHaveCount(0);
 });
 
 test("notifications settings read the deployment's push state and never subscribe on load", async ({

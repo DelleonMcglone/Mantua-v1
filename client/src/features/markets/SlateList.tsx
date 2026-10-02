@@ -7,6 +7,8 @@ interface SlateListProps {
   sport: Sport;
   slate: Slate | undefined;
   loading: boolean;
+  /** Set when today has no games and the list shows the next game day. */
+  nextDay?: Date | null | undefined;
   /** Matchup click — opens the analyst on this game (B5-004). */
   onAnalyze: (event: SlateEvent, sport: Sport) => void;
   /** Trade click — the position panel (B7-003). Only rendered when the
@@ -21,7 +23,7 @@ interface SlateListProps {
  * to logged-out users (B5-007). Trading buttons live on the market page,
  * behind the login gate, once markets open.
  */
-export function SlateList({ sport, slate, loading, onAnalyze, onTrade }: SlateListProps) {
+export function SlateList({ sport, slate, loading, nextDay, onAnalyze, onTrade }: SlateListProps) {
   if (loading && !slate) {
     return (
       <div
@@ -45,9 +47,9 @@ export function SlateList({ sport, slate, loading, onAnalyze, onTrade }: SlateLi
   if (slate.events.length === 0) {
     return (
       <div className="rounded-md border border-border-soft px-4 py-6 text-center">
-        <p className="text-[13px] font-medium">No {sport.label} games today</p>
+        <p className="text-[13px] font-medium">No upcoming {sport.label} games on the schedule</p>
         <p className="mx-auto mt-1.5 max-w-xs text-[12px] leading-relaxed text-text-dim">
-          Games appear here and markets open alongside them.
+          The next games appear here as soon as they are scheduled.
         </p>
       </div>
     );
@@ -55,6 +57,16 @@ export function SlateList({ sport, slate, loading, onAnalyze, onTrade }: SlateLi
 
   return (
     <div className="flex flex-col gap-2">
+      {nextDay && (
+        <p data-testid="board-next-day" className="text-[12px] font-medium text-text-dim">
+          Next games ·{" "}
+          {nextDay.toLocaleDateString(undefined, {
+            weekday: "long",
+            month: "short",
+            day: "numeric",
+          })}
+        </p>
+      )}
       {slate.delayed && (
         <div className="rounded-sm border border-yellow/40 bg-yellow/10 px-3 py-1.5 text-[11px] text-yellow">
           Live data is delayed — scores and odds may lag the game.
