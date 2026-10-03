@@ -21,6 +21,10 @@ import { Button } from "@/components/ui/button.tsx";
 import { useAgentPortfolio } from "./use-agent-portfolio.ts";
 import { AgentWalletStrip, shortAddr } from "./agent-gate.tsx";
 import { DetailRows, Spinner, TxRow } from "./agent-primitives.tsx";
+import { SourcePill } from "./SourcePill.tsx";
+import { isSourceTool } from "./source-pills.ts";
+import { appendStep, appendText, type MessagePart } from "./message-parts.ts";
+import { SummaryCard, type SummaryRow } from "./SummaryCard.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
 import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
@@ -88,6 +92,8 @@ interface AssistantMsg {
   role: "assistant";
   text: string;
   steps: ToolStep[];
+  /** Text and tools in arrival order — what the bubble renders. */
+  parts: MessagePart[];
   streaming: boolean;
   failed?: string;
 }
@@ -176,7 +182,7 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
       setMessages((prev) => [
         ...prev,
         { id: uid(), role: "user", text },
-        { id: assistantId, role: "assistant", text: "", steps: [], streaming: true },
+        { id: assistantId, role: "assistant", text: "", steps: [], parts: [], streaming: true },
       ]);
       setBusy(true);
       busyRef.current = true;
@@ -190,12 +196,17 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
             sessionIdRef.current = ev.sessionId;
             break;
           case "text":
-            patchAssistant(assistantId, (m) => ({ ...m, text: m.text + ev.delta }));
+            patchAssistant(assistantId, (m) => ({
+              ...m,
+              text: m.text + ev.delta,
+              parts: appendText(m.parts, ev.delta),
+            }));
             break;
           case "tool_start":
             patchAssistant(assistantId, (m) => ({
               ...m,
               steps: [...m.steps, { id: ev.id, tool: ev.tool, args: ev.args, status: "running" }],
+              parts: appendStep(m.parts, ev.id),
             }));
             break;
           case "tool_result":
@@ -369,16 +380,22 @@ function AssistantBubble({ msg, onRetry }: { msg: AssistantMsg; onRetry?: () => 
         </div>
       )}
 
-      {msg.steps.map((step) => (
-        <StepCard key={step.id} step={step} />
-      ))}
-
-      {msg.text && (
-        <div className="max-w-[92%] whitespace-pre-wrap text-[13px] leading-[1.55] text-text">
-          <RichText text={msg.text} />
-          {msg.streaming && <Caret />}
-        </div>
-      )}
+      {msg.parts.map((part, i) => {
+        if (part.kind === "step") {
+          const step = msg.steps.find((s) => s.id === part.id);
+          return step ? <StepCard key={part.id} step={step} /> : null;
+        }
+        const last = i === msg.parts.length - 1;
+        return (
+          <div
+            key={`text-${String(i)}`}
+            className="max-w-[92%] whitespace-pre-wrap text-[13px] leading-[1.55] text-text"
+          >
+            <RichText text={part.text} />
+            {msg.streaming && last && <Caret />}
+          </div>
+        );
+      })}
       {/* T-022: the agent's read is an estimate, never a certainty. */}
       {!msg.streaming && msg.text && <PredictionNote className="max-w-[92%]" />}
 
@@ -399,6 +416,10 @@ function AssistantBubble({ msg, onRetry }: { msg: AssistantMsg; onRetry?: () => 
 }
 
 function StepCard({ step }: { step: ToolStep }) {
+  // Data reads are source pills (provider · category · cost), not cards.
+  if (isSourceTool(step.tool) && step.tool !== "mantua_compare_markets") {
+    return <SourcePill tool={step.tool} status={step.status} data={step.data} />;
+  }
   if (step.status === "running") {
     return (
       <div className="flex items-center gap-2">
@@ -548,6 +569,10 @@ function renderResult(step: ToolStep): ReactNode {
           <div className="text-[12px] font-medium">{c.action}</div>
         </div>
       );
+    }
+    case "mantua_compare_markets": {
+      const d = step.data as { budgetUsdc?: number | null; rows?: SummaryRow[] };
+      return <SummaryCard budgetUsdc={d.budgetUsdc ?? null} rows={d.rows ?? []} />;
     }
     case "mantua_daily_brief": {
       const c = dailyBriefCard(step.data as DailyBriefResult);
