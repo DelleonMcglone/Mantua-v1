@@ -18,10 +18,7 @@ export interface CspSource {
 export const CSP_REPORT_PATH = "/api/csp-report";
 
 export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "font", CspSource[]> = {
-  script: [
-    { origin: "https://challenges.cloudflare.com", why: "Privy's Turnstile challenge" },
-    { origin: "https://cdn.plaid.com", why: "Plaid Link loader (react-plaid-link)" },
-  ],
+  script: [{ origin: "https://challenges.cloudflare.com", why: "Privy's Turnstile challenge" }],
   frame: [
     { origin: "https://auth.privy.io", why: "Privy embedded-wallet iframe" },
     { origin: "https://challenges.cloudflare.com", why: "Privy's Turnstile challenge" },
@@ -29,7 +26,6 @@ export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "fon
     { origin: "https://verify.walletconnect.org", why: "WalletConnect verify frame" },
     { origin: "https://secure.walletconnect.com", why: "WalletConnect secure frame" },
     { origin: "https://secure.walletconnect.org", why: "WalletConnect secure frame" },
-    { origin: "https://cdn.plaid.com", why: "Plaid Link iframe" },
   ],
   connect: [
     { origin: "https://auth.privy.io", why: "Privy auth API" },
@@ -40,7 +36,6 @@ export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "fon
     { origin: "https://explorer-api.walletconnect.com", why: "WalletConnect explorer" },
     { origin: "https://api.web3modal.org", why: "WalletConnect modal assets" },
     { origin: "https://pulse.walletconnect.org", why: "WalletConnect telemetry" },
-    { origin: "https://*.plaid.com", why: "Plaid Link API" },
     { origin: "https://rpc.mainnet.arc.io", why: "Arc RPC (public fallback)" },
     {
       origin: "wss://api.elevenlabs.io",

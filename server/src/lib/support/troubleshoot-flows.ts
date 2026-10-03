@@ -1,8 +1,8 @@
 import type { TroubleshootContext } from "./troubleshoot.ts";
 
 /**
- * Task 070 / AE-009 — the money flows of the troubleshooter: transfers
- * (deposit / withdrawal) and trades (pending / refused), keyed on the
+ * Task 070 / AE-009 — the money flows of the troubleshooter: USDC
+ * deposits / withdrawals and trades (pending / refused), keyed on the
  * caller's own account and the platform status. `troubleshoot.ts` holds
  * the issue catalogue and the simpler flows.
  */
@@ -17,36 +17,12 @@ export const SIGN_IN =
   "Sign in so I can check your own account; anonymous chats see only general steps.";
 
 export function transferFlow(kind: "deposit" | "withdrawal", a: Account | null): Flow {
-  if (!a) {
-    return {
-      steps: [SIGN_IN, `A bank ${kind} usually completes within 1–3 business days.`],
-      escalate: false,
-    };
-  }
-  if (a.failedTransfers > 0) {
-    return {
-      steps: [
-        `A recent transfer failed${a.lastFailure ? `: ${a.lastFailure}` : "."}`,
-        "Open Profile → transfers to see whether it can be retried or needs support.",
-      ],
-      escalate: true,
-    };
-  }
-  if (a.pendingTransfers > 0) {
-    return {
-      steps: [
-        `You have ${String(a.pendingTransfers)} pending transfer(s). A bank ${kind} usually completes within 1–3 business days; the status updates on its own.`,
-        "If it has been more than 3 business days, I can escalate it with the reference from your transfers list.",
-      ],
-      escalate: false,
-    };
-  }
-  return {
-    steps: [
-      `No pending ${kind} is on your account. If you sent USDC on chain, check the transaction on the destination address; on-chain transfers appear once confirmed.`,
-    ],
-    escalate: false,
-  };
+  const onChain =
+    kind === "deposit"
+      ? "A USDC deposit lands as soon as the transfer confirms on the Arc network, usually within seconds. If it has not appeared, check that it was sent on Arc — funds sent on another network cannot be recovered — and that the address matches the one on your Profile page."
+      : "A USDC withdrawal confirms on chain within seconds. Check the transaction on the destination address; once confirmed it cannot be reversed.";
+  if (!a) return { steps: [SIGN_IN, onChain], escalate: false };
+  return { steps: [onChain], escalate: false };
 }
 
 /** The banner line when trading is not open, else null. */

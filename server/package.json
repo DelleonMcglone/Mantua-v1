@@ -15,7 +15,6 @@
     "circle:preflight": "tsx --env-file-if-exists=.env src/scripts/circle-preflight.ts",
     "circle:id-smoke": "tsx --env-file-if-exists=.env src/scripts/circle-id-smoke.ts",
     "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
-    "fiat:e2e": "tsx --env-file-if-exists=.env src/scripts/fiat-e2e.ts",
     "load:spike": "tsx --env-file-if-exists=.env src/scripts/load-test.ts",
     "drill:kill-switch": "tsx --env-file-if-exists=.env src/scripts/kill-switch-drill.ts",
     "push:generate-keys": "tsx src/scripts/push-generate-keys.ts",
@@ -26,12 +25,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",
-    "@circle-fin/adapter-circle-wallets": "^1.8.1",
-    "@circle-fin/adapter-viem-v2": "^1.19.0",
-    "@circle-fin/bridge-kit": "^1.15.2",
     "@circle-fin/developer-controlled-wallets": "^10.8.1",
-    "@circle-fin/smart-contract-platform": "^10.8.1",
-    "@circle-fin/unified-balance-kit": "^1.8.0",
     "@circle-fin/x402-batching": "^3.5.0",
     "@privy-io/server-auth": "1.32.5",
     "@upstash/redis": "^1.38.4",
@@ -46,7 +40,6 @@
     "pg": "8.20.0",
     "pino": "10.3.1",
     "pino-http": "11.0.0",
-    "plaid": "47.0.0",
     "serverless-http": "^4.0.0",
     "viem": "2.48.4",
     "zod": "4.3.6"

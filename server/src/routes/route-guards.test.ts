@@ -41,11 +41,6 @@ const ALLOWLIST: { file: string; path: string; reason: string }[] = [
     path: "/api/circle/webhook",
     reason: "signature verified inside the handler against Circle's public key",
   },
-  {
-    file: "fiat-webhook.ts",
-    path: "/api/fiat/webhook",
-    reason: "HMAC verified inside the handler over the raw body",
-  },
 ];
 
 const ROUTES_DIR = import.meta.dirname;

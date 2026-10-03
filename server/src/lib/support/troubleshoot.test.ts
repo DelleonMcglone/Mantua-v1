@@ -18,12 +18,9 @@ const account = (
 ): TroubleshootContext => ({
   ...open,
   account: {
-    pendingTransfers: 0,
-    failedTransfers: 0,
     pendingTrades: 0,
     hasAgentWallet: true,
     agentMode: "user_testing",
-    lastFailure: null,
     ...over,
   },
 });
@@ -48,17 +45,15 @@ void describe("troubleshoot", () => {
     }
   });
 
-  void it("uses the account: a failed transfer escalates, a pending one explains the timeline", () => {
-    const failed = troubleshoot(
-      "deposit_pending",
-      account({ failedTransfers: 1, lastFailure: "bank declined" }),
-    );
-    assert.equal(failed.escalate, true);
-    assert.match(failed.steps[0], /bank declined/);
-    const pending = troubleshoot("withdraw_pending", account({ pendingTransfers: 2 }));
-    assert.equal(pending.escalate, false);
-    assert.match(pending.steps[0], /2 pending/);
-    assert.match(troubleshoot("deposit_pending", account()).steps[0], /No pending deposit/);
+  void it("explains a USDC deposit or withdrawal on chain, with no bank in the story", () => {
+    const deposit = troubleshoot("deposit_pending", account());
+    assert.equal(deposit.escalate, false);
+    assert.match(deposit.steps[0], /sent on Arc/);
+    assert.doesNotMatch(deposit.steps.join(" "), /bank/i);
+    const withdrawal = troubleshoot("withdraw_pending", account());
+    assert.match(withdrawal.steps[0], /cannot be reversed/);
+    const anonymous = troubleshoot("deposit_pending", { platform: null, account: null });
+    assert.match(anonymous.steps[0], /Sign in/);
   });
 
   void it("leads with the platform status when trading is not open", () => {

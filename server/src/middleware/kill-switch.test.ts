@@ -8,15 +8,11 @@ import {
 } from "./kill-switch.ts";
 
 /**
- * The three Vercel-cron money loops (C-020). Each is GET-routed, so the
+ * The Vercel-cron money loops (C-020). Each is GET-routed, so the
  * pre-C-020 write-method gate never stopped them; one refusal test per path
  * proves the gate now covers every money cron while engaged.
  */
-const MONEY_CRON_PATHS = [
-  "/api/cron/rebalance",
-  "/api/cron/intents",
-  "/api/cron/strategies",
-] as const;
+const MONEY_CRON_PATHS = ["/api/cron/strategies"] as const;
 
 interface FireResult {
   nextCalled: boolean;
@@ -69,7 +65,7 @@ void describe("kill switch — cron money-path coverage (C-020)", () => {
 
   void it("refuses the money crons spelled with a trailing slash too", async () => {
     const gate = createKillSwitchGate({ envEngaged: true });
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance/"));
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies/"));
   });
 
   void it("keeps the read-only crons and other GETs up while engaged", async () => {
@@ -82,14 +78,14 @@ void describe("kill switch — cron money-path coverage (C-020)", () => {
 
   void it("still refuses writes while engaged", async () => {
     const gate = createKillSwitchGate({ envEngaged: true });
-    assertRefused(await fire(gate, "POST", "/api/swap"));
+    assertRefused(await fire(gate, "POST", "/api/agent/chat"));
   });
 
   void it("gates nothing while disengaged", async () => {
     const gate = createKillSwitchGate({ envEngaged: false });
-    const write = await fire(gate, "POST", "/api/swap");
+    const write = await fire(gate, "POST", "/api/agent/chat");
     assert.equal(write.nextCalled, true, "writes pass while disengaged");
-    const cron = await fire(gate, "GET", "/api/cron/rebalance");
+    const cron = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(cron.nextCalled, true, "money crons pass while disengaged");
   });
 });
@@ -140,18 +136,18 @@ void describe("kill switch — runtime toggle over the shared store (C-020)", ()
       runtime: createRuntimeKillSwitchFlag({ client: store, cacheTtlMs: 0 }),
     });
 
-    const before = await fire(gate, "GET", "/api/cron/rebalance");
+    const before = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(before.nextCalled, true, "no flag: the money cron runs");
 
     store.setFlag("1"); // the operator's console action
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance"));
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies"));
 
     store.clearFlag();
-    const after = await fire(gate, "GET", "/api/cron/rebalance");
+    const after = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(after.nextCalled, true, "clearing the flag resumes the cron");
   });
 
-  void it("a runtime engagement refuses all three money crons", async () => {
+  void it("a runtime engagement refuses the money crons", async () => {
     const store = new FakeFlagStore();
     store.setFlag("1");
     const gate = createKillSwitchGate({
@@ -181,15 +177,15 @@ void describe("kill switch — runtime toggle over the shared store (C-020)", ()
       runtime: createRuntimeKillSwitchFlag({ client: store, cacheTtlMs: 25 }),
     });
 
-    const first = await fire(gate, "GET", "/api/cron/rebalance");
+    const first = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(first.nextCalled, true, "starts disengaged");
 
     store.setFlag("1");
-    const cached = await fire(gate, "GET", "/api/cron/rebalance");
+    const cached = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(cached.nextCalled, true, "engagement inside the cache window is not seen yet");
 
     await sleep(60);
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance"));
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies"));
   });
 
   void it("a Redis outage keeps the last known engagement (never silently un-kills)", async () => {
@@ -199,11 +195,11 @@ void describe("kill switch — runtime toggle over the shared store (C-020)", ()
       envEngaged: false,
       runtime: createRuntimeKillSwitchFlag({ client: store, cacheTtlMs: 0 }),
     });
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance")); // establishes engaged
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies")); // establishes engaged
 
     store.failReadsWith(new Error("upstash unreachable"));
     assertRefused(
-      await fire(gate, "GET", "/api/cron/rebalance"),
+      await fire(gate, "GET", "/api/cron/strategies"),
       "the outage must not lift the engagement",
     );
   });
@@ -215,7 +211,7 @@ void describe("kill switch — runtime toggle over the shared store (C-020)", ()
       envEngaged: false,
       runtime: createRuntimeKillSwitchFlag({ client: store, cacheTtlMs: 0 }),
     });
-    const result = await fire(gate, "GET", "/api/cron/rebalance");
+    const result = await fire(gate, "GET", "/api/cron/strategies");
     assert.equal(result.nextCalled, true, "an outage must not take the API down");
   });
 
@@ -226,12 +222,12 @@ void describe("kill switch — runtime toggle over the shared store (C-020)", ()
       envEngaged: false,
       runtime: createRuntimeKillSwitchFlag({ client: store, cacheTtlMs: 0 }),
     });
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance"));
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies"));
   });
 
   void it("without Redis configured the switch is deploy-time only — and still covers the crons", async () => {
     const gate = createKillSwitchGate({ envEngaged: true, runtime: undefined });
-    assertRefused(await fire(gate, "POST", "/api/swap"));
-    assertRefused(await fire(gate, "GET", "/api/cron/rebalance"));
+    assertRefused(await fire(gate, "POST", "/api/agent/chat"));
+    assertRefused(await fire(gate, "GET", "/api/cron/strategies"));
   });
 });

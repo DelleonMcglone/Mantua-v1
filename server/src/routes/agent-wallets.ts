@@ -9,7 +9,6 @@ import {
   UserNotFoundError,
 } from "../lib/agent-wallet.ts";
 import { logAudit } from "../lib/audit.ts";
-import { setAutoRebalance } from "../lib/agent-rebalance.ts";
 import { CircleUnavailableError } from "../lib/circle/client.ts";
 import { CustodyUnprovisionedError } from "../lib/custody/custody-wallet-set.ts";
 import { HARD_DAILY_CAP_USD } from "../lib/constants.ts";
@@ -27,7 +26,6 @@ interface AgentWalletDto {
   label: string | null;
   dailyCapUsd: string;
   status: string;
-  rebalanceEnabled: boolean;
   createdAt: string;
 }
 
@@ -38,7 +36,6 @@ function toDto(w: AgentWallet): AgentWalletDto {
     label: w.label,
     dailyCapUsd: w.dailyCapUsd,
     status: w.status,
-    rebalanceEnabled: w.rebalanceEnabled,
     createdAt: w.createdAt.toISOString(),
   };
 }
@@ -177,43 +174,6 @@ agentWalletsRouter.patch(
         reason: err instanceof Error ? err.message : "unknown",
       });
       res.status(500).json({ error: "Failed to update agent wallet cap", code: "INTERNAL" });
-    }
-  },
-);
-
-const rebalanceSchema = z.object({ enabled: z.boolean() });
-
-/**
- * PATCH /api/agent/rebalance — opt the agent wallet in/out of autonomous peg
- * de-peg-exit rebalancing (Phase 2). Defaults off.
- */
-agentWalletsRouter.patch(
-  "/api/agent/rebalance",
-  writeRateLimiter,
-  requireAuth,
-  async (req: Request, res: Response) => {
-    const privyUserId = req.privyUserId;
-    if (!privyUserId) {
-      res.status(401).json({ error: "Authentication required.", code: "UNAUTHENTICATED" });
-      return;
-    }
-    const parsed = rebalanceSchema.safeParse(req.body);
-    if (!parsed.success) {
-      res
-        .status(400)
-        .json({ error: "Invalid request", code: "BAD_REQUEST", details: parsed.error.issues });
-      return;
-    }
-    try {
-      const wallet = await setAutoRebalance(privyUserId, parsed.data.enabled);
-      res.json(toDto(wallet));
-    } catch (err) {
-      if (err instanceof AgentWalletNotFoundError) {
-        res.status(404).json({ error: err.message, code: "AGENT_WALLET_NOT_FOUND" });
-        return;
-      }
-      logger.error({ err }, "agent rebalance toggle failed");
-      res.status(500).json({ error: "Failed to update rebalance setting", code: "INTERNAL" });
     }
   },
 );

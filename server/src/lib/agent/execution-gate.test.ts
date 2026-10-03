@@ -128,8 +128,6 @@ void describe("agent mode policy", () => {
 void describe("isMoneyCall", () => {
   void it("classifies the user's money tools; x402 paid data and reads pass", () => {
     for (const t of MONEY_TOOLS) assert.equal(isMoneyCall(t, {}), true, t);
-    assert.equal(isMoneyCall("gateway", { action: "spend" }), true);
-    assert.equal(isMoneyCall("gateway", { action: "balance" }), false);
     assert.equal(
       isMoneyCall("call_paid_service", { url: "https://x" }),
       false,
@@ -333,7 +331,10 @@ void describe("authorizeExecution — user_testing (Always Ask)", () => {
     );
     assert.equal(
       await refusal(
-        authorizeExecution(store, ctx, { tool: "swap", args: { ...sendArgs, confirmationId: id } }),
+        authorizeExecution(store, ctx, {
+          tool: "fund_job",
+          args: { ...sendArgs, confirmationId: id },
+        }),
       ),
       "CONFIRMATION_MISMATCH",
     );

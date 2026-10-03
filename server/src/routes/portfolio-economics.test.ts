@@ -10,7 +10,6 @@ process.env.PRIVY_APP_SECRET ??= "test-stub";
 
 const { createPortfolioEconomicsRouter } = await import("./portfolio-economics.ts");
 const { computePerformance } = await import("../lib/agent/performance.ts");
-type OnchainPosition = import("../lib/v4-onchain-positions.ts").OnchainPosition;
 
 /**
  * Phase 9 / PF-002, PF-007, PF-012 — the economics and settled-history routes
@@ -24,27 +23,6 @@ after(() => {
 
 const WALLET = "0x00000000000000000000000000000000000000aa";
 const T = (h: number): Date => new Date(Date.UTC(2026, 8, 12, h));
-
-const POSITION = {
-  chainId: 5042,
-  tokenId: "42",
-  positionManager: "0x00000000000000000000000000000000000000f0",
-  tokenA: "USDC",
-  tokenB: "EURC",
-  fee: 3000,
-  hook: null,
-  tickLower: -100,
-  tickUpper: 100,
-  liquidity: "250000",
-  amountA: "100",
-  amountB: "80",
-  token0: "0x00000000000000000000000000000000000000c0",
-  token1: "0x00000000000000000000000000000000000000c1",
-  hookAddress: null,
-  fees0: "1000000",
-  fees1: "0",
-  currentLpFeePips: 3000,
-} as unknown as OnchainPosition;
 
 function perf() {
   return computePerformance(
@@ -82,12 +60,6 @@ function serve(): Promise<string> {
   });
   app.use(
     createPortfolioEconomicsRouter({
-      onchainPositions: () => Promise.resolve([POSITION]),
-      ledgerAdds: () =>
-        Promise.resolve([{ params: { tokenId: "42" }, usdValue: "170.00", createdAt: T(0) }]),
-      price: (sym) => Promise.resolve(sym === "EURC" ? 1.1 : 1),
-      feesUsd: () => Promise.resolve(1),
-      poolLiquidity: () => Promise.resolve(1_000_000n),
       performance: () => Promise.resolve(perf()),
       labels: (ids) =>
         Promise.resolve(
@@ -106,7 +78,6 @@ function serve(): Promise<string> {
           ),
         ),
       redeemed: () => Promise.resolve(new Set(["0xwin"])),
-      resolveUser: () => Promise.resolve("usr_1"),
     }),
   );
   return new Promise((resolve) => {
@@ -120,30 +91,19 @@ function serve(): Promise<string> {
 }
 
 void describe("GET /api/portfolio/economics", () => {
-  void it("values each LP position with basis, fees, P&L and share, and reports realized market results", async () => {
+  void it("reports realized market results and an empty LP list", async () => {
     const origin = await serve();
     const res = await fetch(`${origin}/api/portfolio/economics`);
     assert.equal(res.status, 200);
     const body = (await res.json()) as {
-      lp: {
-        tokenId: string;
-        currentValueUsd: number;
-        depositedUsd: number;
-        pnlUsd: number;
-        liquidityShareBps: number;
-      }[];
+      lp: unknown[];
       lpTotals: { positions: number; pnlUsd: number };
-      realized: { marketRealizedPnlUsd: number; marketWinRate: number; lpCollectedUsd: null };
+      realized: { marketRealizedPnlUsd: number; marketWinRate: number };
     };
-    assert.equal(body.lp.length, 1);
-    assert.equal(body.lp[0]?.currentValueUsd, 188);
-    assert.equal(body.lp[0]?.depositedUsd, 170);
-    assert.equal(body.lp[0]?.pnlUsd, 19);
-    assert.equal(body.lp[0]?.liquidityShareBps, 2500);
-    assert.equal(body.lpTotals.pnlUsd, 19);
+    assert.deepEqual(body.lp, []);
+    assert.equal(body.lpTotals.positions, 0);
     assert.equal(body.realized.marketRealizedPnlUsd, 6);
     assert.equal(body.realized.marketWinRate, 1);
-    assert.equal(body.realized.lpCollectedUsd, null);
   });
 });
 

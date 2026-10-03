@@ -67,7 +67,7 @@ async function until(target: string, want: "engaged" | "open"): Promise<DrillPol
 async function cronRefuses(target: string): Promise<boolean | null> {
   const secret = process.env["CRON_SECRET"];
   if (!secret) return null;
-  const res = await fetch(`${target}/api/cron/rebalance`, {
+  const res = await fetch(`${target}/api/cron/strategies`, {
     headers: { authorization: `Bearer ${secret}` },
   }).catch(() => null);
   return res?.status === 503;

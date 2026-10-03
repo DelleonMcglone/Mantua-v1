@@ -30,14 +30,14 @@ export const KNOWLEDGE: readonly KnowledgeTopic[] = [
   {
     id: "deposits",
     title: "Deposits",
-    keywords: ["deposit", "fund", "add funds", "bank", "ach", "usdc", "wire"],
-    body: "Deposit by bank transfer (through the regulated on-ramp partner, which handles identity checks and holds funds only during conversion) or by sending USDC on Arc to your wallet address from the Profile page. A bank deposit shows as pending until the partner confirms it, then as complete; USDC sent on chain appears as soon as the transfer confirms.",
+    keywords: ["deposit", "fund", "add funds", "usdc", "send", "network"],
+    body: "Mantua works in one asset, USDC. Deposit by sending USDC on the Arc network to your wallet address, shown with a QR code on the Profile page. From an exchange, choose the Arc network when you withdraw; funds sent on any other network cannot be recovered. The balance updates as soon as the transfer confirms, usually within seconds.",
   },
   {
     id: "withdrawals",
     title: "Withdrawals",
-    keywords: ["withdraw", "withdrawal", "cash out", "payout", "bank account"],
-    body: "Withdraw to a linked bank account from the Profile page, or send USDC to any Arc address. A bank withdrawal shows pending, then processing, then complete; a failed one names the reason and whether to retry or contact support. Winning positions must be redeemed to USDC before that USDC can be withdrawn.",
+    keywords: ["withdraw", "withdrawal", "cash out", "payout", "send out"],
+    body: "Withdraw by sending USDC from your wallet to any address on the Arc network, from the Profile page. The transfer confirms on chain within seconds and cannot be reversed, so check the address first. Winning positions must be redeemed to USDC before that USDC can be withdrawn.",
   },
   {
     id: "positions",

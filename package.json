@@ -2,7 +2,7 @@
   "name": "mantua-intelligence",
   "version": "0.0.0",
   "private": true,
-  "description": "Mantua AI v2 — agent-driven liquidity protocol on Base Mainnet",
+  "description": "Mantua.AI — NFL prediction markets on Arc",
   "type": "module",
   "workspaces": [
     "client",
@@ -47,10 +47,5 @@
   },
   "engines": {
     "node": ">=20.18.0"
-  },
-  "overrides": {
-    "plaid": {
-      "axios": "1.20.0"
-    }
   }
 }
