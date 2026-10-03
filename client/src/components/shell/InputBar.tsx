@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send } from "lucide-react";
 import { MicButton } from "@/features/voice/MicButton.tsx";
 import { transcriptText } from "@/features/voice/transcript-core.ts";
@@ -25,6 +25,18 @@ interface Props {
  */
 export function InputBar({ onSubmit, placeholder }: Props) {
   const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  // A starter prompt the user must complete lands here to be edited.
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      setValue((e as CustomEvent<string>).detail);
+      inputRef.current?.focus();
+    };
+    window.addEventListener("mantua:dock-prefill", onPrefill);
+    return () => {
+      window.removeEventListener("mantua:dock-prefill", onPrefill);
+    };
+  }, []);
 
   const submit = (text: string, spoken = false) => {
     const trimmed = text.trim();
@@ -47,6 +59,7 @@ export function InputBar({ onSubmit, placeholder }: Props) {
           are 44 px targets on phones. */}
       <div className="flex items-center gap-1 rounded-md border border-border-soft bg-bg-elev px-2 py-1 md:gap-2 md:px-3.5 md:py-2.5">
         <input
+          ref={inputRef}
           value={shown}
           onChange={(e) => {
             setValue(e.target.value);
