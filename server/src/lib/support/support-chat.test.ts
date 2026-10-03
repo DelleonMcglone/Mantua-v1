@@ -87,8 +87,8 @@ async function collect(gen: AsyncGenerator<AgentChatEvent>): Promise<AgentChatEv
 void describe("runSupportChat", () => {
   void it("answers a how-it-works question from the knowledge base and streams the text", async () => {
     const model = scriptedModel([
-      { tool: { name: "search_help", input: { query: "deposit bank" } } },
-      { text: "Bank deposits show pending until the partner confirms them." },
+      { tool: { name: "search_help", input: { query: "deposit USDC" } } },
+      { text: "A USDC deposit lands once the transfer confirms on Arc." },
     ]);
     const events = await collect(
       runSupportChat({ message: "how do deposits work", channel: "web", auth: null }, deps(model)),
@@ -102,7 +102,7 @@ void describe("runSupportChat", () => {
         .filter((e) => e.type === "text")
         .map((e) => (e as { delta: string }).delta)
         .join(""),
-      "Bank deposits show pending until the partner confirms them.",
+      "A USDC deposit lands once the transfer confirms on Arc.",
     );
     assert.equal(events.at(-1)?.type, "done");
     const system = (model.requests[0]["system"] as { text: string }[])
@@ -127,31 +127,18 @@ void describe("runSupportChat", () => {
     const account = {
       userId: "u1",
       activity: [],
-      transfers: [
-        {
-          kind: "deposit",
-          status: "pending",
-          amountUsd: 50,
-          failureReason: null,
-          recoveryAction: null,
-          at: "2026-09-18T00:00:00.000Z",
-        },
-      ],
       positions: null,
       agent: { hasWallet: true, dailyCapUsd: 100, mode: "user_testing", policy: null },
       troubleshoot: {
-        pendingTransfers: 1,
-        failedTransfers: 0,
         pendingTrades: 0,
         hasAgentWallet: true,
         agentMode: "user_testing",
-        lastFailure: null,
       },
     };
     const signed = scriptedModel([
       { tool: { name: "get_account_context", input: {} } },
       { tool: { name: "troubleshoot", input: { issue: "deposit_pending" } } },
-      { text: "Your deposit of $50 is pending." },
+      { text: "Your USDC deposit lands once it confirms on Arc." },
     ]);
     const evs = await collect(
       runSupportChat(
@@ -174,7 +161,7 @@ void describe("runSupportChat", () => {
         e.type === "tool_result" && e.tool === "troubleshoot",
     );
     assert.ok(ts?.ok);
-    assert.match((ts.data as { steps: string[] }).steps[0], /1 pending transfer/);
+    assert.match((ts.data as { steps: string[] }).steps[0], /USDC deposit lands/);
   });
 
   void it("escalates with a bounded transcript and reports the ticket id in the collected reply", async () => {

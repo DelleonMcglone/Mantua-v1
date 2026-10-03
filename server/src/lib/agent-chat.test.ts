@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 /**
  * 030 — audit rows for chat-driven MUTATING tool calls.
  *
- * The same swap via `routes/agent-swap.ts` writes a `mantua_audit_log` row;
+ * The same trade via its HTTP route writes a `mantua_audit_log` row;
  * the chat tool executor previously wrote none. `auditChatToolCall` is the
  * seam the chat loop defers after EVERY tool call — these tests prove:
  *
@@ -70,19 +70,11 @@ function call(
 
 void describe("agent-chat audit — action mapping", () => {
   void it("maps every mutating tool to its route/loop-consistent action", () => {
-    assert.equal(auditActionForToolCall("swap", {}), "agent_swap");
     assert.equal(auditActionForToolCall("send", {}), "agent_send");
     assert.equal(auditActionForToolCall("trade_market", {}), "agent_market_trade");
-    assert.equal(auditActionForToolCall("bridge", {}), "agent_bridge");
-    assert.equal(auditActionForToolCall("add_liquidity", {}), "agent_add_liquidity");
-    assert.equal(auditActionForToolCall("remove_liquidity", {}), "agent_remove_liquidity");
-    assert.equal(auditActionForToolCall("create_pool", {}), "create_pool");
     assert.equal(auditActionForToolCall("create_job", {}), "agent_commerce");
     assert.equal(auditActionForToolCall("fund_job", {}), "agent_commerce");
     assert.equal(auditActionForToolCall("settle_job", {}), "agent_commerce");
-    for (const action of ["deposit", "deposit_base", "spend"]) {
-      assert.equal(auditActionForToolCall("gateway", { action }), "agent_gateway");
-    }
     assert.equal(
       auditActionForToolCall("manage_wallet", { action: "set_cap" }),
       "agent_wallet_cap_update",
@@ -92,42 +84,30 @@ void describe("agent-chat audit — action mapping", () => {
   void it("maps read-only tools and sub-actions to null", () => {
     for (const tool of [
       "get_portfolio",
-      "get_swap_quote",
-      "get_signals",
-      "get_market_data",
-      "get_fx_quote",
-      "get_positions",
       "get_user_wallet",
       "get_sports_slate",
-      "market_research",
-      "protocol_lookup",
-      "inspect_address",
-      "inspect_token",
-      "inspect_transaction",
-      "inspect_hook_contract",
       "get_job_status",
       "search_paid_services",
     ]) {
       assert.equal(auditActionForToolCall(tool, {}), null, tool);
     }
-    assert.equal(auditActionForToolCall("gateway", { action: "balance" }), null);
     assert.equal(auditActionForToolCall("manage_wallet", { action: "info" }), null);
   });
 });
 
 void describe("agent-chat audit — auditChatToolCall", () => {
   void it("writes one success row for a mutating tool call", async () => {
-    const args = { tokenIn: "USDC", tokenOut: "EURC", amountIn: "25" };
-    await call("swap", args, { ok: true, data: { txHash: "0x" + "a".repeat(64) } });
+    const args = { to: "0x0000000000000000000000000000000000000002", token: "USDC", amount: "25" };
+    await call("send", args, { ok: true, data: { txHash: "0x" + "a".repeat(64) } });
     assert.equal(inserted.length, 1);
     const row = inserted[0];
-    assert.equal(row.action, "agent_swap");
+    assert.equal(row.action, "agent_send");
     assert.equal(row.outcome, "success");
     assert.equal(row.walletAddress, WALLET.toLowerCase());
     assert.equal(row.chainId, CHAIN_ID);
     assert.equal(row.txHash, "0x" + "a".repeat(64));
     assert.equal(row.reason, null);
-    assert.deepEqual(row.params, { tool: "swap", args });
+    assert.deepEqual(row.params, { tool: "send", args });
   });
 
   void it("records the agent mode in the params when the loop supplies it (task 070, AE-013)", async () => {
@@ -167,20 +147,8 @@ void describe("agent-chat audit — auditChatToolCall", () => {
 
   void it("writes NO row for read-only tool calls", async () => {
     await call("get_portfolio", {});
-    await call("get_swap_quote", { tokenIn: "USDC", tokenOut: "EURC", amountIn: "1" });
-    await call("get_market_data", { topic: "market-summary" });
-    await call("gateway", { action: "balance" });
     await call("manage_wallet", { action: "info" });
     assert.equal(inserted.length, 0);
-  });
-
-  void it("audits a gateway spend as agent_gateway", async () => {
-    const args = { action: "spend", amount: "10", destinationChain: "arbitrum" };
-    await call("gateway", args, { ok: true, data: { status: "settled" } });
-    assert.equal(inserted.length, 1);
-    assert.equal(inserted[0].action, "agent_gateway");
-    assert.equal(inserted[0].outcome, "success");
-    assert.deepEqual(inserted[0].params, { tool: "gateway", args });
   });
 
   void it("audits trade_market as agent_market_trade", async () => {

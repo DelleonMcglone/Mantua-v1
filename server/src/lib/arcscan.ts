@@ -33,12 +33,12 @@ async function getJson(path: string): Promise<unknown> {
   try {
     const res = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
     if (!res.ok) {
-      logger.warn({ status: res.status, path }, "basescan fetch failed");
+      logger.warn({ status: res.status, path }, "arcscan fetch failed");
       return null;
     }
     return await res.json();
   } catch (err) {
-    logger.warn({ err, path }, "basescan request errored");
+    logger.warn({ err, path }, "arcscan request errored");
     return null;
   }
 }

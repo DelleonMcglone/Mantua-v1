@@ -20,7 +20,7 @@ import { agentWallets } from "../../db/schema/index.ts";
 import { events, markets } from "../../db/schema/index.ts";
 import { SafetyError } from "../errors.ts";
 import { logger } from "../logger.ts";
-import { baseRpcClient } from "../rpc-client.ts";
+import { arcRpcClient } from "../rpc-client.ts";
 import { parseAbi } from "viem";
 import { checkSpendingCap } from "../spending-cap.ts";
 import { agentMarketTrade } from "./market-agent-trade.ts";
@@ -115,7 +115,7 @@ export async function executeTriggeredClose(
   const readBalance =
     deps.balanceOf ??
     ((token: string, owner: string) =>
-      baseRpcClient.readContract({
+      arcRpcClient.readContract({
         address: token as `0x${string}`,
         abi: BALANCE_ABI,
         functionName: "balanceOf",

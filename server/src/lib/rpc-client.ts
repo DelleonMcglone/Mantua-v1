@@ -94,8 +94,8 @@ baseClient.transport.onResponse(({ status, transport, error }) => {
   if (Number.isInteger(index)) registry.record(index, status === "success", error);
 });
 
-/** Legacy single-chain alias. Use `getRpcClient(chainId)` in new code. */
-export const baseRpcClient = baseClient;
+/** Single-chain alias for Arc. Use `getRpcClient(chainId)` in new code. */
+export const arcRpcClient = baseClient;
 
 /** Per-chain public client — single chain today: 5042 → Arc Mainnet. */
 export function getRpcClient(_chainId: SupportedChainId) {

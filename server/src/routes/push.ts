@@ -14,7 +14,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { db } from "../db/client.ts";
-import { dbFiatStore } from "../lib/fiat-store.ts";
+import { ensureUser } from "../lib/users.ts";
 import { logger } from "../lib/logger.ts";
 import { notifyUserOf, type DispatchDeps } from "../lib/push/dispatch.ts";
 import { isPushTopic, PUSH_TOPICS } from "../lib/push/topics.ts";
@@ -49,7 +49,7 @@ const topicsBody = endpointSchema.extend({ topics: topicsSchema });
 
 export function createPushRouter(overrides: Partial<PushRouteDeps> = {}): Router {
   const deps: PushRouteDeps = {
-    ensureUser: (id) => dbFiatStore.ensureUser(id),
+    ensureUser,
     dispatch: () => pushDeps(db),
     ...subscriptionWriter(db),
     topics: (userId, endpoint) => readTopics(db, userId, endpoint),

@@ -55,7 +55,6 @@ const banner = {
 };
 
 const dcwOut = join(root, "api/_dcw.mjs");
-const ubkOut = join(root, "api/_ubk.mjs");
 
 await build({
   entryPoints: [join(root, "server/dcw-entry.mjs")],
@@ -66,29 +65,9 @@ await build({
   banner,
 });
 
-// Unified Balance Kit + Circle Wallets adapter, bundled self-contained. Same
-// rationale as _dcw.mjs (the tracer won't follow the bare import) plus bundling
-// resolves the adapter's CJS `Blockchain` named import from
-// developer-controlled-wallets, which Node's ESM loader can't see at runtime.
-await build({
-  entryPoints: [join(root, "server/ubk-entry.mjs")],
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  outfile: ubkOut,
-  banner,
-});
-
-// The aliased Circle packages are bundled from the passes above, so they
-// must not be external even though some are hoisted to the root.
-const ALWAYS_BUNDLE = new Set([
-  "@circle-fin/developer-controlled-wallets",
-  "@circle-fin/smart-contract-platform",
-  "@circle-fin/unified-balance-kit",
-  "@circle-fin/adapter-circle-wallets",
-  "@circle-fin/bridge-kit",
-  "@circle-fin/adapter-viem-v2",
-]);
+// The aliased Circle package is bundled from the pass above, so it must
+// not be external even when hoisted to the root.
+const ALWAYS_BUNDLE = new Set(["@circle-fin/developer-controlled-wallets"]);
 const external = rootPackages()
   .filter((name) => !ALWAYS_BUNDLE.has(name))
   .flatMap((name) => [name, `${name}/*`]);
@@ -99,15 +78,8 @@ await build({
   platform: "node",
   format: "esm",
   external,
-  alias: {
-    "@circle-fin/developer-controlled-wallets": dcwOut,
-    "@circle-fin/smart-contract-platform": dcwOut,
-    "@circle-fin/unified-balance-kit": ubkOut,
-    "@circle-fin/adapter-circle-wallets": ubkOut,
-    "@circle-fin/bridge-kit": ubkOut,
-    "@circle-fin/adapter-viem-v2": ubkOut,
-  },
+  alias: { "@circle-fin/developer-controlled-wallets": dcwOut },
   outfile: join(root, "api/_server.mjs"),
 });
 
-console.log("built api/_dcw.mjs + api/_ubk.mjs + api/_server.mjs");
+console.log("built api/_dcw.mjs + api/_server.mjs");

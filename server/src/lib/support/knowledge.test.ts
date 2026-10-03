@@ -15,8 +15,8 @@ void describe("knowledge", () => {
   });
 
   void it("ranks the topic that matches the question first", () => {
-    assert.equal(searchKnowledge("how do I deposit from my bank")[0]?.id, "deposits");
-    assert.equal(searchKnowledge("withdraw my winnings to my bank account")[0]?.id, "withdrawals");
+    assert.equal(searchKnowledge("how do I deposit USDC")[0]?.id, "deposits");
+    assert.equal(searchKnowledge("withdraw my winnings")[0]?.id, "withdrawals");
     assert.equal(searchKnowledge("why is my microphone not working")[0]?.id, "voice");
     assert.deepEqual(searchKnowledge("zzz qqq"), []);
     assert.ok(searchKnowledge("trade position deposit", 2).length <= 2);

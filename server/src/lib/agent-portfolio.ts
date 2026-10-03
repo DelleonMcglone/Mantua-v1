@@ -7,8 +7,6 @@ import { ARC_CHAIN_ID, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
 import { getTokens, type Token, type TokenSymbol } from "./tokens.ts";
 import { tokenAmountUsd } from "./usd-pricing.ts";
-import { readOnchainPositions } from "./v4-onchain-positions.ts";
-import { logger } from "./logger.ts";
 
 const ERC20_ABI = parseAbi(["function balanceOf(address account) view returns (uint256)"]);
 
@@ -20,32 +18,19 @@ export interface AgentBalance {
   usdValue: number;
 }
 
-/** One of the agent wallet's open LP positions (read live on-chain). */
-export interface AgentPositionRow {
-  tokenId: string;
-  tokenA: TokenSymbol;
-  tokenB: TokenSymbol;
-  fee: number;
-  /** Hook name powering the pool, or null for a no-hook pool. */
-  hook: string | null;
-  amountA: string;
-  amountB: string;
-  /** Uncollected swap fees (raw base units). */
-  fees0: string;
-  fees1: string;
-}
-
 export interface AgentPortfolio {
   address: string;
   balances: AgentBalance[];
-  positions: AgentPositionRow[];
+  /** Always empty: liquidity provision left the product (D-123). Kept
+   *  for the client's shape until its reader is removed. */
+  positions: never[];
   transactions: PortfolioTransaction[];
 }
 
 /**
  * P6-008 — agent wallet balances + recent tx history.
  *
- * Balances are read live from the chain via baseRpcClient; native ETH
+ * Balances are read live from the chain via arcRpcClient; native ETH
  * via getBalance, ERC-20s via balanceOf. USD values come from the
  * existing tokenAmountUsd helper (CoinGecko, 60s cached). All four
  * supported tokens are always returned, even at zero balance, so the UI
@@ -88,26 +73,6 @@ export async function getAgentPortfolio(
     }),
   );
 
-  // Open LP positions, read live on-chain for the agent address. Degrade to an
-  // empty list on a read error rather than failing the whole portfolio.
-  let positions: AgentPositionRow[] = [];
-  try {
-    const onchain = await readOnchainPositions(agentAddress, chainId);
-    positions = onchain.map((p) => ({
-      tokenId: p.tokenId,
-      tokenA: p.tokenA,
-      tokenB: p.tokenB,
-      fee: p.fee,
-      hook: p.hook,
-      amountA: p.amountA,
-      amountB: p.amountB,
-      fees0: p.fees0,
-      fees1: p.fees1,
-    }));
-  } catch (err) {
-    logger.warn({ err, agentAddress }, "agent-portfolio: on-chain positions read failed");
-  }
-
   const transactions = await db
     .select()
     .from(portfolioTransactions)
@@ -118,7 +83,7 @@ export async function getAgentPortfolio(
   return {
     address: wallet.address,
     balances,
-    positions,
+    positions: [],
     transactions,
   };
 }

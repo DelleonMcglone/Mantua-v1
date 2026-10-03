@@ -27,7 +27,7 @@ import {
   updateAgentWalletCap,
 } from "./agent-wallet.ts";
 import { sendFromAgentWallet } from "./agent-send.ts";
-import { swapFromAgentWallet, quoteAgentSwap } from "./agent-swap.ts";
+import { getUserPortfolio } from "./user-portfolio.ts";
 import { agentMarketTrade } from "./sports/market-agent-trade.ts";
 import { readCanonicalPublicSlate } from "./sports/store.ts";
 import { withLiveOdds } from "./sports/live-odds.ts";
@@ -57,58 +57,15 @@ import { recordActivity } from "./activity.ts";
 import { counters } from "./metrics.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
-import {
-  addLiquidityFromAgentWallet,
-  removeLiquidityFromAgentWallet,
-  listAgentPositions,
-  createPoolFromAgentWallet,
-} from "./agent-liquidity.ts";
-import { bridgeFromAgentWallet } from "./agent-bridge.ts";
-import { getUserPortfolio } from "./user-portfolio.ts";
 import { getAgentPortfolio } from "./agent-portfolio.ts";
-import { isFeeTier, type FeeTier } from "./v4-contracts.ts";
-import { getTradeSignals, type TradeSignals } from "./agent-signals.ts";
-import {
-  resolveBlockedSwap,
-  listIntents,
-  cancelIntent,
-  retryIntentsForPair,
-} from "./agent-intents.ts";
 import { waitUntil } from "@vercel/functions";
-import { messageAuthorizesForce } from "./force-attestation.ts";
 import {
   createJobFromAgentWallet,
   fundJobFromAgentWallet,
   settleJobFromAgentWallet,
   getJobStatus,
 } from "./agent-commerce.ts";
-import { runAnalyze, topicSchema } from "./analyze.ts";
 import { isX402Available, searchServices, callPaidService } from "./x402-buyer.ts";
-import {
-  getAddressInfo,
-  getAddressTransactions,
-  getAddressTokenTransfers,
-  getTokenInfo,
-  getTokenHolders,
-  getTransactionInfo,
-  summarizeWhaleSignals,
-  isEvmAddress,
-  isTxHash,
-} from "./arcscan.ts";
-import { readHookViaScp } from "./circle-contracts.ts";
-import { getTvlMovers, getNarrativePerformance, lookupProtocols } from "./defillama.ts";
-import { getStableFxQuote, isFxCurrency } from "./stablefx.ts";
-import { quoteExactInputV4 } from "./v4-onchain-swap.ts";
-import { getPythPrice, PYTH_EUR_USD_FEED_ID } from "./pyth-prices.ts";
-import {
-  getUnifiedBalances,
-  depositToUnifiedBalance,
-  depositToUnifiedBalanceFromArc,
-  spendUnifiedBalance,
-  resolveGatewaySpendChain,
-  GATEWAY_SPEND_CHAINS,
-} from "./unified-balance.ts";
-import { getTrendingCoins } from "./trending.ts";
 import { randomUUID } from "node:crypto";
 import { modePolicy, type AgentMode } from "./agent/agent-mode.ts";
 import { ConfirmationStore, argsHash } from "./agent/confirmation-store.ts";
@@ -294,69 +251,6 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "get_swap_quote",
-    description:
-      "Get a read-only quote for how much tokenOut the agent would receive swapping amountIn of tokenIn. Does not execute.",
-    input_schema: {
-      type: "object",
-      properties: {
-        tokenIn: { type: "string", description: "Symbol to swap from." },
-        tokenOut: { type: "string", description: "Symbol to swap into." },
-        amountIn: { type: "string", description: "Decimal amount of tokenIn." },
-      },
-      required: ["tokenIn", "tokenOut", "amountIn"],
-    },
-  },
-  {
-    name: "get_signals",
-    description:
-      "Read the real-time decision signals for a potential trade: peg deviations (USDC/EURC), spot prices, and the live quote-implied price impact. Pass tokenIn/tokenOut/amountIn for a trade-specific read, or no args for a general peg/price snapshot. Read-only. Call this before swapping.",
-    input_schema: {
-      type: "object",
-      properties: {
-        tokenIn: { type: "string", description: "Symbol to swap from (optional)." },
-        tokenOut: { type: "string", description: "Symbol to swap into (optional)." },
-        amountIn: { type: "string", description: "Decimal amount of tokenIn (optional)." },
-      },
-    },
-  },
-  {
-    name: "get_fx_quote",
-    description:
-      "Best-execution FX comparison for USDC↔EURC: fetches Circle's StableFX RFQ reference rate, the on-chain Uniswap v4 pool rate, and the Pyth interbank EUR/USD — and recommends the better venue. Read-only; call before any USDC↔EURC conversion or when the user asks about FX rates.",
-    input_schema: {
-      type: "object",
-      properties: {
-        from: { type: "string", enum: ["USDC", "EURC"], description: "Currency to convert from." },
-        to: { type: "string", enum: ["USDC", "EURC"], description: "Currency to convert into." },
-        amount: {
-          type: "string",
-          description: "Decimal amount of `from` to price. Defaults to 100.",
-        },
-      },
-      required: ["from", "to"],
-    },
-  },
-  {
-    name: "swap",
-    description:
-      "Execute a token swap from the agent wallet via Uniswap on Arc. Input is denominated in tokenIn. Executes immediately. If the live signals breach the safety thresholds the swap is AUTO-RESOLVED instead of dropped: a peg breach parks the whole amount as a standing intent (retried automatically); an impact breach executes the largest clip under the limit now and parks the remainder. The result reports guardHeld=true with what executed and what was parked. force=true skips the guard entirely, but is only honored when the user's current message explicitly asks for an override (checked in code).",
-    input_schema: {
-      type: "object",
-      properties: {
-        tokenIn: { type: "string", description: "Symbol to swap from." },
-        tokenOut: { type: "string", description: "Symbol to swap into." },
-        amountIn: { type: "string", description: "Decimal amount of tokenIn." },
-        force: {
-          type: "boolean",
-          description:
-            "Override the safety guard. Only set true after the user has been told the risk and explicitly insists.",
-        },
-      },
-      required: ["tokenIn", "tokenOut", "amountIn"],
-    },
-  },
-  {
     name: "mantua_search_markets",
     description:
       "Find sports markets to analyze or trade (A-020): filters Mantua's canonical slate by team name/key, league (nfl, wnba) and status (live | upcoming | final | any). Each row carries providerEventId, matchup, start time, status, scores, home/away implied win probability in bps (liveOdds true = the on-chain pool price), and the two outcomes with the outcomeIndex to pass to mantua_simulate_trade. Call this FIRST for any question about games, matchups, odds, or what to bet. Free, read-only, no user data.",
@@ -527,22 +421,6 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
-    name: "standing_intents",
-    description:
-      "List or cancel the agent's standing swap intents — guard-held swaps parked for automatic retry (the intent sweep re-checks signals and fills them as conditions recover, until they fill, are cancelled, or expire after 7 days). action=list shows them (id, pair, remaining amount, status, why it was held); action=cancel cancels a pending intent by id.",
-    input_schema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["list", "cancel"] },
-        intentId: {
-          type: "string",
-          description: "Intent id from list. Required when action=cancel.",
-        },
-      },
-      required: ["action"],
-    },
-  },
-  {
     name: "send",
     description: "Send tokens from the agent wallet to an address. Executes immediately.",
     input_schema: {
@@ -553,78 +431,6 @@ const RAW_TOOLS: Anthropic.Tool[] = [
         amount: { type: "string", description: "Decimal amount in human units." },
       },
       required: ["to", "token", "amount"],
-    },
-  },
-  {
-    name: "get_market_data",
-    description:
-      "Fetch read-only market / on-chain data (CoinGecko + DefiLlama + Arc pools) for a known topic. Use for prices, volumes, peg status, pool stats, market summaries. For an arbitrary token price use topic 'token-price' with a symbol.",
-    input_schema: {
-      type: "object",
-      properties: {
-        topic: { type: "string", description: "One of the supported analyze topics." },
-        symbol: {
-          type: "string",
-          description: "Token symbol, only for topic 'token-price' (e.g. BTC, ETH, SOL).",
-        },
-      },
-      required: ["topic"],
-    },
-  },
-  {
-    name: "get_positions",
-    description:
-      "List the agent wallet's open liquidity positions (id, token pair, fee tier, liquidity). Call this before remove_liquidity to get the position id. Read-only.",
-    input_schema: { type: "object", properties: {} },
-  },
-  {
-    name: "add_liquidity",
-    description:
-      "Add liquidity to a NO-HOOK pool from the agent wallet, using only supported tokens (USDC/EURC/cirBTC). Executes immediately (gas-sponsored). Fails if no no-hook pool exists at the fee tier.",
-    input_schema: {
-      type: "object",
-      properties: {
-        tokenA: { type: "string", description: "First token symbol (USDC/EURC/cirBTC)." },
-        tokenB: { type: "string", description: "Second token symbol (must differ from tokenA)." },
-        amountA: { type: "string", description: "Decimal amount of tokenA (human units)." },
-        amountB: { type: "string", description: "Decimal amount of tokenB (human units)." },
-        fee: {
-          type: "number",
-          description: "Fee tier in pips: 100, 500, 3000, or 10000. Defaults to 3000 (0.30%).",
-        },
-      },
-      required: ["tokenA", "tokenB", "amountA", "amountB"],
-    },
-  },
-  {
-    name: "remove_liquidity",
-    description:
-      "Remove a percentage of liquidity from one of the agent's positions. Get the positionId from get_positions first. Executes immediately.",
-    input_schema: {
-      type: "object",
-      properties: {
-        positionId: { type: "string", description: "Position id from get_positions." },
-        percentage: {
-          type: "number",
-          description: "Percent of the position to remove, 1–100 (100 = full exit).",
-        },
-      },
-      required: ["positionId", "percentage"],
-    },
-  },
-  {
-    name: "protocol_lookup",
-    description:
-      "Free TVL lookup for ANY DeFi protocol or chain by name (DefiLlama registry): current TVL, 1d/7d change, category, chains. Also returns total chain TVL when the query names a chain. Use for questions like 'what is Uniswap's TVL' — don't decline general protocol questions before trying this. Read-only, free.",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "Protocol or chain name, e.g. 'uniswap', 'aave', 'base'.",
-        },
-      },
-      required: ["query"],
     },
   },
   {
@@ -665,119 +471,6 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     description:
       "Read the USER's connected wallet USDC balance (+ USD value) — distinct from the agent's own wallet. Use when advising whether the user should execute a transaction themselves (e.g. after an insufficient-agent-balance or spending-cap error). Read-only.",
     input_schema: { type: "object", properties: {} },
-  },
-  {
-    name: "bridge",
-    description:
-      "Bridge USDC from the agent wallet on Arc to another chain via Circle CCTP. Destination accepts a chain name or alias (ethereum, arbitrum, avalanche, optimism, polygon). Funds land at the USER's connected wallet on the destination unless an explicit 0x recipient is given. Executes immediately (~10-60s).",
-    input_schema: {
-      type: "object",
-      properties: {
-        amount: { type: "string", description: 'Decimal USDC amount, e.g. "1.5".' },
-        destinationChain: { type: "string", description: "Destination chain name or alias." },
-        recipient: {
-          type: "string",
-          description: "Optional 0x recipient on the destination. Defaults to the user's wallet.",
-        },
-      },
-      required: ["amount", "destinationChain"],
-    },
-  },
-  {
-    name: "gateway",
-    description:
-      "Circle Gateway treasury (unified USDC balance): action=balance reads the agent's consolidated cross-chain USDC; action=deposit moves agent USDC on Arc into the unified balance; action=deposit_base moves USDC held by the ops wallet on Arc into the agent's unified balance (the top-up path after a user sends USDC to the ops wallet); action=spend settles USDC out of the unified balance to another chain (burn, mint on the destination — Arc as the settlement hub). Spend defaults to the agent's own address on the destination. First spend may report delegate_pending while Gateway finalizes the signing delegate — relay that and retry when asked.",
-    input_schema: {
-      type: "object",
-      properties: {
-        action: { type: "string", enum: ["balance", "deposit", "deposit_base", "spend"] },
-        amount: {
-          type: "string",
-          description: "Decimal USDC amount. Required for deposit, deposit_base, and spend.",
-        },
-        destinationChain: {
-          type: "string",
-          description:
-            "Spend destination chain name or alias (ethereum, avalanche, optimism, arbitrum, polygon — all mainnets). Required for spend.",
-        },
-        recipientAddress: {
-          type: "string",
-          description: "Optional 0x recipient on the destination. Defaults to the agent wallet.",
-        },
-      },
-      required: ["action"],
-    },
-  },
-  {
-    name: "create_pool",
-    description:
-      "Initialize a NO-HOOK v4 pool for a supported token pair at the live market price (Pyth). Use when add_liquidity reports the pool doesn't exist, then add liquidity. Executes immediately.",
-    input_schema: {
-      type: "object",
-      properties: {
-        tokenA: { type: "string", description: "First token symbol (USDC/EURC/cirBTC)." },
-        tokenB: { type: "string", description: "Second token symbol (must differ)." },
-        fee: {
-          type: "number",
-          description: "Fee tier in pips: 100, 500, 3000, or 10000. Defaults to 3000.",
-        },
-      },
-      required: ["tokenA", "tokenB"],
-    },
-  },
-  {
-    name: "market_research",
-    description:
-      "The daily 'stay in the loop' feed in one call: trending coins (CoinGecko), narrative/sector performance (BTC, L1s, L2s, DeFi, AI, RWA, memes, stablecoins — avg 24h moves), and TVL outliers (DefiLlama protocols with the sharpest 1-day TVL changes — 'research why' candidates). Read-only, free data. Use focus to fetch just one feed.",
-    input_schema: {
-      type: "object",
-      properties: {
-        focus: {
-          type: "string",
-          enum: ["all", "trending", "narratives", "tvl-movers"],
-          description: "Which feed(s) to fetch. Default all.",
-        },
-      },
-    },
-  },
-  {
-    name: "inspect_address",
-    description:
-      "On-chain analysis of ANY address on Arc via the explorer: native balance, contract/EOA, recent transactions + token transfers, and computed whale signals (accumulating/selling per token, stables↔tokens rotation). Use for whale-watching, checking a counterparty, or reviewing a wallet's activity. Read-only.",
-    input_schema: {
-      type: "object",
-      properties: {
-        address: { type: "string", description: "0x address to inspect." },
-      },
-      required: ["address"],
-    },
-  },
-  {
-    name: "inspect_token",
-    description:
-      "Tokenomics + holder analysis for a token on Arc via the explorer: supply, holder count, top holders with % of supply, top-10 concentration, and safety red flags (heavy concentration, tiny holder count). Accepts a supported symbol (USDC/EURC/cirBTC) or any 0x token address. Read-only.",
-    input_schema: {
-      type: "object",
-      properties: {
-        addressOrSymbol: {
-          type: "string",
-          description: "Token symbol (USDC/EURC/cirBTC) or 0x token address.",
-        },
-      },
-      required: ["addressOrSymbol"],
-    },
-  },
-  {
-    name: "inspect_transaction",
-    description:
-      "Decode what a Arc transaction actually did: status, method, from/to, and every token movement inside it. Use when the user pastes a tx hash or you need to verify an on-chain action. Read-only.",
-    input_schema: {
-      type: "object",
-      properties: {
-        hash: { type: "string", description: "0x transaction hash (66 chars)." },
-      },
-      required: ["hash"],
-    },
   },
   {
     name: "create_job",
@@ -834,12 +527,6 @@ const RAW_TOOLS: Anthropic.Tool[] = [
       },
       required: ["jobId"],
     },
-  },
-  {
-    name: "inspect_hook_contract",
-    description:
-      "Read the Stable Protection hook's live guard state THROUGH Circle Contracts (SCP): the EUR/USD peg reference, current deviation in bps, peg zone (HEALTHY→CRITICAL), whether the circuit breaker is blocking swaps, and the hook owner. Use when asked about the hook's health, peg guard, or circuit breaker. Read-only.",
-    input_schema: { type: "object", properties: {} },
   },
   // ── 039 sports-data suite (S-011..S-020) — canonical-DB reads, no audit ──
   {
@@ -1183,37 +870,9 @@ const RAW_TOOLS: Anthropic.Tool[] = [
   },
 ];
 
-/**
- * Out of scope (owner decision 2026-09-20; the 2026-09-16 scope cut): token
- * swaps and their guards, liquidity, bridging, the Gateway treasury, FX,
- * crypto-market research and the explorer reads. Their handlers stay below
- * for the audit trail, but the model never sees them, so it can neither
- * offer nor call them.
- */
-export const OUT_OF_SCOPE_TOOLS: ReadonlySet<string> = new Set([
-  "get_swap_quote",
-  "get_signals",
-  "get_fx_quote",
-  "swap",
-  "standing_intents",
-  "get_market_data",
-  "get_positions",
-  "add_liquidity",
-  "remove_liquidity",
-  "protocol_lookup",
-  "bridge",
-  "gateway",
-  "create_pool",
-  "market_research",
-  "inspect_address",
-  "inspect_token",
-  "inspect_transaction",
-  "inspect_hook_contract",
-]);
-
 /** Every money-moving tool carries the optional confirmationId (A-031). */
-const TOOLS: Anthropic.Tool[] = RAW_TOOLS.filter((t) => !OUT_OF_SCOPE_TOOLS.has(t.name)).map((t) =>
-  MONEY_TOOLS.has(t.name) || t.name === "gateway" ? withConfirmationId(t) : t,
+const TOOLS: Anthropic.Tool[] = RAW_TOOLS.map((t) =>
+  MONEY_TOOLS.has(t.name) ? withConfirmationId(t) : t,
 );
 
 interface ToolInput {
@@ -1251,23 +910,18 @@ function deferBackground(work: Promise<unknown>): void {
  * `mantua_audit_log` rows; the chat tool executor previously wrote none, so
  * an incident reconstruction would miss every chat-driven action. Action
  * names reuse the route/loop equivalents so one query covers both surfaces.
- * Tools whose LIBRARY layer already audits every call (bridge → agent_bridge
- * in `agent-bridge.ts`, commerce → agent_commerce in `agent-commerce.ts`,
- * x402 → agent_x402 in `x402-buyer.ts`) still get a chat-level row: the
+ * Tools whose LIBRARY layer already audits every call (commerce →
+ * agent_commerce in `agent-commerce.ts`, x402 → agent_x402 in
+ * `x402-buyer.ts`) still get a chat-level row: the
  * chat row records the tool boundary (args + outcome as the model saw them),
  * which the lib row does not.
  */
 const MUTATING_TOOL_ACTIONS: Record<string, AuditAction> = {
-  swap: "agent_swap",
   send: "agent_send",
   trade_market: "agent_market_trade",
   mantua_execute_trade: "agent_market_trade",
   mantua_sell_position: "agent_market_trade",
   mantua_execute_combo: "combo_open",
-  bridge: "agent_bridge",
-  add_liquidity: "agent_add_liquidity",
-  remove_liquidity: "agent_remove_liquidity",
-  create_pool: "create_pool",
   create_job: "agent_commerce",
   fund_job: "agent_commerce",
   settle_job: "agent_commerce",
@@ -1275,8 +929,8 @@ const MUTATING_TOOL_ACTIONS: Record<string, AuditAction> = {
 
 /**
  * Map a chat tool call to its audit action, or null when the call is
- * read-only (no row). `gateway` and `manage_wallet` are mixed read/write
- * tools — only their mutating sub-actions audit.
+ * read-only (no row). `manage_wallet` is a mixed read/write tool — only
+ * its mutating sub-action audits.
  */
 export function auditActionForToolCall(
   name: string,
@@ -1284,10 +938,6 @@ export function auditActionForToolCall(
 ): AuditAction | null {
   if (name === "manage_wallet") {
     return args["action"] === "set_cap" ? "agent_wallet_cap_update" : null;
-  }
-  if (name === "gateway") {
-    const a = args["action"];
-    return a === "deposit" || a === "deposit_base" || a === "spend" ? "agent_gateway" : null;
   }
   return MUTATING_TOOL_ACTIONS[name] ?? null;
 }
@@ -1497,27 +1147,7 @@ function buildSimulationDeps(privyUserId: string, chainId: SupportedChainId): Si
 }
 
 /** A human summary for a non-market money action's preview (A-026). */
-async function previewActionSummary(
-  tool: string,
-  args: Record<string, unknown>,
-  chainId: SupportedChainId,
-): Promise<string> {
-  if (tool === "swap" && isTokenSymbol(args["tokenIn"]) && isTokenSymbol(args["tokenOut"])) {
-    const amountIn =
-      typeof args["amountIn"] === "string" ? args["amountIn"] : String(Number(args["amountIn"]));
-    try {
-      const q = await quoteAgentSwap({
-        tokenIn: args["tokenIn"],
-        tokenOut: args["tokenOut"],
-        amountIn,
-        chainId,
-      });
-      const out = formatUnits(BigInt(q.amountOutRaw), getToken(args["tokenOut"], chainId).decimals);
-      return `swap ${amountIn} ${args["tokenIn"]} → ~${out} ${args["tokenOut"]}`;
-    } catch {
-      return `swap ${amountIn} ${args["tokenIn"]} → ${args["tokenOut"]} (quote unavailable)`;
-    }
-  }
+function previewActionSummary(tool: string, args: Record<string, unknown>): string {
   const parts = Object.entries(args)
     .filter(([k]) => k !== "confirmationId")
     .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`);
@@ -1635,7 +1265,7 @@ async function executeTool(
       }
       if (typeof args !== "object" || args === null) throw new Error("args (object) is required");
       const previewArgs = args as Record<string, unknown>;
-      const summary = await previewActionSummary(tool, previewArgs, chainId);
+      const summary = previewActionSummary(tool, previewArgs);
       await confirmationStore.savePreview({
         sessionId: turn.sessionId,
         kind: "action",
@@ -1928,258 +1558,6 @@ async function executeTool(
       if (!w) throw new Error("No agent wallet provisioned.");
       return { address: w.address, dailyCapUsd: w.dailyCapUsd, status: w.status };
     }
-    case "get_swap_quote": {
-      const { tokenIn, tokenOut, amountIn } = input;
-      if (!isTokenSymbol(tokenIn) || !isTokenSymbol(tokenOut)) {
-        throw new Error(`tokens must be one of: ${TOKEN_SYMBOLS.join(", ")}`);
-      }
-      const q = await quoteAgentSwap({ tokenIn, tokenOut, amountIn: String(amountIn), chainId });
-      return {
-        tokenIn: q.tokenIn,
-        tokenOut: q.tokenOut,
-        amountIn: formatUnits(BigInt(q.amountInRaw), getToken(q.tokenIn).decimals),
-        amountOut: formatUnits(BigInt(q.amountOutRaw), getToken(q.tokenOut).decimals),
-      };
-    }
-    case "get_fx_quote": {
-      const from = input["from"];
-      const to = input["to"];
-      if (!isFxCurrency(from) || !isFxCurrency(to) || from === to) {
-        throw new Error("from and to must be USDC and EURC (one of each).");
-      }
-      const amount =
-        typeof input["amount"] === "string" && Number(input["amount"]) > 0
-          ? input["amount"]
-          : "100";
-      // On-chain venue: try the agent-executable no-hook pool first, then
-      // fall back to the Stable Protection pool (the seeded, FX-aware
-      // USDC/EURC venue — manual-panel execution only).
-      const quotePool = async (): Promise<{
-        amountInRaw: string;
-        amountOutRaw: string;
-        venue: "no-hook" | "stable-protection";
-      } | null> => {
-        try {
-          const q = await quoteAgentSwap({ tokenIn: from, tokenOut: to, amountIn: amount });
-          return { amountInRaw: q.amountInRaw, amountOutRaw: q.amountOutRaw, venue: "no-hook" };
-        } catch (err) {
-          logger.warn({ err, from, to }, "fx no-hook pool quote failed; trying stable-protection");
-        }
-        try {
-          const amountInRaw = parseUnits(amount, getToken(from).decimals);
-          const q = await quoteExactInputV4({
-            tokenIn: from,
-            tokenOut: to,
-            fee: 3000,
-            hook: "stable-protection",
-            amountInRaw,
-          });
-          return {
-            amountInRaw: amountInRaw.toString(),
-            amountOutRaw: q.amountOut,
-            venue: "stable-protection",
-          };
-        } catch (err) {
-          logger.warn({ err, from, to }, "fx stable-protection pool quote failed");
-          return null;
-        }
-      };
-      const [fx, poolQuote, eurUsd] = await Promise.all([
-        getStableFxQuote({ from, to, amount }),
-        quotePool(),
-        getPythPrice(PYTH_EUR_USD_FEED_ID),
-      ]);
-
-      // Effective rates: units of `to` received per 1 unit of `from`.
-      let poolRate: number | null = null;
-      if (poolQuote) {
-        const inHuman = Number(formatUnits(BigInt(poolQuote.amountInRaw), getToken(from).decimals));
-        const outHuman = Number(formatUnits(BigInt(poolQuote.amountOutRaw), getToken(to).decimals));
-        if (inHuman > 0 && Number.isFinite(outHuman)) poolRate = outHuman / inHuman;
-      }
-      let stablefxNet: number | null = null;
-      if (fx.available) {
-        const net = (Number(fx.toAmount) - Number(fx.fee)) / Number(fx.fromAmount);
-        stablefxNet = Number.isFinite(net) && net > 0 ? net : fx.rate;
-      }
-      // Interbank reference in the SAME direction (to per from).
-      const interbank = eurUsd ? (from === "USDC" ? 1 / eurUsd : eurUsd) : null;
-
-      let recommendedVenue: "stablefx" | "onchain-pool" | null = null;
-      if (stablefxNet !== null && poolRate !== null) {
-        recommendedVenue = stablefxNet > poolRate ? "stablefx" : "onchain-pool";
-      } else if (poolRate !== null) recommendedVenue = "onchain-pool";
-      else if (stablefxNet !== null) recommendedVenue = "stablefx";
-
-      const spreadPct = (rate: number | null): number | null =>
-        rate !== null && interbank ? ((rate - interbank) / interbank) * 100 : null;
-
-      return {
-        pair: `${from}->${to}`,
-        amount,
-        stablefx: fx.available
-          ? {
-              rate: fx.rate,
-              effectiveRate: stablefxNet,
-              fee: fx.fee,
-              expiresAt: fx.expiresAt,
-              spreadVsInterbankPct: spreadPct(stablefxNet),
-            }
-          : { available: false, reason: fx.reason },
-        onchainPool:
-          poolRate !== null && poolQuote
-            ? {
-                effectiveRate: poolRate,
-                spreadVsInterbankPct: spreadPct(poolRate),
-                venue: poolQuote.venue,
-                executable: poolQuote.venue === "no-hook",
-              }
-            : { available: false },
-        interbank: interbank !== null ? { rate: interbank, source: "Pyth FX.EUR/USD" } : null,
-        recommendedVenue,
-      };
-    }
-    case "gateway": {
-      const action = input["action"];
-      if (action === "balance") {
-        return await getUnifiedBalances(privyUserId);
-      }
-      const amount = input["amount"];
-      if (typeof amount !== "string" || !(Number(amount) > 0)) {
-        throw new Error("amount (positive decimal string) is required for deposit and spend.");
-      }
-      if (action === "deposit" || action === "deposit_base") {
-        const deposited =
-          action === "deposit"
-            ? await depositToUnifiedBalance(privyUserId, userWalletAddress, amount)
-            : await depositToUnifiedBalanceFromArc(privyUserId, amount);
-        // Task 062 / PF-015 — the unified-balance move on the timeline.
-        const dep = deposited as unknown as Record<string, unknown>;
-        await recordActivity(db, {
-          kind: "gateway_deposit",
-          actor: "agent",
-          userId: await resolveUserId(privyUserId),
-          txHash: typeof dep["txHash"] === "string" ? dep["txHash"] : null,
-          chainId,
-          asset: "USDC",
-          amountRaw: String(Math.round(Number(amount) * 1e6)),
-          valueUsd: Number(amount),
-          data: { action, ...dep },
-        });
-        return deposited;
-      }
-      if (action === "spend") {
-        const destIn = input["destinationChain"];
-        if (typeof destIn !== "string") {
-          throw new Error("destinationChain is required for spend.");
-        }
-        const destinationChain = resolveGatewaySpendChain(destIn);
-        if (!destinationChain) {
-          throw new Error(
-            `Unknown Gateway destination "${destIn}". Supported: ${GATEWAY_SPEND_CHAINS.join(", ")}.`,
-          );
-        }
-        const recipient = input["recipientAddress"];
-        if (typeof recipient === "string" && recipient.length > 0 && !isAddress(recipient)) {
-          throw new Error("recipientAddress must be a valid 0x EVM address.");
-        }
-        const spent = await spendUnifiedBalance(privyUserId, {
-          amount,
-          destinationChain,
-          ...(typeof recipient === "string" && recipient.length > 0
-            ? { recipientAddress: recipient }
-            : {}),
-        });
-        // Task 062 / PF-015 — the unified-balance spend on the timeline.
-        const sp = spent as unknown as Record<string, unknown>;
-        await recordActivity(db, {
-          kind: "gateway_spend",
-          actor: "agent",
-          userId: await resolveUserId(privyUserId),
-          txHash: typeof sp["txHash"] === "string" ? sp["txHash"] : null,
-          chainId,
-          asset: "USDC",
-          amountRaw: String(Math.round(Number(amount) * 1e6)),
-          valueUsd: Number(amount),
-          data: { action, ...sp },
-        });
-        return spent;
-      }
-      throw new Error("action must be balance, deposit, or spend.");
-    }
-    case "get_signals": {
-      const { tokenIn, tokenOut, amountIn } = input;
-      return await getTradeSignals({
-        ...(isTokenSymbol(tokenIn) ? { tokenIn } : {}),
-        ...(isTokenSymbol(tokenOut) ? { tokenOut } : {}),
-        ...(typeof amountIn === "string" ? { amountIn } : {}),
-      });
-    }
-    case "swap": {
-      const { tokenIn, tokenOut, amountIn, force } = input;
-      if (!isTokenSymbol(tokenIn) || !isTokenSymbol(tokenOut)) {
-        throw new Error(`tokens must be one of: ${TOKEN_SYMBOLS.join(", ")}`);
-      }
-      // Code-level attestation: force is only honored when the user's CURRENT
-      // message explicitly asks to override the guard. Not model-decided.
-      if (force === true && !messageAuthorizesForce(userMessage)) {
-        throw new Error(
-          "Force override rejected: the user's current message doesn't explicitly ask to override the safety guard. Explain the risk and tell them to say e.g. 'force the swap' if they really want the full fill.",
-        );
-      }
-      // Decision guardrail: when live signals breach the safety thresholds
-      // the swap is RESOLVED, not dropped — a peg breach parks the whole
-      // amount as a standing intent; an impact breach executes the largest
-      // safe clip now and parks the remainder. force=true skips the guard
-      // entirely. Signal-feed failures don't block (verdict stays ok when
-      // data is missing).
-      if (force !== true) {
-        let signals: TradeSignals | null = null;
-        try {
-          signals = await getTradeSignals({ tokenIn, tokenOut, amountIn: String(amountIn) });
-        } catch (err) {
-          logger.warn({ err, tokenIn, tokenOut }, "agent swap signal check failed; proceeding");
-        }
-        if (signals && !signals.verdict.ok) {
-          const resolved = await resolveBlockedSwap({
-            privyUserId,
-            tokenIn,
-            tokenOut,
-            amountIn: String(amountIn),
-            signals,
-          });
-          if (resolved.action === "clipped") {
-            // The clip moved the pool — opportunistically retry OTHER intents
-            // on this pair (the one just parked is excluded: signals are bad
-            // for it right now by construction).
-            deferBackground(
-              retryIntentsForPair(tokenIn, tokenOut, { excludeIntentId: resolved.intent?.id }),
-            );
-          }
-          return { guardHeld: true, ...resolved };
-        }
-      }
-      await requireAgentBalance(privyUserId, tokenIn, String(amountIn), chainId);
-      const r = await swapFromAgentWallet({
-        privyUserId,
-        tokenIn,
-        tokenOut,
-        amountIn: String(amountIn),
-        chainId,
-      });
-      // Pool state just changed — retry pending intents on this pair now
-      // instead of waiting for the next cron tick.
-      deferBackground(retryIntentsForPair(tokenIn, tokenOut));
-      return {
-        txHash: r.txHash,
-        explorerUrl: r.explorerUrl,
-        tokenIn: r.tokenIn,
-        tokenOut: r.tokenOut,
-        amountIn: formatUnits(BigInt(r.amountInRaw), getToken(r.tokenIn).decimals),
-        amountOut: formatUnits(BigInt(r.amountOutRaw), getToken(r.tokenOut).decimals),
-        usdValue: r.usdValue,
-      };
-    }
     case "mantua_search_markets": {
       const league = input["league"];
       const leagues: LeagueSlug[] = league === "nfl" ? [league] : ["nfl"];
@@ -2327,7 +1705,6 @@ async function executeTool(
         })),
         marketPositions: markets.positions,
         marketTotals: markets.totals,
-        liquidityPositions: p.positions,
         recentTransactions: p.transactions.slice(0, 5),
       };
     }
@@ -2341,20 +1718,6 @@ async function executeTool(
         leagues.map(async (league) => withLiveOdds(await readCanonicalPublicSlate(db, league))),
       );
       return { slates };
-    }
-    case "standing_intents": {
-      const action = input["action"];
-      if (action === "list") {
-        return { intents: await listIntents(privyUserId) };
-      }
-      if (action === "cancel") {
-        const intentId = input["intentId"];
-        if (typeof intentId !== "string" || intentId.length === 0) {
-          throw new Error("intentId (string) is required for cancel.");
-        }
-        return await cancelIntent(privyUserId, intentId);
-      }
-      throw new Error("action must be list or cancel.");
     }
     case "send": {
       const { to, token, amount } = input;
@@ -2380,75 +1743,6 @@ async function executeTool(
         to: r.to,
         usdValue: r.usdValue,
       };
-    }
-    case "get_market_data": {
-      const parsed = topicSchema.safeParse(input["topic"]);
-      if (!parsed.success) {
-        throw new Error(`Unknown topic. Provide a supported analyze topic.`);
-      }
-      const symbol = typeof input["symbol"] === "string" ? input["symbol"] : undefined;
-      return await runAnalyze(parsed.data, symbol);
-    }
-    case "get_positions": {
-      const list = await listAgentPositions(privyUserId, chainId);
-      return {
-        positions: list.map((p) => ({
-          id: p.id,
-          pair: `${p.tokenA}/${p.tokenB}`,
-          fee: p.fee,
-          hasHook: p.hasHook,
-          liquidity: p.liquidity,
-        })),
-      };
-    }
-    case "add_liquidity": {
-      const { tokenA, tokenB, amountA, amountB } = input;
-      if (!isTokenSymbol(tokenA) || !isTokenSymbol(tokenB)) {
-        throw new Error(`Both tokens must be supported symbols: ${TOKEN_SYMBOLS.join(", ")}.`);
-      }
-      if (typeof amountA !== "string" || typeof amountB !== "string") {
-        throw new Error("amountA and amountB are required decimal strings.");
-      }
-      const feeRaw = typeof input["fee"] === "number" ? input["fee"] : 3000;
-      if (!isFeeTier(feeRaw)) throw new Error("fee must be one of 100, 500, 3000, 10000.");
-      const fee: FeeTier = feeRaw;
-      await requireAgentBalance(privyUserId, tokenA, amountA, chainId);
-      await requireAgentBalance(privyUserId, tokenB, amountB, chainId);
-      const addResult = await addLiquidityFromAgentWallet({
-        privyUserId,
-        tokenA,
-        tokenB,
-        fee,
-        chainId,
-        hook: null, // no hooks — agent only manages no-hook pools
-        amountA,
-        amountB,
-        slippageBps: 50,
-        deadlineSeconds: Math.floor(Date.now() / 1000) + 1800,
-      });
-      // Deeper liquidity helps intents in BOTH directions on this pair.
-      deferBackground(retryIntentsForPair(tokenA, tokenB));
-      return addResult;
-    }
-    case "remove_liquidity": {
-      const positionId = input["positionId"];
-      const percentage = input["percentage"];
-      if (typeof positionId !== "string") throw new Error("positionId (string) is required.");
-      if (typeof percentage !== "number" || percentage < 1 || percentage > 100) {
-        throw new Error("percentage must be a number from 1 to 100.");
-      }
-      return await removeLiquidityFromAgentWallet({
-        privyUserId,
-        positionId,
-        percentage,
-        chainId,
-        slippageBps: 50,
-        deadlineSeconds: Math.floor(Date.now() / 1000) + 1800,
-      });
-    }
-    case "protocol_lookup": {
-      if (typeof input["query"] !== "string") throw new Error("query (string) is required");
-      return await lookupProtocols(input["query"]);
     }
     case "search_paid_services": {
       if (!(await isX402Available())) {
@@ -2485,129 +1779,6 @@ async function executeTool(
           usdValue: b.usdValue,
         })),
       };
-    }
-    case "bridge": {
-      const amountIn = input["amount"];
-      const destIn = input["destinationChain"];
-      if (typeof amountIn !== "string" || typeof destIn !== "string") {
-        throw new Error("amount and destinationChain must be strings.");
-      }
-      const amount = amountIn;
-      const destinationChain = destIn;
-      const explicit = input["recipient"];
-      let recipient: `0x${string}`;
-      if (typeof explicit === "string" && explicit.length > 0) {
-        if (!isAddress(explicit)) throw new Error("recipient must be a valid 0x EVM address.");
-        recipient = explicit;
-      } else if (userWalletAddress && isAddress(userWalletAddress)) {
-        recipient = userWalletAddress;
-      } else {
-        throw new Error(
-          "No recipient available: the user has no connected wallet — ask for an explicit 0x recipient address on the destination chain.",
-        );
-      }
-      await requireAgentBalance(privyUserId, "USDC", amount);
-      const r = await bridgeFromAgentWallet({ privyUserId, amount, destinationChain, recipient });
-      // Task 062 / PF-015 — the bridge on the timeline.
-      {
-        const br = r as unknown as Record<string, unknown>;
-        await recordActivity(db, {
-          kind: "bridge",
-          actor: "agent",
-          userId: await resolveUserId(privyUserId),
-          txHash: typeof br["txHash"] === "string" ? br["txHash"] : null,
-          chainId,
-          asset: "USDC",
-          amountRaw: String(Math.round(Number(amount) * 1e6)),
-          valueUsd: Number(amount),
-          data: { destinationChain, recipient },
-        });
-      }
-      return r;
-    }
-    case "create_pool": {
-      const { tokenA, tokenB } = input;
-      if (!isTokenSymbol(tokenA) || !isTokenSymbol(tokenB)) {
-        throw new Error(`Both tokens must be supported symbols: ${TOKEN_SYMBOLS.join(", ")}.`);
-      }
-      const feeRaw = typeof input["fee"] === "number" ? input["fee"] : 3000;
-      if (!isFeeTier(feeRaw)) throw new Error("fee must be one of 100, 500, 3000, 10000.");
-      return await createPoolFromAgentWallet({ privyUserId, tokenA, tokenB, fee: feeRaw, chainId });
-    }
-    case "market_research": {
-      const focus = typeof input["focus"] === "string" ? input["focus"] : "all";
-      const wantTrending = focus === "all" || focus === "trending";
-      const wantNarratives = focus === "all" || focus === "narratives";
-      const wantMovers = focus === "all" || focus === "tvl-movers";
-      const [trending, narratives, tvlMovers] = await Promise.all([
-        wantTrending ? getTrendingCoins() : Promise.resolve(null),
-        wantNarratives ? getNarrativePerformance() : Promise.resolve(null),
-        wantMovers ? getTvlMovers() : Promise.resolve(null),
-      ]);
-      return {
-        ...(trending ? { trending } : {}),
-        ...(narratives ? { narratives } : {}),
-        ...(tvlMovers ? { tvlMovers } : {}),
-      };
-    }
-    case "inspect_address": {
-      const address = input["address"];
-      if (typeof address !== "string" || !isEvmAddress(address)) {
-        throw new Error("address must be a valid 0x EVM address.");
-      }
-      const [info, txs, transfers] = await Promise.all([
-        getAddressInfo(address),
-        getAddressTransactions(address, 8),
-        getAddressTokenTransfers(address, 15),
-      ]);
-      if (!info) {
-        return {
-          found: false,
-          note: "The explorer has no data for this address (or is unreachable).",
-        };
-      }
-      return {
-        found: true,
-        ...info,
-        recentTransactions: txs,
-        tokenTransfers: transfers,
-        signals: summarizeWhaleSignals(transfers),
-      };
-    }
-    case "inspect_token": {
-      const raw = input["addressOrSymbol"];
-      if (typeof raw !== "string" || raw.length === 0) {
-        throw new Error("addressOrSymbol is required.");
-      }
-      const address = isTokenSymbol(raw) ? getToken(raw).address : raw;
-      if (!isEvmAddress(address)) {
-        throw new Error(
-          "Provide a supported token symbol (USDC/EURC/cirBTC) or a 0x token address.",
-        );
-      }
-      const [info, holders] = await Promise.all([getTokenInfo(address), getTokenHolders(address)]);
-      if (!info) {
-        return { found: false, note: "The explorer has no token data for this address." };
-      }
-      const flags: string[] = [];
-      if (holders.top10Pct > 50) {
-        flags.push(
-          `Heavy concentration: top 10 holders control ${holders.top10Pct.toFixed(1)}% of supply.`,
-        );
-      }
-      if (info.holdersCount > 0 && info.holdersCount < 100) {
-        flags.push(`Very small holder base (${String(info.holdersCount)} holders).`);
-      }
-      return { found: true, ...info, ...holders, flags };
-    }
-    case "inspect_transaction": {
-      const hash = input["hash"];
-      if (typeof hash !== "string" || !isTxHash(hash)) {
-        throw new Error("hash must be a 0x transaction hash (66 chars).");
-      }
-      const tx = await getTransactionInfo(hash);
-      if (!tx) return { found: false, note: "The explorer has no data for this transaction." };
-      return { found: true, ...tx };
     }
     case "create_job": {
       const { provider, evaluator, description } = input;
@@ -2666,9 +1837,6 @@ async function executeTool(
         throw new Error("jobId must be a numeric string.");
       }
       return await getJobStatus(jobId, chainId);
-    }
-    case "inspect_hook_contract": {
-      return await readHookViaScp();
     }
     // ── 039 sports-data suite — read-only canonical-DB queries. Input
     // validation (zod) lives inside each function; throws surface as tool

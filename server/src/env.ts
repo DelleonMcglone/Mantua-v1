@@ -9,38 +9,6 @@ const schema = z.object({
   PRIVY_APP_ID: z.string().min(1),
   PRIVY_APP_SECRET: z.string().min(1),
 
-  UNISWAP_TRADING_API_KEY: z.string().min(1).optional(),
-
-  // ── Fiat rails (D-101) ───────────────────────────────────────────────
-  // Zero Hash is the regulated on/off-ramp of record.  It owns KYC/AML,
-  // custody during conversion, ACH/RTP movement, and transaction monitoring.
-  // Until commercial credentials are provisioned we only expose the local
-  // deterministic sandbox; production defaults to disabled.
-  FIAT_RAILS_MODE: z.enum(["disabled", "sandbox", "live"]).default("disabled"),
-  ZERO_HASH_API_KEY: z.string().min(1).optional(),
-  ZERO_HASH_PASSPHRASE: z.string().min(1).optional(),
-  ZERO_HASH_SECRET: z.string().min(1).optional(),
-  ZERO_HASH_PLATFORM_CODE: z.string().min(1).optional(),
-  /** Zero Hash environment: `sandbox` targets the cert host
-   *  (api.cert.zerohash.com), `production` the live API. Independent of
-   *  FIAT_RAILS_MODE so `sandbox` mode can exercise real cert credentials. */
-  ZERO_HASH_ENV: z.enum(["sandbox", "production"]).default("sandbox"),
-  /** HMAC secret for Zero Hash webhook deliveries (x-zh-hook-signature).
-   *  Absent → POST /api/fiat/webhook fails closed (503) — an unverified
-   *  provider event is never processed. */
-  ZERO_HASH_WEBHOOK_SECRET: z.string().min(1).optional(),
-  /** D-112 — the USDC destination network for fiat deposits is CONFIG, not
-   *  code. Zero Hash asset codes are `USDC.<NETWORK>`; this names the
-   *  network half. Zero Hash delivers USDC on Arc (`USDC.ARC`, confirmed
-   *  2026-09-30, F-001) — this variable plus Zero Hash-side asset support
-   *  is the entire switch, so it stays env-driven. */
-  FIAT_USDC_NETWORK: z.string().min(1).default("ARC"),
-  PLAID_CLIENT_ID: z.string().min(1).optional(),
-  PLAID_SECRET: z.string().min(1).optional(),
-  PLAID_ENV: z.enum(["sandbox", "development", "production"]).default("sandbox"),
-  /** Zero Hash's Plaid processor id, issued during commercial onboarding. */
-  ZERO_HASH_PLAID_PROCESSOR_ID: z.string().min(1).optional(),
-
   /** Network gate. Mantua runs on Arc Mainnet — defaults to `mainnet`;
    *  the `testnet` option is retained for the shared IS_MAINNET guard. */
   MANTUA_NETWORK: z.enum(["mainnet", "testnet"]).default("mainnet"),
@@ -242,12 +210,6 @@ const schema = z.object({
     .union([z.literal("0"), z.literal("1")])
     .default("0")
     .transform((v) => v === "1"),
-  MANTUA_FEE_BPS: z.coerce.number().int().min(0).max(25).default(10),
-  MANTUA_FEE_RECIPIENT: z
-    .string()
-    .regex(/^0x[a-fA-F0-9]{40}$/)
-    .optional(),
-  MANTUA_FEE_ADMIN_KEY: z.string().min(1).optional(),
   /** Task 074 — the operator key behind `/api/ops/*` (institution onboarding).
    *  Sent as `Authorization: Bearer <key>`; absent → those routes are 503. */
   MANTUA_OPS_KEY: z.string().min(16).optional(),
@@ -350,9 +312,9 @@ const schema = z.object({
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
 
-  /** Mantua hook addresses on Arc Mainnet. Deployment pending — see
-   *  docs/tasks/v2-roadmap.md; absent → hook-gated pools don't resolve
-   *  (graceful degradation). */
+  /** Legacy v4 hook addresses. Never deployed on Arc; read only by the
+   *  paid portfolio service's position reader (x402), which degrades to
+   *  "no hook" when unset. */
   STABLE_PROTECTION_HOOK_ADDRESS: z
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)
@@ -399,7 +361,7 @@ export type Env = z.infer<typeof schema>;
 /**
  * Treat blank `.env` values (`KEY=`) as unset. Zod's `.optional()`
  * accepts `undefined` but not `""`, so a stray empty line failed
- * validation for fields like `MANTUA_FEE_RECIPIENT` and crashed the
+ * validation for optional address fields and crashed the
  * server on boot.
  */
 function blankEnvToUndefined(env: NodeJS.ProcessEnv): Record<string, string | undefined> {

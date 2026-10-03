@@ -1,5 +1,5 @@
 import { keccak256, toHex } from "viem";
-import { baseRpcClient } from "./rpc-client.ts";
+import { arcRpcClient } from "./rpc-client.ts";
 import { fetchSubgraphPositions, type SubgraphPosition } from "./subgraph.ts";
 import { decodePositionInfo } from "./v4-position-info.ts";
 import { POSITION_MANAGER_VIEW_ABI, getV4Addresses, hasCanonicalV4 } from "./v4-contracts.ts";
@@ -68,13 +68,13 @@ async function enrichOne(
   try {
     const tokenIdBig = BigInt(tokenId);
     const [poolAndInfo, liquidity] = await Promise.all([
-      baseRpcClient.readContract({
+      arcRpcClient.readContract({
         address: positionManager,
         abi: POSITION_MANAGER_VIEW_ABI,
         functionName: "getPoolAndPositionInfo",
         args: [tokenIdBig],
       }),
-      baseRpcClient.readContract({
+      arcRpcClient.readContract({
         address: positionManager,
         abi: POSITION_MANAGER_VIEW_ABI,
         functionName: "getPositionLiquidity",

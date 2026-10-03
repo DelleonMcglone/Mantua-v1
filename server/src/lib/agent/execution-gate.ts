@@ -40,22 +40,13 @@ export const MONEY_TOOLS: ReadonlySet<string> = new Set([
   "mantua_execute_combo",
   "mantua_arm_exit",
   "mantua_execute_basket",
-  "swap",
   "send",
-  "bridge",
-  "add_liquidity",
-  "remove_liquidity",
-  "create_pool",
   "fund_job",
   "create_job",
   "settle_job",
 ]);
 
-/** `gateway` is mixed: these sub-actions move money. */
-const GATEWAY_MONEY_ACTIONS: ReadonlySet<string> = new Set(["deposit", "deposit_base", "spend"]);
-
-export function isMoneyCall(tool: string, args: Record<string, unknown>): boolean {
-  if (tool === "gateway") return GATEWAY_MONEY_ACTIONS.has(String(args["action"]));
+export function isMoneyCall(tool: string, _args: Record<string, unknown>): boolean {
   return MONEY_TOOLS.has(tool);
 }
 

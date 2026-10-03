@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { legalAcceptances } from "../db/schema/legal.ts";
-import { dbFiatStore } from "../lib/fiat-store.ts";
+import { ensureUser } from "../lib/users.ts";
 import {
   CURRENT_VERSIONS,
   LEGAL_DOCS,
@@ -38,7 +38,7 @@ const acceptSchema = z.object({
  */
 export function createLegalRouter(overrides: Partial<LegalRouteDeps> = {}): Router {
   const deps: LegalRouteDeps = {
-    ensureUser: overrides.ensureUser ?? ((id) => dbFiatStore.ensureUser(id)),
+    ensureUser: overrides.ensureUser ?? ensureUser,
     list:
       overrides.list ??
       (async (userId) =>

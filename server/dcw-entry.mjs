@@ -6,6 +6,3 @@
 // lives in server/node_modules (un-hoisted), so inlining is the reliable path.
 // Living under server/ lets esbuild resolve the package from server/node_modules.
 export * from "@circle-fin/developer-controlled-wallets";
-// Circle Contracts (SCP) rides the same bundle — named export only, because a
-// wildcard would collide with DCW's shared symbol names (Blockchain, FeeLevel...).
-export { initiateSmartContractPlatformClient } from "@circle-fin/smart-contract-platform";

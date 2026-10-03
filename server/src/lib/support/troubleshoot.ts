@@ -22,12 +22,9 @@ export interface TroubleshootContext {
   platform: { mode: string; trading: string; reads: string; message: string | null } | null;
   /** Null for an anonymous conversation. */
   account: {
-    pendingTransfers: number;
-    failedTransfers: number;
     pendingTrades: number;
     hasAgentWallet: boolean;
     agentMode: string;
-    lastFailure: string | null;
   } | null;
 }
 

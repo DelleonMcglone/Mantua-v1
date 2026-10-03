@@ -23,7 +23,7 @@ export const agentWallets = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    /** Circle blockchain id: "BASE". One wallet row per (user,
+    /** Circle blockchain id: "ARC". One wallet row per (user,
      *  blockchain) — the walletId IS the chain selector on Circle's
      *  transaction API. */
     blockchain: varchar("blockchain", { length: 32 }).notNull().default("ARC"),

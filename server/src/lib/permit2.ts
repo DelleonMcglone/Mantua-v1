@@ -1,4 +1,4 @@
-import { baseRpcClient } from "./rpc-client.ts";
+import { arcRpcClient } from "./rpc-client.ts";
 import { ZERO_ADDRESS } from "./tokens.ts";
 import { PERMIT2, PERMIT2_ABI } from "./v4-contracts.ts";
 
@@ -23,7 +23,7 @@ export async function readPermit2Allowance(
   token: `0x${string}`,
   positionManager: `0x${string}`,
 ): Promise<PermitDetailsLive> {
-  const [amount, expiration, nonce] = await baseRpcClient.readContract({
+  const [amount, expiration, nonce] = await arcRpcClient.readContract({
     address: PERMIT2,
     abi: PERMIT2_ABI,
     functionName: "allowance",

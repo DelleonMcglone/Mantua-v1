@@ -33,7 +33,7 @@ export const SUPPORT_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_account_context",
     description:
-      "The signed-in user's own recent activity, fiat transfers, marked positions and agent standing. Empty for an anonymous user. Use before answering anything about their account.",
+      "The signed-in user's own recent activity, marked positions and agent standing. Empty for an anonymous user. Use before answering anything about their account.",
     input_schema: { type: "object", properties: {} },
   },
   {

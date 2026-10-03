@@ -7,20 +7,14 @@ import type { RedisRateLimitClient } from "./rate-limit-redis-store.ts";
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /**
- * The Vercel-cron money loops (C-020). All three are GET routes — Vercel
- * Cron always GETs — so the write-method gate never saw them, yet each
- * executes real agent-signed trades:
- *   - /api/cron/rebalance  → runAutoRebalance()      → agent swaps
- *   - /api/cron/intents    → runIntentSweep()        → agent swap retries
+ * The Vercel-cron money loops (C-020). GET routes — Vercel Cron always
+ * GETs — so the write-method gate never sees them, yet they execute real
+ * agent-signed trades:
  *   - /api/cron/strategies → executeTriggeredClose() → on-chain position closes
- * Enumerated exactly on purpose: the read-only crons (peg-sync, resolution,
+ * Enumerated exactly on purpose: the read-only crons (resolution,
  * sports-sync) keep running while the switch is engaged.
  */
-const MONEY_CRON_PATHS: ReadonlySet<string> = new Set([
-  "/api/cron/rebalance",
-  "/api/cron/intents",
-  "/api/cron/strategies",
-]);
+const MONEY_CRON_PATHS: ReadonlySet<string> = new Set(["/api/cron/strategies"]);
 
 /** Express routes match with or without a trailing slash; the refusal set must cover both spellings. */
 function withoutTrailingSlash(path: string): string {
