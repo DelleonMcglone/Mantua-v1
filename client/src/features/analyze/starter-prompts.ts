@@ -1,6 +1,6 @@
 /**
- * "Start Trading With Your First Five Prompts" — the analyst's starter
- * cards (owner, 2026-10-03). They walk the agent workflow in order: find an
+ * "Start Trading With Your First … Prompts" — the analyst's starter cards
+ * (owner, 2026-10-03; prompt 6 added the same day). They walk the agent workflow in order: find an
  * opportunity, research it, work out the trade, size it, execute and manage
  * it. A prompt that names a game or team the user must choose is put into
  * the dock for editing instead of being sent as is.
@@ -14,7 +14,7 @@ export interface StarterPrompt {
   body: string;
 }
 
-export const STARTER_PROMPTS_TITLE = "Start Trading With Your First Five Prompts";
+const WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
 
 export const STARTER_PROMPTS: readonly StarterPrompt[] = [
   {
@@ -47,7 +47,16 @@ export const STARTER_PROMPTS: readonly StarterPrompt[] = [
     headline: "Execute the trade as prepared, then manage the position for me.",
     body: "Place the trade using the position we just structured. Before executing, confirm the market, side, price, quantity, and maximum risk. If anything has changed from the preview, stop and ask me first. After execution, monitor the position and notify me when the market reaches the conditions we established for taking profit, reducing risk, or exiting the position. Do not make a new trade without my approval.",
   },
+  {
+    step: 6,
+    title: "Find the probability gaps",
+    headline: "Find today's biggest probability gaps.",
+    body: "Scan today's available sports markets and identify the five markets where Mantua's estimated probability differs most from the current market probability. For each market, show me: the market and outcome; the current market probability; Mantua's estimated probability; the probability gap in percentage points; the confidence in Mantua's estimate; the current liquidity; and the key factors driving the difference. Then explain why Mantua's probability differs from the market's probability and identify what information could cause the gap to narrow or disappear. Do not place any trades. I will decide what to do.",
+  },
 ];
+
+/** The title counts the cards, so adding a prompt never leaves it stale. */
+export const STARTER_PROMPTS_TITLE = `Start Trading With Your First ${WORDS[STARTER_PROMPTS.length] ?? String(STARTER_PROMPTS.length)} Prompts`;
 
 const PLACEHOLDER = /\[(GAME|TEAM)\]/;
 
