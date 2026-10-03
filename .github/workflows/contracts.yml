@@ -41,8 +41,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -55,11 +53,7 @@ jobs:
       # `contracts/lib/` is gitignored — local devs run these install
       # commands once (see `contracts/README.md`). The CI workflow was
       # missing the step, so every previous run failed with "Source not
-      # found" on `v4-core/`, `forge-std/`, `solmate/`, etc. The same
-      # install has to be re-run inside each hook submodule because
-      # submodules also gitignore their own `lib/` and the parent build
-      # pulls submodule source in via the
-      # `hooks/stable-protection/:` remapping.
+      # found" on `v4-core/`, `forge-std/`, `solmate/`, etc.
       #
       # Wrapped in a 3-attempt retry (same pattern as the gating tests
       # below): dependency clones off github.com flake with git exit
@@ -97,73 +91,6 @@ jobs:
           done
           exit 1
 
-      - name: Install Foundry deps (stable-protection submodule)
-        working-directory: contracts/hooks/stable-protection
-        run: |
-          if [ -f foundry.toml ]; then
-            set -e
-            # Deps a hook pins as git submodules are materialized by
-            # the recursive checkout and must NOT be re-cloned: a
-            # default-branch clone can drift from the pin (v4-periphery
-            # main no longer ships src/utils/BaseHook.sol, which the
-            # hook imports). Install only what the checkout left
-            # missing, and fail loudly if that still fails.
-            for dep in foundry-rs/forge-std Uniswap/v4-core Uniswap/v4-periphery transmissions11/solmate; do
-              name="${dep##*/}"
-              if [ -d "lib/$name" ] && [ -n "$(ls -A "lib/$name")" ]; then
-                echo "$name already present; skipping"
-                continue
-              fi
-              installed=""
-              for attempt in 1 2 3; do
-                echo "::group::forge install $name attempt $attempt"
-                if forge install "$dep" --no-git; then
-                  echo "::endgroup::"
-                  installed=1
-                  break
-                fi
-                echo "::endgroup::"
-                echo "Attempt $attempt failed; sleeping 15s before retry…"
-                sleep 15
-              done
-              if [ -z "$installed" ]; then
-                echo "::error::Failed to install $name in hooks/stable-protection after 3 attempts"
-                exit 1
-              fi
-            done
-          fi
-
-      - name: Install Foundry deps (dynamic-fee submodule)
-        working-directory: contracts/hooks/dynamic-fee
-        run: |
-          if [ -f foundry.toml ]; then
-            set -e
-            # Same pin-preserving rule as stable-protection above.
-            for dep in foundry-rs/forge-std Uniswap/v4-core Uniswap/v4-periphery transmissions11/solmate; do
-              name="${dep##*/}"
-              if [ -d "lib/$name" ] && [ -n "$(ls -A "lib/$name")" ]; then
-                echo "$name already present; skipping"
-                continue
-              fi
-              installed=""
-              for attempt in 1 2 3; do
-                echo "::group::forge install $name attempt $attempt"
-                if forge install "$dep" --no-git; then
-                  echo "::endgroup::"
-                  installed=1
-                  break
-                fi
-                echo "::endgroup::"
-                echo "Attempt $attempt failed; sleeping 15s before retry…"
-                sleep 15
-              done
-              if [ -z "$installed" ]; then
-                echo "::error::Failed to install $name in hooks/dynamic-fee after 3 attempts"
-                exit 1
-              fi
-            done
-          fi
-
       # Fail fast before `forge build` if any dependency clone failed:
       # a missing (or empty, i.e. partial) lib/ source otherwise
       # surfaces as a confusing "Source not found" error deep in the
@@ -177,27 +104,13 @@ jobs:
               exit 1
             fi
           done
-          # Hook deps live inside each submodule (pinned checkouts or
-          # fresh installs) — verify them in place so a missing source
-          # fails loudly here instead of as a solc "Source not found".
-          for hook in stable-protection dynamic-fee; do
-            if [ -f "hooks/$hook/foundry.toml" ]; then
-              for dep in forge-std v4-core v4-periphery solmate; do
-                if [ ! -d "hooks/$hook/lib/$dep" ] || [ -z "$(ls -A "hooks/$hook/lib/$dep")" ]; then
-                  echo "::error::Missing or empty contracts/hooks/$hook/lib/$dep after forge install"
-                  exit 1
-                fi
-              done
-            fi
-          done
 
       - name: Build contracts
         run: forge build --sizes
 
-      # The full-lifecycle E2E + the hook-bytecode baseline are the
-      # gating tests. They run against current Arc Mainnet state and
-      # exercise the entire user-facing flow (create → add → swap →
-      # remove) as well as the hook deployments.
+      # The market lifecycle fork E2E is the gating test. It runs against
+      # current Arc Mainnet state and exercises the whole market flow
+      # (bootstrap → trade → resolve → redeem) on the Dynamic Market stack.
       #
       # Wrapped in a 3-attempt retry because the public
       # `https://rpc.mainnet.arc.io` endpoint occasionally returns
@@ -209,7 +122,7 @@ jobs:
           set -e
           for attempt in 1 2 3; do
             echo "::group::forge test attempt $attempt"
-            if forge test --match-contract "HookBaseline|FullLifecycleE2E" -vv; then
+            if forge test --match-contract "MarketLifecycleForkE2E" -vv; then
               echo "::endgroup::"
               exit 0
             fi
@@ -219,14 +132,3 @@ jobs:
           done
           exit 1
 
-      # The remaining per-hook E2Es depend on live Arc Mainnet state
-      # (DynamicFee TWAP warmup, etc.) and can flake on chain drift.
-      # Run them as advisory so they surface in logs without blocking
-      # the PR. RWAGate / AsyncLimitOrder tests were removed in PR
-      # #100 (MVP scope-down); only the two retained hooks remain.
-      - name: Run advisory per-hook fork tests
-        continue-on-error: true
-        run: |
-          forge test \
-            --match-contract "StableProtectionE2E|DynamicFeeE2E" \
-            -vv
