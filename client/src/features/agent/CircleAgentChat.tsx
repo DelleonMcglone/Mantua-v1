@@ -9,6 +9,12 @@ import {
 } from "react";
 import { ArrowLeft, Bot, Check, ExternalLink, X } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
+import {
+  needsInput,
+  promptText,
+  STARTER_PROMPTS,
+  STARTER_PROMPTS_TITLE,
+} from "@/features/analyze/starter-prompts.ts";
 import { Banner } from "@/components/ui/banner.tsx";
 import { ARC_CHAIN_ID, getExplorerTxUrl } from "@/lib/chains.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -1063,6 +1069,40 @@ function EmptyState({ onPick, disabled }: { onPick: (s: string) => void; disable
         or exit a bet, or review your positions and P&amp;L. Reads happen as we go; anything that
         moves money is previewed first and runs only after you reply &quot;confirm&quot;, within
         your daily spending cap.
+      </div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-mute">
+        {STARTER_PROMPTS_TITLE}
+      </div>
+      <div className="flex flex-col gap-2">
+        {STARTER_PROMPTS.map((p) => {
+          const edit = needsInput(p);
+          return (
+            <button
+              key={p.step}
+              type="button"
+              disabled={disabled}
+              data-testid="agent-starter-prompt"
+              onClick={() => {
+                if (edit) {
+                  window.dispatchEvent(
+                    new CustomEvent("mantua:dock-prefill", { detail: promptText(p) }),
+                  );
+                } else {
+                  onPick(promptText(p));
+                }
+              }}
+              className="flex flex-col gap-0.5 rounded-md border border-border-soft bg-bg-elev px-3.5 py-2.5 text-left cursor-pointer transition-colors hover:border-accent disabled:cursor-default disabled:opacity-50"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-mute">
+                Prompt {p.step} · {p.title}
+              </span>
+              <span className="text-[13px] font-medium leading-snug">{p.headline}</span>
+              {edit && (
+                <span className="text-[11px] text-text-dim">Fill in the blank, then send.</span>
+              )}
+            </button>
+          );
+        })}
       </div>
       <div className="flex flex-nowrap gap-2 overflow-x-auto pb-0.5">
         {SUGGESTIONS.map((s) => (

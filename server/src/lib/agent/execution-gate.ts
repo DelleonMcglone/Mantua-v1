@@ -38,6 +38,7 @@ export const MONEY_TOOLS: ReadonlySet<string> = new Set([
   "mantua_execute_trade",
   "mantua_sell_position",
   "mantua_execute_combo",
+  "mantua_arm_exit",
   "swap",
   "send",
   "bridge",
