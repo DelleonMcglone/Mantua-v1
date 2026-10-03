@@ -7,12 +7,10 @@
  * lower 14 bits of the hook's CREATE2 address (per Uniswap v4
  * Hooks.sol).
  *
- * Every expected address comes from an env var (the Dynamic Market Hook
+ * The expected address comes from an env var (the Dynamic Market Hook
  * is live on Arc Mainnet (5042) since 2026-09-30 — the address is
- * pinned in server/src/lib/v4-contracts.ts; the other two are pending):
+ * pinned in server/src/lib/v4-contracts.ts):
  *
- *   STABLE_PROTECTION_HOOK_ADDRESS
- *   DYNAMIC_FEE_HOOK_ADDRESS
  *   DYNAMIC_MARKET_HOOK_ADDRESS
  *
  * A hook with no configured address is reported as "pending mainnet
@@ -56,28 +54,6 @@ function envAddress(name: string): `0x${string}` | null {
 }
 
 const HOOKS: HookConfig[] = [
-  {
-    name: "StableProtectionHook",
-    repo: "DelleonMcglone/stableprotection-hook",
-    pinnedCommit: "1282b899b6f68d27e28d65194dc75661f23476af",
-    addressEnvVar: "STABLE_PROTECTION_HOOK_ADDRESS",
-    address: envAddress("STABLE_PROTECTION_HOOK_ADDRESS"),
-    chainId: ARC_CHAIN_ID,
-    chainName: "Arc",
-    rpcUrl: ARC_RPC,
-    expectedPermissions: ["BEFORE_INITIALIZE", "BEFORE_SWAP", "AFTER_SWAP"],
-  },
-  {
-    name: "DynamicFee",
-    repo: "DelleonMcglone/dynamic-fee",
-    pinnedCommit: "62710d6d9b403557b073a702b5546bc10e75c0c6",
-    addressEnvVar: "DYNAMIC_FEE_HOOK_ADDRESS",
-    address: envAddress("DYNAMIC_FEE_HOOK_ADDRESS"),
-    chainId: ARC_CHAIN_ID,
-    chainName: "Arc",
-    rpcUrl: ARC_RPC,
-    expectedPermissions: ["BEFORE_SWAP", "AFTER_SWAP"],
-  },
   {
     name: "DynamicMarketHook",
     repo: "DelleonMcglone/Mantua-v1",
