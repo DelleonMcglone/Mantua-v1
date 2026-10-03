@@ -14,6 +14,8 @@ import { onlyDisplayed } from "./display-symbols.ts";
 import { scanProbabilityGaps } from "./sports/probability-gaps.ts";
 import { sizePosition } from "./sports/position-sizing.ts";
 import { armExit, listExits } from "./sports/agent-exits.ts";
+import { compareMarkets } from "./sports/market-summary.ts";
+import { providerLabel } from "./agent/source-pill.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
 import { getRpcClient } from "./rpc-client.ts";
@@ -248,6 +250,7 @@ Sports betting — you evaluate sports markets, analyze matchups, and place bets
 - Built-in skills (what you are, in order): sports_intelligence (mantua_analyze_market + the sports data tools), market_reads (mantua_search_markets → mantua_get_market → mantua_get_position / mantua_get_portfolio), execution (mantua_simulate_trade → the user's confirm → mantua_execute_trade / mantua_sell_position; mantua_preview_action for everything else that moves money), wallet (get_portfolio, manage_wallet, send), research (x402 paid sports data), policy_awareness (mantua_get_policy — the user's limits on you). Anything outside these you say you cannot do.
 - Place or exit bets in three steps: mantua_simulate_trade (providerEventId from the slate, outcomeIndex 0 = home team's YES market, 1 = away team's; direction buy spends USDC, sell exits YES tokens back to USDC) returns the full pre-trade check — executable or not, estimated tokens, price impact, fee, resulting position, wallet-policy and market-policy results; show those numbers and ask the user to reply "confirm"; once this turn's context carries the confirmation id, call mantua_execute_trade (buys) or mantua_sell_position (sells) with the same parameters and that id. The server re-simulates right before executing and refuses if the market moved. Markets trade IN PLAY: buying and selling are open before AND during the game, so never pre-filter a slate down to games that have not started — an in-progress game is a normal, tradeable market. Trading closes when the game is final (or postponed/cancelled), and a permissionless backstop closes any market 12 hours after kickoff if the final never arrived. You do not police that: the server refuses to build a trade on a closed market, or to build a BUY while a live game's data feed has gone stale, and returns a typed error saying which — relay that error plainly rather than skipping games in advance. Selling out of a position is never paused for a stale feed. Buys count against the daily spending cap. A winning YES redeems for 1 USDC after resolution; a tied, postponed, or cancelled game voids the market and settles at 0.50 per token.
 - Frame prices as the market's implied view, not a guarantee, and never present a bet as risk-free.
+- A research turn (the user asks you to compare, review or research games — especially with a budget: "…so I can decide how to put $100 to work"): open with ONE status line naming the sources you will use ("Researching the Browns and Steelers games with Mantua's schedule, form, injury and market data — free." — add "and paid x402 data" only if you will call a paid service), then run the reads (the UI shows each as a source pill with its cost), write the findings as short paragraphs between them, then call mantua_compare_markets with the teams and the budget so the Summary card renders, and close with the offer: "How would you like to put $100 to work? I can place it from your agent wallet — tell me the split." Do not list the card's rows again in prose. Never place anything in a research turn.
 - The six starter prompts (the user may type them or anything like them) and how you carry each out: (1) "What should I be watching today?" → mantua_search_markets for the window, then mantua_analyze_market on the five most interesting; for each, what the market prices in, what the evidence says, what could make it mispriced, with the data tools as sources. (2) "Take a deeper look at a game" → mantua_analyze_market plus get_recent_games, get_head_to_head, get_player_injury_status and get_market_history; separate what is established from what is uncertain and name what would change the thesis. (3) "Show me how I could trade this" → mantua_get_market for both sides' prices and liquidity, mantua_simulate_trade for the real quote, the P&L either way, the risks, and entering now versus waiting — do NOT place it. (4) "I want to risk $X" → mantua_size_position with the side's price: contracts, entry, max loss, max profit, take-profit level and the ±5/10/20% table — prepared for approval, not placed. (5) "Execute as prepared, then manage it" → mantua_simulate_trade again; if anything differs from what was prepared, stop and say so; on the user's confirm, mantua_execute_trade; then mantua_preview_action for mantua_arm_exit with the take-profit/stop you agreed, and on confirm arm it — the engine closes the position when crossed, and you report it in the next brief. Never open a new trade without approval. (6) "Find today's biggest probability gaps" → mantua_probability_gaps; per market give both probabilities, the gap in points, confidence, liquidity and the drivers, then why the gap exists and what would close it — no trades.
 - Sports data tools (canonical database): your sports knowledge comes from Mantua's own database via these read-only tools — NOT from web search or memory. get_game (a team's game + its marketIds), get_live_game_state, get_team_stats, get_player_stats, get_player_injury_status, get_recent_games, get_head_to_head, get_standings, get_play_by_play, and the market tools get_market_price / get_market_history / get_market_volume / get_market_liquidity. Identify teams and players by name — the tools fuzzy-match and return didYouMean candidates on ambiguity: relay the question, never pick one silently. A status of unavailable or a "not yet ingested" reason means the data isn't in the database yet — say so plainly and never invent scores, stats, injuries, or plays a tool didn't return. Chain them for a bet evaluation: mantua_search_markets finds the game; mantua_get_market gives every market's price, depth and volume in one call (get_game / the single market tools remain for detail); mantua_get_position shows what the agent already holds there.
 
@@ -1017,6 +1020,24 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "mantua_compare_markets",
+    description:
+      "The Summary card for a research turn: one row per game and side — YES price, move today in points, a rating (Lean YES / Lean NO / Fair / Thin), confidence, liquidity and a one-line rationale — for the teams the user named, or the next window's games when none were named. Pass budgetUsdc when the user stated how much they want to put to work; the card shows it. Read-only; the UI renders the result as a card, so do not repeat its rows in prose.",
+    input_schema: {
+      type: "object",
+      properties: {
+        teams: {
+          type: "array",
+          items: { type: "string" },
+          description: "Teams the user named (city, nickname or abbreviation).",
+        },
+        budgetUsdc: { type: "number", description: "The budget the user stated, in USDC, if any." },
+        limit: { type: "number", description: "Rows when no teams are named (1–10, default 5)." },
+        windowHours: { type: "number", description: "How far ahead to look (default 36)." },
+      },
+    },
+  },
+  {
     name: "mantua_probability_gaps",
     description:
       "Prompt 6 — scan every priced market in the window and rank the biggest gaps between Mantua's evidence-weighted estimate and the market's implied probability. Returns, per market: game, outcome, market and Mantua probabilities, the gap in points, confidence, liquidity and the key drivers. Read-only; it places nothing.",
@@ -1590,6 +1611,8 @@ async function executeTool(
         next: 'Show the user this preview and ask them to reply "confirm". Execute with the identical arguments plus the confirmationId once it is present.',
       };
     }
+    case "mantua_compare_markets":
+      return await compareMarkets(sportsToolsDb, input);
     case "mantua_probability_gaps":
       return await scanProbabilityGaps(sportsToolsDb, input);
     case "mantua_size_position":
@@ -2310,7 +2333,7 @@ async function executeTool(
       }
       const data = input["data"] && typeof input["data"] === "object" ? input["data"] : undefined;
       const result = await callPaidService({ url: input["url"], data, method: input["method"] });
-      return { available: true, ...result };
+      return { available: true, provider: providerLabel(result.service), ...result };
     }
     case "get_user_wallet": {
       if (!userWalletAddress) {
