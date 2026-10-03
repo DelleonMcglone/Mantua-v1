@@ -20,8 +20,8 @@ import { formatRawAmount, isValidEvmAddress, parseAmountRaw } from "./withdraw-h
 
 const ERC20_TRANSFER = parseAbi(["function transfer(address to, uint256 amount) returns (bool)"]);
 
-/** The withdrawable set: USDC, the platform currency and the only asset shown. */
-const WITHDRAW_SYMBOLS: TokenSymbol[] = ["USDC"];
+/** The withdrawable asset: USDC, the platform currency and the only asset shown. */
+const WITHDRAW_SYMBOL: TokenSymbol = "USDC";
 
 type Phase =
   | { kind: "idle" }
@@ -50,13 +50,14 @@ export function WithdrawModal({ onClose, initialRecipient }: Props) {
   const confirm = useConfirmedAction();
   const getWallet = useChainWalletClient();
 
-  const [symbol, setSymbol] = useState<TokenSymbol>("USDC");
+  const symbol = WITHDRAW_SYMBOL;
   const [recipient, setRecipient] = useState(initialRecipient ?? "");
   const [amount, setAmount] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
 
   const tokenMeta = getTokens(chainId)[symbol];
-  const balance = balances.find((b) => b.symbol === symbol);
+  const wanted: string = symbol;
+  const balance = balances.find((b) => b.symbol === wanted);
   const decimals = balance?.decimals ?? tokenMeta.decimals;
   const balanceRaw = BigInt(balance?.balanceRaw ?? "0");
 
@@ -124,30 +125,6 @@ export function WithdrawModal({ onClose, initialRecipient }: Props) {
         </DialogHeader>
 
         <div className="space-y-4">
-          <div>
-            <p className="text-xs text-text-dim mb-2 uppercase tracking-wider">Token</p>
-            <div className="grid grid-cols-3 gap-2">
-              {WITHDRAW_SYMBOLS.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  aria-pressed={symbol === s}
-                  onClick={() => {
-                    setSymbol(s);
-                    setAmount("");
-                  }}
-                  className={`py-2 rounded-sm border text-sm font-medium transition-colors ${
-                    symbol === s
-                      ? "border-accent bg-chip text-text"
-                      : "border-border-soft bg-bg-elev text-text-dim hover:text-text"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div>
             <label
               htmlFor="withdraw-recipient"

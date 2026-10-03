@@ -53,7 +53,7 @@
 }
 
 /* Animations referenced by agent-flow primitives (Spinner, Skel) and
-   AgentStrip / IntentCard transitions. Verbatim from
+   AgentStrip transitions. Verbatim from
    `mantua-ai/project/Mantua Agent Flows.html`. */
 @keyframes spin {
   to {

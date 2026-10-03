@@ -98,7 +98,6 @@ export function TradeTicket({
           {t.funding.open && (
             <TicketFunding
               walletAddress={user?.wallet?.address}
-              suggestedUsd={t.ticket.amount}
               onClose={t.funding.close}
               onSkip={t.funding.skip}
             />
