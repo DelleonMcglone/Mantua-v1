@@ -31,6 +31,10 @@ const MANTUA_SOURCES: Record<string, string> = {
   get_market_volume: "volume",
   get_market_liquidity: "liquidity",
   get_nfl_schedule: "schedule",
+  // The logged-out analyst's reads.
+  get_market_data: "market data",
+  get_signals: "signals",
+  protocol_lookup: "protocol data",
 };
 
 const PAID_SOURCES = new Set(["call_paid_service", "search_paid_services"]);
