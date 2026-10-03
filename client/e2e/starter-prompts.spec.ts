@@ -16,17 +16,18 @@ test("the first five prompts: a complete prompt sends, a prompt with a blank goe
   await dock.press("Enter");
   await page.getByRole("button", { name: "New chat" }).click();
 
-  await expect(page.getByText("Start Trading With Your First Five Prompts")).toBeVisible();
+  await expect(page.getByText("Start Trading With Your First Six Prompts")).toBeVisible();
   const cards = page.getByTestId("starter-prompt");
-  await expect(cards).toHaveCount(5);
+  await expect(cards).toHaveCount(6);
   await expect(cards.nth(0)).toContainText("Prompt 1 · Find the games that matter");
   await expect(cards.nth(4)).toContainText("Prompt 5 · Execute and manage it");
+  await expect(cards.nth(5)).toContainText("Prompt 6 · Find the probability gaps");
   await page.screenshot({ path: "test-results/starter-prompts.png" });
 
   // Prompt 2 names a game the user must choose: it lands in the dock, unsent.
   await cards.nth(1).click();
   await expect(dock).toHaveValue(/Take a deeper look at \[GAME\]\./);
-  await expect(cards).toHaveCount(5);
+  await expect(cards).toHaveCount(6);
 
   // Prompt 1 is complete: it sends and starts the thread.
   await cards.nth(0).click();

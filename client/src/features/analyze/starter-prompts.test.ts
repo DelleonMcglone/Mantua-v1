@@ -8,11 +8,11 @@ import {
 } from "./starter-prompts.ts";
 
 void describe("starter prompts", () => {
-  void it("are five, numbered in workflow order under the agreed title", () => {
-    assert.equal(STARTER_PROMPTS_TITLE, "Start Trading With Your First Five Prompts");
+  void it("are six, numbered in workflow order, and the title counts them", () => {
+    assert.equal(STARTER_PROMPTS_TITLE, "Start Trading With Your First Six Prompts");
     assert.deepEqual(
       STARTER_PROMPTS.map((p) => p.step),
-      [1, 2, 3, 4, 5],
+      [1, 2, 3, 4, 5, 6],
     );
     assert.deepEqual(
       STARTER_PROMPTS.map((p) => p.title),
@@ -22,11 +22,12 @@ void describe("starter prompts", () => {
         "Find the trade",
         "Size the position",
         "Execute and manage it",
+        "Find the probability gaps",
       ],
     );
   });
   void it("send straight away unless the user must name a game or team", () => {
-    assert.deepEqual(STARTER_PROMPTS.map(needsInput), [false, true, true, false, false]);
+    assert.deepEqual(STARTER_PROMPTS.map(needsInput), [false, true, true, false, false, false]);
   });
   void it("send the headline followed by the full instruction", () => {
     const [first] = STARTER_PROMPTS;
