@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
+import {
+  needsInput,
+  promptText,
+  STARTER_PROMPTS,
+  STARTER_PROMPTS_TITLE,
+} from "./starter-prompts.ts";
 import { ApiError, api } from "@/lib/api.ts";
 import { Banner } from "@/components/ui/banner.tsx";
 import { Spinner } from "@/features/agent/agent-primitives.tsx";
@@ -50,12 +56,6 @@ type Topic =
 
 /** Empty-state cards: NFL questions with no `topic` — they route through the
  *  free-form analyst stream, which reads the live canonical slate. */
-const SUGGESTIONS: { topic?: Topic; question: string }[] = [
-  { question: "Analyze today's NFL games and matchups" },
-  { question: "Which NFL game looks closest today, and where is the value?" },
-  { question: "Which NFL markets are mispriced right now?" },
-  { question: "What should a prediction-market bettor watch this week?" },
-];
 
 // --- Conversation turn model -------------------------------------------------
 
@@ -253,17 +253,6 @@ export function AnalyzePanel({
     [buildHistory, seedTopic, streamChat],
   );
 
-  // Suggestion card → deterministic topic turn when the card names a topic,
-  // otherwise the free-form analyst stream (the sports cards).
-  const runSuggestion = useCallback(
-    (s: { topic?: Topic; question: string }) => {
-      if (busyRef.current) return;
-      if (s.topic) seedTopic(s.topic, s.question);
-      else ask(s.question);
-    },
-    [seedTopic, ask],
-  );
-
   // Listen for input forwarded from the global InputBar (App.tsx).
   const askRef = useRef(ask);
   useEffect(() => {
@@ -290,8 +279,7 @@ export function AnalyzePanel({
     if (seededRef.current) return;
     seededRef.current = true;
     if (initialTopic) {
-      const question =
-        initialQuestion ?? SUGGESTIONS.find((s) => s.topic === initialTopic)?.question ?? "Analyze";
+      const question = initialQuestion ?? "Analyze";
       seedTopicRef.current(initialTopic, question, initialSymbol);
     } else if (initialQuestion) {
       askRef.current(initialQuestion);
@@ -308,15 +296,19 @@ export function AnalyzePanel({
     <>
       <PanelHeader onNewChat={newChat} />
       <PanelSubHeader
-        title="Analyze & Research"
-        subtitle="Ask about prices, pegs, pools, or anything markets — pick a suggestion or type."
+        title={STARTER_PROMPTS_TITLE}
+        subtitle="Five prompts that take you from finding an opportunity to a managed position. Pick one, or ask anything."
         {...(onBack ? { onBack } : messages.length > 0 ? { onBack: newChat } : {})}
         onClose={onClose}
       />
 
       <div className="px-5 py-3.5 flex-1 overflow-auto flex flex-col gap-3.5">
         {messages.length === 0 ? (
-          <EmptyState onPick={runSuggestion} />
+          <EmptyState
+            onSend={(text) => {
+              ask(text);
+            }}
+          />
         ) : (
           messages.map((m) => <TurnView key={m.id} turn={m} onRetry={fetchTopic} />)
         )}
@@ -326,27 +318,42 @@ export function AnalyzePanel({
   );
 }
 
-function EmptyState({ onPick }: { onPick: (s: { topic?: Topic; question: string }) => void }) {
+/**
+ * The five starter cards. A prompt the user must complete (a game or team)
+ * is placed in the dock to edit; the rest are sent as they are.
+ */
+function EmptyState({ onSend }: { onSend: (text: string) => void }) {
   return (
-    <>
-      <div className="text-[11px] text-text-mute tracking-[0.08em] mb-1 font-semibold">
-        SUGGESTED QUESTIONS
-      </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        {SUGGESTIONS.map((s) => (
+    <div className="flex flex-col gap-2.5">
+      {STARTER_PROMPTS.map((p) => {
+        const edit = needsInput(p);
+        return (
           <button
-            key={s.question}
+            key={p.step}
             type="button"
+            data-testid="starter-prompt"
             onClick={() => {
-              onPick(s);
+              if (edit) {
+                window.dispatchEvent(
+                  new CustomEvent("mantua:dock-prefill", { detail: promptText(p) }),
+                );
+              } else {
+                onSend(promptText(p));
+              }
             }}
-            className="flex items-center px-3.5 py-3.5 bg-bg-elev border border-border-soft rounded-md cursor-pointer text-left text-[13px] leading-snug font-medium min-h-[56px] hover:border-accent transition-colors"
+            className="flex flex-col gap-1 px-3.5 py-3 bg-bg-elev border border-border-soft rounded-md cursor-pointer text-left hover:border-accent transition-colors"
           >
-            {s.question}
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-mute">
+              Prompt {p.step} · {p.title}
+            </span>
+            <span className="text-[13px] font-medium leading-snug">{p.headline}</span>
+            {edit && (
+              <span className="text-[11px] text-text-dim">Fill in the blank, then send.</span>
+            )}
           </button>
-        ))}
-      </div>
-    </>
+        );
+      })}
+    </div>
   );
 }
 
