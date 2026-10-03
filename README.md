@@ -109,7 +109,7 @@ capital with it.**
 3. **Combines paid intelligence with live sports and on-chain signals**: game state, market
    depth, price movement, settlement history.
 4. **Executes through the Dynamic Market Hook and a Circle Developer-Controlled Wallet**: takes
-   a position, sizes it under its cap, and bridges USDC in via CCTP when it needs to fund it.
+   a position and sizes it under its cap.
 5. **Manages the position**: hedging strategies fire on price and game-state ticks under a
    policy cap, and auto-disarm when a market freezes.
 
@@ -252,10 +252,10 @@ Fireblocks, Copper, and others): recorded, never integrated. Full spec:
 ### Circle
 
 - **Developer-Controlled Wallets** (`@circle-fin/developer-controlled-wallets`): server-managed
-  agent wallets (smart-contract accounts) that sign and execute on Base Mainnet; the user's
+  agent wallets (smart-contract accounts) that sign and execute on Arc Mainnet; the user's
   signing key is never touched by the agent path.
-- **Gas Station and Paymaster**: every agent transaction is sponsored by Circle Gas Station and
-  user transactions by Circle Paymaster, so no wallet on the platform holds ETH.
+- **Gas Station**: every agent transaction is sponsored by Circle Gas Station. Arc's gas token
+  is USDC, so no wallet on the platform ever holds ETH.
 - **x402 agent marketplace** (`@x402/fetch` plus `@x402/extensions` Bazaar discovery): the full
   paid-services catalog at [agents.circle.com/services](https://agents.circle.com/services),
   paid per-call in USDC via EIP-3009 authorizations from the agent's buyer EOA. Mantua is also
@@ -263,26 +263,18 @@ Fireblocks, Copper, and others): recorded, never integrated. Full spec:
   trading quote/calldata, portfolio exposure, hedging plans, sports intelligence) through a
   dual-rail paywall (Gateway nanopayments plus vanilla exact), plus the legacy `GET
 /api/x402/analyst-brief` ($0.01); dark by default, go-live counsel-gated.
-- **USDC**: Circle's stablecoin, native on Base Mainnet, the collateral behind every market and
-  the unit every balance and payout is quoted in.
+- **USDC**: Circle's stablecoin, native on Arc Mainnet (it is the chain's gas token), the
+  collateral behind every market and the unit every balance and payout is quoted in.
 
-### Base
+### Arc
 
-- **Base Mainnet** (chain id `8453`): Coinbase's Ethereum L2. RPC
-  `https://mainnet.base.org` (fallback `https://base-rpc.publicnode.com`); explorer
-  [BaseScan](https://basescan.org).
-- **BaseScan API** powers the agent's on-chain analysis tools (address activity,
-  token holders, transaction decoding).
-
-### Pyth Network
-
-- **Hermes price feeds**: the price source behind `getUsdPrice` for portfolio and balance
-  valuation, with DefiLlama as automatic fallback.
+- **Arc Mainnet** (chain id `5042`): Circle's USDC-native L1. RPC `https://rpc.mainnet.arc.io`
+  (set `ARC_RPC_URL` to a dedicated provider in production); explorer
+  [explorer.arc.io](https://explorer.arc.io), with Sourcify verification.
 
 ### Application
 
-- **Client**: Vite + React + TypeScript SPA; Privy auth (embedded and external wallets), viem,
-  lightweight-charts.
+- **Client**: Vite + React + TypeScript SPA; Privy auth (embedded and external wallets), viem.
 - **Server**: Express + TypeScript API; Anthropic **Claude** (`claude-opus-4-8`) agent loop,
   Drizzle ORM + Postgres (Neon). Deployed on **Vercel** (serverless) with crons: sports-sync
   (ingest plus on-chain market/pool creation), resolution (settlement), strategies (hedging
@@ -299,7 +291,8 @@ the trading freeze all hold even if the app is bypassed. Its eight Solidity modu
 this repo under
 [`contracts/src/hooks/dynamic-market/`](contracts/src/hooks/dynamic-market), alongside the
 market primitives in [`contracts/src/markets/`](contracts/src/markets) and the Foundry deploy
-scripts in [`contracts/script/`](contracts/script). Base Mainnet deployment is pending.
+scripts in [`contracts/script/`](contracts/script). The stack is live on Arc Mainnet (see
+_Deployed contracts_ below).
 
 > The hook shipped against the authoritative spec in
 > [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md) and the Mantua fee
@@ -321,34 +314,33 @@ Hook permission bits and PoolManager wiring are verified by `npm run verify:hook
 
 ## Deployed contracts
 
-The single supported chain is **Base Mainnet `8453`** (verifiable on
-[BaseScan](https://basescan.org)). The canonical machine-readable source is
+The single supported chain is **Arc Mainnet `5042`** (verifiable on
+[explorer.arc.io](https://explorer.arc.io)). The canonical machine-readable source is
 [`server/src/lib/v4-contracts.ts`](server/src/lib/v4-contracts.ts) and
-[`server/src/lib/markets-contracts.ts`](server/src/lib/markets-contracts.ts).
+[`server/src/lib/markets-contracts.ts`](server/src/lib/markets-contracts.ts); the deployment
+records are in [`deploy/dynamic-market/README.md`](deploy/dynamic-market/README.md) and
+[`deploy/agentic-commerce/README.md`](deploy/agentic-commerce/README.md).
 
-### Uniswap v4 (canonical Base Mainnet deployment)
+Arc has no canonical Uniswap v4 stack, so the market stack is Mantua's own, deployed
+2026-09-29/30:
 
-| Contract        | Address                                      |
-| --------------- | -------------------------------------------- |
-| PoolManager     | `0x498581fF718922c3f8e6A244956aF099B2652b2b` |
-| PositionManager | `0x7C5f5A4bBd8fD63184577525326123B519429bDc` |
-| StateView       | `0xA3c0c9b65baD0b08107Aa264b0f3dB444b867A71` |
-| V4Quoter        | `0x0d5e0F971ED27FBfF6c2837bf31316121532048D` |
+| Contract            | Address                                                               |
+| ------------------- | --------------------------------------------------------------------- |
+| PoolManager         | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                          |
+| PositionManager     | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                          |
+| StateView           | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                          |
+| V4Quoter            | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                          |
+| MarketStateRegistry | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                          |
+| DynamicMarketHook   | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                          |
+| MarketFactory       | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                          |
+| Resolver            | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                          |
+| AgenticCommerce     | `0xC8972dd832f4465ad068c754062B01d2f7216b8D` (UUPS proxy, 2026-10-01) |
+| USDC (collateral)   | `0x3600000000000000000000000000000000000000`                          |
 
-### Mantua contracts: Base Mainnet deployment pending
-
-Mantua's own contracts (DynamicMarketHook, MarketStateRegistry, MarketFactory, Resolver, and
-the AgenticCommerce (ERC-8183) escrow) have **no mainnet addresses yet**. They are configured
-through env overrides, default to `null`, and the app degrades gracefully until they are
-deployed. The deployment and verification checklist lives in
-[`docs/security/hook-deployments.md`](docs/security/hook-deployments.md); the step-by-step
-runbook and the deployment record live in
-[`deploy/dynamic-market/README.md`](deploy/dynamic-market/README.md).
-
-Once deployed: each game's Market contract and YES/NO tokens are minted by the factory at
-ingest time, with deterministic ids and one market per side per game. The Resolver is the
-fixed settlement authority every market burns in as an immutable; the keys behind it rotate
-without redeploying a single market.
+Each game's Market contract and YES/NO tokens are minted by the factory at ingest time, with
+deterministic ids and one market per side per game. The Resolver is the fixed settlement
+authority every market burns in as an immutable; the keys behind it rotate without redeploying
+a single market.
 
 ---
 
@@ -363,17 +355,17 @@ server/      Express + TypeScript API (port 3001): market calldata builders, quo
              (lib/agent), social posting (lib/social), the support agent (lib/support),
              custody (lib/custody), the x402 seller catalog (lib/x402), Drizzle schema
 contracts/   Foundry contracts: market primitives (MarketFactory, Market, OutcomeToken,
-             Resolver, pool bootstrap), the Dynamic Market Hook (8 modules), full-lifecycle
-             E2E tests, and the deploy scripts (contracts/script/)
+             Resolver, pool bootstrap), the Dynamic Market Hook (8 modules), the Arc fork
+             E2E, and the deploy scripts (contracts/script/)
 deploy/      Deploy runbooks, the deploy wrapper, and per-chain deployment records for the
              market stack and the agent-commerce escrow
 docs/        Architecture, specs, decision memos, task lists, legal drafts
 ```
 
 - **Wallets.** Users connect via Privy (embedded and external). Agents use **Circle
-  Developer-Controlled Wallets** (server-managed smart-contract accounts on Base); the user's
+  Developer-Controlled Wallets** (server-managed smart-contract accounts on Arc); the user's
   signing key is never touched by the agent path.
-- **Market pools.** Every market pool resolves to the canonical Base Mainnet v4 stack plus the
+- **Market pools.** Every market pool lives on Mantua's own v4 PoolManager on Arc, with the
   market periphery the factory bootstraps; the pool's hook is always the Dynamic Market Hook.
 
 ---
@@ -498,14 +490,13 @@ on the home page itself (`client/src/components/shell/Footer.tsx`).
 
 ```bash
 cd contracts
-forge test    # market primitives, the Dynamic Market Hook suite, invariants, full-lifecycle E2E
+forge test    # market primitives, the Dynamic Market Hook suite, invariants, the Arc fork E2E
 ```
 
 > **Dependencies are not vendored.** `contracts/lib/` is gitignored, so a fresh checkout has no
 > forge-std, solmate, OpenZeppelin, v4-core, or v4-periphery and the Solidity will not compile
-> until they are installed. They are not yet pinned as submodules; install them into
-> `contracts/lib/` before building (the exact clone commands are in
-> [`deploy/dynamic-market/README.md`](deploy/dynamic-market/README.md)).
+> until they are installed into `contracts/lib/` (the exact commands are in
+> [`contracts/README.md`](contracts/README.md)).
 
 Optional: the agent can pay per-call for premium data via the x402
 marketplace (off by default; set `X402_ENABLED=1` and fund the buyer wallet);
@@ -514,7 +505,7 @@ see [`docs/x402-setup.md`](docs/x402-setup.md).
 ## Deploying the on-chain stack
 
 The Dynamic Market Hook stack (a dedicated PoolManager, the MarketStateRegistry, and the hook
-at its mined CREATE2 address) deploys to Base Mainnet with
+at its mined CREATE2 address) deploys to Arc Mainnet with
 `deploy/dynamic-market/deploy.sh hook`, followed by `deploy.sh periphery` against the
 PoolManager the first step printed. The wrapper checks the chain id, prints the deployer
 address and balance, runs the salt-mine and hook suites, shows the fork dry run with the gas

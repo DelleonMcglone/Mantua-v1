@@ -31,14 +31,7 @@ export default tseslint.config(
       "contracts/out/**",
       "contracts/cache/**",
       "contracts/lib/**",
-      // Hook submodules are Foundry projects (Solidity + vendored lib/ trees
-      // that carry their own eslint configs) — not ours to lint.
-      "contracts/hooks/**",
       "server/drizzle/migrations/**",
-      "Mantua Prototype.html",
-      "/src/**",
-      "/landing/**",
-      "/assets/**",
     ],
   },
   js.configs.recommended,
