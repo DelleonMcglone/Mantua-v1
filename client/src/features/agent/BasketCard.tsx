@@ -56,9 +56,11 @@ export function BasketPreviewCard({
         {legs.map((l) => (
           <div
             key={`${l.providerEventId}-${String(l.outcomeIndex)}`}
-            className="flex items-baseline gap-3 text-[13px]"
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13px]"
           >
-            <span className="min-w-0 flex-1 truncate font-medium">{legName(l)}</span>
+            <span className="basis-full font-medium sm:min-w-0 sm:flex-1 sm:basis-auto sm:truncate">
+              {legName(l)}
+            </span>
             <span className="font-mono text-text-dim">
               {l.contracts === null ? "—" : `${l.contracts.toFixed(2)} ct`}
             </span>
@@ -103,9 +105,11 @@ export function BasketFillsCard({
         {legs.map((l) => (
           <div
             key={`${l.providerEventId}-${String(l.outcomeIndex)}`}
-            className="flex items-baseline gap-3 text-[13px]"
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-[13px]"
           >
-            <span className="min-w-0 flex-1 truncate font-medium">{legName(l)}</span>
+            <span className="basis-full font-medium sm:min-w-0 sm:flex-1 sm:basis-auto sm:truncate">
+              {legName(l)}
+            </span>
             <span className="font-mono text-text-dim">{l.received ?? "—"}</span>
             <span className="font-mono">{usd(l.amountUsdc)}</span>
             <span className="font-mono text-[12px] text-text-dim">

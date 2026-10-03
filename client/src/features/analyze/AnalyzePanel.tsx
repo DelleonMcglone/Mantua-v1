@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { PanelHeader } from "@/components/shell/PanelHeader.tsx";
 import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
+import { SourcePill } from "@/features/agent/SourcePill.tsx";
+import { appendStep, appendText, type MessagePart } from "@/features/agent/message-parts.ts";
 import {
   needsInput,
   promptText,
@@ -75,10 +77,19 @@ interface TopicTurn {
   error: string | null;
 }
 /** An AI-streamed free-form research answer. */
+interface ChatStep {
+  id: string;
+  tool: string;
+  status: "running" | "ok" | "error";
+  data?: unknown;
+}
 interface ChatTurn {
   id: string;
   role: "chat";
   text: string;
+  /** Text and data reads in arrival order; reads render as source pills. */
+  parts: MessagePart[];
+  steps: ChatStep[];
   streaming: boolean;
   failed?: string;
 }
@@ -189,7 +200,34 @@ export function AnalyzePanel({
           { message: question, history },
           (ev) => {
             if (ev.type === "text") {
-              patch(id, (m) => (m.role === "chat" ? { ...m, text: m.text + ev.delta } : m));
+              patch(id, (m) =>
+                m.role === "chat"
+                  ? { ...m, text: m.text + ev.delta, parts: appendText(m.parts, ev.delta) }
+                  : m,
+              );
+            } else if (ev.type === "tool_start") {
+              patch(id, (m) =>
+                m.role === "chat"
+                  ? {
+                      ...m,
+                      parts: appendStep(m.parts, ev.id),
+                      steps: [...m.steps, { id: ev.id, tool: ev.tool, status: "running" }],
+                    }
+                  : m,
+              );
+            } else if (ev.type === "tool_result") {
+              patch(id, (m) =>
+                m.role === "chat"
+                  ? {
+                      ...m,
+                      steps: m.steps.map((st) =>
+                        st.id === ev.id
+                          ? { ...st, status: ev.ok ? "ok" : "error", data: ev.data }
+                          : st,
+                      ),
+                    }
+                  : m,
+              );
             } else if (ev.type === "error") {
               patch(id, (m) => (m.role === "chat" ? { ...m, failed: ev.message } : m));
             }
@@ -244,7 +282,14 @@ export function AnalyzePanel({
       const history = buildHistory();
       const userTurn: UserTurn = { id: nextId(), role: "user", text };
       const turnId = nextId();
-      const chatTurn: ChatTurn = { id: turnId, role: "chat", text: "", streaming: true };
+      const chatTurn: ChatTurn = {
+        id: turnId,
+        role: "chat",
+        text: "",
+        parts: [],
+        steps: [],
+        streaming: true,
+      };
       setMessages((prev) => [...prev, userTurn, chatTurn]);
       void streamChat(turnId, text, history).finally(() => {
         busyRef.current = false;
@@ -375,15 +420,25 @@ function TurnView({
             <span className="text-[13px] text-text-dim">Researching…</span>
           </div>
         )}
-        {turn.text && (
-          <div
-            className="text-[13px] text-text leading-relaxed"
-            style={{ whiteSpace: "pre-wrap", maxWidth: "92%" }}
-          >
-            <RichText text={turn.text} />
-            {turn.streaming && <Caret />}
-          </div>
-        )}
+        {turn.parts.map((part, i) => {
+          if (part.kind === "step") {
+            const step = turn.steps.find((st) => st.id === part.id);
+            return step ? (
+              <SourcePill key={part.id} tool={step.tool} status={step.status} data={step.data} />
+            ) : null;
+          }
+          const last = i === turn.parts.length - 1;
+          return (
+            <div
+              key={`text-${String(i)}`}
+              className="text-[13px] text-text leading-relaxed"
+              style={{ whiteSpace: "pre-wrap", maxWidth: "92%" }}
+            >
+              <RichText text={part.text} />
+              {turn.streaming && last && <Caret />}
+            </div>
+          );
+        })}
         {turn.failed && (
           <Banner tone="error" icon="⊘" title="Something went wrong">
             {turn.failed}
