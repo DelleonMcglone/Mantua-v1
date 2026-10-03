@@ -1,13 +1,13 @@
 # Deploy scripts and runbooks
 
 Standalone deploy scripts and records that live outside the main
-Foundry project in `contracts/`. Everything here targets **Base
-Mainnet (8453)** — the single chain Mantua supports.
+Foundry project in `contracts/`. Everything here targets **Arc
+Mainnet (5042)** — the single chain Mantua supports.
 
-| Directory | Contents |
-|---|---|
-| [`dynamic-market/`](dynamic-market/README.md) | Runbook + records for the Dynamic Market Hook stack (dedicated PoolManager, MarketStateRegistry, mined hook, markets periphery). The script itself lives at `contracts/script/DeployDynamicMarket.s.sol`. |
-| [`agentic-commerce-base/`](agentic-commerce-base/README.md) | ERC-8183 AgenticCommerce escrow (UUPS implementation + ERC1967 proxy, Base USDC as payment token). |
+| Directory                                         | Contents                                                                                                                                                                                                  |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`dynamic-market/`](dynamic-market/README.md)     | Runbook + records for the Dynamic Market Hook stack (dedicated PoolManager, MarketStateRegistry, mined hook, markets periphery). The script itself lives at `contracts/script/DeployDynamicMarket.s.sol`. |
+| [`agentic-commerce/`](agentic-commerce/README.md) | ERC-8183 AgenticCommerce escrow (UUPS implementation + ERC1967 proxy, Arc USDC as payment token).                                                                                                         |
 
 Conventions shared by the scripts:
 
@@ -18,11 +18,10 @@ Conventions shared by the scripts:
 - `run()` returns nothing on purpose — a returning `run()` breaks
   `--broadcast` serialization.
 - Keep deployer keys in an encrypted keystore (`cast wallet import ...
-  --interactive`), never in a plaintext env var or command line.
-- Verify sources on [BaseScan](https://basescan.org) with
-  `BASESCAN_API_KEY` (the `[etherscan] base` entry in
-  `contracts/foundry.toml`).
+--interactive`), never in a plaintext env var or command line.
+- Verify sources on the [Arc explorer](https://explorer.arc.io) via
+  Sourcify (`deploy/dynamic-market/verify.sh`) — the explorer's API is
+  behind Cloudflare, so the web form is the fallback.
 
-After each deploy, paste the printed addresses back so they can be wired
-into the app's env-driven contract registry (no addresses are hard-coded
-until a mainnet deployment exists — see `docs/tasks/v2-roadmap.md`).
+After each deploy, record the printed addresses in the runbook and wire
+them into the app's env-driven contract registry.

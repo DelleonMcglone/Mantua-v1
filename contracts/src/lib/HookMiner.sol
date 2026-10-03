@@ -12,10 +12,10 @@ pragma solidity ^0.8.21;
  *         is more invasive than copying ~50 lines. Re-sync if upstream
  *         restores HookMiner or relocates it.
  *
- *         Used by `script/DeployStableProtection.s.sol` to mine
+ *         Used by `script/DeployDynamicMarket.s.sol` to mine
  *         a CREATE2 salt that produces a hook address whose lower 14 bits
  *         encode the `beforeInitialize | beforeSwap | afterSwap` permission
- *         flags required by `StableProtectionHook.getHookPermissions()`.
+ *         flags required by `DynamicMarketHook.getHookPermissions()`.
  */
 
 import {Hooks} from "@uniswap/v4-core/src/libraries/Hooks.sol";

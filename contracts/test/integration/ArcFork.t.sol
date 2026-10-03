@@ -17,12 +17,9 @@ import {Test} from "forge-std/Test.sol";
  *   2. Public endpoint `https://rpc.mainnet.arc.io` (rate-limited; OK for
  *      bytecode/permission-flag checks; not great for high-fanout reads)
  *
- * Mantua's hooks have no Arc Mainnet deployment yet, so their addresses
- * come from env vars rather than checked-in constants:
- *   `STABLE_PROTECTION_HOOK_ADDRESS`, `DYNAMIC_FEE_HOOK_ADDRESS`
- * Tests that need a hook call `_requireHook(...)` and skip cleanly while
- * the env var is unset — once the mainnet deploy lands, set the vars and
- * the suite runs in full.
+ * Mantua's PoolManager address comes from the `POOL_MANAGER` env var
+ * rather than a checked-in constant. Tests that need it call
+ * `_requirePoolManager()` and skip cleanly while the var is unset.
  *
  * Run from repo root:
  *   forge test --match-path "contracts/test/integration/*.t.sol" -vv
@@ -36,23 +33,11 @@ abstract contract ArcFork is Test {
     /// the `POOL_MANAGER` env var, address(0) until that deploy lands.
     address internal V4_POOL_MANAGER;
 
-    /// Mantua hook addresses — env-driven, address(0) until deployed.
-    address internal STABLE_PROTECTION_HOOK;
-    address internal DYNAMIC_FEE_HOOK;
-
-    /// Lower 14 bits of a hook address encode its lifecycle permissions
-    /// per Uniswap v4 Hooks.sol — see also contracts/script/verify-hooks.ts.
-    uint16 internal constant FLAG_BEFORE_INITIALIZE = 1 << 13;
-    uint16 internal constant FLAG_BEFORE_SWAP = 1 << 7;
-    uint16 internal constant FLAG_AFTER_SWAP = 1 << 6;
-
     function setUp() public virtual {
         string memory rpc = _resolveRpc();
         vm.createSelectFork(rpc);
         require(block.chainid == ARC_CHAIN_ID, "fork: not Arc Mainnet");
         V4_POOL_MANAGER = _envHook("POOL_MANAGER");
-        STABLE_PROTECTION_HOOK = _envHook("STABLE_PROTECTION_HOOK_ADDRESS");
-        DYNAMIC_FEE_HOOK = _envHook("DYNAMIC_FEE_HOOK_ADDRESS");
     }
 
     function _resolveRpc() internal returns (string memory) {
@@ -62,7 +47,7 @@ abstract contract ArcFork is Test {
         return "https://rpc.mainnet.arc.io";
     }
 
-    /// Reads a hook address from the env; address(0) means "not deployed yet".
+    /// Reads an address from the env; address(0) means "not deployed yet".
     function _envHook(string memory envVar) internal returns (address) {
         try vm.envAddress(envVar) returns (address hook) {
             return hook;
@@ -70,20 +55,9 @@ abstract contract ArcFork is Test {
         return address(0);
     }
 
-    /// Skips the calling test while the hook's Arc deployment is pending.
-    function _requireHook(address hook) internal {
-        if (hook == address(0)) vm.skip(true);
-    }
-
     /// Skips the calling test until Mantua's PoolManager is deployed on Arc
     /// and named in `POOL_MANAGER`.
     function _requirePoolManager() internal {
         if (V4_POOL_MANAGER == address(0)) vm.skip(true);
-    }
-
-    function _hookFlags(address hook) internal pure returns (uint16) {
-        // Permission flags live in the lower 14 bits — truncation is the point.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint16(uint160(hook)) & 0x3FFF;
     }
 }

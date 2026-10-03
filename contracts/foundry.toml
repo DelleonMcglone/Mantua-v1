@@ -4,8 +4,8 @@ out = "out"
 libs = ["lib"]
 test = "test"
 script = "script"
-# Phase 5b-3.2: auto-detect handles per-file pragma. Vendored hook submodules
-# pin `pragma solidity 0.8.26` (exact); monorepo-owned scripts target 0.8.27.
+# Auto-detect handles per-file pragma: the vendored ERC-8183 contracts pin
+# `pragma solidity 0.8.26` (exact); monorepo-owned sources target 0.8.27+.
 # A single fixed `solc` setting can't satisfy both.
 auto_detect_solc = true
 optimizer = true
