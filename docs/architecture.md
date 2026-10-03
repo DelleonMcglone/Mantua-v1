@@ -8,20 +8,19 @@ Living document. Updated as the build progresses.
 mantua-intelligence/
 ├── client/                  # Vite + React 19 + TS strict + Tailwind 4 frontend
 ├── server/                  # Express 5 + TS + Drizzle + Zod backend
-├── contracts/               # Foundry project for Uniswap v4 hooks
+├── contracts/               # Foundry project: markets, the Dynamic Market Hook, AgenticCommerce
+├── deploy/                  # deploy runbooks and Arc deployment records
 ├── docs/
 │   ├── architecture.md      # this file
 │   ├── tasks/               # roadmaps, task lists
 │   ├── decisions/           # decision memos
-│   ├── design/              # design tokens, deviations from prototype
+│   ├── design/              # design tokens, mobile audits
 │   ├── promptHistory/       # notable LLM prompts and outputs
 │   └── security/            # AI-assisted security analysis findings + sign-off
-├── prototype/               # NOT YET — v1 prototype currently lives at repo root
-│   └── (Mantua Prototype.html, src/, assets/, landing/)
 └── README.md
 ```
 
-The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) currently lives at the repo root and is the design reference for Phase D. It will be moved into `prototype/` in a later phase if needed; until then it is read-only.
+The v1 prototype that once lived at the repo root (`Mantua Prototype.html`, `src/`, `assets/`, `landing/`) was removed on 2026-10-03 with the rest of the stablecoin-era artifacts; the design tokens it informed live in `docs/design/components.md`.
 
 ## Stack at a glance
 
@@ -34,7 +33,7 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 | ORM         | Drizzle                                   | TS-first, lightweight, schema-as-code             |
 | Validation  | Zod 4                                     | Runtime + compile-time guarantees at boundaries   |
 | DB          | PostgreSQL (Neon planned per D-004)       | Serverless Postgres with branching for staging    |
-| Contracts   | Foundry (forge / anvil / cast)            | Standard for v4 hook work                         |
+| Contracts   | Foundry (forge / anvil / cast)            | Standard for v4 hook and market work              |
 | LLM         | Anthropic Claude primary, OpenAI fallback | Per D-013; provider-abstracted                    |
 
 ## Open architectural notes
@@ -42,10 +41,10 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 - **Branching (B-011):** one branch per task document, named to match —
   task docs live in `docs/tasks/NNN-short-slug.md` and the branch carries
   the same `NNN-short-slug` name. See `docs/tasks/011-branch-management.md`.
-- **Chain lock:** Arc Mainnet only (chain ID 5042; decided 2026-09-29, previously Base). Privy `supportedChains` and viem clients are configured with Arc only; any other chain ID is rejected at the boundary. The `useBaseWalletClient` hook (`client/src/lib/privy/wallet-client.ts`) attempts an automatic chain switch and throws if the wallet remains off-Base.
+- **Chain lock:** Arc Mainnet only (chain ID 5042; decided 2026-09-29, previously Base). Privy `supportedChains` and viem clients are configured with Arc only; any other chain ID is rejected at the boundary. The `useChainWalletClient` hook (`client/src/lib/privy/wallet-client.ts`) attempts an automatic chain switch and throws if the wallet remains off-Arc.
 - **Two-process dev:** `npm run dev` at the root spawns client (Vite, HTTPS via self-signed cert) and server (Express) in parallel. Each has its own port. Frontend talks to backend via a base URL from env.
 - **HTTPS in dev:** Privy's Web Crypto API key sharding silently fails over plain HTTP outside `localhost`. The Vite dev server runs HTTPS by default via `@vitejs/plugin-basic-ssl`. The browser will warn about the self-signed cert on first load — that's expected; click through. Staging/prod use real TLS (Vercel handles this for the frontend).
-- **Single shared logic:** Critical Phase 3 / Phase 4 modules (swap, liquidity) are written once on the server and exposed via API endpoints; the agent (Phase 6) calls the same endpoints. No client-side duplication of swap-construction logic.
+- **Single shared logic:** the market trade builder and quote path are written once on the server and exposed via API endpoints; the agent calls the same endpoints. No client-side duplication of calldata construction.
 
 ## Auth flow (Phase 2)
 
@@ -57,62 +56,14 @@ The v1 prototype (`Mantua Prototype.html` + `src/` + `assets/` + `landing/`) cur
 
 `req.walletAddress` is what `walletRateLimiter` (P1-007) keys on once auth is wired into write paths.
 
-## Fiat rails — Deposit → Trade → Withdraw (Phase F)
+## Fiat rails — removed (D-123, 2026-10-02)
 
-### D-101: selected provider and integration boundary
-
-**Selected ramp: Zero Hash, subject to execution of its platform agreement and
-production approval.** Zero Hash is the regulated financial counterparty for
-USD ↔ USDC conversion, ACH/RTP money movement, customer KYC/AML and transaction
-monitoring. Mantua is an orchestration and trading application; it does not
-accept customer deposits, hold a fiat balance, custody the customer’s primary
-wallet keys, or make compliance eligibility decisions.
-
-**Bank link: Plaid.** Mantua obtains a Plaid Link token server-side and receives
-only the short-lived public token callback. It exchanges that token server-side
-and creates a Zero Hash processor token/external account. Raw account/routing
-numbers and Plaid access tokens must never reach the browser, app database,
-logs, analytics, or LLM context. Plaid products required before production are
-Auth, Balance, Identity, and Identity Match.
-
-| Product surface      | Behind the scenes                                                              | Owner / boundary                                            |
-| -------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| Connect bank account | Plaid Link → processor token → Zero Hash external account                      | Plaid + Zero Hash                                           |
-| Deposit dollars      | ACH/RTP debit → Zero Hash conversion → USDC delivered to the user’s Arc wallet | Zero Hash; Circle provides wallet infrastructure where used |
-| Trade                | User signs an Arc transaction through Privy; Mantua routes market activity     | User / Privy / Arc                                          |
-| Withdraw dollars     | USDC conversion → ACH/RTP credit to the linked account                         | Zero Hash                                                   |
-| Direct USDC          | User trades from their connected Arc wallet without a bank link                | User / Privy / Arc                                          |
-
-The product wording intentionally excludes wallets, bridges, private keys,
-network names, and gas from cash screens. It says only **Deposit**, **Trade**,
-and **Withdraw**. The existing Circle agent wallet remains a separately funded,
-bounded agent budget; it is never a hidden destination for a user’s fiat
-deposit and cannot initiate a user withdrawal.
-
-### Current implementation and production gate
-
-`server/src/routes/fiat-rails.ts` provides the authenticated product contract:
-state, sandbox bank-link initiation, deposits, withdrawals, and audit events.
-`FIAT_RAILS_MODE=disabled` is the production-safe default. A deterministic
-`sandbox` adapter supports the user flow and E2E-style state transitions without
-contacting a bank or minting USDC. `live` deliberately fails closed until all of
-the following are completed:
-
-1. Zero Hash agreement, participant/platform code, production API access, and
-   explicit Arc-USDC availability are confirmed.
-2. Plaid production approval and the Zero Hash processor integration are
-   enabled; credentials are stored in the deployment secrets manager.
-3. Provider request signing, webhook signature verification, idempotency keys,
-   persisted transfer/external-account records, reconciliation, and support
-   recovery runbook are implemented and independently tested.
-4. A sandbox test proves: link bank → initiate deposit → completed status →
-   credited wallet balance → withdrawal → provider receipt. No simulated result
-   counts as fiat movement evidence.
-
-Zero Hash may reject, hold, return, or reverse a transfer; UI states therefore
-remain `pending`, `complete`, or `needs attention` and never optimistically
-credit a user balance. Pending cash activity is refreshed automatically and the
-provider’s final receipt is the source of truth in live mode.
+Mantua is USDC in, USDC out. The Zero Hash + Plaid on/off-ramp designed
+under D-101 and built as Phase F was never enabled in production and was
+removed from the codebase on 2026-10-03 (server routes, store, webhook,
+client tab, env vars; the fiat tables are dropped by migration 0029).
+The history of that design lives in `docs/decisions/` and the task
+ledgers; nothing in the running app accepts dollars or bank accounts.
 
 ## Circle agent wallet (Phase 6)
 
@@ -221,21 +172,21 @@ Both deferrals are tracked in `docs/tasks/v2-roadmap.md` and revisited at the en
 
 The v1 prototype (`Mantua Prototype.html`) is the design spec. Phase D extracts it into a reusable system before feature phases build UIs on top.
 
-| Artifact           | Path                                                          |
-| ------------------ | ------------------------------------------------------------- |
-| Constraint capture | `docs/design/notes.md`                                        |
-| Token source       | `client/src/styles/tokens.css` (CSS vars)                     |
-| Tailwind 4 binding | `client/src/index.css` (`@theme inline`)                      |
-| Component mapping  | `docs/design/components.md`                                   |
-| Shell scaffold     | `client/src/components/shell/{AppShell,Header,Logo,Card}.tsx` |
-| Confirmation seam  | `client/src/hooks/use-confirmed-action.tsx`                   |
-| Theme toggle       | `client/src/hooks/use-theme.tsx` (`html[data-theme]`)         |
+| Artifact           | Path                                                           |
+| ------------------ | -------------------------------------------------------------- |
+| Constraint capture | `docs/design/notes.md` (removed 2026-10-03 with the prototype) |
+| Token source       | `client/src/styles/tokens.css` (CSS vars)                      |
+| Tailwind 4 binding | `client/src/index.css` (`@theme inline`)                       |
+| Component mapping  | `docs/design/components.md`                                    |
+| Shell scaffold     | `client/src/components/shell/{AppShell,Header,Logo,Card}.tsx`  |
+| Confirmation seam  | `client/src/hooks/use-confirmed-action.tsx`                    |
+| Theme toggle       | `client/src/hooks/use-theme.tsx` (`html[data-theme]`)          |
 
 ### Deviations from the prototype
 
 PD-007 — things the prototype shows differently from how v2 will ship, with rationale.
 
-- **Responsive design.** The prototype hard-locks `<meta viewport width=1400>`. v2 must support mobile. Added our own breakpoints in `docs/design/notes.md`. Right-column slide-in sheet (mobile) lands as a Phase D follow-up when the first feature actually needs it.
+- **Responsive design.** The prototype hard-locks `<meta viewport width=1400>`. v2 must support mobile. Our own breakpoints are in `client/src/index.css`. Right-column slide-in sheet (mobile) lands as a Phase D follow-up when the first feature actually needs it.
 - **Onboarding modal removed.** The four-screen welcome carousel from the prototype was dropped per design feedback (PR [#1](https://github.com/DelleonMcglone/Mantua-Intelligence/pull/1)). v2 lands users on the login screen directly. The login screen reuses the welcome modal's visual style.
 - **Self-signed HTTPS in dev.** Privy needs a secure context. Added `@vitejs/plugin-basic-ssl`. Browser shows a one-time cert warning. (Documented earlier, not a Phase D-specific deviation.)
 - **Focus-visible rings.** Prototype doesn't show keyboard focus. v2 adds a 2px accent-purple ring on every `:focus-visible` (in `client/src/index.css`) per WCAG 2.1 AA.
@@ -298,40 +249,12 @@ read end-to-end with file:line evidence; verdicts are **KEEP** (production-
 usable as-is), **REFACTOR** (usable after named changes), **REPLACE** (wrong
 for mainnet), or **MISSING** (needs building). Effort is S/M/L.
 
-### Swap module
+### Swap and liquidity modules
 
-The quote path is production-grade; the execution path is not — it was built
-on `PoolSwapTest`, which does not exist on mainnet (`poolSwapTest: null`), so
-every swap-execution entry point (user calldata route, agent swap, intents,
-chat tool, rebalance) currently errors.
-
-| Component                                                                                                                    | Verdict                  | Why                                                                                                                                                                                              | Effort |
-| ---------------------------------------------------------------------------------------------------------------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| V4Quoter quote path (`quoteExactInputV4`, `resolveInitializedFee`, revert decoding, `readSlot0`/StateView, max-input search) | KEEP                     | Canonical live mainnet contracts; well-engineered caching and error decoding                                                                                                                     | S      |
-| `buildPoolSwapTestCalldata` (`server/src/lib/v4-onchain-swap.ts:620`)                                                        | REPLACE                  | Target contract absent on 8453; no `amountOutMinimum`, no deadline. Replace with UniversalRouter `V4_SWAP` + Permit2 — both constants already declared in `v4-contracts.ts` but wired to nothing | M      |
-| `/api/v4/swap/calldata` route + client `useSwap`                                                                             | REFACTOR                 | Route shape (server-side re-quote, min-out derivation) is right; swap the builder, add deadline, replace infinite-approve-to-test-router with bounded approve→Permit2                            | M      |
-| `swapFromAgentWallet` guard chain                                                                                            | REFACTOR                 | Cap/ledger/audit scaffolding keeps; `slippageTolerance` is validated then silently dropped — no min-out on agent swaps at all                                                                    | M      |
-| Hook-null fallback (`resolveHookAddress`)                                                                                    | REFACTOR                 | Silently substitutes the no-hook pool when a hook is undeployed; must fail closed and hide undeployed hook venues in the UI                                                                      | S      |
-| Uniswap Trading API path (`lib/uniswap.ts`, `/api/quote`, `/api/swap/*`)                                                     | KEEP as no-hook fallback | Handles Permit2/slippage properly and indexes mainnet pools, but has zero client callers today — wire it or delete it, don't leave it registered-but-unreachable                                 | S      |
-| 8 dead client swap components (~456 LOC, incl. the never-wired `SlippageInput` — slippage is hardcoded 50 bps)               | REPLACE (delete)         | Zero importers                                                                                                                                                                                   | S      |
-| CCTP bridge venue                                                                                                            | KEEP                     | Only execution path that works on mainnet today; all-mainnet destinations                                                                                                                        | —      |
-
-### Liquidity module
-
-The calldata layer is genuinely production-grade — real
-`PositionManager.modifyLiquidities` multicalls with Permit2, correct v4 fee
-accounting, no test routers anywhere. The data layer around it has three hard
-mainnet blockers.
-
-| Component                                                                                                                                                       | Verdict               | Why                                                                                                                                                                                                          | Effort |
-| --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ |
-| Add/remove/collect calldata builders, v4 action encoding, pool-key/tick/liquidity math, Permit2 helpers, accrued-fees math                                      | KEEP                  | Correct against v4-periphery; the strongest code in the app                                                                                                                                                  | —      |
-| On-chain position discovery (`ownedTokenIds`)                                                                                                                   | REPLACE               | Sequential `ownerOf` sweep of tokenIds 1–2000 can never find a real user position on the canonical mainnet PositionManager; replace with subgraph/`Transfer`-log/NFT-index discovery, keep `readOnePosition` | M      |
-| `poolKeyHash` (3 divergent formulas across add-route, pool-create, external-positions)                                                                          | REFACTOR              | Hashes never match, so no `positions` DB row is ever written — user and agent position tracking silently dead. One shared helper; highest value-per-effort fix in the module                                 | S      |
-| `IS_MAINNET` data-source fork in Positions UI                                                                                                                   | REFACTOR              | Permanently-true flag routes the UI to the broken DB path and dead-codes the authoritative on-chain reader; delete the fork                                                                                  | M      |
-| Pool discovery (DefiLlama listing + translator + hook inference)                                                                                                | REPLACE (longer-term) | Returns thousands of mixed v2/v3/v4 Base pools, top-50 reachable, hook binding _guessed_ from (pair, fee); move to the v4 subgraph's real PoolKeys                                                           | L      |
-| `AddLiquidityForm` fee handling                                                                                                                                 | REFACTOR              | `ctx.fee` silently discarded → joining a 0.05% pool creates and seeds a brand-new 0.30% pool with real money; honor the fee and gate pool creation behind an explicit confirm                                | M      |
-| `RemoveLiquidityModal` success callback (stale closure), placeholder position values, localStorage pools/positions as source of truth, ~350 LOC dead components | REFACTOR / delete     | Breadcrumb overlay logic keeps as the post-mint RPC-lag shim only                                                                                                                                            | S–M    |
+Both were audited here on 2026-09-02 and carried for a time behind the
+scope cut; the code was removed on 2026-10-03 (the product trades
+prediction-market outcome tokens through the Dynamic Market Hook only).
+The audit rows are preserved in git history.
 
 ### Wallet layer
 
