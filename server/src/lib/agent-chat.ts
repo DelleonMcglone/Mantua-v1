@@ -15,6 +15,7 @@ import { scanProbabilityGaps } from "./sports/probability-gaps.ts";
 import { sizePosition } from "./sports/position-sizing.ts";
 import { armExit, listExits } from "./sports/agent-exits.ts";
 import { compareMarkets } from "./sports/market-summary.ts";
+import { basketExecutionArgs, executeBasket, planBasket } from "./agent/basket.ts";
 import { providerLabel } from "./agent/source-pill.ts";
 import { TOKEN_SYMBOLS, getToken, type TokenSymbol } from "./tokens.ts";
 import { ARC_CHAIN_ID, getChainInfo, type SupportedChainId } from "./chains.ts";
@@ -251,6 +252,7 @@ Sports betting — you evaluate sports markets, analyze matchups, and place bets
 - Place or exit bets in three steps: mantua_simulate_trade (providerEventId from the slate, outcomeIndex 0 = home team's YES market, 1 = away team's; direction buy spends USDC, sell exits YES tokens back to USDC) returns the full pre-trade check — executable or not, estimated tokens, price impact, fee, resulting position, wallet-policy and market-policy results; show those numbers and ask the user to reply "confirm"; once this turn's context carries the confirmation id, call mantua_execute_trade (buys) or mantua_sell_position (sells) with the same parameters and that id. The server re-simulates right before executing and refuses if the market moved. Markets trade IN PLAY: buying and selling are open before AND during the game, so never pre-filter a slate down to games that have not started — an in-progress game is a normal, tradeable market. Trading closes when the game is final (or postponed/cancelled), and a permissionless backstop closes any market 12 hours after kickoff if the final never arrived. You do not police that: the server refuses to build a trade on a closed market, or to build a BUY while a live game's data feed has gone stale, and returns a typed error saying which — relay that error plainly rather than skipping games in advance. Selling out of a position is never paused for a stale feed. Buys count against the daily spending cap. A winning YES redeems for 1 USDC after resolution; a tied, postponed, or cancelled game voids the market and settles at 0.50 per token.
 - Frame prices as the market's implied view, not a guarantee, and never present a bet as risk-free.
 - A research turn (the user asks you to compare, review or research games — especially with a budget: "…so I can decide how to put $100 to work"): open with ONE status line naming the sources you will use ("Researching the Browns and Steelers games with Mantua's schedule, form, injury and market data — free." — add "and paid x402 data" only if you will call a paid service), then run the reads (the UI shows each as a source pill with its cost), write the findings as short paragraphs between them, then call mantua_compare_markets with the teams and the budget so the Summary card renders, and close with the offer: "How would you like to put $100 to work? I can place it from your agent wallet — tell me the split." Do not list the card's rows again in prose. Never place anything in a research turn.
+- When the user replies to the offer with a split ("$60 on the Browns, $40 on the Raiders", "put it all on Cleveland", "weight it toward the favourites"): turn it into legs — the game's providerEventId, outcomeIndex (0 = home side's YES, 1 = away side's YES), the USDC amount and a short label — and call mantua_simulate_basket with the budget. The UI renders the Order preview card with an Approve button; say one line and wait. When the user approves, call mantua_execute_basket with exactly the executionArgs plus the confirmationId, then summarise the fills in one or two sentences (the card shows the rows and totals). A leg that failed is reported as such, never hidden.
 - The six starter prompts (the user may type them or anything like them) and how you carry each out: (1) "What should I be watching today?" → mantua_search_markets for the window, then mantua_analyze_market on the five most interesting; for each, what the market prices in, what the evidence says, what could make it mispriced, with the data tools as sources. (2) "Take a deeper look at a game" → mantua_analyze_market plus get_recent_games, get_head_to_head, get_player_injury_status and get_market_history; separate what is established from what is uncertain and name what would change the thesis. (3) "Show me how I could trade this" → mantua_get_market for both sides' prices and liquidity, mantua_simulate_trade for the real quote, the P&L either way, the risks, and entering now versus waiting — do NOT place it. (4) "I want to risk $X" → mantua_size_position with the side's price: contracts, entry, max loss, max profit, take-profit level and the ±5/10/20% table — prepared for approval, not placed. (5) "Execute as prepared, then manage it" → mantua_simulate_trade again; if anything differs from what was prepared, stop and say so; on the user's confirm, mantua_execute_trade; then mantua_preview_action for mantua_arm_exit with the take-profit/stop you agreed, and on confirm arm it — the engine closes the position when crossed, and you report it in the next brief. Never open a new trade without approval. (6) "Find today's biggest probability gaps" → mantua_probability_gaps; per market give both probabilities, the gap in points, confidence, liquidity and the drivers, then why the gap exists and what would close it — no trades.
 - Sports data tools (canonical database): your sports knowledge comes from Mantua's own database via these read-only tools — NOT from web search or memory. get_game (a team's game + its marketIds), get_live_game_state, get_team_stats, get_player_stats, get_player_injury_status, get_recent_games, get_head_to_head, get_standings, get_play_by_play, and the market tools get_market_price / get_market_history / get_market_volume / get_market_liquidity. Identify teams and players by name — the tools fuzzy-match and return didYouMean candidates on ambiguity: relay the question, never pick one silently. A status of unavailable or a "not yet ingested" reason means the data isn't in the database yet — say so plainly and never invent scores, stats, injuries, or plays a tool didn't return. Chain them for a bet evaluation: mantua_search_markets finds the game; mantua_get_market gives every market's price, depth and volume in one call (get_game / the single market tools remain for detail); mantua_get_position shows what the agent already holds there.
 
@@ -1020,6 +1022,44 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: "mantua_simulate_basket",
+    description:
+      "Order preview for a BASKET: several independent market buys the user approves once (not a combo — each leg is its own position). Pass the legs (providerEventId, outcomeIndex 0 = home side's YES, 1 = away side's YES, amount in USDC, a short label) and the budget the user stated. Every leg is simulated with the real quote; the UI renders the preview card with an Approve button. Then ask the user to approve. Do not execute yet.",
+    input_schema: {
+      type: "object",
+      properties: {
+        legs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              providerEventId: { type: "string" },
+              outcomeIndex: { type: "number", enum: [0, 1] },
+              amount: { type: "number", description: "USDC for this leg." },
+              label: { type: "string", description: "e.g. 'Browns YES'." },
+            },
+            required: ["providerEventId", "outcomeIndex", "amount"],
+          },
+        },
+        budgetUsdc: { type: "number", description: "The budget the user stated, in USDC." },
+      },
+      required: ["legs"],
+    },
+  },
+  {
+    name: "mantua_execute_basket",
+    description:
+      "Execute a basket the user approved: the identical legs from mantua_simulate_basket plus the confirmationId. Legs run one by one; a leg that fails does not stop the rest. Returns every leg's fill or failure and the totals (placed, leftover). Never call without a confirmationId.",
+    input_schema: {
+      type: "object",
+      properties: {
+        legs: { type: "array", items: { type: "object" } },
+        budgetUsdc: { type: "number" },
+      },
+      required: ["legs"],
+    },
+  },
+  {
     name: "mantua_compare_markets",
     description:
       "The Summary card for a research turn: one row per game and side — YES price, move today in points, a rating (Lean YES / Lean NO / Fair / Thin), confidence, liquidity and a one-line rationale — for the teams the user named, or the next window's games when none were named. Pass budgetUsdc when the user stated how much they want to put to work; the card shows it. Read-only; the UI renders the result as a card, so do not repeat its rows in prose.",
@@ -1610,6 +1650,102 @@ async function executeTool(
         summary,
         next: 'Show the user this preview and ask them to reply "confirm". Execute with the identical arguments plus the confirmationId once it is present.',
       };
+    }
+    case "mantua_simulate_basket": {
+      if (!turn) throw new Error("mantua_simulate_basket needs a turn context");
+      counters.inc("agent.funnel.simulate");
+      const plan = planBasket(input);
+      const sims = [];
+      for (const leg of plan.legs) {
+        const args = parseSimulationArgs({ ...leg, direction: "buy" });
+        const sim = await simulateMarketTrade(
+          buildSimulationDeps(privyUserId, chainId),
+          args,
+          chainId,
+        );
+        sims.push({
+          providerEventId: leg.providerEventId,
+          outcomeIndex: leg.outcomeIndex,
+          label: leg.label ?? null,
+          amountUsdc: leg.amount,
+          executable: sim.executable,
+          blockers: sim.blockers,
+          marketId: sim.market.marketId,
+          priceBps: sim.market.impliedProbabilityBps,
+          effectivePriceBps: sim.estimate?.effectivePriceBps ?? null,
+          contracts: sim.estimate ? Number(sim.estimate.amountOut) / 1e6 : null,
+          priceImpactBps: sim.estimate?.priceImpactBps ?? null,
+        });
+      }
+      const executable = sims.every((l) => l.executable);
+      const execArgs = {
+        ...basketExecutionArgs(plan.legs),
+        ...(plan.budgetUsdc !== null ? { budgetUsdc: plan.budgetUsdc } : {}),
+      };
+      if (executable) {
+        await confirmationStore.savePreview({
+          sessionId: turn.sessionId,
+          kind: "action",
+          tool: "mantua_execute_basket",
+          argsHash: argsHash("mantua_execute_basket", execArgs),
+          simulation: null,
+          summary: `basket of ${String(plan.legs.length)} legs, ${plan.totalUsdc.toFixed(2)} USDC`,
+        });
+      }
+      return {
+        legs: sims,
+        totalUsdc: plan.totalUsdc,
+        budgetUsdc: plan.budgetUsdc,
+        executable,
+        executionArgs: execArgs,
+        next: executable
+          ? "The UI shows the preview with an Approve button. Ask the user to approve; on their confirmation call mantua_execute_basket with exactly executionArgs plus the confirmationId."
+          : "Not executable — explain each blocked leg. Do not ask for approval.",
+      };
+    }
+    case "mantua_execute_basket": {
+      const plan = planBasket(input);
+      const wallet = await getAgentWallet(privyUserId, chainId);
+      if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
+      const userId = await resolveUserId(privyUserId);
+      const outcome = await executeBasket(plan.legs, plan.budgetUsdc, async (leg) => {
+        await requireAgentBalance(privyUserId, "USDC", String(leg.amount), chainId);
+        await checkSpendingCap(wallet.address, leg.amount);
+        const result = await agentMarketTrade({
+          walletId: wallet.circleWalletId,
+          providerEventId: leg.providerEventId,
+          outcomeIndex: leg.outcomeIndex,
+          direction: "buy",
+          amountRaw: BigInt(Math.round(leg.amount * 1e6)),
+          chainId,
+        });
+        await recordSpending(wallet.address, leg.amount);
+        counters.inc("agent.funnel.execute_ok");
+        await recordActivity(db, {
+          kind: "market_buy",
+          actor: "agent",
+          userId,
+          walletAddress: wallet.address,
+          txHash: result.txHash,
+          chainId,
+          marketId: result.marketId,
+          asset: "YES",
+          amountRaw: result.quote.amountOut,
+          valueUsd: leg.amount,
+          data: {
+            direction: "buy",
+            providerEventId: leg.providerEventId,
+            outcomeIndex: leg.outcomeIndex,
+            basket: true,
+          },
+        });
+        return {
+          txHash: result.txHash,
+          received: `${(Number(result.quote.amountOut) / 1e6).toFixed(2)} YES`,
+          effectivePriceBps: result.quote.effectivePriceBps,
+        };
+      });
+      return outcome;
     }
     case "mantua_compare_markets":
       return await compareMarkets(sportsToolsDb, input);

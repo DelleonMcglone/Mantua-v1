@@ -25,6 +25,12 @@ import { SourcePill } from "./SourcePill.tsx";
 import { isSourceTool } from "./source-pills.ts";
 import { appendStep, appendText, type MessagePart } from "./message-parts.ts";
 import { SummaryCard, type SummaryRow } from "./SummaryCard.tsx";
+import {
+  BasketFillsCard,
+  BasketPreviewCard,
+  type BasketFillLeg,
+  type BasketPreviewLeg,
+} from "./BasketCard.tsx";
 import { streamAgentChat, AgentStreamError, type AgentChatEvent } from "./agent-stream.ts";
 import { UserBubble, RichText, Caret } from "./chat-text.tsx";
 import { PredictionNote } from "@/features/markets/PredictionNote.tsx";
@@ -43,6 +49,9 @@ import {
  * Confirm button) send through the same path as typing: the user's own
  * message "confirm" is the only thing the server accepts as consent.
  */
+/** True inside the latest reply: only there can a preview still be acted on. */
+const LatestReplyContext = createContext(false);
+
 const AgentActionsContext = createContext<{ send: (text: string) => void; busy: boolean }>({
   send: () => undefined,
   busy: false,
@@ -348,17 +357,18 @@ export function CircleAgentChat({ onClose, initialMessage, initialSpoken }: Prop
               const asked = messages[i - 1];
               const isLast = i === messages.length - 1;
               return (
-                <AssistantBubble
-                  key={m.id}
-                  msg={m}
-                  {...(isLast && m.failed && asked.role === "user" && !busy
-                    ? {
-                        onRetry: () => {
-                          retry(asked.text);
-                        },
-                      }
-                    : {})}
-                />
+                <LatestReplyContext.Provider key={m.id} value={isLast}>
+                  <AssistantBubble
+                    msg={m}
+                    {...(isLast && m.failed && asked.role === "user" && !busy
+                      ? {
+                          onRetry: () => {
+                            retry(asked.text);
+                          },
+                        }
+                      : {})}
+                  />
+                </LatestReplyContext.Provider>
               );
             })
           )}
@@ -489,6 +499,9 @@ function fmtNum(s: string): string {
 
 function ConfirmRow({ label }: { label: string }) {
   const { send, busy } = useContext(AgentActionsContext);
+  const live = useContext(LatestReplyContext);
+  // An earlier preview is history: the button goes, the rows stay.
+  if (!live) return null;
   return (
     <div className="flex items-center justify-between gap-3 pt-1">
       <span className="text-[11px] text-text-mute">
@@ -568,6 +581,40 @@ function renderResult(step: ToolStep): ReactNode {
           )}
           <div className="text-[12px] font-medium">{c.action}</div>
         </div>
+      );
+    }
+    case "mantua_simulate_basket": {
+      const d = step.data as {
+        legs: BasketPreviewLeg[];
+        totalUsdc: number;
+        budgetUsdc: number | null;
+        executable: boolean;
+      };
+      return (
+        <BasketPreviewCard
+          legs={d.legs}
+          totalUsdc={d.totalUsdc}
+          budgetUsdc={d.budgetUsdc}
+          approve={d.executable ? <ConfirmRow label="Approve" /> : null}
+        />
+      );
+    }
+    case "mantua_execute_basket": {
+      const d = step.data as {
+        legs: BasketFillLeg[];
+        placedUsdc: number;
+        requestedUsdc: number;
+        leftoverUsdc: number;
+      };
+      const budget = typeof step.args["budgetUsdc"] === "number" ? step.args["budgetUsdc"] : null;
+      return (
+        <BasketFillsCard
+          legs={d.legs}
+          placedUsdc={d.placedUsdc}
+          requestedUsdc={d.requestedUsdc}
+          leftoverUsdc={d.leftoverUsdc}
+          budgetUsdc={budget}
+        />
       );
     }
     case "mantua_compare_markets": {
