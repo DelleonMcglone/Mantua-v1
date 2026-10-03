@@ -306,9 +306,8 @@ function shortenAddress(addr: string): string {
 const KNOWN_ASSETS: AssetSymbol[] = ["USDC"];
 
 function AssetRowIcon({ symbol }: { symbol: string }) {
-  const norm = symbol === "WETH" ? "ETH" : symbol;
-  if ((KNOWN_ASSETS as readonly string[]).includes(norm)) {
-    return <AssetIcon symbol={norm as AssetSymbol} size={28} />;
+  if ((KNOWN_ASSETS as readonly string[]).includes(symbol)) {
+    return <AssetIcon symbol={symbol as AssetSymbol} size={28} />;
   }
   const initial = symbol.slice(0, 1).toUpperCase();
   return (

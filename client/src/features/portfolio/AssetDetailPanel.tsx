@@ -20,9 +20,8 @@ interface Props {
 /**
  * Asset detail — opened by clicking a row in the Assets tab. Shows the
  * token's balance + USD value at top, then a filtered list of recent
- * portfolio transactions involving this token (swaps where it's the
- * in/out leg, pool creates / liquidity adds where it's one of the pair,
- * sends where it's the token moved). Each row links to the explorer.
+ * portfolio transactions involving this token (sends where it's the
+ * token moved). Each row links to the explorer.
  */
 export function AssetDetailPanel({ symbol, onClose }: Props) {
   const chainId = ARC_CHAIN_ID;
@@ -30,7 +29,8 @@ export function AssetDetailPanel({ symbol, onClose }: Props) {
   const asset = useMemo<DisplayAsset | null>(() => {
     if (!portfolio.walletAddress) return null;
     const all = toDisplayAssets(portfolio.balances, chainId);
-    return all.find((a) => a.symbol === symbol) ?? null;
+    const wanted: string = symbol;
+    return all.find((a) => a.symbol === wanted) ?? null;
   }, [portfolio.walletAddress, portfolio.balances, symbol, chainId]);
 
   // `meta` is undefined when the user deep-links to a token that doesn't
@@ -129,26 +129,12 @@ function TxRow({
 }
 
 const ACTION_LABELS: Record<string, string> = {
-  swap: "Swap",
-  add_liquidity: "Add liquidity",
-  remove_liquidity: "Remove liquidity",
-  create_pool: "Create pool",
   send_tokens: "Send",
 };
 
 function describeTx(tx: PortfolioTransaction, symbol: TokenSymbol): string {
   const verb = ACTION_LABELS[tx.action] ?? tx.action;
   const p = tx.params;
-  if (tx.action === "swap") {
-    const tokenIn = strOrNull(p["tokenIn"]);
-    const tokenOut = strOrNull(p["tokenOut"]);
-    if (tokenIn && tokenOut) return `${verb} ${tokenIn} → ${tokenOut}`;
-  }
-  if (tx.action === "add_liquidity" || tx.action === "create_pool") {
-    const tokenA = strOrNull(p["tokenA"]);
-    const tokenB = strOrNull(p["tokenB"]);
-    if (tokenA && tokenB) return `${verb} ${tokenA} / ${tokenB}`;
-  }
   if (tx.action === "send_tokens") {
     const recipient = strOrNull(p["recipient"]);
     if (recipient) return `${verb} ${symbol} → ${shortenAddress(recipient)}`;
@@ -158,18 +144,7 @@ function describeTx(tx: PortfolioTransaction, symbol: TokenSymbol): string {
 
 function txInvolvesSymbol(tx: PortfolioTransaction, symbol: TokenSymbol): boolean {
   const p = tx.params;
-  switch (tx.action) {
-    case "swap":
-      return p["tokenIn"] === symbol || p["tokenOut"] === symbol;
-    case "add_liquidity":
-    case "remove_liquidity":
-    case "create_pool":
-      return p["tokenA"] === symbol || p["tokenB"] === symbol;
-    case "send_tokens":
-      return p["token"] === symbol;
-    default:
-      return false;
-  }
+  return tx.action === "send_tokens" && p["token"] === symbol;
 }
 
 function strOrNull(v: unknown): string | null {

@@ -77,7 +77,6 @@ export function ComboBuilder({ onClose, onBrowse }: { onClose: () => void; onBro
               {b.funding.open && (
                 <TicketFunding
                   walletAddress={b.walletAddress}
-                  suggestedUsd={b.stake}
                   onClose={b.funding.close}
                   onSkip={b.funding.skip}
                 />

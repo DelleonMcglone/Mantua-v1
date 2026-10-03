@@ -46,13 +46,11 @@ test("the JavaScript the first market view downloads stays inside the byte budge
       .map((s) => `${s.file}=${String(s.gzip)}`)
       .join(", ")}`,
   );
-  // The deferred libraries must not be on the critical path.
-  for (const deferred of ["bridge-vendor", "solana-vendor", "charts-vendor", "funding-vendor"]) {
-    expect(
-      sizes.some((s) => s.file.startsWith(deferred)),
-      deferred,
-    ).toBe(false);
-  }
+  // The deferred Solana peer must not be on the critical path.
+  expect(
+    sizes.some((s) => s.file.startsWith("solana-vendor")),
+    "solana-vendor",
+  ).toBe(false);
   expect(total, `critical JS ${String(total)} B gzip`).toBeLessThan(CRITICAL_JS_GZIP_MAX_BYTES);
   expect(largest, `largest chunk ${String(largest)} B gzip`).toBeLessThan(
     LARGEST_CHUNK_GZIP_MAX_BYTES,

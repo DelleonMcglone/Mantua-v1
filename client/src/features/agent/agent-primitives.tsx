@@ -1,8 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Check, Copy } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
-import { TokenIcon } from "@/features/portfolio/TokenIcon.tsx";
-import type { TokenSymbol } from "@/lib/tokens.ts";
 
 /**
  * Shared atoms for the agent flows — originally verbatim inline-style
@@ -14,18 +12,6 @@ import type { TokenSymbol } from "@/lib/tokens.ts";
  * through `@/components/ui/banner.tsx`, skeletons through
  * `@/components/ui/skeleton.tsx`.
  */
-
-// ── Token chip (.tok) ─────────────────────────────────────────────
-
-/**
- * Token mark for the agent flows. Delegates to the app's canonical
- * `TokenIcon` (the same USDC / EURC / cirBTC `AssetIcon` marks used in the
- * portfolio + swap UIs) so the agent panel matches the rest of the app,
- * with a neutral coin-initial fallback for any unknown symbol.
- */
-export function TokenChip({ sym, size = 22 }: { sym: string; size?: number }) {
-  return <TokenIcon symbol={sym as TokenSymbol} size={size} />;
-}
 
 // ── Copy button ───────────────────────────────────────────────────
 
