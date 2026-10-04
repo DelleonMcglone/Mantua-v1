@@ -4,7 +4,7 @@ HERE=os.path.dirname(os.path.abspath(__file__)); OUT=os.path.join(HERE,'out'); P
 FF=os.environ.get('FFMPEG','ffmpeg'); FP=os.environ.get('FFPROBE','ffprobe')  # or the @ffmpeg-installer binaries
 def dur(p): return float(subprocess.check_output([FP,'-v','error','-show_entries','format=duration','-of','csv=p=0',p]).decode().strip())
 # (path, seconds or None for a clip, trim-head seconds for clips)
-seq=[('card-open.png',4.0),('card-intro.png',2.6),('card-1.png',2.4),('turn-1.webm',None),('card-2.png',2.4),('turn-2.webm',None),('card-3.png',2.4),('turn-6.webm',None),('card-close.png',6.0)]
+seq=[('card-open.png',4.0),('card-intro.png',2.6),('board.webm',None),('card-1.png',2.4),('turn-1.webm',None),('card-2.png',2.4),('turn-2.webm',None),('card-3.png',2.4),('turn-6.webm',None),('card-close.png',6.0)]
 X=0.6  # crossfade seconds
 args=[FF,'-y','-v','error']
 durs=[]
