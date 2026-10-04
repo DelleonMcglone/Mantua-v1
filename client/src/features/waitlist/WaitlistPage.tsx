@@ -2,7 +2,6 @@ import { Header } from "@/components/shell/Header.tsx";
 import { Footer } from "@/components/shell/Footer.tsx";
 import type { LegalDoc } from "@/components/legal/LegalPage.tsx";
 import type { NavDestination } from "@/components/shell/MarketNav.tsx";
-import { HeroWordmark } from "./HeroWordmark.tsx";
 import { WaitlistForm } from "./WaitlistForm.tsx";
 
 interface Props {
@@ -44,16 +43,16 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
         <main className="flex flex-1 flex-col items-center px-5 pb-10 pt-10 sm:px-8 sm:pt-16">
           <section className="w-full max-w-4xl text-center">
             <h1 className="sr-only">Mantua — Programmable Sports Agents</h1>
-            <HeroWordmark className="mx-auto w-full max-w-3xl" />
-            <div
-              aria-hidden
-              className="mx-auto mt-2 h-px w-2/3 max-w-md bg-gradient-to-r from-transparent via-[#38a8e8] to-transparent"
+            {/* The owner's wordmark art, lifted off its background so it
+                sits straight on the night sky — exact letterforms. */}
+            <img
+              src="/assets/waitlist-hero.png"
+              alt=""
+              width={1240}
+              height={460}
+              className="mx-auto w-full max-w-3xl"
+              fetchPriority="high"
             />
-            <p className="mt-6 text-[22px] font-medium tracking-tight sm:text-[32px]">
-              <span className="text-[#a07cff]">Programmable</span>{" "}
-              <span className="text-white">Sports</span>{" "}
-              <span className="text-[#2ee6a6]">Agents</span>
-            </p>
             <p className="mx-auto mt-8 max-w-2xl text-[20px] font-medium leading-snug text-white sm:text-[24px]">
               Trade sports prediction markets with AI agents.
             </p>
