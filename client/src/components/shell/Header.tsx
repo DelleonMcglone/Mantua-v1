@@ -34,8 +34,9 @@ interface HeaderProps {
   onQuickAction?: ((id: HomePromptId) => void) | undefined;
   /** The league page currently open, highlighted in the league bar. */
   activeSport?: SportId | null | undefined;
-  /** The waitlist landing page: the same bar without help, login or
-   *  sign-up — a visitor can only leave an email there. */
+  /** The waitlist landing page: the same bar without help, login,
+   *  sign-up or the theme toggle (the page is always dark) — a visitor
+   *  can only leave an email there. */
   minimal?: boolean;
   /** Extra classes on the `<header>` (the landing page makes it float
    *  over its background). */
@@ -108,9 +109,11 @@ export function Header({
               <LifeBuoy className="h-[18px] w-[18px]" />
             </Button>
           )}
-          <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
-            <Icon className="h-[18px] w-[18px]" />
-          </Button>
+          {!minimal && (
+            <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
+              <Icon className="h-[18px] w-[18px]" />
+            </Button>
+          )}
           {!minimal && (
             <HeaderAccount
               walletAddress={walletAddress}
