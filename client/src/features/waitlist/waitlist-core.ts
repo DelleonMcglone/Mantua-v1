@@ -38,3 +38,30 @@ export const WAITLIST_PATH = "/waitlist";
 export function isWaitlistPath(pathname: string): boolean {
   return pathname.replace(/\/+$/, "") === WAITLIST_PATH;
 }
+
+/** The way in while the front door is the waitlist: `/login` opens the
+ *  app with the login modal up, then settles on `/`. */
+export const LOGIN_PATH = "/login";
+
+export function isLoginPath(pathname: string): boolean {
+  return pathname.replace(/\/+$/, "") === LOGIN_PATH;
+}
+
+/** Route kinds a logged-out visitor may still reach while gated: the
+ *  public pages, and the landing page itself. */
+const GATE_EXEMPT: ReadonlySet<string> = new Set(["waitlist", "legal", "docs", "agent-public"]);
+
+/**
+ * Pre-launch front door: with the flag on, a visitor who is not signed in
+ * sees the waitlist instead of the app — unless they came in through
+ * `/login` (the owner and testers) or asked for a public page.
+ */
+export function waitlistGate(input: {
+  frontDoor: boolean;
+  authenticated: boolean;
+  loginRequested: boolean;
+  routeKind: string;
+}): boolean {
+  if (!input.frontDoor || input.authenticated || input.loginRequested) return false;
+  return !GATE_EXEMPT.has(input.routeKind);
+}

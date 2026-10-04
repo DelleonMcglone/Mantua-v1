@@ -7,8 +7,10 @@ process.env.NODE_ENV = "test";
 process.env.DATABASE_URL ??= "postgres://stub:stub@localhost:5432/stub";
 process.env.PRIVY_APP_ID ??= "test-stub";
 process.env.PRIVY_APP_SECRET ??= "test-stub";
+process.env.CRON_SECRET = "test-cron-secret-0123456789";
 
-const { createWaitlistRouter } = await import("./waitlist.ts");
+const { createWaitlistRouter, createWaitlistExportRouter, waitlistCsv } =
+  await import("./waitlist.ts");
 
 const servers: Server[] = [];
 after(() => {
@@ -69,5 +71,50 @@ void describe("POST /api/waitlist", () => {
       assert.equal(res.status, 400, String(email).slice(0, 20));
     }
     assert.equal(calls, 0);
+  });
+});
+
+void describe("GET /api/ops/waitlist.csv", () => {
+  void it("quotes awkward cells and dates rows in ISO", () => {
+    const csv = waitlistCsv([
+      { email: "a@b.co", source: "landing", createdAt: new Date("2026-10-04T10:00:00Z") },
+      { email: 'we"ird,@b.co', source: "landing", createdAt: new Date("2026-10-04T11:00:00Z") },
+    ]);
+    assert.equal(
+      csv,
+      'email,source,created_at\na@b.co,landing,2026-10-04T10:00:00.000Z\n"we""ird,@b.co",landing,2026-10-04T11:00:00.000Z\n',
+    );
+  });
+
+  void it("refuses without the cron secret and serves a CSV attachment with it", async () => {
+    const app = express();
+    app.use(
+      createWaitlistExportRouter({
+        list: () =>
+          Promise.resolve([
+            { email: "a@b.co", source: "landing", createdAt: new Date("2026-10-04T10:00:00Z") },
+          ]),
+      }),
+    );
+    const origin = await new Promise<string>((resolve) => {
+      const server = app.listen(0, "127.0.0.1", () => {
+        servers.push(server);
+        const addr = server.address();
+        if (addr === null || typeof addr === "string") throw new Error("no port");
+        resolve(`http://127.0.0.1:${String(addr.port)}`);
+      });
+    });
+    const anon = await fetch(`${origin}/api/ops/waitlist.csv`);
+    assert.equal(anon.status, 401);
+    const ok = await fetch(`${origin}/api/ops/waitlist.csv`, {
+      headers: { authorization: "Bearer test-cron-secret-0123456789" },
+    });
+    assert.equal(ok.status, 200);
+    assert.match(ok.headers.get("content-type") ?? "", /text\/csv/);
+    assert.match(ok.headers.get("content-disposition") ?? "", /mantua-waitlist\.csv/);
+    assert.equal(
+      await ok.text(),
+      "email,source,created_at\na@b.co,landing,2026-10-04T10:00:00.000Z\n",
+    );
   });
 });
