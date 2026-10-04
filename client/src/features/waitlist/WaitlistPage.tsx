@@ -78,22 +78,17 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
             <h2 id="demo-h" className="sr-only">
               See what the app can do
             </h2>
-            <div
+            <video
               data-testid="waitlist-video"
-              className="flex aspect-video w-full items-center justify-center rounded-lg border border-white/15 bg-black/50 backdrop-blur-sm"
+              className="aspect-video w-full rounded-lg border border-white/15 bg-black"
+              src="/assets/demo.mp4"
+              poster="/assets/demo-poster.jpg"
+              controls
+              playsInline
+              preload="metadata"
             >
-              <div className="text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-white/25 bg-white/10">
-                  <svg viewBox="0 0 24 24" className="ml-1 h-6 w-6 fill-white" aria-hidden>
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </div>
-                <p className="mt-4 text-[14px] font-medium text-white/85">Demo video coming soon</p>
-                <p className="mt-1 text-[12.5px] text-white/50">
-                  A walk through the board, the agent and a first trade.
-                </p>
-              </div>
-            </div>
+              Your browser can't play this video.
+            </video>
           </section>
         </main>
         <div className="border-white/10 text-white/80 [&_footer]:border-white/10">
