@@ -18,8 +18,8 @@ test("the waitlist page takes an email and confirms it, with no login or help in
   await page.goto("/waitlist");
 
   await expect(page.getByTestId("waitlist-page")).toBeVisible();
-  await expect(page.getByRole("img", { name: "Mantua" }).last()).toBeVisible();
-  await expect(page.getByText("Programmable", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Programmable Sports Agents/ })).toBeAttached();
+  await expect(page.locator('img[src="/assets/waitlist-hero.png"]')).toBeVisible();
   await expect(page.getByText("Trade sports prediction markets with AI agents.")).toBeVisible();
   await expect(page.getByText("Your agent executes it.")).toBeVisible();
   const header = page.locator("header");
