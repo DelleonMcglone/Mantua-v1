@@ -1,12 +1,18 @@
 /**
  * The waitlist confirmation email (owner, 2026-10-04): one message the
  * moment an address is first saved — "we have it, here is what happens
- * next". Sent through Resend's HTTP API from hello@mantua.ai; the sender
- * and the API key are env, and without a key the send is a no-op that
- * says so, never a failed signup.
+ * next". Sent through Resend's HTTP API from the founder's mailbox (owner,
+ * 2026-10-04: delleon@mantua.ai, until a hello@ alias exists), so replies
+ * land somewhere read. The address and the API key are env; without a
+ * key the send is a no-op that says so, never a failed signup.
  */
-export const WAITLIST_FROM = "Mantua <hello@mantua.ai>";
+export const DEFAULT_SENDER = "delleon@mantua.ai";
 export const WAITLIST_SUBJECT = "You're on the Mantua waitlist";
+
+/** "Mantua <addr>" for the From header. */
+export function senderHeader(address: string): string {
+  return `Mantua <${address}>`;
+}
 
 export function confirmationText(): string {
   return [
@@ -44,6 +50,8 @@ export function confirmationHtml(): string {
 
 export interface ConfirmationDeps {
   apiKey: string | undefined;
+  /** The mailbox the mail is from and replies go to. */
+  sender: string;
   fetch: typeof fetch;
 }
 
@@ -59,9 +67,9 @@ export async function sendConfirmation(
       method: "POST",
       headers: { authorization: `Bearer ${deps.apiKey}`, "content-type": "application/json" },
       body: JSON.stringify({
-        from: WAITLIST_FROM,
+        from: senderHeader(deps.sender),
         to: [to],
-        reply_to: "hello@mantua.ai",
+        reply_to: deps.sender,
         subject: WAITLIST_SUBJECT,
         text: confirmationText(),
         html: confirmationHtml(),
