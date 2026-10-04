@@ -6,10 +6,12 @@
  * IP with the write limiter; the global limiter and kill switch apply.
  */
 import { Router, type Request, type Response } from "express";
+import { asc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { waitlist } from "../db/schema/waitlist.ts";
 import { logger } from "../lib/logger.ts";
+import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 
 export interface WaitlistDeps {
@@ -61,3 +63,49 @@ export function createWaitlistRouter(overrides: Partial<WaitlistDeps> = {}): Rou
 }
 
 export const waitlistRouter = createWaitlistRouter();
+
+/**
+ * `GET /api/ops/waitlist.csv` — the owner's export, guarded like the crons
+ * (Bearer CRON_SECRET). One row per signup, oldest first; a text/csv
+ * attachment so a browser or `curl -O` saves it as a file.
+ */
+export interface WaitlistExportDeps {
+  list: () => Promise<{ email: string; source: string; createdAt: Date }[]>;
+}
+
+const csvCell = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+
+export function waitlistCsv(rows: { email: string; source: string; createdAt: Date }[]): string {
+  const lines = ["email,source,created_at"];
+  for (const r of rows) {
+    lines.push([csvCell(r.email), csvCell(r.source), r.createdAt.toISOString()].join(","));
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+export function createWaitlistExportRouter(overrides: Partial<WaitlistExportDeps> = {}): Router {
+  const deps: WaitlistExportDeps = {
+    list: () =>
+      db
+        .select({ email: waitlist.email, source: waitlist.source, createdAt: waitlist.createdAt })
+        .from(waitlist)
+        .orderBy(asc(waitlist.createdAt)),
+    ...overrides,
+  };
+  const router = Router();
+  router.get("/api/ops/waitlist.csv", requireCronSecret, async (_req: Request, res: Response) => {
+    try {
+      const rows = await deps.list();
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="mantua-waitlist.csv"');
+      res.send(waitlistCsv(rows));
+    } catch (err) {
+      logger.warn({ err }, "waitlist export failed");
+      res.status(500).json({ error: "Failed to export the waitlist", code: "INTERNAL" });
+    }
+  });
+  return router;
+}
+
+export const waitlistExportRouter = createWaitlistExportRouter();

@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { looksLikeEmail, readWaitlistReply } from "./waitlist-core.ts";
+import { isLoginPath, looksLikeEmail, readWaitlistReply, waitlistGate } from "./waitlist-core.ts";
 
 void describe("looksLikeEmail", () => {
   void it("accepts an ordinary address and rejects the obvious misses", () => {
@@ -24,5 +24,25 @@ void describe("readWaitlistReply", () => {
     assert.equal(readWaitlistReply(400, { error: "Enter a valid email address." }).kind, "error");
     assert.match((readWaitlistReply(429, null) as { message: string }).message, /give it a minute/);
     assert.match((readWaitlistReply(500, null) as { message: string }).message, /Try again/);
+  });
+});
+
+void describe("waitlistGate", () => {
+  void it("sends logged-out visitors to the waitlist only while the flag is on", () => {
+    const base = { frontDoor: true, authenticated: false, loginRequested: false };
+    assert.equal(waitlistGate({ ...base, routeKind: "home" }), true);
+    assert.equal(waitlistGate({ ...base, routeKind: "market" }), true);
+    assert.equal(waitlistGate({ ...base, routeKind: "agent" }), true);
+    for (const k of ["waitlist", "legal", "docs", "agent-public"]) {
+      assert.equal(waitlistGate({ ...base, routeKind: k }), false, k);
+    }
+    assert.equal(waitlistGate({ ...base, routeKind: "home", authenticated: true }), false);
+    assert.equal(waitlistGate({ ...base, routeKind: "home", loginRequested: true }), false);
+    assert.equal(waitlistGate({ ...base, routeKind: "home", frontDoor: false }), false);
+  });
+  void it("recognises /login with or without a trailing slash", () => {
+    assert.equal(isLoginPath("/login"), true);
+    assert.equal(isLoginPath("/login/"), true);
+    assert.equal(isLoginPath("/"), false);
   });
 });

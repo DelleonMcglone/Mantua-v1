@@ -46,7 +46,13 @@ import { InputBar } from "./components/shell/InputBar.tsx";
 // Task 070 (Phase 13) — the public performance page, the agent's voice, support.
 import { PublicAgentPage } from "./features/reputation/PublicAgentPage.tsx";
 import { agentHandleFromPath, agentPagePath } from "./features/reputation/reputation-core.ts";
-import { WAITLIST_PATH, isWaitlistPath } from "./features/waitlist/waitlist-core.ts";
+import {
+  WAITLIST_PATH,
+  isLoginPath,
+  isWaitlistPath,
+  waitlistGate,
+} from "./features/waitlist/waitlist-core.ts";
+import { WAITLIST_FRONT_DOOR } from "./features/waitlist/waitlist-flag.ts";
 import { SocialPanel } from "./features/social/SocialPanel.tsx";
 import { SupportPanel } from "./features/support/SupportPanel.tsx";
 import { PanelLoading } from "./components/shell/PanelLoading.tsx";
@@ -180,7 +186,11 @@ export default function App() {
       window.history.replaceState(null, "", clean);
     }
   }, []);
-  const [showLogin, setShowLogin] = useState(false);
+  // Pre-launch front door: `/login` is the way past the waitlist. The
+  // request is remembered for the session so a redirect after the Privy
+  // round-trip does not bounce the user back to the landing page.
+  const [loginRequested] = useState(() => isLoginPath(window.location.pathname));
+  const [showLogin, setShowLogin] = useState(() => isLoginPath(window.location.pathname));
 
   // Any surface can request the login modal without prop-drilling —
   // league-page and dock gate buttons dispatch this event.
@@ -237,7 +247,8 @@ export default function App() {
       (route.kind === "agent-public" ||
         route.kind === "waitlist" ||
         agentHandleFromPath(window.location.pathname) ||
-        isWaitlistPath(window.location.pathname))
+        isWaitlistPath(window.location.pathname) ||
+        isLoginPath(window.location.pathname))
     ) {
       window.history.replaceState(null, "", wanted);
     }
@@ -337,7 +348,18 @@ export default function App() {
 
   // The waitlist landing page is public and standalone: the home header
   // (no help / login / sign-up), the hero, the email field, the footer.
-  if (route.kind === "waitlist") {
+  // With the front door on, it is also what a logged-out visitor gets for
+  // any in-app route — the route itself is kept, so logging in through
+  // `/login` lands them where they were headed.
+  if (
+    route.kind === "waitlist" ||
+    waitlistGate({
+      frontDoor: WAITLIST_FRONT_DOOR,
+      authenticated,
+      loginRequested,
+      routeKind: route.kind,
+    })
+  ) {
     return (
       <Suspense fallback={null}>
         <WaitlistPage
