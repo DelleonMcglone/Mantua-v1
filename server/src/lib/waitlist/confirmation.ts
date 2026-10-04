@@ -17,7 +17,7 @@ export function senderHeader(address: string): string {
 /** The owner's copy, verbatim (2026-10-04). */
 const PARAGRAPHS = [
   "Thanks for signing up. We’ll email you when Mantua opens and your invite is ready.",
-  "Mantua lets you trade NFL prediction markets yourself or hand the work to an Mantua sports agent that researches games, sizes positions, and executes trades for you in USDC, within your limits.",
+  "Mantua lets you trade NFL prediction markets yourself or hand the work to a Mantua sports agent that researches games, sizes positions, and executes trades for you in USDC, within your limits.",
   "We’re bringing users in as access opens up. Keep an eye on your inbox for your invite.",
   "Questions or feedback? Just reply to this email.",
 ] as const;
