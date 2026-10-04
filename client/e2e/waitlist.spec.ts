@@ -23,8 +23,10 @@ test("the waitlist page takes an email and confirms it, with no login or help in
   await expect(page.getByText("Trade sports prediction markets with AI agents.")).toBeVisible();
   await expect(page.getByText("Your agent executes it.")).toBeVisible();
   const header = page.locator("header");
-  await expect(header.getByRole("button", { name: "Toggle theme" })).toBeVisible();
-  await expect(header.getByRole("button", { name: /log in|sign up|help/i })).toHaveCount(0);
+  await expect(header.getByRole("button", { name: "Back to home" })).toBeVisible();
+  await expect(
+    header.getByRole("button", { name: /log in|sign up|help|toggle theme/i }),
+  ).toHaveCount(0);
   await expect(page.getByTestId("waitlist-video")).toHaveAttribute("src", "/assets/demo.mp4");
   await expect(page.getByRole("button", { name: "Terms of Use" })).toBeVisible();
 
