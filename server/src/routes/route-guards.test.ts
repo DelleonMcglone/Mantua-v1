@@ -37,6 +37,12 @@ const ALLOWLIST: { file: string; path: string; reason: string }[] = [
       "browser-originated CSP violation reports carry no credentials by design; IP rate-limited; body capped at 16 kB and reduced to a log line; no state",
   },
   {
+    file: "waitlist.ts",
+    path: "/api/waitlist",
+    reason:
+      "pre-launch email sign-up; anonymous by design; per-IP write limiter; one validated email per row, nothing else stored",
+  },
+  {
     file: "circle-webhook.ts",
     path: "/api/circle/webhook",
     reason: "signature verified inside the handler against Circle's public key",

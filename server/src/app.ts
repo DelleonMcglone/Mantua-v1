@@ -7,6 +7,7 @@ import { securityHeaders } from "./middleware/security-headers.ts";
 import { ipRateLimiter } from "./middleware/rate-limit.ts";
 import { agentChatRouter } from "./routes/agent-chat.ts";
 import { cspReportRouter } from "./routes/csp-report.ts";
+import { waitlistRouter } from "./routes/waitlist.ts";
 import { agentPortfolioRouter } from "./routes/agent-portfolio.ts";
 import { cronSportsSyncRouter } from "./routes/cron-sports-sync.ts";
 import { sportsSlateRouter } from "./routes/sports-slate.ts";
@@ -128,6 +129,7 @@ app.use(pushRouter);
 // Task 067 (G-014) — recorded Terms acceptance.
 app.use(legalRouter);
 app.use(cspReportRouter);
+app.use(waitlistRouter);
 app.use(marketRedeemRouter);
 app.use(activityRouter);
 app.use(portfolioEconomicsRouter);

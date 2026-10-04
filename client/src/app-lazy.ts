@@ -50,3 +50,6 @@ export const MarketIntegrityPage = lazy(() =>
     default: m.MarketIntegrityPage,
   })),
 );
+export const WaitlistPage = lazy(() =>
+  import("./features/waitlist/WaitlistPage.tsx").then((m) => ({ default: m.WaitlistPage })),
+);

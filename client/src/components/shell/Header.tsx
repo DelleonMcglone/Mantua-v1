@@ -34,6 +34,12 @@ interface HeaderProps {
   onQuickAction?: ((id: HomePromptId) => void) | undefined;
   /** The league page currently open, highlighted in the league bar. */
   activeSport?: SportId | null | undefined;
+  /** The waitlist landing page: the same bar without help, login or
+   *  sign-up — a visitor can only leave an email there. */
+  minimal?: boolean;
+  /** Extra classes on the `<header>` (the landing page makes it float
+   *  over its background). */
+  className?: string;
 }
 
 /**
@@ -54,13 +60,15 @@ export function Header({
   onNavigate,
   onQuickAction,
   activeSport = null,
+  minimal = false,
+  className = "",
 }: HeaderProps) {
   const { theme, toggle } = useTheme();
   const Icon = theme === "dark" ? Sun : Moon;
   const [navOpen, setNavOpen] = useState(false);
 
   return (
-    <header className="border-b border-border-soft">
+    <header className={`border-b border-border-soft ${className}`}>
       {/* Task 071: fits a 360 px phone logged out — tighter gaps, the wordmark
           from `sm`, the auth buttons compact below `md`. */}
       <div className="flex items-center gap-2 px-3 py-3 md:gap-4 md:px-8 md:py-4 lg:gap-6">
@@ -88,28 +96,32 @@ export function Header({
         <div className="ml-auto flex shrink-0 items-center gap-1.5 md:gap-2.5">
           {/* Task 070 (AE-007) — help is one press from anywhere, signed in
               or not; the app listens for the event like it does for login. */}
-          <Button
-            variant="icon"
-            size="icon"
-            aria-label="Help & support"
-            onClick={() => {
-              window.dispatchEvent(new Event("mantua:open-support"));
-            }}
-          >
-            <LifeBuoy className="h-[18px] w-[18px]" />
-          </Button>
+          {!minimal && (
+            <Button
+              variant="icon"
+              size="icon"
+              aria-label="Help & support"
+              onClick={() => {
+                window.dispatchEvent(new Event("mantua:open-support"));
+              }}
+            >
+              <LifeBuoy className="h-[18px] w-[18px]" />
+            </Button>
+          )}
           <Button variant="icon" size="icon" aria-label="Toggle theme" onClick={toggle}>
             <Icon className="h-[18px] w-[18px]" />
           </Button>
-          <HeaderAccount
-            walletAddress={walletAddress}
-            onLogin={onLogin}
-            onSignup={onSignup}
-            onDisconnect={onDisconnect}
-            walletSetup={walletSetup}
-            onOpenProfile={onOpenProfile}
-            onOpenAgent={onOpenAgent}
-          />
+          {!minimal && (
+            <HeaderAccount
+              walletAddress={walletAddress}
+              onLogin={onLogin}
+              onSignup={onSignup}
+              onDisconnect={onDisconnect}
+              walletSetup={walletSetup}
+              onOpenProfile={onOpenProfile}
+              onOpenAgent={onOpenAgent}
+            />
+          )}
         </div>
       </div>
       {/* The league sub-header: every league with its logo, NFL live, the

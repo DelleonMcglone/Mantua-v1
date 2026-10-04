@@ -101,6 +101,31 @@ html[data-theme="light"] {
   --destructive-foreground: #ffffff;
 }
 
+/* A surface that is always dark whatever the theme — the waitlist landing
+   page sits on night-sky art. Re-declares every token the light theme
+   overrides, with the `:root` (dark) values. */
+.theme-dark {
+  --bg: #000000;
+  --bg-elev: #0a0a0d;
+  --panel: #0f0f14ee;
+  --panel-solid: #0e0e13;
+  --border: #22222a;
+  --border-soft: #1a1a20;
+  --text: #ffffff;
+  --text-dim: #8e8e96;
+  --text-mute: #5a5a62;
+  --accent: #8b6cf0;
+  --accent-2: #b892ff;
+  --amber: #f5a524;
+  --amber-dim: #f5a52433;
+  --green: #3ddc97;
+  --red: #ff6b6b;
+  --chip: #18181e;
+  --row-hover: #121217;
+  --primary-foreground: #ffffff;
+  --destructive-foreground: #ffffff;
+}
+
 html[data-density="compact"] {
   --density: 0.82;
 }
