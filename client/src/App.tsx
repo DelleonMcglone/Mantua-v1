@@ -20,6 +20,7 @@ import {
   PrivacyPage,
   ProfilePage,
   TermsPage,
+  WaitlistPage,
 } from "./app-lazy.ts";
 import { usePrivy } from "@privy-io/react-auth";
 import { ErrorBoundary } from "@/components/ErrorBoundary.tsx";
@@ -45,6 +46,7 @@ import { InputBar } from "./components/shell/InputBar.tsx";
 // Task 070 (Phase 13) — the public performance page, the agent's voice, support.
 import { PublicAgentPage } from "./features/reputation/PublicAgentPage.tsx";
 import { agentHandleFromPath, agentPagePath } from "./features/reputation/reputation-core.ts";
+import { WAITLIST_PATH, isWaitlistPath } from "./features/waitlist/waitlist-core.ts";
 import { SocialPanel } from "./features/social/SocialPanel.tsx";
 import { SupportPanel } from "./features/support/SupportPanel.tsx";
 import { PanelLoading } from "./components/shell/PanelLoading.tsx";
@@ -60,6 +62,8 @@ import { Board } from "./features/markets/Board.tsx";
 type Route =
   | { kind: "legal"; doc: LegalDoc }
   | { kind: "docs" }
+  /** The pre-launch landing page at `/waitlist` (public, no login). */
+  | { kind: "waitlist" }
   | { kind: "home" }
   | {
       kind: "market";
@@ -120,7 +124,13 @@ const RESTORABLE_KINDS: readonly Route["kind"][] = [
  *  never store an agent `message`: restoring it would auto-resend the
  *  command on refresh (potentially re-executing a trade). */
 function sanitizeRouteForStorage(route: Route): Route | null {
-  if (route.kind === "legal" || route.kind === "docs" || route.kind === "agent-public") return null;
+  if (
+    route.kind === "legal" ||
+    route.kind === "docs" ||
+    route.kind === "agent-public" ||
+    route.kind === "waitlist"
+  )
+    return null;
   if (route.kind === "agent") return { kind: "agent" };
   // A stored question would be re-asked on every refresh, spending one of
   // the three free analyst questions each time.
@@ -160,6 +170,7 @@ export default function App() {
   const [route, setRoute] = useState<Route>(() => {
     const handle = agentHandleFromPath(window.location.pathname);
     if (handle) return { kind: "agent-public", handle };
+    if (isWaitlistPath(window.location.pathname)) return { kind: "waitlist" };
     return launchRoute(window.location.search) ?? loadStoredRoute() ?? { kind: "home" };
   });
   const isMobile = useIsMobile();
@@ -215,10 +226,18 @@ export default function App() {
   // Task 070 — keep the address bar honest for the one shareable route: the
   // public page carries its handle; leaving it returns to the root.
   useEffect(() => {
-    const wanted = route.kind === "agent-public" ? agentPagePath(route.handle) : "/";
+    const wanted =
+      route.kind === "agent-public"
+        ? agentPagePath(route.handle)
+        : route.kind === "waitlist"
+          ? WAITLIST_PATH
+          : "/";
     if (
       window.location.pathname !== wanted &&
-      (route.kind === "agent-public" || agentHandleFromPath(window.location.pathname))
+      (route.kind === "agent-public" ||
+        route.kind === "waitlist" ||
+        agentHandleFromPath(window.location.pathname) ||
+        isWaitlistPath(window.location.pathname))
     ) {
       window.history.replaceState(null, "", wanted);
     }
@@ -313,6 +332,29 @@ export default function App() {
           setRoute({ kind: "home" });
         }}
       />
+    );
+  }
+
+  // The waitlist landing page is public and standalone: the home header
+  // (no help / login / sign-up), the hero, the email field, the footer.
+  if (route.kind === "waitlist") {
+    return (
+      <Suspense fallback={null}>
+        <WaitlistPage
+          onLogoClick={() => {
+            setRoute({ kind: "waitlist" });
+          }}
+          onNavigate={(destination) => {
+            setRoute(navDestinationToRoute(destination));
+          }}
+          onOpenDocs={() => {
+            setRoute({ kind: "docs" });
+          }}
+          onOpenLegal={(doc) => {
+            setRoute({ kind: "legal", doc });
+          }}
+        />
+      </Suspense>
     );
   }
 
