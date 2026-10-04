@@ -28,7 +28,7 @@ void describe("sendConfirmation", () => {
     assert.equal(body["from"], "Mantua <founder@mantua.ai>");
     assert.equal(body["reply_to"], "founder@mantua.ai");
     assert.deepEqual(body["to"], ["Fan@example.com"]);
-    assert.match(String(body["text"]), /What happens next/);
+    assert.match(String(body["text"]), /your invite is ready/);
     assert.equal(
       (calls[0]?.init.headers as Record<string, string>)["authorization"],
       "Bearer re_test",
@@ -50,8 +50,12 @@ void describe("sendConfirmation", () => {
     assert.deepEqual(down, { error: "ECONNRESET" });
   });
 
-  void it("names the next steps in plain text", () => {
-    assert.match(confirmationText(), /email you once when Mantua opens/);
-    assert.match(confirmationText(), /Reply to this email/);
+  void it("carries the owner's copy, verbatim", () => {
+    const t = confirmationText();
+    assert.match(t, /^You’re on the Mantua waitlist\./);
+    assert.match(t, /We’ll email you when Mantua opens and your invite is ready\./);
+    assert.match(t, /Keep an eye on your inbox for your invite\./);
+    assert.match(t, /Questions or feedback\? Just reply to this email\./);
+    assert.match(t, /— The Mantua team$/);
   });
 });
