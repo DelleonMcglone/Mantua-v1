@@ -54,6 +54,13 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
               <span className="text-white">Sports</span>{" "}
               <span className="text-[#2ee6a6]">Agents</span>
             </p>
+            <p className="mx-auto mt-8 max-w-2xl text-[20px] font-medium leading-snug text-white sm:text-[24px]">
+              Trade sports prediction markets with AI agents.
+            </p>
+            <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-white/75 sm:text-[16px]">
+              Research markets, size positions, and execute trades automatically. You set the
+              strategy. Your agent executes it.
+            </p>
           </section>
 
           <section className="mt-10 w-full max-w-4xl text-center" aria-labelledby="waitlist-h">
