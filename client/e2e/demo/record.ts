@@ -13,6 +13,7 @@ import { writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
 import { mockApi, signIn } from "../harness.ts";
 import { TURN_1, TURN_2, TURN_6, type Frame } from "./turns.ts";
+import { week5Slate } from "./slate.ts";
 
 const OUT = new URL("./out/", import.meta.url).pathname;
 const SIZE = { width: 1280, height: 720 };
@@ -61,6 +62,13 @@ async function record(name: string, turn: { prompt: string; frames: Frame[] }) {
   const page = await context.newPage();
   const t0 = Date.now();
   await mockApi(page, { termsAccepted: true });
+  await page.route("**/api/sports/slate**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(week5Slate()),
+    }),
+  );
   await page.route("**/api/agent/portfolio**", (route) =>
     route.fulfill({
       status: 200,
@@ -107,7 +115,68 @@ async function record(name: string, turn: { prompt: string; frames: Frame[] }) {
   console.log("recorded", name);
 }
 
+/** The board shot: the home page with this week's games, a slow look down the list. */
+async function recordBoard() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({
+    viewport: SIZE,
+    deviceScaleFactor: 1,
+    recordVideo: { dir: OUT, size: SIZE },
+    colorScheme: "dark",
+  });
+  const page = await context.newPage();
+  const t0 = Date.now();
+  await mockApi(page, { termsAccepted: true });
+  await page.route("**/api/sports/slate**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(week5Slate()),
+    }),
+  );
+  await page.goto("http://localhost:5173/");
+  await signIn(page);
+  // Lighter zoom here: the board column only shows at a desktop width.
+  await page.addStyleTag({
+    content: "* { caret-color: transparent !important; } html { zoom: 1.12; }",
+  });
+  await page.getByRole("button", { name: "Trade", exact: true }).first().waitFor();
+  await sleep(600);
+  const typingAtMs = Date.now() - t0;
+  await sleep(2000);
+  // Into the NFL page: the whole week's games, then a slow look down the list.
+  await page
+    .getByRole("button", { name: /view markets/i })
+    .first()
+    .click();
+  await page.getByRole("button", { name: "Next week" }).waitFor();
+  await sleep(900);
+  await page.getByRole("button", { name: "Next week" }).click();
+  await page
+    .getByText("Las Vegas Raiders")
+    .first()
+    .waitFor({ timeout: 8000 })
+    .catch(async () => {
+      await page.screenshot({ path: `${OUT}board-fail.png` });
+      throw new Error("week 5 not on the page — see out/board-fail.png");
+    });
+  await sleep(1800);
+  for (let i = 0; i < 28; i += 1) {
+    await page.mouse.wheel(0, 16);
+    await sleep(100);
+  }
+  await sleep(1800);
+  const video = page.video();
+  await page.close();
+  if (video) await video.saveAs(`${OUT}board.webm`);
+  writeFileSync(`${OUT}board.json`, JSON.stringify({ typingAtMs }));
+  await context.close();
+  await browser.close();
+  console.log("recorded board");
+}
+
 const only = process.argv[2];
+if (!only || only === "board") await recordBoard();
 if (!only || only === "1") await record("turn-1", TURN_1);
 if (!only || only === "2") await record("turn-2", TURN_2);
 if (!only || only === "6") await record("turn-6", TURN_6);

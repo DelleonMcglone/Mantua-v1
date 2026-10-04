@@ -19,10 +19,11 @@ after(() => {
 
 function serve(
   save: (row: { email: string; source: string; userAgent: string | null }) => Promise<boolean>,
+  confirm: (email: string) => Promise<unknown> = () => Promise.resolve({ skipped: "test" }),
 ) {
   const app = express();
   app.use(express.json());
-  app.use(createWaitlistRouter({ save }));
+  app.use(createWaitlistRouter({ save, confirm }));
   return new Promise<string>((resolve) => {
     const server = app.listen(0, "127.0.0.1", () => {
       servers.push(server);
@@ -53,11 +54,33 @@ void describe("POST /api/waitlist", () => {
     assert.deepEqual(seen, [{ email: "fan@example.com", source: "landing", userAgent: "test-ua" }]);
   });
 
-  void it("treats a repeat email as already on the list, not an error", async () => {
-    const origin = await serve(() => Promise.resolve(false));
+  void it("treats a repeat email as already on the list, not an error, and sends nothing", async () => {
+    let sent = 0;
+    const origin = await serve(
+      () => Promise.resolve(false),
+      () => {
+        sent += 1;
+        return Promise.resolve({});
+      },
+    );
     const res = await post(origin, { email: "fan@example.com" });
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { ok: true, already: true });
+    assert.equal(sent, 0);
+  });
+
+  void it("sends the confirmation once to a fresh signup", async () => {
+    const sent: string[] = [];
+    const origin = await serve(
+      () => Promise.resolve(true),
+      (email) => {
+        sent.push(email);
+        return Promise.resolve({ id: "em_1" });
+      },
+    );
+    const res = await post(origin, { email: "New@Example.com" });
+    assert.equal(res.status, 200);
+    assert.deepEqual(sent, ["new@example.com"]);
   });
 
   void it("rejects a malformed email with 400 and never touches the store", async () => {

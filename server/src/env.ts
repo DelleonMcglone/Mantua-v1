@@ -129,6 +129,15 @@ const schema = z.object({
     .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
     .optional(),
 
+  /** Resend API key for the waitlist confirmation email (owner,
+   *  2026-10-04), sent from hello@mantua.ai. Absent → signups are saved
+   *  and no email goes out. */
+  RESEND_API_KEY: z
+    .string()
+    .min(1)
+    .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
+    .optional(),
+
   // ── Task 070 (Phase 13) — social posting and support ────────────────
   /** X (Twitter) API v2 credentials for the deployment's posting account
    *  (D-107): the developer app's consumer key/secret and the account's

@@ -10,13 +10,17 @@ import { asc } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/client.ts";
 import { waitlist } from "../db/schema/waitlist.ts";
+import { env } from "../env.ts";
 import { logger } from "../lib/logger.ts";
+import { sendConfirmation } from "../lib/waitlist/confirmation.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 
 export interface WaitlistDeps {
   /** Persist one signup; false when the email was already on the list. */
   save: (row: { email: string; source: string; userAgent: string | null }) => Promise<boolean>;
+  /** The confirmation email, sent once per fresh signup; never throws. */
+  confirm: (email: string) => Promise<unknown>;
 }
 
 const body = z.object({
@@ -38,7 +42,11 @@ async function saveToDb(row: {
 }
 
 export function createWaitlistRouter(overrides: Partial<WaitlistDeps> = {}): Router {
-  const deps: WaitlistDeps = { save: saveToDb, ...overrides };
+  const deps: WaitlistDeps = {
+    save: saveToDb,
+    confirm: (email) => sendConfirmation(email, { apiKey: env.RESEND_API_KEY, fetch }),
+    ...overrides,
+  };
   const router = Router();
   router.post("/api/waitlist", writeRateLimiter, async (req: Request, res: Response) => {
     const parsed = body.safeParse(req.body);
@@ -53,6 +61,12 @@ export function createWaitlistRouter(overrides: Partial<WaitlistDeps> = {}): Rou
         source: parsed.data.source,
         userAgent: ua ? ua.slice(0, 200) : null,
       });
+      if (fresh) {
+        // Awaited so the function never exits mid-send (Resend answers in
+        // well under a second); a refusal is a log line, not a failed signup.
+        const outcome = await deps.confirm(parsed.data.email);
+        logger.info({ outcome }, "waitlist confirmation");
+      }
       res.json({ ok: true, already: !fresh });
     } catch (err) {
       logger.warn({ err }, "waitlist signup failed");
