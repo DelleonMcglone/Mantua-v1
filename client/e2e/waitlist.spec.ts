@@ -18,7 +18,8 @@ test("the waitlist page takes an email and confirms it, with no login or help in
   await page.goto("/waitlist");
 
   await expect(page.getByTestId("waitlist-page")).toBeVisible();
-  await expect(page.getByRole("img", { name: /Programmable Sports Agents/ })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Mantua" }).last()).toBeVisible();
+  await expect(page.getByText("Programmable")).toBeVisible();
   const header = page.locator("header");
   await expect(header.getByRole("button", { name: "Toggle theme" })).toBeVisible();
   await expect(header.getByRole("button", { name: /log in|sign up|help/i })).toHaveCount(0);
