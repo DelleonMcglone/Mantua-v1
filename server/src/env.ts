@@ -138,6 +138,10 @@ const schema = z.object({
     .refine((v) => !/\s/.test(v), "must not contain whitespace — check for a broken paste")
     .optional(),
 
+  /** The mailbox the waitlist confirmation is from and replies go to
+   *  (default: the founder's, lib/waitlist/confirmation.ts). */
+  WAITLIST_SENDER_EMAIL: z.email().optional(),
+
   // ── Task 070 (Phase 13) — social posting and support ────────────────
   /** X (Twitter) API v2 credentials for the deployment's posting account
    *  (D-107): the developer app's consumer key/secret and the account's

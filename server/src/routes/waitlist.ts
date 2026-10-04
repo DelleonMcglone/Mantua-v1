@@ -12,7 +12,7 @@ import { db } from "../db/client.ts";
 import { waitlist } from "../db/schema/waitlist.ts";
 import { env } from "../env.ts";
 import { logger } from "../lib/logger.ts";
-import { sendConfirmation } from "../lib/waitlist/confirmation.ts";
+import { DEFAULT_SENDER, sendConfirmation } from "../lib/waitlist/confirmation.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { writeRateLimiter } from "../middleware/rate-limit.ts";
 
@@ -44,7 +44,12 @@ async function saveToDb(row: {
 export function createWaitlistRouter(overrides: Partial<WaitlistDeps> = {}): Router {
   const deps: WaitlistDeps = {
     save: saveToDb,
-    confirm: (email) => sendConfirmation(email, { apiKey: env.RESEND_API_KEY, fetch }),
+    confirm: (email) =>
+      sendConfirmation(email, {
+        apiKey: env.RESEND_API_KEY,
+        sender: env.WAITLIST_SENDER_EMAIL ?? DEFAULT_SENDER,
+        fetch,
+      }),
     ...overrides,
   };
   const router = Router();
