@@ -26,6 +26,7 @@ export const CSP_SOURCES: Record<"script" | "frame" | "connect" | "style" | "fon
     { origin: "https://verify.walletconnect.org", why: "WalletConnect verify frame" },
     { origin: "https://secure.walletconnect.com", why: "WalletConnect secure frame" },
     { origin: "https://secure.walletconnect.org", why: "WalletConnect secure frame" },
+    { origin: "https://www.youtube-nocookie.com", why: "the landing page's demo video" },
   ],
   connect: [
     { origin: "https://auth.privy.io", why: "Privy auth API" },

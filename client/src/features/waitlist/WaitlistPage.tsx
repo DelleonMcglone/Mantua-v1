@@ -78,17 +78,18 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
             <h2 id="demo-h" className="sr-only">
               See what the app can do
             </h2>
-            <video
+            {/* The demo, hosted on YouTube (owner, 2026-10-05); the
+                privacy-enhanced host sets no cookies until play. */}
+            <iframe
               data-testid="waitlist-video"
               className="aspect-video w-full rounded-lg border border-white/15 bg-black"
-              src="/assets/demo.mp4"
-              poster="/assets/demo-poster.jpg"
-              controls
-              playsInline
-              preload="metadata"
-            >
-              Your browser can't play this video.
-            </video>
+              src="https://www.youtube-nocookie.com/embed/siArImNtatM?rel=0&modestbranding=1"
+              title="Mantua demo"
+              loading="lazy"
+              allow="accelerometer; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
           </section>
         </main>
         <div className="border-white/10 text-white/80 [&_footer]:border-white/10">
