@@ -27,7 +27,10 @@ test("the waitlist page takes an email and confirms it, with no login or help in
   await expect(
     header.getByRole("button", { name: /log in|sign up|help|toggle theme/i }),
   ).toHaveCount(0);
-  await expect(page.getByTestId("waitlist-video")).toHaveAttribute("src", "/assets/demo.mp4");
+  await expect(page.getByTestId("waitlist-video")).toHaveAttribute(
+    "src",
+    /youtube-nocookie\.com\/embed\/siArImNtatM/,
+  );
   await expect(page.getByRole("button", { name: "Terms of Use" })).toBeVisible();
 
   const join = page.getByRole("button", { name: "Join the waitlist" });
