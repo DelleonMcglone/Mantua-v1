@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { CHIEFS_GAME, CHIEFS_LIVE } from "../fixtures.ts";
 import { mockApi, type MockOptions } from "../harness.ts";
 
@@ -91,4 +91,22 @@ export async function mockMobileApi(page: Page, opts: MobileMockOptions = {}) {
 /** The centre of an element must be reachable by a thumb: the bottom 60% of the viewport. */
 export function inThumbZone(box: { y: number; height: number }, viewportHeight: number): boolean {
   return box.y + box.height / 2 >= viewportHeight * 0.4;
+}
+
+/**
+ * Resolves once every finite animation on `el` and its subtree has finished
+ * (the bottom sheet's 220 ms `sheet-in-bottom` slide, chiefly). Measure touch
+ * targets only after this: mid-slide the rect sits at a fractional
+ * translateY, and a 44 px button can read back as 43.9999 px. Infinite
+ * animations (spinners, the live dot) are skipped so this never hangs.
+ */
+export async function animationsSettled(el: Locator): Promise<void> {
+  await el.evaluate((node) =>
+    Promise.all(
+      node
+        .getAnimations({ subtree: true })
+        .filter((a) => a.effect?.getComputedTiming().endTime !== Infinity)
+        .map((a) => a.finished.catch(() => undefined)),
+    ),
+  );
 }
