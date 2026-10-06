@@ -87,6 +87,16 @@ export function liveProviderChainFor(league: LeagueSlug): SportsDataProvider[] {
   return providerChainFor(league);
 }
 
+/**
+ * The source for reference data (injuries, standings): ESPN on a trial
+ * Sportradar key — its endpoints are free and unmetered, where the trial
+ * quota starved these feeds in production (owner report 2026-10-05) —
+ * and the provider that served the slate on a production key.
+ */
+export function referenceProviderFor(served: SportsDataProvider): SportsDataProvider {
+  return env.SPORTRADAR_ENV !== "production" ? espn : served;
+}
+
 /** Breaker state across every active adapter, for health reporting. */
 export function activeBreakerState(): Record<
   string,

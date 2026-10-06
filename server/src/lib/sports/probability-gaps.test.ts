@@ -13,6 +13,7 @@ const row = (game: string, gapPoints: number, liquidityUsdc: number | null): Gap
   confidence: "medium",
   liquidityUsdc,
   drivers: [],
+  reference: "pool",
 });
 
 void describe("rankGaps", () => {
@@ -63,8 +64,22 @@ void describe("gapRowFromAnalysis", () => {
     assert.equal(r.gapPoints, 21);
     assert.equal(r.game, "Pittsburgh Steelers at Cleveland Browns");
     assert.deepEqual(r.drivers, ["record: 7-3 vs 4-6"]);
+    assert.equal(r.reference, "pool");
   });
-  void it("skips an unpriced market", () => {
+  void it("compares with the sportsbook line while no market is open, and says so", () => {
+    const r = gapRowFromAnalysis(event, {
+      team: "Cleveland Browns",
+      market: null,
+      bookLine: { impliedProbabilityBps: 6100 },
+      analysis: { probabilityBps: 5200, confidence: "medium", evidence: [] },
+    });
+    assert.ok(r);
+    assert.equal(r.reference, "book");
+    assert.equal(r.marketProbabilityBps, 6100);
+    assert.equal(r.gapPoints, -9);
+    assert.equal(r.marketId, "");
+  });
+  void it("skips a game with neither a pool price nor a book line", () => {
     assert.equal(
       gapRowFromAnalysis(event, {
         market: { marketId: "0xabc", impliedProbabilityBps: null, liquidityUsdc: null },

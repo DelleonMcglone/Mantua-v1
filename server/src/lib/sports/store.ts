@@ -15,7 +15,7 @@
  * a known event, that is corruption to escalate, not data to apply.
  */
 
-import { eq, and, isNull, or, asc, sql } from "drizzle-orm";
+import { eq, and, inArray, isNull, ne, or, asc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { DB } from "../../db/client.ts";
 import {
@@ -684,6 +684,38 @@ export interface ReferenceRefreshResult {
  * has ~33 requests/day of budget, so rosters rotate (stalest first) instead
  * of fetching all 32 teams every tick.
  */
+/** Canonical team ids by provider-agnostic key, for a league. */
+async function teamIdsFor(db: DB, league: LeagueSlug): Promise<ReadonlyMap<string, string>> {
+  const leagueId = await ensureLeague(db, league);
+  const rows = await db
+    .select({ id: teams.id, key: teams.key })
+    .from(teams)
+    .where(eq(teams.leagueId, leagueId));
+  return new Map(rows.map((t) => [t.key, t.id]));
+}
+
+/** Close every open injury another provider wrote for this league's players. */
+async function resolveOtherProvidersInjuries(
+  db: DB,
+  provider: string,
+  league: LeagueSlug,
+): Promise<void> {
+  const leagueId = await ensureLeague(db, league);
+  await db
+    .update(injuries)
+    .set({ resolvedAt: sql`now()` })
+    .where(
+      and(
+        isNull(injuries.resolvedAt),
+        ne(injuries.provider, provider),
+        inArray(
+          injuries.playerId,
+          db.select({ id: players.id }).from(players).where(eq(players.leagueId, leagueId)),
+        ),
+      ),
+    );
+}
+
 export async function refreshReferenceData(
   db: DB,
   provider: SportsDataProvider,
@@ -735,7 +767,34 @@ export async function refreshReferenceData(
     const feed = await provider.getInjuries(league);
     const openRows = await listOpenInjuries(db, feed.provider, league);
     const plan = planInjuryTransitions(openRows, feed.items, feed.delayed);
+    // A report that names its team can create the player it is about, so a
+    // provider with no roster feed (ESPN) still lands its injuries instead
+    // of skipping every one as an unknown player.
+    const named = plan.open.filter((r): r is typeof r & { teamKey: string } => Boolean(r.teamKey));
+    if (named.length > 0) {
+      const ids = teamIdsByKey.size > 0 ? teamIdsByKey : await teamIdsFor(db, league);
+      await upsertPlayers(
+        db,
+        feed.provider,
+        league,
+        named.map((r) => {
+          const position = (r as { position?: string }).position;
+          return {
+            providerPlayerId: r.providerPlayerId,
+            name: r.playerName,
+            teamKey: r.teamKey,
+            status: "active" as const,
+            ...(position ? { position } : {}),
+          };
+        }),
+        ids,
+      );
+    }
     const applied = await applyInjuryPlan(db, feed.provider, league, plan);
+    // One provider owns the open injury set: when the reference source
+    // changes, the previous source's open rows would otherwise stay open
+    // forever and show up as duplicates.
+    if (!feed.delayed) await resolveOtherProvidersInjuries(db, feed.provider, league);
     recordFeedPoll("injuries", league, feed.provider, feed.delayed);
     result.injuries = { ...applied, reports: feed.items.length, delayed: feed.delayed };
   }
@@ -746,15 +805,7 @@ export async function refreshReferenceData(
   // hierarchy pass.
   if (typeof provider.getStandings === "function") {
     const feed = await provider.getStandings(league);
-    let ids: ReadonlyMap<string, string> = teamIdsByKey;
-    if (ids.size === 0) {
-      const leagueId = await ensureLeague(db, league);
-      const teamRows = await db
-        .select({ id: teams.id, key: teams.key })
-        .from(teams)
-        .where(eq(teams.leagueId, leagueId));
-      ids = new Map(teamRows.map((t) => [t.key, t.id]));
-    }
+    const ids = teamIdsByKey.size > 0 ? teamIdsByKey : await teamIdsFor(db, league);
     const plan = planTeamRecordRows(feed.items, ids, feed.delayed);
     const upserted = await upsertTeamRecords(db, feed.provider, plan);
     recordFeedPoll("standings", league, feed.provider, feed.delayed);

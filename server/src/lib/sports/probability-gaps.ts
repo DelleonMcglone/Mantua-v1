@@ -18,6 +18,9 @@ export interface GapRow {
   confidence: string;
   liquidityUsdc: number | null;
   drivers: string[];
+  /** What the estimate is compared with: Mantua's pool price, or — while
+   *  no market is open for the game — the sportsbook line. */
+  reference: "pool" | "book";
 }
 
 /** Largest absolute gap first; ties by liquidity (deeper first). */
@@ -37,25 +40,33 @@ export function gapRowFromAnalysis(event: EventRow, a: Record<string, unknown>):
     impliedProbabilityBps: number | null;
     liquidityUsdc: number | null;
   } | null;
+  const book = a["bookLine"] as { impliedProbabilityBps: number } | null | undefined;
   const analysis = a["analysis"] as
     | { probabilityBps: number; confidence: string; evidence: { factor: string; detail: string }[] }
     | undefined;
-  if (!market || market.impliedProbabilityBps === null || !analysis) return null;
+  if (!analysis) return null;
+  const pool = market?.impliedProbabilityBps ?? null;
+  const reference = pool !== null ? "pool" : book ? "book" : null;
+  const against = pool ?? book?.impliedProbabilityBps ?? null;
+  if (reference === null || against === null) return null;
   return {
     game: `${event.awayTeam} at ${event.homeTeam}`,
     providerEventId: event.providerEventId,
     outcome: typeof a["team"] === "string" ? a["team"] : event.homeTeam,
-    marketId: market.marketId,
-    marketProbabilityBps: market.impliedProbabilityBps,
+    marketId: market?.marketId ?? "",
+    marketProbabilityBps: against,
     mantuaProbabilityBps: analysis.probabilityBps,
-    gapPoints: Math.round((analysis.probabilityBps - market.impliedProbabilityBps) / 10) / 10,
+    gapPoints: Math.round((analysis.probabilityBps - against) / 10) / 10,
     confidence: analysis.confidence,
-    liquidityUsdc: market.liquidityUsdc,
+    liquidityUsdc: market?.liquidityUsdc ?? null,
     drivers: analysis.evidence.slice(0, 4).map((e) => `${e.factor}: ${e.detail}`),
+    reference,
   };
 }
 
 const DEFAULT_WINDOW_HOURS = 36;
+/** Midweek there is no game inside a day and a half: look at the week. */
+const WEEK_HOURS = 168;
 
 export async function scanProbabilityGaps(
   dbx: SportsToolsDb,
@@ -68,13 +79,17 @@ export async function scanProbabilityGaps(
   const league = (await dbx.listLeagues()).find((l) => l.slug === slug);
   if (!league) return { status: "unknown_league", league: slug };
   const from = now.getTime() - 4 * 3_600_000;
-  const to = now.getTime() + hours * 3_600_000;
-  const events = (await dbx.listEventsForLeague(league.id, 500)).filter(
-    (e) =>
-      (e.status === "scheduled" || e.status === "in_progress") &&
-      e.startsAt.getTime() >= from &&
-      e.startsAt.getTime() <= to,
+  const all = (await dbx.listEventsForLeague(league.id, 500)).filter(
+    (e) => (e.status === "scheduled" || e.status === "in_progress") && e.startsAt.getTime() >= from,
   );
+  const within = (h: number) =>
+    all.filter((e) => e.startsAt.getTime() <= now.getTime() + h * 3_600_000);
+  let events = within(hours);
+  let window = hours;
+  if (events.length === 0 && input.windowHours === undefined) {
+    events = within(WEEK_HOURS);
+    window = WEEK_HOURS;
+  }
   const rows: GapRow[] = [];
   let unpriced = 0;
   for (const event of events) {
@@ -89,10 +104,10 @@ export async function scanProbabilityGaps(
   }
   return {
     status: "ok",
-    windowHours: hours,
+    windowHours: window,
     scanned: events.length,
     unpriced,
     gaps: rankGaps(rows, limit),
-    note: "gapPoints = Mantua's estimate minus the market, in percentage points; the outcome is the home side — the away side's gap is the negative. Estimates are evidence-weighted, not predictions.",
+    note: "gapPoints = Mantua's estimate minus the reference, in percentage points; the outcome is the home side — the away side's gap is the negative. reference 'pool' is Mantua's live market price; 'book' means no Mantua market is open for that game yet and the comparison is with the sportsbook line — say which. The estimate is a simple evidence-weighted read (venue, record, form, injuries, head-to-head); a sportsbook line prices far more, so treat a wide gap against the book as a question to research, not a mispricing. Not a prediction.",
   };
 }

@@ -1,7 +1,11 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
-import { activeBreakerState, providerChainFor } from "../lib/sports/active-provider.ts";
+import {
+  activeBreakerState,
+  providerChainFor,
+  referenceProviderFor,
+} from "../lib/sports/active-provider.ts";
 import { refreshSeasonSchedule } from "../lib/sports/season-schedule.ts";
 import { feedFreshnessSnapshot, refreshNextSlate } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
@@ -146,13 +150,13 @@ cronSportsSyncRouter.get(
             marketsOnChain: creation ?? "disabled (no signer for this chain)",
           };
         }
-        // S-003: teams/players/injuries into the canonical tables, when the
-        // provider offers the capabilities (Sportradar does; ESPN yields
-        // all-null and the pass is a no-op). Failure here must not undo the
-        // slate work above — reference data heals on the next tick.
+        // S-003: teams/players/injuries/standings into the canonical
+        // tables, from the reference source (ESPN on a trial key, the
+        // served provider on a production one). Failure here must not undo
+        // the slate work above — reference data heals on the next tick.
         let reference: unknown = null;
         try {
-          reference = await refreshReferenceData(db, provider, league);
+          reference = await refreshReferenceData(db, referenceProviderFor(provider), league);
         } catch (err) {
           logger.warn({ league, err }, "sports-sync: reference-data pass failed");
           reference = { error: err instanceof Error ? err.message : String(err) };

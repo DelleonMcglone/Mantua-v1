@@ -25,6 +25,12 @@ import {
   type SeasonType,
 } from "./provider.ts";
 import { LIVE_TTL_MS, PREGAME_TTL_MS, ResilientJson } from "./resilience.ts";
+import { impliedHomeWinProbabilityBps } from "./espn-odds.ts";
+import { parseInjuries, parseStandings } from "./espn-reference.ts";
+import type { ProviderFeed, ProviderInjuryReport, ProviderTeamStanding } from "./provider.ts";
+
+/** Injuries and standings move on the scale of hours, not seconds. */
+const REFERENCE_TTL_MS = 10 * 60_000;
 
 /** ESPN's path segment per league — mirrors `leagues.provider_key` in the DB. */
 const LEAGUE_PATH: Record<LeagueSlug, string> = {
@@ -139,7 +145,9 @@ export function parseHomeWinProbabilityBps(
 
   const prob = asRecord(first["homeTeamOdds"]);
   const pct = asNumber(prob?.["winPercentage"]) ?? asNumber(first["homeWinPercentage"]);
-  if (pct === undefined) return undefined;
+  // No published percentage (the usual case before kickoff): fall back to
+  // the posted line — moneyline with the vig removed, else the spread.
+  if (pct === undefined) return impliedHomeWinProbabilityBps(competition);
   if (pct <= 0 || pct >= 100) return undefined;
   return Math.round(pct * 100);
 }
@@ -330,5 +338,37 @@ export class EspnProvider implements SportsDataProvider {
     } catch {
       return null;
     }
+  }
+
+  /** League-wide injury report (free; one call). */
+  async getInjuries(league: LeagueSlug): Promise<ProviderFeed<ProviderInjuryReport>> {
+    const res = await this.http.get<unknown>(
+      `espn:injuries:${league}`,
+      `/apis/site/v2/sports/${LEAGUE_PATH[league]}/injuries`,
+      REFERENCE_TTL_MS,
+    );
+    return {
+      provider: this.name,
+      league,
+      items: parseInjuries(res.value, league),
+      delayed: res.delayed,
+      fetchedAt: res.fetchedAt,
+    };
+  }
+
+  /** Season standings (free; one call). Note the `/apis/v2` path. */
+  async getStandings(league: LeagueSlug): Promise<ProviderFeed<ProviderTeamStanding>> {
+    const res = await this.http.get<unknown>(
+      `espn:standings:${league}`,
+      `/apis/v2/sports/${LEAGUE_PATH[league]}/standings`,
+      REFERENCE_TTL_MS,
+    );
+    return {
+      provider: this.name,
+      league,
+      items: parseStandings(res.value, league),
+      delayed: res.delayed,
+      fetchedAt: res.fetchedAt,
+    };
   }
 }

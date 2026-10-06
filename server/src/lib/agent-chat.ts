@@ -871,6 +871,12 @@ const RAW_TOOLS: Anthropic.Tool[] = [
 ];
 
 /** Every money-moving tool carries the optional confirmationId (A-031). */
+/** The definitions of the named tools, for surfaces that reuse a subset
+ *  (the read-only analyst shares the free sports reads). */
+export function toolDefinitions(names: readonly string[]): Anthropic.Tool[] {
+  return RAW_TOOLS.filter((t) => names.includes(t.name));
+}
+
 const TOOLS: Anthropic.Tool[] = RAW_TOOLS.map((t) =>
   MONEY_TOOLS.has(t.name) ? withConfirmationId(t) : t,
 );

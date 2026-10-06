@@ -70,26 +70,48 @@ const DEFAULT_HOME_ADVANTAGE_BPS = 250;
 /** Edge the estimate must show over the market before suggesting a side. */
 export const EDGE_THRESHOLD_BPS = 500;
 
-function winPct(r: { wins: number; losses: number; ties: number } | null): number | null {
-  if (!r) return null;
-  const games = r.wins + r.losses + r.ties;
-  if (games === 0) return null;
-  return (r.wins + r.ties / 2) / games;
+/** Prior games at .500 mixed into a record, so four weeks of results do
+ *  not read like a full season (owner report 2026-10-05: 1-3 vs 3-1 was
+ *  moving the estimate 25 points). */
+const RECORD_PRIOR_GAMES = 8;
+const FORM_PRIOR_GAMES = 3;
+/** Games of record below which an estimate is never "high" confidence. */
+const EARLY_SEASON_GAMES = 6;
+
+function gamesOf(r: { wins: number; losses: number; ties: number } | null): number {
+  return r ? r.wins + r.losses + r.ties : 0;
 }
 
+/** Win share shrunk toward .500 by `RECORD_PRIOR_GAMES`. */
+function winPct(r: { wins: number; losses: number; ties: number } | null): number | null {
+  if (!r) return null;
+  const games = gamesOf(r);
+  if (games === 0) return null;
+  return (r.wins + r.ties / 2 + RECORD_PRIOR_GAMES / 2) / (games + RECORD_PRIOR_GAMES);
+}
+
+/** Recent-form share shrunk toward .500 by `FORM_PRIOR_GAMES`. */
 function formPct(form: readonly ("W" | "L" | "T")[]): number | null {
   if (form.length === 0) return null;
   const pts = form.reduce((acc, r) => acc + (r === "W" ? 1 : r === "T" ? 0.5 : 0), 0);
-  return pts / form.length;
+  return (pts + FORM_PRIOR_GAMES / 2) / (form.length + FORM_PRIOR_GAMES);
 }
 
+/**
+ * Bps a side loses to its injury report. A quarterback out or doubtful is
+ * the one absence that moves a line on its own; other players count a
+ * little each. Injured reserve is not counted — those absences are
+ * already in the record.
+ */
 function injuryPenaltyBps(injuries: SideFacts["injuries"]): number {
   let bps = 0;
   for (const i of injuries) {
     const s = i.status.toLowerCase();
-    if (s.includes("out") || s.includes("ir") || s.includes("doubtful")) bps += 300;
-    else if (s.includes("questionable") || s.includes("day-to-day") || s.includes("probable"))
-      bps += 100;
+    if (s === "ir") continue;
+    const qb = (i.position ?? "").toUpperCase() === "QB";
+    if (s.includes("out") || s.includes("doubtful")) bps += qb ? 700 : 150;
+    else if (s.includes("questionable") || s.includes("day") || s.includes("probable"))
+      bps += qb ? 250 : 50;
   }
   return Math.min(bps, 900);
 }
@@ -125,6 +147,10 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
       detail: `${f.team.name} ${String(f.team.record?.wins)}-${String(f.team.record?.losses)} vs ${f.opponent.name} ${String(f.opponent.record?.wins)}-${String(f.opponent.record?.losses)}`,
       effectBps: eff,
     });
+    const fewest = Math.min(gamesOf(f.team.record), gamesOf(f.opponent.record));
+    if (fewest < EARLY_SEASON_GAMES) {
+      risks.push(`early season: records rest on ${String(fewest)} game(s), weighted toward .500`);
+    }
   } else {
     risks.push("no season record for one or both teams — strength unweighted");
   }
@@ -206,8 +232,13 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
 
   // Confidence from evidence breadth and data freshness.
   const strong = evidence.filter((e) => e.factor !== "venue").length;
+  const seasoned =
+    Math.min(gamesOf(f.team.record), gamesOf(f.opponent.record)) >= EARLY_SEASON_GAMES;
   const confidence: SportsAnalysis["confidence"] =
-    strong >= 3 && !f.delayed && (f.marketAgeSeconds === null || f.marketAgeSeconds <= 15 * 60)
+    strong >= 3 &&
+    seasoned &&
+    !f.delayed &&
+    (f.marketAgeSeconds === null || f.marketAgeSeconds <= 15 * 60)
       ? "high"
       : strong >= 2
         ? "medium"
@@ -241,7 +272,7 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
   return {
     probabilityBps,
     method:
-      "Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win% gap × 5000), recent form (gap × 2000), injuries (out/doubtful −300, questionable −100 per player, capped 900), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.",
+      "Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × 5000, each share weighted toward .500 by 8 prior games), recent form (gap × 2000, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; injured reserve not counted; capped 900), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.",
     evidence,
     riskFactors: risks,
     discrepancyBps,
