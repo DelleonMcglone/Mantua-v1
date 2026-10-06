@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { confirmationText, sendConfirmation } from "./confirmation.ts";
+import { confirmationHtml, confirmationText, sendConfirmation } from "./confirmation.ts";
 
 void describe("sendConfirmation", () => {
   void it("is a no-op without a key", async () => {
@@ -28,7 +28,7 @@ void describe("sendConfirmation", () => {
     assert.equal(body["from"], "Mantua <founder@mantua.ai>");
     assert.equal(body["reply_to"], "founder@mantua.ai");
     assert.deepEqual(body["to"], ["Fan@example.com"]);
-    assert.match(String(body["text"]), /your invite is ready/);
+    assert.match(String(body["text"]), /with your invite/);
     assert.equal(
       (calls[0]?.init.headers as Record<string, string>)["authorization"],
       "Bearer re_test",
@@ -52,10 +52,15 @@ void describe("sendConfirmation", () => {
 
   void it("carries the owner's copy, verbatim", () => {
     const t = confirmationText();
-    assert.match(t, /^You’re on the Mantua waitlist\./);
-    assert.match(t, /We’ll email you when Mantua opens and your invite is ready\./);
-    assert.match(t, /Keep an eye on your inbox for your invite\./);
-    assert.match(t, /Questions or feedback\? Just reply to this email\./);
-    assert.match(t, /— The Mantua team$/);
+    assert.match(
+      t,
+      /^You're on the Mantua waitlist\.\nThanks for signing up\. Here's what happens next:/,
+    );
+    assert.match(t, /1\. We'll email you once when Mantua opens, with your invite\./);
+    assert.match(t, /3\. Until then, the demo on mantua\.ai \(https:\/\/www\.mantua\.ai\/\) shows/);
+    assert.match(t, /4\. My telegram handle is @Datadealer_D/);
+    assert.match(t, /— Delleon McGlone, Founder & CEO of Mantua$/);
+    assert.match(confirmationHtml(), /<a href="https:\/\/www\.mantua\.ai\/"[^>]*>mantua\.ai<\/a>/);
+    assert.match(confirmationHtml(), /&amp; CEO/);
   });
 });
