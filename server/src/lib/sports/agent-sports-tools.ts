@@ -101,6 +101,8 @@ export interface EventRow {
   status: string;
   homeScore: number | null;
   awayScore: number | null;
+  /** The sportsbook-implied home win probability the feed carried, bps. */
+  homeWinProbabilityBps?: number | null;
 }
 
 export interface MarketRow {
@@ -207,6 +209,7 @@ export function makeSportsToolsDb(db: DB): SportsToolsDb {
     status: events.status,
     homeScore: events.homeScore,
     awayScore: events.awayScore,
+    homeWinProbabilityBps: events.homeWinProbabilityBps,
   };
   const injuryCols = {
     id: injuries.id,
@@ -2015,6 +2018,10 @@ export async function analyzeMarket(
   });
 
   const fadeIndex: 0 | 1 = outcomeIndex === 0 ? 1 : 0;
+  // The sportsbook line for this side, when the feed carried one: the
+  // reference to compare against while no pool price exists.
+  const homeBook = event.homeWinProbabilityBps ?? null;
+  const bookBps = homeBook === null ? null : side === "home" ? homeBook : 10_000 - homeBook;
   return {
     status: "ok",
     skill: "sports_intelligence",
@@ -2022,6 +2029,14 @@ export async function analyzeMarket(
     side,
     team: team.name,
     opponent: opponent.name,
+    bookLine:
+      bookBps === null
+        ? null
+        : {
+            impliedProbabilityBps: bookBps,
+            gapPoints: Math.round((analysis.probabilityBps - bookBps) / 10) / 10,
+            source: "sportsbook closing line, vig removed (not a Mantua market price)",
+          },
     market: market
       ? {
           marketId: market["marketId"],
