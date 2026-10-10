@@ -112,10 +112,15 @@ regular season as free.
       salt `0x2443`, tx `0x1852e5d9…7dbd`, block 25298378, receipt `0x1`.
 - [x] Deployment record updated; `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook`
       and its test point at the new hook; README address table updated.
-- [ ] Arcscan verification of the new hook (`verify.sh`, the wrapper's
-      `--verify` hit the known solmate-import failure).
-- [ ] `DYNAMIC_MARKET_HOOK_ADDRESS=0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0 npm run verify:hooks`
-      to refresh `docs/security/hook-deployments.md` (needs Arc RPC).
+- [x] On-chain probes: `poolManager()` and `registry()` on the new hook
+      return the reused PoolManager and registry (owner, 2026-10-10).
+- [x] Arcscan verification of the new hook: `verify.sh` passed on Sourcify
+      with the deploy's solc passed as `SOLC=` (the 0.8.26 default did not
+      match the deployed bytecode); the wrapper's `--verify` had hit the
+      known solmate-import failure.
+- [x] `verify:hooks` report refreshed and committed to `main`
+      (`docs/security/hook-deployments.md`: deployed, permissions and
+      bytecode match).
 - [ ] `quoteFee` probe on the first market created on the new hook: a
       regular-season pool must quote `1000 ≤ breakdown.rate ≤ 7000`.
 - [ ] Security pass and sign-off for the new hook address.
