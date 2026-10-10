@@ -18,8 +18,9 @@ import {MarketErrors} from "./MarketErrors.sol";
 ///      Registration is once-only. There is no kickoff setter, because a
 ///      mutable kickoff would defeat the §6 time backstop (anyone able to push
 ///      it forward could keep an abandoned market tradeable), and no season
-///      setter, because a flippable D-105 `playoffs` flag would be an admin
-///      path to turn fees on against traders.
+///      setter: the D-105 `playoffs` flag is a registration fact (since task
+///      076 a label, not a fee gate) and a flippable label would let an
+///      operator misdescribe a market after people have traded it.
 contract MarketStateRegistry is IMarketStateRegistry {
     /// @inheritdoc IMarketStateRegistry
     address public override operator;
@@ -56,8 +57,9 @@ contract MarketStateRegistry is IMarketStateRegistry {
     /// @param yesIsToken0 Whether YES sorted into token0. Recorded once so the
     ///        hook cannot get the ordering backwards when reading price.
     /// @param outcomeDecimals Outcome-token decimals (spec §9).
-    /// @param playoffs D-105 season switch from the league calendar: true
-    ///        enables the dynamic fee, false keeps the pool fee-free.
+    /// @param playoffs D-105 season label from the league calendar: true for a
+    ///        playoff game, false for the regular season. The dynamic fee
+    ///        applies either way (task 076).
     function registerPool(
         PoolId poolId,
         uint64 kickoffTimestamp,

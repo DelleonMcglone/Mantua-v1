@@ -2,8 +2,9 @@
 pragma solidity ^0.8.26;
 
 // Purpose: tests for MarketFeeCalculator — the four-driver dynamic rate, the
-// D-105 season gate, the p × (1 − p) shaping, stale behaviour, clamping, and
-// the trade cap. Task 049: H-003, H-004, H-006. Spec §33 edge cases 5-10, 13, 14.
+// season label (task 076: every season pays), the p × (1 − p) shaping, stale
+// behaviour, clamping, and the trade cap. Task 049: H-003, H-006. Spec §33
+// edge cases 5-10, 13, 14.
 
 import {Test} from "forge-std/Test.sol";
 import {MarketFeeCalculator as C} from "../../../src/hooks/dynamic-market/MarketFeeCalculator.sol";
@@ -33,24 +34,35 @@ contract MarketFeeCalculatorTest is Test {
         return C.rate(i).rate;
     }
 
-    // ─── Season gate (H-004) ─────────────────────────────────────────────
+    // ─── Season label (task 076: every season pays) ──────────────────────
 
-    function test_regularSeasonIsFreeWhateverTheConditions() public pure {
+    function test_regularSeasonPaysTheSameRateAsThePlayoffs() public pure {
         C.Inputs memory i = _calm();
-        i.playoffs = false;
         i.liquidity = 0;
         i.volatilityBps = 10_000;
         i.imbalanceBps = 10_000;
-        i.stale = true;
         i.eventState = I.EventState.CRITICAL;
-        (uint24 fee, C.Breakdown memory b) = C.calculate(i);
-        assertEq(fee, RiskPolicy.REGULAR_SEASON_FEE);
-        assertEq(b.rate, 0);
-        assertEq(b.minRate, 0);
-        assertFalse(b.playoffs);
+        (uint24 playoffFee, C.Breakdown memory playoff) = C.calculate(i);
+        i.playoffs = false;
+        (uint24 regularFee, C.Breakdown memory regular) = C.calculate(i);
+        assertEq(regularFee, playoffFee, "the season does not change the fee");
+        assertEq(regular.rate, playoff.rate);
+        assertEq(regular.minRate, RiskPolicy.MIN_RATE);
+        assertGt(regular.rate, RiskPolicy.MIN_RATE, "the drivers are read in the regular season");
+        assertFalse(regular.playoffs, "the label still records the season");
+        assertTrue(playoff.playoffs);
     }
 
-    function test_playoffsActivateTheDynamicRate() public pure {
+    function test_regularSeasonStaleKeeperClampsToTheCeiling() public pure {
+        C.Inputs memory i = _calm();
+        i.playoffs = false;
+        i.stale = true;
+        (uint24 fee, C.Breakdown memory b) = C.calculate(i);
+        assertEq(b.rate, RiskPolicy.MAX_RATE, "fail closed in every season");
+        assertEq(fee, F.effectiveFeePips(RiskPolicy.MAX_RATE, 5000));
+    }
+
+    function test_calmMarketPaysTheFloorRate() public pure {
         (uint24 fee, C.Breakdown memory b) = C.calculate(_calm());
         assertEq(b.rate, RiskPolicy.MIN_RATE, "no risk means the floor rate");
         assertEq(fee, F.effectiveFeePips(RiskPolicy.MIN_RATE, 5000), "50/50 charges half the rate on the input");
@@ -223,9 +235,9 @@ contract MarketFeeCalculatorTest is Test {
     }
 
     /// @dev The one property that must hold in every reachable state: the
-    ///      fee never exceeds the ceiling, the playoff rate never leaves its
-    ///      band, and the regular season is free.
-    function testFuzz_feeNeverExceedsTheCeilingAndTheSeasonRuleHolds(
+    ///      fee never exceeds the ceiling, the rate never leaves its band,
+    ///      and the season label changes nothing but itself (task 076).
+    function testFuzz_feeNeverExceedsTheCeilingAndTheSeasonChangesNothing(
         uint16 mp,
         uint16 mo,
         uint16 cf,
@@ -237,15 +249,16 @@ contract MarketFeeCalculatorTest is Test {
         bool inc,
         bool po
     ) public pure {
-        (uint24 fee, C.Breakdown memory b) = C.calculate(_any(mp, mo, cf, vol, imb, liq, st, stale, inc, po));
+        C.Inputs memory i = _any(mp, mo, cf, vol, imb, liq, st, stale, inc, po);
+        (uint24 fee, C.Breakdown memory b) = C.calculate(i);
         assertLe(fee, RiskPolicy.MAX_RATE);
-        if (po) {
-            assertGe(b.rate, RiskPolicy.MIN_RATE);
-            assertLe(b.rate, RiskPolicy.MAX_RATE);
-        } else {
-            assertEq(fee, 0);
-            assertEq(b.rate, 0);
-        }
+        assertGe(b.rate, RiskPolicy.MIN_RATE);
+        assertLe(b.rate, RiskPolicy.MAX_RATE);
+        assertEq(b.playoffs, po);
+        i.playoffs = !po;
+        (uint24 otherFee, C.Breakdown memory other) = C.calculate(i);
+        assertEq(otherFee, fee, "the other season pays the same fee");
+        assertEq(other.rate, b.rate, "the other season carries the same rate");
     }
 
     /// @dev fee(p = 0.5) ≥ fee(p) per contract, for the same conditions.

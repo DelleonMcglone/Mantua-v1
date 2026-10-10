@@ -15,7 +15,7 @@ test("the Terms page carries the current version, the fee model, and the review 
   await expect(page.getByText("Effective October 2, 2026")).toBeVisible();
   const body = await page.locator("main").innerText();
   expect(body).toMatch(/0\.10% and 0\.70%/);
-  expect(body).toMatch(/regular-season games carry no trading fee/i);
+  expect(body).toMatch(/regular-season and playoff games alike/i);
   expect(body).toMatch(/mandatory review window/i);
   expect(body).toMatch(/before and during the game/i);
   expect(body).toMatch(/fifty cents per contract/i);

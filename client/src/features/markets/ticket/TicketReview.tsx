@@ -59,7 +59,7 @@ export function TicketReview({
             </div>
           ))}
           <div className="col-span-2 mt-1 text-[10.5px] text-text-mute">
-            {summary.playoffs ? "Playoff game · dynamic fee" : "Regular season · no trading fee"}
+            {summary.playoffs ? "Playoff game" : "Regular season"} · dynamic fee
           </div>
         </dl>
       )}

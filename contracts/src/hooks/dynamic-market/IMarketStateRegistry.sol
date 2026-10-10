@@ -46,11 +46,12 @@ interface IMarketStateRegistry {
         ///      (spec §0.1) but storing it means a future non-6dp collateral
         ///      cannot silently break notional maths.
         uint8 outcomeDecimals;
-        /// @dev D-105 season switch. True when the game is a playoff game per
-        ///      the league calendar: the dynamic 0.10%–0.70% fee applies.
-        ///      False is the regular season: every swap is fee-free. Written
-        ///      once at registration by the operator and never again, so
-        ///      nobody can turn fees on or off against traders mid-market.
+        /// @dev D-105 season label. True when the game is a playoff game per
+        ///      the league calendar, false for the regular season. Since the
+        ///      2026-10-10 amendment (task 076) the dynamic 0.10%–0.70% fee
+        ///      applies in both; the flag rides into the fee breakdown and
+        ///      the telemetry as a label. Written once at registration by
+        ///      the operator and never again.
         bool playoffs;
     }
 

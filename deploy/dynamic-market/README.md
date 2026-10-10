@@ -216,6 +216,69 @@ Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 | Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                           |
 | Verification status     | All 11 verified on Arcscan (2026-09-30) — exact matches on Sourcify (chain 5042) via `verify.sh`, which Arcscan imports; the hook (CREATE2, no creation tx indexed) was submitted through the explorer's web form. See the note below. |
 
+> **Fee model amendment (task 076, 2026-10-10).** The hook at
+> `0xb23d…28c0` was compiled from the D-105 source with the regular-season
+> gate: a pool registered with `playoffs == false` pays 0% on this
+> deployment. The source now charges the dynamic fee in every season, so
+> charging regular-season pools requires a **new hook deployment** — see
+> [Redeploying the hook alone](#redeploying-the-hook-alone-task-076)
+> below. The PoolManager, the registry and the periphery are reused; open
+> markets on the old hook keep their 0% regular-season pricing until they
+> resolve. Re-run `npm run verify:hooks`, the security suite and the
+> sign-off for the new address before any pool is created on it.
+
+## Redeploying the hook alone (task 076)
+
+The hook address is a per-market input: `createMarketsOnChain`
+(`server/src/lib/sports/markets-onchain.ts`) builds each new pool key
+from `DYNAMIC_MARKET_BY_CHAIN[chain].hook`, and nothing on-chain pins a
+PoolManager or registry to one hook. So a fee-model change is a
+**hook-only** deploy: `DeployDynamicMarketHook.s.sol` mines a fresh
+CREATE2 salt against the live `(PoolManager, Registry)` pair and deploys
+only the hook. Reusing the registry keeps the operator and keeper roles,
+and reusing the PoolManager keeps every periphery contract valid.
+
+```bash
+export POOL_MANAGER=0xee196B3F83Fe6f57E074C399DBdeFe07e1407636
+export MARKET_REGISTRY=0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6
+export ARC_RPC_URL=https://<dedicated-provider>/...    # optional
+deploy/dynamic-market/deploy.sh hook-only
+```
+
+The wrapper runs the same preflight as `hook` (chain id, deployer
+balance, the salt-mine and hook suites, a fork dry run with the gas
+estimate) and broadcasts only after an explicit `yes`. The script itself
+refuses an address with no code and calls `registry.globalPaused()` before
+mining, so a typo fails before anything is spent; after the deploy it
+asserts the mined address, the `0x28C0` bits, `hook.poolManager()` and
+`hook.registry()` in the same transaction. The hook step alone is about
+2.4M gas (≈ $0.05 at Arc's ~20 gwei).
+
+Rehearsed 2026-10-10 on a local anvil at chain id 5042 with the canonical
+CREATE2 proxy etched in: stack deploy, then `hook-only` against its
+PoolManager and registry — mined salt `0x49b4`, address `…40Ae8c0`, bits
+`10432`, both probes returning the reused contracts; a dead registry
+address was refused with `MARKET_REGISTRY has no code`. A mined salt is
+specific to the hook bytecode and the constructor pair, so the Arc run
+will mine its own.
+
+After the broadcast:
+
+1. Record the new address and salt in the deployment record below
+   (a "Hook redeploy" row; PoolManager and Registry unchanged).
+2. Probe `poolManager()` and `registry()` on the new hook.
+3. Point the server at it: `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook` in
+   `server/src/lib/v4-contracts.ts` (and the expected address in
+   `v4-contracts.test.ts`), then `DYNAMIC_MARKET_HOOK_ADDRESS=<Hook> npm run
+verify:hooks` to refresh `docs/security/hook-deployments.md`.
+4. Run the `quoteFee` probe (step 4 of the first-deploy runbook) on the
+   first new market: a regular-season pool now quotes
+   `1000 ≤ breakdown.rate ≤ 7000`.
+5. Markets created before the switch keep trading on the old hook with
+   its 0% regular-season rate; the server reads each market's own pool
+   key, so both hooks serve their pools side by side until the old
+   markets resolve.
+
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
 > `contracts/script/DeployMarketPeriphery.s.sol` against it (`POOL_MANAGER`).
@@ -285,20 +348,22 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      wrong does not revert**; it inverts every probability the hook reads, so a
      25% market prices as a near-certainty. Compute it, do not guess it.
    - `6` — outcome-token decimals, confirmed in spec §0.1.
-   - `PLAYOFFS` — the D-105 season switch: `true` for a postseason game
-     (dynamic 0.10%–0.70% fee), `false` for the regular season (0%). **Once
-     only** — there is no setter; a wrong value means pause + a new market.
-     The sync cron takes it from the provider's season type
-     (`PlannedMarket.playoffs`), never by hand.
+   - `PLAYOFFS` — the D-105 season label: `true` for a postseason game,
+     `false` for the regular season. Since task 076 (2026-10-10) the
+     dynamic 0.10%–0.70% fee applies either way; the flag rides into the
+     fee breakdown and the telemetry as a label. **Once only** — there is
+     no setter; a wrong value means pause + a new market. The sync cron
+     takes it from the provider's season type (`PlannedMarket.playoffs`),
+     never by hand.
 
 2. **Initialize the pool** with `fee = 0x800000` (`DYNAMIC_FEE_FLAG`). A static
    fee is rejected: without the flag the PoolManager ignores the hook's fee
    override and the pool would silently run at a fixed tier.
 
 3. **Feed the keeper state.** Until the first `updateMarket`, the market reads
-   as stale, so a playoff pool's rate sits at `MAX_RATE` (0.70%) and the cap
-   at `MIN_TRADE_CAP` ($100); a regular-season pool stays at 0%. That is the
-   intended fail-closed posture (spec §22 / D-105), not a bug. The server's
+   as stale, so every pool's rate sits at `MAX_RATE` (0.70%) and the cap
+   at `MIN_TRADE_CAP` ($100), whatever its season. That is the intended
+   fail-closed posture (spec §22 / D-105), not a bug. The server's
    keeper (`server/src/lib/sports/registry-keeper.ts`, K-01) writes the three
    fields on every live-sync tick once `MARKET_SIGNER_PRIVATE_KEY` is set;
    `npm run keeper:fork-proof -w @mantua/server` rehearses it against the
@@ -315,9 +380,9 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      --rpc-url https://rpc.mainnet.arc.io
    ```
 
-   Expect `fee == 0` and `breakdown.playoffs == false` on a regular-season
-   pool; on a playoff pool `fee == breakdown.rate × (10000 − p) / 10000`
-   with `1000 ≤ rate ≤ 7000`. The server's trade build calls exactly this.
+   Expect `fee == breakdown.rate × (10000 − p) / 10000` with
+   `1000 ≤ rate ≤ 7000` on every pool; `breakdown.playoffs` only reports the
+   season label. The server's trade build calls exactly this.
 
 5. **Record addresses** in the table above, then wire them into the
    server's env-driven contract registry (`server/src/lib/v4-contracts.ts`)

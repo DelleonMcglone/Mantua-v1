@@ -4,10 +4,10 @@ import { providerFor } from "../sports/active-provider.ts";
 import type { LeagueSlug } from "../sports/provider.ts";
 
 /**
- * Task 072 — the D-105 season flag per game, from the provider slate the
- * sports sync registers pools with. A combo pool is playoff-priced when
- * any leg is a postseason game; absent season data means regular season
- * (the fee-free default, never the other way round).
+ * Task 072 — the D-105 season label per game, from the provider slate the
+ * sports sync registers pools with. A combo pool is labelled a playoff pool
+ * when any leg is a postseason game; absent season data means regular
+ * season. The label has no fee consequence since task 076.
  */
 
 export const SEASON_CACHE_MS = 5 * 60_000;
@@ -21,7 +21,7 @@ async function postseasonIds(league: LeagueSlug): Promise<string[]> {
         .filter((e) => e.seasonType === "postseason")
         .map((e) => e.providerEventId);
     } catch (err) {
-      logger.warn({ league, err }, "combos: season lookup failed — regular season assumed");
+      logger.warn({ league, err }, "combos: season lookup failed — regular-season label assumed");
       return [];
     }
   });

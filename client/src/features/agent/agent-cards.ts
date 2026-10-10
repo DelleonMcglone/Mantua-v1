@@ -74,7 +74,7 @@ export function simulationCard(sim: SimulationResult): {
   if (sim.fees) {
     rows.push({
       label: "Hook fee",
-      value: `${money(usd6(sim.fees.feeUsdcRaw))}${sim.fees.playoffs ? " (playoffs)" : ""}`,
+      value: money(usd6(sim.fees.feeUsdcRaw)),
     });
   }
   rows.push({

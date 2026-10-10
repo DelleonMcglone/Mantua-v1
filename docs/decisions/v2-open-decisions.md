@@ -476,16 +476,31 @@ ops surface with BaseScan links. Public user UI stays chainless — no
 explorer links or chain branding (the existing MarketDetail explorer link is
 removed).
 
-## D-105 — Dynamic Market Hook fee model ✅ CLOSED 2026-09-11
+## D-105 — Dynamic Market Hook fee model ✅ CLOSED 2026-09-11 · AMENDED 2026-10-10
+
+> **Amendment 2026-10-10 (owner, task 076).** The regular-season exemption
+> is withdrawn: Mantua charges users in every season. The dynamic
+> 0.10%–0.70% fee, its formula, its drivers and its ceiling apply to every
+> pool regardless of the `playoffs` flag. `REGULAR_SEASON_FEE` is removed
+> from `RiskPolicy`; `MarketFeeCalculator.rate` no longer gates on the
+> season. The per-pool `playoffs` flag stays as a write-once season
+> **label** carried into the fee breakdown, the telemetry and the ticket,
+> because removing it would change the registry and hook ABIs for no
+> fee-model benefit. The hook live on Arc Mainnet since 2026-09-30 carries
+> the old gate in its bytecode; charging regular-season pools needs a
+> redeploy (`deploy/dynamic-market/README.md`). The original decision text
+> follows for the record; read "regular season: 0%" as superseded.
 
 **Decision (owner spec, authoritative).** Trading fees on Mantua market pools
 follow the league calendar:
 
 - **Regular season: 0%.** Adoption, liquidity, and activity come first.
+  _Superseded by the 2026-10-10 amendment above._
 - **Playoffs: dynamic 0.10%–0.70%**, set per swap by the Dynamic Market
   Hook from liquidity, volatility, trading activity, and market
   uncertainty. **0.70% is a hard ceiling** — a `constant` in `RiskPolicy`
-  with no setter; raising it means a redeploy.
+  with no setter; raising it means a redeploy. _Since 2026-10-10 this is
+  the rule in every season._
 - **Formula:** `Fee = C × fee_rate × p × (1 − p)` — `C` contracts traded,
   `p` the contract price read from the pool. `p(1−p)` peaks at 0.50, so
   50/50 trades carry the highest fee per contract, declining toward 0 and 1.

@@ -119,9 +119,9 @@ void describe("feeQuoteFromReceiptLogs", () => {
     assert.equal(feeQuoteFromReceiptLogs([], HOOK, "buy", "1", "1"), null);
   });
 
-  void it("records a regular-season fill as a zero fee, not a missing one", () => {
+  void it("records a zero-fee fill (regular-season label, p at certainty) as zero, not missing", () => {
     const q = feeQuoteFromReceiptLogs(
-      [feeLog(HOOK, 0, 0, 5000, false)],
+      [feeLog(HOOK, 0, 1000, 10_000, false)],
       HOOK,
       "buy",
       "1",

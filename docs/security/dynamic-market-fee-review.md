@@ -1,5 +1,14 @@
 # Security Review — Dynamic Market Hook fee model (D-105)
 
+> **Scope note (2026-10-10, task 076):** this review covers the D-105
+> source as deployed on 2026-09-30, which included the regular-season 0%
+> gate. The D-105 amendment removed that gate and `REGULAR_SEASON_FEE`
+> (`docs/tasks/076-regular-season-fees.md`); the "regular season: 0%"
+> rows below describe the reviewed build, and the replacement property
+> (`invariant_seasonDoesNotChangeTheRate`) is asserted by the current
+> suite. The amended hook needs its own review pass and sign-off before
+> deployment.
+
 **Task:** 049 (H-008) in `docs/tasks/049-dynamic-market-fee-model.md`
 **Scope:** `contracts/src/hooks/dynamic-market/` — 9 files, the fee-model
 change: `RiskPolicy.sol`, `MarketFeeFormula.sol` (new),
