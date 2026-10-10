@@ -70,8 +70,8 @@ condition if any path can raise `MAX_FEE` or `ABS_MAX_TRADE`.
 
 | Constant             | Value        | Meaning          | Why                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------- | ------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ~~`BASE_FEE`~~       | ~~`3_000`~~  | ~~0.30%~~        | **Superseded by D-105 (§0.6):** `REGULAR_SEASON_FEE = 0`, `MIN_RATE = 1_000` (0.10%)                                                                                                                                                                                                                                                                                                                                                              |
-| ~~`MAX_FEE`~~        | ~~`50_000`~~ | ~~5.00%~~        | **Superseded by D-105 (§0.6):** `MAX_RATE = 7_000` (0.70%), the immutable ceiling; §22 clamps a stale playoff market here                                                                                                                                                                                                                                                                                                                         |
+| ~~`BASE_FEE`~~       | ~~`3_000`~~  | ~~0.30%~~        | **Superseded by D-105 (§0.6):** `MIN_RATE = 1_000` (0.10%), the floor in every season (task 076 removed `REGULAR_SEASON_FEE`)                                                                                                                                                                                                                                                                                                                     |
+| ~~`MAX_FEE`~~        | ~~`50_000`~~ | ~~5.00%~~        | **Superseded by D-105 (§0.6):** `MAX_RATE = 7_000` (0.70%), the immutable ceiling; §22 clamps a stale market here                                                                                                                                                                                                                                                                                                                                 |
 | `ABS_MAX_TRADE`      | `10_000e6`   | $10,000 USDC     | Large enough not to bind in normal flow, small enough that the §35 "above cap → reverts" test is reachable                                                                                                                                                                                                                                                                                                                                        |
 | `MIN_TRADE_CAP`      | `100e6`      | $100 USDC        | The §21 floor, and where §22 clamps a stale market                                                                                                                                                                                                                                                                                                                                                                                                |
 | `STALE_AFTER`        | `900`        | 15 minutes       | Keeper cadence tolerance before §22 fail-closed behaviour engages                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -100,20 +100,25 @@ Work is tracked against §33, §44, §45, and §46. Note that §45 requires "all
 twelve success criteria pass" but no list of twelve is enumerated anywhere in
 this document.
 
-### 0.6 Fee model superseded by D-105 (2026-09-11, task 049)
+### 0.6 Fee model superseded by D-105 (2026-09-11, task 049; amended 2026-10-10, task 076)
 
 The owner supplied the fee model after this spec was written. It is
 authoritative over §16–§18, §22 (fee line), §27 (fee bounds), §29 and §34:
 
-- **Regular season: 0%.** **Playoffs: dynamic 0.10%–0.70%**, from
-  liquidity, volatility, trading activity and market uncertainty. The 0.70%
-  ceiling is `RiskPolicy.MAX_RATE`, a `constant`; `MIN_RATE` is the floor;
-  `REGULAR_SEASON_FEE = 0`. `BASE_FEE` / `MAX_FEE` no longer exist.
+- **Every season: dynamic 0.10%–0.70%**, from liquidity, volatility,
+  trading activity and market uncertainty. The 0.70% ceiling is
+  `RiskPolicy.MAX_RATE`, a `constant`; `MIN_RATE` is the floor.
+  `BASE_FEE` / `MAX_FEE` no longer exist. _Until 2026-10-10 the regular
+  season was 0% (`REGULAR_SEASON_FEE`) and only playoff pools paid the
+  dynamic rate; the D-105 amendment removed that gate and the constant.
+  Where the sections below say "regular season: 0" or "playoffs", read
+  "every pool"._
 - **`Fee = C × fee_rate × p × (1 − p)`**, `p` read from `sqrtPriceX96`.
   Realised as the v4 pip fee `rate × (1 − p)` on the gross input
   (`MarketFeeFormula.sol`, derivation there and in D-105).
-- **Season switch:** `MarketState.playoffs`, written once at `registerPool`
-  from the league calendar. No setter.
+- **Season label:** `MarketState.playoffs`, written once at `registerPool`
+  from the league calendar. No setter. Carried into the breakdown and the
+  telemetry; no effect on the rate since task 076.
 - **`quoteFee`** — a view on the hook over the same pricing path as
   `beforeSwap`, for the pre-trade quote.
 
@@ -516,12 +521,12 @@ configured risk maximum and the trade-size cap toward its minimum.
 
 ## 16. Fee Calculation
 
-> **Superseded by D-105 (§0.6).** The fee is `0` for a regular-season pool.
-> For a playoff pool the _rate_ is `MIN_RATE` plus four bounded premiums
-> (liquidity, volatility, activity, uncertainty; shares 25% each of the
-> `MAX_RATE − MIN_RATE` headroom), clamped to `[MIN_RATE, MAX_RATE]`, and
-> the pip fee returned to v4 is `rate × (1 − p)`. The text below describes
-> the original stack for history.
+> **Superseded by D-105 (§0.6).** For every pool the _rate_ is `MIN_RATE`
+> plus four bounded premiums (liquidity, volatility, activity, uncertainty;
+> shares 25% each of the `MAX_RATE − MIN_RATE` headroom), clamped to
+> `[MIN_RATE, MAX_RATE]`, and the pip fee returned to v4 is
+> `rate × (1 − p)`. (Until task 076 a regular-season pool paid `0`.) The
+> text below describes the original stack for history.
 
 A five-premium fee stack:
 
@@ -540,8 +545,7 @@ risk according to the configured calculator logic.
 Every premium is individually bounded. The final rate must be clamped:
 
 ```text
-MIN_RATE <= rate <= MAX_RATE        (playoffs; D-105)
-fee = 0                             (regular season; D-105)
+MIN_RATE <= rate <= MAX_RATE        (every pool; D-105 as amended by task 076)
 ```
 
 No governance or keeper path may increase `MAX_RATE`.
@@ -550,8 +554,8 @@ No governance or keeper path may increase `MAX_RATE`.
 
 ### 17.1 Base Fee
 
-The minimum playoff rate under normal conditions: `MIN_RATE` (0.10%, D-105).
-Regular-season pools charge nothing.
+The minimum rate under normal conditions: `MIN_RATE` (0.10%, D-105), in
+every season (task 076).
 
 ### 17.2 Volatility Premium
 
@@ -639,7 +643,7 @@ Stale state must not cause the market to revert solely because the keeper is
 offline. Instead:
 
 ```text
-rate              → MAX_RATE (playoffs; a regular-season pool stays at 0)
+rate              → MAX_RATE (every pool; task 076)
 trade cap         → MIN_TRADE_CAP
 deviation premium → excluded
 ```
@@ -722,8 +726,7 @@ pattern rather than duplicate a separate authorization mechanism.
 `RiskPolicy` contains immutable protocol bounds. At minimum:
 
 ```text
-REGULAR_SEASON_FEE   (0%,    D-105)
-MIN_RATE             (0.10%, D-105)
+MIN_RATE             (0.10%, D-105; the floor in every season since task 076)
 MAX_RATE             (0.70%, D-105 — the ceiling)
 ABS_MAX_TRADE
 MIN_TRADE_CAP
@@ -882,8 +885,8 @@ market states. The invariant is:
 
 ```solidity
 fee <= MAX_RATE                      // always (D-105)
-MIN_RATE <= rate <= MAX_RATE         // playoff pools
-fee == 0                             // regular-season pools
+MIN_RATE <= rate <= MAX_RATE         // every pool (task 076)
+fee(playoffs) == fee(!playoffs)      // the season label never changes the fee
 fee == rate * (BPS - p) / BPS        // the price shaping
 ```
 
@@ -1050,9 +1053,10 @@ The implementation is considered failed if any of the following occurs:
 - LPs cannot remove liquidity during a halt.
 - `BEFORE_REMOVE_LIQUIDITY` is enabled.
 - `BEFORE_SWAP_RETURNS_DELTA` is enabled.
-- A playoff rate falls below `MIN_RATE` (D-105).
+- A rate falls below `MIN_RATE` (D-105).
 - A fee exceeds `MAX_RATE` (D-105).
-- A regular-season swap is charged a non-zero fee (D-105).
+- A regular-season swap is priced differently from a playoff swap under
+  the same conditions (D-105 as amended by task 076).
 - A trade above the cap succeeds.
 - A halted market accepts a swap.
 - A zero-liquidity market causes an unintended arithmetic revert.

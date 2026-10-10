@@ -87,7 +87,7 @@ contract DynamicMarketHookTest is Test {
         registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6, true);
     }
 
-    /// @dev Regular-season pool: fee-free by D-105.
+    /// @dev Regular-season pool: priced like any other since task 076.
     function _registerRegularSeason() internal {
         vm.prank(operator);
         registry.registerPool(id, kickoff, kickoff + 4 hours, true, 6, false);
@@ -321,21 +321,23 @@ contract DynamicMarketHookTest is Test {
         assertLe(fee, RiskPolicy.MAX_RATE);
     }
 
-    // ─── Season gate (D-105, H-004) ──────────────────────────────────────
+    // ─── Season label (D-105 as amended by task 076) ─────────────────────
 
-    function test_regularSeasonPoolIsFeeFreeEvenWhenStaleAndThin() public {
+    function test_regularSeasonPoolPaysTheDynamicFeeAndClampsWhenStale() public {
         _registerRegularSeason(); // never fed: stale, zero liquidity
         manager.initialize(key, SQRT_P50);
 
         vm.prank(address(manager));
         (,, uint24 feeWithFlag) = hook.beforeSwap(trader, key, _swap(-1e6), "");
         assertTrue(feeWithFlag & LPFeeLibrary.OVERRIDE_FEE_FLAG != 0, "override so the pool's own fee never applies");
-        assertEq(_fee(feeWithFlag), RiskPolicy.REGULAR_SEASON_FEE, "0% in the regular season");
+        assertEq(
+            _fee(feeWithFlag), F.effectiveFeePips(RiskPolicy.MAX_RATE, 5000), "stale clamps to 0.70% in every season"
+        );
 
         (uint24 quoted, Calc.Breakdown memory b,,) = hook.quoteFee(key, _swap(-1e6));
-        assertEq(quoted, 0);
-        assertFalse(b.playoffs);
-        assertEq(b.rate, 0);
+        assertEq(quoted, _fee(feeWithFlag), "the quote is the swap's fee");
+        assertFalse(b.playoffs, "the label still says regular season");
+        assertEq(b.rate, RiskPolicy.MAX_RATE);
     }
 
     // ─── Price-derived p (H-005; edge cases 1-4) ─────────────────────────

@@ -29,36 +29,34 @@ void describe("fair probability and odds", () => {
     assert.equal(oddsMultiplier(0), 0);
   });
 
-  void it("charges no fee in the regular season and the hook's minimum rate in the playoffs", () => {
-    assert.equal(plannedFeePips(1_500, false), 0);
+  void it("charges the hook's floor rate at the opening price in every season (task 076)", () => {
     // rate × (1 − p): 1000 × 0.85 = 850 pips
-    assert.equal(plannedFeePips(1_500, true), 850);
+    assert.equal(plannedFeePips(1_500), 850);
+    assert.equal(plannedFeePips(10_000), 0, "zero only at certainty");
   });
 });
 
 void describe("priceCombo", () => {
-  void it("planned: shares = (stake − fee) / fair, payout at par, no premium", () => {
-    const p = priceCombo({ stakeRaw: 10_000_000n, legs, pool: null, playoffs: false });
+  void it("planned: shares = (stake − fee) / fair, payout at par, fee taken from the stake first", () => {
+    const p = priceCombo({ stakeRaw: 10_000_000n, legs, pool: null });
     assert.equal(p.source, "planned");
     assert.equal(p.fairProbabilityBps, 1_500);
     assert.equal(p.openingProbability, 0.15);
-    assert.equal(p.feeUsdcRaw, 0n);
-    assert.equal(p.sharesRaw, 66_666_666n);
-    assert.equal(p.potentialPayoutRaw, 66_666_666n);
-    assert.equal(p.combinedOdds, 6.67);
-    assert.equal(p.premiumBps, 0);
+    assert.equal(p.feePips, 850);
+    assert.equal(p.feeUsdcRaw, 8_500n);
+    assert.equal(p.sharesRaw, ((10_000_000n - 8_500n) * 10_000n) / 1_500n);
+    assert.equal(p.potentialPayoutRaw, p.sharesRaw);
+    assert.ok(p.premiumBps > 0, "the fee shows as a premium over fair");
     assert.deepEqual(
       p.legs.map((l) => l.oddsMultiplier),
       [2, 1.67, 2],
     );
   });
 
-  void it("planned in the playoffs takes the hook fee out of the stake first", () => {
-    const p = priceCombo({ stakeRaw: 10_000_000n, legs, pool: null, playoffs: true });
-    assert.equal(p.feePips, 850);
-    assert.equal(p.feeUsdcRaw, 8_500n);
-    assert.equal(p.sharesRaw, ((10_000_000n - 8_500n) * 10_000n) / 1_500n);
-    assert.ok(p.premiumBps > 0);
+  void it("planned: the odds follow the effective price net of the fee", () => {
+    const p = priceCombo({ stakeRaw: 10_000_000n, legs, pool: null });
+    assert.equal(p.effectivePriceBps, Number((10_000_000n * 10_000n) / p.sharesRaw));
+    assert.equal(p.combinedOdds, oddsMultiplier(p.effectivePriceBps));
   });
 
   void it("pool: the pool's own quote sets the price; premium is pool over fair", () => {
@@ -66,7 +64,6 @@ void describe("priceCombo", () => {
       stakeRaw: 10_000_000n,
       legs,
       pool: { amountOut: 50_000_000n, feeUsdcRaw: 12_345n, feePips: 700 },
-      playoffs: false,
     });
     assert.equal(p.source, "pool");
     assert.equal(p.effectivePriceBps, 2_000);

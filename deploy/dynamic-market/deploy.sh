@@ -3,12 +3,14 @@
 # the periphery, with the preflight the runbook requires baked in.
 #
 #   deploy/dynamic-market/deploy.sh hook        # PoolManager + Registry + Hook (mined CREATE2)
+#   deploy/dynamic-market/deploy.sh hook-only   # a new Hook against the live PoolManager + Registry (task 076)
 #   deploy/dynamic-market/deploy.sh periphery   # PoolSwapTest, LP router, StateView, V4Quoter, PositionManager
 #
 # Reads (public values only — never a private key):
-#   MARKET_OPERATOR     operator address (registers pools, pauses, rotates roles)
-#   MARKET_RESOLVER     keeper address = the market resolver key (spec §0.1)
-#   POOL_MANAGER        (periphery only) the PoolManager the hook step printed
+#   MARKET_OPERATOR     (hook) operator address (registers pools, pauses, rotates roles)
+#   MARKET_RESOLVER     (hook) keeper address = the market resolver key (spec §0.1)
+#   POOL_MANAGER        (hook-only, periphery) the live PoolManager
+#   MARKET_REGISTRY     (hook-only) the live MarketStateRegistry
 #   DEPLOYER_ACCOUNT    keystore name (default: mantua-deployer) — its password is
 #                       prompted by cast/forge, never read from the environment
 #   ARC_RPC_URL         (default: https://rpc.mainnet.arc.io; use the dedicated one)
@@ -22,8 +24,8 @@
 set -euo pipefail
 
 MODE="${1:-}"
-if [[ "$MODE" != "hook" && "$MODE" != "periphery" ]]; then
-  echo "usage: $0 hook|periphery" >&2
+if [[ "$MODE" != "hook" && "$MODE" != "hook-only" && "$MODE" != "periphery" ]]; then
+  echo "usage: $0 hook|hook-only|periphery" >&2
   exit 2
 fi
 
@@ -44,6 +46,9 @@ need_addr() {
 if [[ "$MODE" == "hook" ]]; then
   need_addr MARKET_OPERATOR; need_addr MARKET_RESOLVER
   SCRIPT=script/DeployDynamicMarket.s.sol
+elif [[ "$MODE" == "hook-only" ]]; then
+  need_addr POOL_MANAGER; need_addr MARKET_REGISTRY
+  SCRIPT=script/DeployDynamicMarketHook.s.sol
 else
   need_addr POOL_MANAGER
   SCRIPT=script/DeployMarketPeriphery.s.sol
@@ -66,7 +71,7 @@ if [[ "$BAL_WEI" == "0" ]]; then
   exit 2
 fi
 
-if [[ "$MODE" == "hook" ]]; then
+if [[ "$MODE" == "hook" || "$MODE" == "hook-only" ]]; then
   echo "== preflight: salt mine + hook suites"
   # The artifact resolver logs spurious "solmate/src/src/..." ERROR lines
   # under the parent remapping; compilation and the tests still succeed
@@ -111,6 +116,20 @@ if [[ "$MODE" == "hook" ]]; then
   3. Probe: cast call <Hook> "poolManager()(address)" --rpc-url $RPC
             cast call <Hook> "registry()(address)"    --rpc-url $RPC
   4. If Arcscan shows any contract unverified: deploy/dynamic-market/verify.sh <path:Name> <address> [ctor-args]
+EOF
+elif [[ "$MODE" == "hook-only" ]]; then
+  cat <<EOF
+  1. Record the new DynamicMarketHook address and salt in deploy/dynamic-market/README.md
+     (Deployment record — "Hook redeploy" row); PoolManager and Registry are unchanged.
+  2. Probe: cast call <Hook> "poolManager()(address)" --rpc-url $RPC   # must equal $POOL_MANAGER
+            cast call <Hook> "registry()(address)"    --rpc-url $RPC   # must equal $MARKET_REGISTRY
+  3. Point the server at it: DYNAMIC_MARKET_BY_CHAIN[arc].hook in server/src/lib/v4-contracts.ts
+     (and the expected address in its test), then DYNAMIC_MARKET_HOOK_ADDRESS=<Hook> npm run verify:hooks.
+  4. Run the quoteFee probe from the runbook on the first new market: a regular-season pool
+     must now quote 1000 <= breakdown.rate <= 7000.
+  5. If Arcscan shows the hook unverified: deploy/dynamic-market/verify.sh \\
+       src/hooks/dynamic-market/DynamicMarketHook.sol:DynamicMarketHook <Hook> \\
+       \$(cast abi-encode "constructor(address,address)" $POOL_MANAGER $MARKET_REGISTRY)
 EOF
 else
   cat <<EOF

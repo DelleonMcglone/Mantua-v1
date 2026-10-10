@@ -1,10 +1,5 @@
 import { MAX_PROBABILITY, MIN_PROBABILITY } from "../probability.ts";
-import {
-  MIN_RATE_PIPS,
-  REGULAR_SEASON_FEE_PIPS,
-  effectiveFeePips,
-  feeOnInput,
-} from "../sports/market-fee.ts";
+import { MIN_RATE_PIPS, effectiveFeePips, feeOnInput } from "../sports/market-fee.ts";
 
 /**
  * Task 072 / CB-003 — the combined payout and pricing engine. A combo's
@@ -38,7 +33,6 @@ export interface ComboPricingInput {
   legs: readonly PricedLeg[];
   /** The combo pool's quote, or null when the market does not exist yet. */
   pool: PoolQuote | null;
-  playoffs: boolean;
 }
 
 export interface ComboLegView extends PricedLeg {
@@ -85,9 +79,12 @@ export function oddsMultiplier(priceBps: number): number {
   return Number((10_000 / priceBps).toFixed(2));
 }
 
-/** The fee the hook would charge a new combo pool at its opening price. */
-export function plannedFeePips(fairBps: number, playoffs: boolean): number {
-  return playoffs ? effectiveFeePips(MIN_RATE_PIPS, fairBps) : REGULAR_SEASON_FEE_PIPS;
+/**
+ * The fee the hook would charge a new combo pool at its opening price: a
+ * calm, fresh pool pays the floor rate, in every season (task 076).
+ */
+export function plannedFeePips(fairBps: number): number {
+  return effectiveFeePips(MIN_RATE_PIPS, fairBps);
 }
 
 export function priceCombo(input: ComboPricingInput): ComboPricing {
@@ -108,7 +105,7 @@ export function priceCombo(input: ComboPricingInput): ComboPricing {
       premiumBps: effective - fair,
     };
   }
-  const feePips = plannedFeePips(fair, input.playoffs);
+  const feePips = plannedFeePips(fair);
   const feeUsdcRaw = feeOnInput(input.stakeRaw, feePips);
   const net = input.stakeRaw > feeUsdcRaw ? input.stakeRaw - feeUsdcRaw : 0n;
   const sharesRaw = (net * PROB_BPS_UNIT) / BigInt(fair);

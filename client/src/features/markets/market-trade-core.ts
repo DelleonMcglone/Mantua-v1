@@ -65,6 +65,7 @@ export interface FeeQuoteWire {
   feePips: number;
   ratePips: number;
   probabilityBps: number;
+  /** Season label (true for a playoff game); the fee applies in every season. */
   playoffs: boolean;
   /** Fee in raw units of the input token. */
   feeRaw: string;

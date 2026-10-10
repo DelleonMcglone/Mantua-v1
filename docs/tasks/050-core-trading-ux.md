@@ -36,7 +36,8 @@ quick actions, and the discovery filters.
       every trade and on a shared poll; the ticket's balance line reads the
       same source as the portfolio (T-007).
 - [x] **Fee display.** Position / Fee / Fee % / Total from the hook quote in
-      every season; 0% shown in the regular season; a quote above 0.70% is
+      every season (since task 076 the fee is charged in both; a zero fee
+      at certainty still renders as $0.00 / 0.00%); a quote above 0.70% is
       refused, never rendered; the spec numbers are asserted: a $100 buy at
       50/50 and the ceiling shows $0.35, 100 contracts at that price show
       $0.18 (T-008). A fee-structure explainer sits behind one tap (T-009).
@@ -79,7 +80,7 @@ quick actions, and the discovery filters.
 
 ## Edge cases
 
-- Regular-season quote: Fee $0.00 / 0.00% still renders all four lines.
+- Zero-fee quote (p at certainty): Fee $0.00 / 0.00% still renders all four lines.
 - Fee rounds up to the cent; a non-zero fee never shows $0.00.
 - Balance exactly equal to the ticket total is sufficient.
 - Logged-out user: the ticket shows **Log in to trade**, not Add funds.

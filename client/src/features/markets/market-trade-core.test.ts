@@ -90,21 +90,31 @@ test("feeSummary rounds the fee UP to the cent and never shows a non-zero fee as
   assert.equal(usdcCeil2(0n), "0.00");
 });
 
-test("feeSummary reports a regular-season quote as free", () => {
-  const free = {
+test("feeSummary prices a regular-season quote exactly like a playoff quote", () => {
+  const regular = { ...PLAYOFF_FEE, playoffs: false };
+  const s = feeSummary(100_000_000n, regular);
+  const p = feeSummary(100_000_000n, PLAYOFF_FEE);
+  assert.equal(s.fee, p.fee);
+  assert.equal(s.position, p.position);
+  assert.equal(s.total, p.total);
+  assert.equal(s.ratePct, p.ratePct);
+  assert.equal(s.playoffs, false, "the label still records the season");
+});
+
+test("feeSummary renders a zero fee (p at certainty) as $0.00 / 0.00%", () => {
+  const atCertainty = {
     ...PLAYOFF_FEE,
     feePips: 0,
-    ratePips: 0,
-    playoffs: false,
+    ratePips: 1000,
+    probabilityBps: 10_000,
     feeRaw: "0",
     feeUsdcRaw: "0",
   };
-  const s = feeSummary(50_000_000n, free);
+  const s = feeSummary(50_000_000n, atCertainty);
   assert.equal(s.fee, "0.00");
   assert.equal(s.position, "50.00");
   assert.equal(s.total, "50.00");
   assert.equal(s.ratePct, "0.00%");
-  assert.equal(s.playoffs, false);
 });
 
 test("feeSummary prints three decimals when the pip rate needs them", () => {
@@ -114,16 +124,17 @@ test("feeSummary prints three decimals when the pip rate needs them", () => {
 
 // ─── T-008 — fee lines and the ceiling guard (task 050) ─────────────────────
 
-test("feeLines renders four lines in every season, 0% in the regular season", () => {
-  const free = {
+test("feeLines renders all four lines even when the fee is zero", () => {
+  const zero = {
     ...PLAYOFF_FEE,
     feePips: 0,
-    ratePips: 0,
+    ratePips: 1000,
+    probabilityBps: 10_000,
     playoffs: false,
     feeRaw: "0",
     feeUsdcRaw: "0",
   };
-  const lines = feeLines(feeSummary(50_000_000n, free), "buy");
+  const lines = feeLines(feeSummary(50_000_000n, zero), "buy");
   assert.deepEqual(
     lines.map((l) => l.label),
     ["Position", "Fee", "Fee rate", "Total"],

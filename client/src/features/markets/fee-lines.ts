@@ -23,7 +23,7 @@ export interface FeeLine {
 }
 
 /**
- * The review block, rendered in every season (0% shows as $0.00 / 0.00%).
+ * The review block, rendered for every quote (a zero fee at certainty shows as $0.00 / 0.00%).
  * Buys: Position / Fee / Fee rate / Total. Sells: the fee is taken from the
  * contracts sold, so the block lists the contracts and the fee's dollar
  * value — there is no "total" leaving the wallet.

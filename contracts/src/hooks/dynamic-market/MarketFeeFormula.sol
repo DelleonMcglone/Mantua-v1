@@ -32,7 +32,7 @@ library MarketFeeFormula {
     uint256 internal constant PIPS = 1_000_000;
 
     /// @notice The v4 pip fee that realises the formula: `rate × (1 − p)`.
-    /// @param ratePips Dynamic rate in pips (0 in the regular season).
+    /// @param ratePips Dynamic rate in pips (`MIN_RATE`–`MAX_RATE` from the calculator).
     /// @param probBps  Pre-trade YES probability in bps; values above BPS are
     ///                 treated as certainty and yield 0.
     /// @dev Floors. Bounded by `ratePips` at p = 0, so the fee can never

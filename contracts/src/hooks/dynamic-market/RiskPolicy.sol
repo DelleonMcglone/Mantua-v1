@@ -20,13 +20,11 @@ pragma solidity ^0.8.26;
 library RiskPolicy {
     // ─── Fee-rate bounds (v4 pips: 1_000_000 == 100%) ────────────────────
 
-    /// @notice The regular-season fee — 0%. D-105: adoption first.
-    uint24 internal constant REGULAR_SEASON_FEE = 0;
-
-    /// @notice Floor of the playoff dynamic rate — 0.10%. D-105.
+    /// @notice Floor of the dynamic rate — 0.10%. D-105; charged in every
+    ///         season since the 2026-10-10 amendment (task 076).
     uint24 internal constant MIN_RATE = 1000;
 
-    /// @notice Ceiling of the playoff dynamic rate — 0.70%. D-105 (H-002).
+    /// @notice Ceiling of the dynamic rate — 0.70%. D-105 (H-002).
     ///         Mantua never exceeds this; a stale keeper clamps here (§22).
     uint24 internal constant MAX_RATE = 7000;
 
@@ -54,12 +52,11 @@ library RiskPolicy {
 
     // ─── Pure checks ─────────────────────────────────────────────────────
 
-    /// @notice Clamp a computed playoff rate into `[MIN_RATE, MAX_RATE]`.
+    /// @notice Clamp a computed rate into `[MIN_RATE, MAX_RATE]`.
     /// @dev The single choke point for the "rate below the floor" and "rate
     ///      above the ceiling" failure conditions — premium arithmetic may
-    ///      overshoot as long as it passes through here. Regular-season
-    ///      pools never reach this function: the season gate short-circuits
-    ///      to `REGULAR_SEASON_FEE` before any rate is computed.
+    ///      overshoot as long as it passes through here. Every pool's rate
+    ///      passes through here whatever its season (task 076).
     function clampRate(uint24 rate) internal pure returns (uint24) {
         if (rate < MIN_RATE) return MIN_RATE;
         if (rate > MAX_RATE) return MAX_RATE;

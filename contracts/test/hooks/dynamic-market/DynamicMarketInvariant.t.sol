@@ -2,10 +2,10 @@
 pragma solidity ^0.8.26;
 
 // Purpose: B2-008 / H-007 invariants and the spec §34 fee fuzz at 100k+ calls.
-// The properties: the fee never exceeds MAX_RATE, the playoff rate never
-// leaves [MIN_RATE, MAX_RATE], the regular season is free, the per-contract
-// fee peaks at even odds, the cap never leaves its band, and no reachable
-// state reverts the calculator.
+// The properties: the fee never exceeds MAX_RATE, the rate never leaves
+// [MIN_RATE, MAX_RATE], the season label does not change the rate (task
+// 076), the per-contract fee peaks at even odds, the cap never leaves its
+// band, and no reachable state reverts the calculator.
 
 import {Test} from "forge-std/Test.sol";
 import {MarketFeeCalculator as C} from "../../../src/hooks/dynamic-market/MarketFeeCalculator.sol";
@@ -17,9 +17,9 @@ import {IMarketStateRegistry as I} from "../../../src/hooks/dynamic-market/IMark
 ///         the extremes it produced so the invariants can check them.
 contract FeeHandler is Test {
     uint24 public maxFeeSeen;
-    uint24 public minPlayoffRateSeen = type(uint24).max;
-    uint24 public maxPlayoffRateSeen;
-    uint24 public maxRegularSeasonFeeSeen;
+    uint24 public minRateSeen = type(uint24).max;
+    uint24 public maxRateSeen;
+    uint256 public seasonMismatches;
     uint256 public minCapSeen = type(uint256).max;
     uint256 public maxCapSeen;
     uint256 public calls;
@@ -54,13 +54,13 @@ contract FeeHandler is Test {
         uint256 cap = C.tradeCap(i);
 
         if (fee > maxFeeSeen) maxFeeSeen = fee;
-        if (playoffs) {
-            if (b.rate < minPlayoffRateSeen) minPlayoffRateSeen = b.rate;
-            if (b.rate > maxPlayoffRateSeen) maxPlayoffRateSeen = b.rate;
-            if (F.contractFee(1e12, b.rate, i.marketProbBps) > F.contractFee(1e12, b.rate, 5000)) peakViolations++;
-        } else if (fee > maxRegularSeasonFeeSeen) {
-            maxRegularSeasonFeeSeen = fee;
-        }
+        if (b.rate < minRateSeen) minRateSeen = b.rate;
+        if (b.rate > maxRateSeen) maxRateSeen = b.rate;
+        if (F.contractFee(1e12, b.rate, i.marketProbBps) > F.contractFee(1e12, b.rate, 5000)) peakViolations++;
+        // The same conditions under the other season label must price identically.
+        i.playoffs = !playoffs;
+        (uint24 otherFee, C.Breakdown memory other) = C.calculate(i);
+        if (otherFee != fee || other.rate != b.rate) seasonMismatches++;
         if (cap < minCapSeen) minCapSeen = cap;
         if (cap > maxCapSeen) maxCapSeen = cap;
         calls++;
@@ -76,19 +76,17 @@ contract DynamicMarketInvariantTest is Test {
     }
 
     /// @notice H-002 / H-006 — the fee never exceeds the immutable ceiling and
-    ///         the playoff rate never leaves its band.
+    ///         the rate never leaves its band, in every season.
     function invariant_feeWithinImmutableBounds() public view {
         if (handler.calls() == 0) return;
         assertLe(handler.maxFeeSeen(), RiskPolicy.MAX_RATE, "fee exceeded MAX_RATE");
-        if (handler.maxPlayoffRateSeen() > 0) {
-            assertGe(handler.minPlayoffRateSeen(), RiskPolicy.MIN_RATE, "rate fell below MIN_RATE");
-            assertLe(handler.maxPlayoffRateSeen(), RiskPolicy.MAX_RATE, "rate exceeded MAX_RATE");
-        }
+        assertGe(handler.minRateSeen(), RiskPolicy.MIN_RATE, "rate fell below MIN_RATE");
+        assertLe(handler.maxRateSeen(), RiskPolicy.MAX_RATE, "rate exceeded MAX_RATE");
     }
 
-    /// @notice H-004 — the regular season is always free.
-    function invariant_regularSeasonIsFree() public view {
-        assertEq(handler.maxRegularSeasonFeeSeen(), 0, "a regular-season swap was charged");
+    /// @notice Task 076 — the season label never changes the rate or the fee.
+    function invariant_seasonDoesNotChangeTheRate() public view {
+        assertEq(handler.seasonMismatches(), 0, "a regular-season pool priced differently from a playoff pool");
     }
 
     /// @notice H-006 — fee(p = 0.5) ≥ fee(p) for the same conditions.
@@ -126,21 +124,18 @@ contract DynamicMarketInvariantTest is Test {
                 eventState: I.EventState((h >> 120) % 6),
                 stale: ((h >> 128) & 1) == 1,
                 increasesRisk: ((h >> 129) & 1) == 1,
-                playoffs: ((h >> 130) & 3) != 0 // three in four draws are playoff pools
+                playoffs: ((h >> 130) & 1) == 1 // half the draws are regular-season pools
             });
 
             (uint24 fee, C.Breakdown memory b) = C.calculate(i);
             uint256 cap = C.tradeCap(i);
 
             assertLe(fee, RiskPolicy.MAX_RATE);
-            if (i.playoffs) {
-                assertGe(b.rate, RiskPolicy.MIN_RATE);
-                assertLe(b.rate, RiskPolicy.MAX_RATE);
-                assertEq(fee, F.effectiveFeePips(b.rate, i.marketProbBps));
-                if (b.rate < loRate) loRate = b.rate;
-            } else {
-                assertEq(fee, 0);
-            }
+            assertGe(b.rate, RiskPolicy.MIN_RATE);
+            assertLe(b.rate, RiskPolicy.MAX_RATE);
+            assertEq(fee, F.effectiveFeePips(b.rate, i.marketProbBps));
+            assertEq(b.playoffs, i.playoffs);
+            if (b.rate < loRate) loRate = b.rate;
             assertGe(cap, RiskPolicy.MIN_TRADE_CAP);
             assertLe(cap, RiskPolicy.ABS_MAX_TRADE);
             if (fee > hi) hi = fee;

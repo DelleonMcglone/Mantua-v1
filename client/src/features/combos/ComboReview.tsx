@@ -58,8 +58,8 @@ export function ComboReview({
             </div>
           ))}
           <div className="col-span-2 mt-1 text-[10.5px] text-text-mute">
-            {quote.fee.playoffs ? "Playoff leg · dynamic fee" : "Regular season · no trading fee"} ·
-            one fee for the whole combo
+            {quote.fee.playoffs ? "Playoff leg" : "Regular season"} · dynamic fee · one fee for the
+            whole combo
           </div>
         </dl>
       ) : (

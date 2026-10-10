@@ -55,11 +55,10 @@ transactions generally cannot be reversed by you or by us.
 
 ## 4. Fees and costs
 
-- Regular-season games: no trading fee.
-- Playoff games: a dynamic fee between 0.10% and 0.70% of the amount
-  traded (liquidity, volatility, activity, uncertainty); 0.70% is a
-  contract-level ceiling. The exact fee is shown before confirmation
-  and is the fee paid.
+- Every trade, on regular-season and playoff games alike: a dynamic fee
+  between 0.10% and 0.70% of the amount traded (liquidity, volatility,
+  activity, uncertainty); 0.70% is a contract-level ceiling. The exact
+  fee is shown before confirmation and is the fee paid.
 - Sponsored transactions cost nothing beyond the shown amount; where
   sponsorship is unavailable the wallet pays the network cost, which
   never flows to us.

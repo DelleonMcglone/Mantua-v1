@@ -46,11 +46,10 @@ export function FeesAndCosts() {
   return (
     <Section title="Fees and costs">
       <p>
-        Trading fees follow the league calendar. Trades on regular-season games carry no trading
-        fee. Trades on playoff games carry a dynamic fee between 0.10% and 0.70% of the amount
-        traded, set by the market&rsquo;s liquidity, volatility, activity, and uncertainty; 0.70% is
-        an absolute ceiling written into the contract. The exact fee for your trade is shown before
-        you confirm, and it is the fee the trade pays.
+        Every trade carries a dynamic fee between 0.10% and 0.70% of the amount traded, on
+        regular-season and playoff games alike, set by the market&rsquo;s liquidity, volatility,
+        activity, and uncertainty; 0.70% is an absolute ceiling written into the contract. The exact
+        fee for your trade is shown before you confirm, and it is the fee the trade pays.
       </p>
       <p>
         Where we sponsor the cost of submitting your transaction, you pay nothing beyond the amount

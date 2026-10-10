@@ -1,5 +1,7 @@
 # Task 049 — Dynamic Market Hook fee model (Phase 5, H-001 … H-017)
 
+> **Amended 2026-10-10 (task 076, `docs/tasks/076-regular-season-fees.md`):** the regular-season 0% exemption below is withdrawn by the owner; the dynamic fee applies in every season and `REGULAR_SEASON_FEE` no longer exists. The season switch (H-004) survives as a write-once label. This ledger is kept as the record of the original build.
+
 > **Chain note (2026-09-30):** this ledger predates the move to **Arc Mainnet (5042)** — Base Mainnet references below are historical. Current chain facts: `docs/tasks/mantua-v1-task-list.md` (B-005) and `deploy/dynamic-market/README.md`.
 
 > Owner directive 2026-09-11 (Phase 5 🪝, 🔴). Adjust the Dynamic Market

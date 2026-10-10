@@ -195,26 +195,99 @@ to `0x103be191c9c6fed41d1efa950f4249b97ec33b27d0377d83af1491b82d25880c`
 (7,793 B), identical to the pinned solc 0.8.26 build and to the superseded
 Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 
-| Field                   | Value                                                                                                                                                                                                                                  |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chain                   | Arc Mainnet                                                                                                                                                                                                                            |
-| Chain ID                | `5042`                                                                                                                                                                                                                                 |
-| RPC                     | `https://rpc.mainnet.arc.io`                                                                                                                                                                                                           |
-| Explorer                | <https://explorer.arc.io> (Arcscan / Blockscout)                                                                                                                                                                                       |
-| PoolManager             | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                           |
-| PositionManager         | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                           |
-| StateView               | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                           |
-| V4Quoter                | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                           |
-| PoolSwapTest            | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                           |
-| PoolModifyLiquidityTest | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                           |
-| PositionDescriptor      | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                           |
-| MarketStateRegistry     | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                           |
-| DynamicMarketHook       | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                                                                                                                                                                                           |
-| Deployment salt         | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                       |
-| Hook permission bits    | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                         |
-| Operator                | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                 |
-| Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                           |
-| Verification status     | All 11 verified on Arcscan (2026-09-30) — exact matches on Sourcify (chain 5042) via `verify.sh`, which Arcscan imports; the hook (CREATE2, no creation tx indexed) was submitted through the explorer's web form. See the note below. |
+| Field                                    | Value                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chain                                    | Arc Mainnet                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Chain ID                                 | `5042`                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| RPC                                      | `https://rpc.mainnet.arc.io`                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Explorer                                 | <https://explorer.arc.io> (Arcscan / Blockscout)                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| PoolManager                              | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| PositionManager                          | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| StateView                                | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| V4Quoter                                 | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| PoolSwapTest                             | `0x76578c4EA626bEe114e5B72939e7927eF5f1CAbF`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| PoolModifyLiquidityTest                  | `0x0cd79B383c3f10F786bF9B942F791283dFB4d6e6`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| PositionDescriptor                       | `0x6A8Ce701aB14a2909F22a18063426fEE016A36da`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| MarketStateRegistry                      | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| DynamicMarketHook (task 076, 2026-10-10) | `0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0` — the hook new markets use; hook-only redeploy against the same PoolManager and registry, tx `0x1852e5d94a866d15c8fe3271686ee8b0c576124b4826af86c14b25f9d5b07dbd`, block 25298378, gas 1,761,822; salt `0x…2443` (`0x0000000000000000000000000000000000000000000000000000000000002443`); permission bits `10432` asserted in-run; Arcscan verification pending (`verify.sh`, see step 5 of the hook-only checklist) |
+| DynamicMarketHook (2026-09-30)           | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0` — D-105 build with the regular-season gate; still serves the pools of markets created before 2026-10-10                                                                                                                                                                                                                                                                                                             |
+| Deployment salt (2026-09-30 hook)        | `0x…94a3` (`0x00000000000000000000000000000000000000000000000000000000000094a3`)                                                                                                                                                                                                                                                                                                                                                                                 |
+| Hook permission bits                     | `0x28C0` (asserted in-tx; re-checked on-chain)                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Operator                                 | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3` (also the deployer and PoolManager owner)                                                                                                                                                                                                                                                                                                                                                                           |
+| Keeper                                   | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Verification status                      | All 11 verified on Arcscan (2026-09-30) — exact matches on Sourcify (chain 5042) via `verify.sh`, which Arcscan imports; the hook (CREATE2, no creation tx indexed) was submitted through the explorer's web form. See the note below.                                                                                                                                                                                                                           |
+
+> **Fee model amendment (task 076, 2026-10-10).** The hook at
+> `0xb23d…28c0` was compiled from the D-105 source with the regular-season
+> gate: a pool registered with `playoffs == false` pays 0% on this
+> deployment. The source now charges the dynamic fee in every season, so
+> the hook was **redeployed alone on 2026-10-10** at
+> `0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0` (procedure:
+> [Redeploying the hook alone](#redeploying-the-hook-alone-task-076)
+> below; record in the table). The PoolManager, the registry and the
+> periphery are reused; markets created before the switch keep their own
+> pool key on the old hook and its 0% regular-season pricing until they
+> resolve. `npm run verify:hooks`, the security suite and the sign-off for
+> the new address are still owed before the first pool is created on it.
+
+## Redeploying the hook alone (task 076)
+
+The hook address is a per-market input: `createMarketsOnChain`
+(`server/src/lib/sports/markets-onchain.ts`) builds each new pool key
+from `DYNAMIC_MARKET_BY_CHAIN[chain].hook`, and nothing on-chain pins a
+PoolManager or registry to one hook. So a fee-model change is a
+**hook-only** deploy: `DeployDynamicMarketHook.s.sol` mines a fresh
+CREATE2 salt against the live `(PoolManager, Registry)` pair and deploys
+only the hook. Reusing the registry keeps the operator and keeper roles,
+and reusing the PoolManager keeps every periphery contract valid.
+
+```bash
+export POOL_MANAGER=0xee196B3F83Fe6f57E074C399DBdeFe07e1407636
+export MARKET_REGISTRY=0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6
+export ARC_RPC_URL=https://<dedicated-provider>/...    # optional
+deploy/dynamic-market/deploy.sh hook-only
+```
+
+The wrapper runs the same preflight as `hook` (chain id, deployer
+balance, the salt-mine and hook suites, a fork dry run with the gas
+estimate) and broadcasts only after an explicit `yes`. The script itself
+refuses an address with no code and calls `registry.globalPaused()` before
+mining, so a typo fails before anything is spent; after the deploy it
+asserts the mined address, the `0x28C0` bits, `hook.poolManager()` and
+`hook.registry()` in the same transaction. The hook step alone is about
+2.4M gas (≈ $0.05 at Arc's ~20 gwei).
+
+Rehearsed 2026-10-10 on a local anvil at chain id 5042 with the canonical
+CREATE2 proxy etched in: stack deploy, then `hook-only` against its
+PoolManager and registry — mined salt `0x49b4`, address `…40Ae8c0`, bits
+`10432`, both probes returning the reused contracts; a dead registry
+address was refused with `MARKET_REGISTRY has no code`. A mined salt is
+specific to the hook bytecode and the constructor pair, so the Arc run
+mined its own.
+
+**Run on Arc Mainnet 2026-10-10** from the `mantua-deployer` keystore:
+`DynamicMarketHook` at `0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0`, salt
+`0x2443`, tx `0x1852e5d9…7dbd`, block 25298378, gas 1,761,822, receipt
+status `0x1`. The wrapper's `--verify` step reported `0 / 1 contracts
+verified`, the known solmate-import failure, so the hook is verified
+through `verify.sh` (step 5 below) rather than the forge flag.
+
+After the broadcast:
+
+1. Record the new address and salt in the deployment record below
+   (a "Hook redeploy" row; PoolManager and Registry unchanged).
+2. Probe `poolManager()` and `registry()` on the new hook.
+3. Point the server at it: `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook` in
+   `server/src/lib/v4-contracts.ts` (and the expected address in
+   `v4-contracts.test.ts`), then `DYNAMIC_MARKET_HOOK_ADDRESS=<Hook> npm run
+verify:hooks` to refresh `docs/security/hook-deployments.md`.
+4. Run the `quoteFee` probe (step 4 of the first-deploy runbook) on the
+   first new market: a regular-season pool now quotes
+   `1000 ≤ breakdown.rate ≤ 7000`.
+5. Markets created before the switch keep trading on the old hook with
+   its 0% regular-season rate; the server reads each market's own pool
+   key, so both hooks serve their pools side by side until the old
+   markets resolve.
 
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
@@ -285,20 +358,22 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      wrong does not revert**; it inverts every probability the hook reads, so a
      25% market prices as a near-certainty. Compute it, do not guess it.
    - `6` — outcome-token decimals, confirmed in spec §0.1.
-   - `PLAYOFFS` — the D-105 season switch: `true` for a postseason game
-     (dynamic 0.10%–0.70% fee), `false` for the regular season (0%). **Once
-     only** — there is no setter; a wrong value means pause + a new market.
-     The sync cron takes it from the provider's season type
-     (`PlannedMarket.playoffs`), never by hand.
+   - `PLAYOFFS` — the D-105 season label: `true` for a postseason game,
+     `false` for the regular season. Since task 076 (2026-10-10) the
+     dynamic 0.10%–0.70% fee applies either way; the flag rides into the
+     fee breakdown and the telemetry as a label. **Once only** — there is
+     no setter; a wrong value means pause + a new market. The sync cron
+     takes it from the provider's season type (`PlannedMarket.playoffs`),
+     never by hand.
 
 2. **Initialize the pool** with `fee = 0x800000` (`DYNAMIC_FEE_FLAG`). A static
    fee is rejected: without the flag the PoolManager ignores the hook's fee
    override and the pool would silently run at a fixed tier.
 
 3. **Feed the keeper state.** Until the first `updateMarket`, the market reads
-   as stale, so a playoff pool's rate sits at `MAX_RATE` (0.70%) and the cap
-   at `MIN_TRADE_CAP` ($100); a regular-season pool stays at 0%. That is the
-   intended fail-closed posture (spec §22 / D-105), not a bug. The server's
+   as stale, so every pool's rate sits at `MAX_RATE` (0.70%) and the cap
+   at `MIN_TRADE_CAP` ($100), whatever its season. That is the intended
+   fail-closed posture (spec §22 / D-105), not a bug. The server's
    keeper (`server/src/lib/sports/registry-keeper.ts`, K-01) writes the three
    fields on every live-sync tick once `MARKET_SIGNER_PRIVATE_KEY` is set;
    `npm run keeper:fork-proof -w @mantua/server` rehearses it against the
@@ -315,9 +390,9 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      --rpc-url https://rpc.mainnet.arc.io
    ```
 
-   Expect `fee == 0` and `breakdown.playoffs == false` on a regular-season
-   pool; on a playoff pool `fee == breakdown.rate × (10000 − p) / 10000`
-   with `1000 ≤ rate ≤ 7000`. The server's trade build calls exactly this.
+   Expect `fee == breakdown.rate × (10000 − p) / 10000` with
+   `1000 ≤ rate ≤ 7000` on every pool; `breakdown.playoffs` only reports the
+   season label. The server's trade build calls exactly this.
 
 5. **Record addresses** in the table above, then wire them into the
    server's env-driven contract registry (`server/src/lib/v4-contracts.ts`)

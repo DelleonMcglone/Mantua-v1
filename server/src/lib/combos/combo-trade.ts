@@ -104,11 +104,14 @@ export function legResults(
   }));
 }
 
-/** The `fee` block a planned (pre-creation) quote carries — the hook's own formula. */
+/**
+ * The `fee` block a planned (pre-creation) quote carries — the hook's own
+ * formula at the floor rate. `playoffs` is the season label only (task 076).
+ */
 export function plannedFeeWire(pricing: ComboPricing, playoffs: boolean) {
   return {
     feePips: pricing.feePips,
-    ratePips: playoffs ? MIN_RATE_PIPS : 0,
+    ratePips: MIN_RATE_PIPS,
     probabilityBps: pricing.fairProbabilityBps,
     playoffs,
     feeRaw: pricing.feeUsdcRaw.toString(),

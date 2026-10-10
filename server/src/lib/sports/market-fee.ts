@@ -24,8 +24,7 @@ export const FEE_PIPS = 1_000_000n;
 /** Probability unit: 10_000 == 100%. */
 export const PROB_BPS = 10_000n;
 
-/** `RiskPolicy` bounds — mirrored, never authoritative. */
-export const REGULAR_SEASON_FEE_PIPS = 0;
+/** `RiskPolicy` bounds — mirrored, never authoritative. Charged in every season (task 076). */
 export const MIN_RATE_PIPS = 1_000;
 export const MAX_RATE_PIPS = 7_000;
 
@@ -67,6 +66,7 @@ export interface FeeBreakdown {
   uncertaintyPremium: number;
   rate: number;
   probabilityBps: number;
+  /** Season label from registration; the rate is the same either way (task 076). */
   playoffs: boolean;
   stale: boolean;
 }
@@ -75,9 +75,10 @@ export interface FeeBreakdown {
 export interface MarketFeeQuote {
   /** Pip fee on the gross input — `rate × (1 − p)`, straight from the hook. */
   feePips: number;
-  /** The dynamic rate (0 in the regular season, else 1000–7000). */
+  /** The dynamic rate, 1000–7000 in every season. */
   ratePips: number;
   probabilityBps: number;
+  /** Season label: true for a playoff game. Carried for the UI and telemetry only. */
   playoffs: boolean;
   stale: boolean;
   /** Fee in raw units of the input token (USDC for buys, YES for sells). */

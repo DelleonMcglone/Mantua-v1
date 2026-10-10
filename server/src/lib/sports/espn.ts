@@ -211,8 +211,7 @@ export function parseEvent(raw: unknown, league: LeagueSlug): ProviderEvent {
 /**
  * ESPN's `season.type` on a scoreboard event: 1 preseason, 2 regular season,
  * 3 postseason (4 is the off-season and never carries a game). Anything else
- * is null — the D-105 switch defaults to the fee-free regular season, so an
- * unknown phase can never turn fees on by accident.
+ * is null — the D-105 season label then defaults to the regular season.
  */
 export function mapEspnSeasonType(raw: unknown): SeasonType | null {
   const n = typeof raw === "string" ? Number(raw) : raw;

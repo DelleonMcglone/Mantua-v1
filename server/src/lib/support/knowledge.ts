@@ -25,7 +25,7 @@ export const KNOWLEDGE: readonly KnowledgeTopic[] = [
     id: "trading",
     title: "Placing and closing a trade",
     keywords: ["trade", "buy", "sell", "ticket", "confirm", "close", "position", "slippage", "fee"],
-    body: "Open a league page, tap a price to load the ticket, enter an amount and press Confirm. The ticket shows the exact fee before you confirm: 0% in the regular season, a dynamic 0.10%–0.70% in the playoffs. A trade is confirmed on chain before it shows as executed; the ticket reports pending, confirmed or failed from the server's own verification. To close, open the position and use Close, which pre-fills a sell of the full balance.",
+    body: "Open a league page, tap a price to load the ticket, enter an amount and press Confirm. The ticket shows the exact fee before you confirm: a dynamic 0.10%–0.70% of what you trade, in the regular season and the playoffs alike. A trade is confirmed on chain before it shows as executed; the ticket reports pending, confirmed or failed from the server's own verification. To close, open the position and use Close, which pre-fills a sell of the full balance.",
   },
   {
     id: "deposits",

@@ -7,8 +7,7 @@ import { ChevronDown } from "lucide-react";
  * long-form page is `docs/fee-model.md`.
  */
 const POINTS: readonly string[] = [
-  "Regular season: 0% trading fee on every trade.",
-  "Playoffs: a dynamic fee between 0.10% and 0.70% of what you trade.",
+  "Every trade pays a dynamic fee between 0.10% and 0.70% of what you trade, regular season and playoffs alike.",
   "0.70% is the absolute ceiling. Nothing can raise it.",
   "Inside the band the fee responds to liquidity, volatility, trading activity, and how uncertain the market is.",
   "Fees are highest on coin-flip contracts near 50¢ and fall toward zero near 1¢ and 99¢.",
