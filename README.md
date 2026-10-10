@@ -324,18 +324,18 @@ records are in [`deploy/dynamic-market/README.md`](deploy/dynamic-market/README.
 Arc has no canonical Uniswap v4 stack, so the market stack is Mantua's own, deployed
 2026-09-29/30:
 
-| Contract            | Address                                                               |
-| ------------------- | --------------------------------------------------------------------- |
-| PoolManager         | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                          |
-| PositionManager     | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                          |
-| StateView           | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                          |
-| V4Quoter            | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                          |
-| MarketStateRegistry | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                          |
-| DynamicMarketHook   | `0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0`                          |
-| MarketFactory       | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                          |
-| Resolver            | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                          |
-| AgenticCommerce     | `0xC8972dd832f4465ad068c754062B01d2f7216b8D` (UUPS proxy, 2026-10-01) |
-| USDC (collateral)   | `0x3600000000000000000000000000000000000000`                          |
+| Contract            | Address                                                                                                                 |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| PoolManager         | `0xee196B3F83Fe6f57E074C399DBdeFe07e1407636`                                                                            |
+| PositionManager     | `0x17a69A23F3c0F7F0dCA6391f967C020BaC0906da`                                                                            |
+| StateView           | `0x8F76Bba1695798E9ddDb0Da6c67c2900fe0f5deF`                                                                            |
+| V4Quoter            | `0x1791972C76a8Bcb9da83E50B9435612590a0102f`                                                                            |
+| MarketStateRegistry | `0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6`                                                                            |
+| DynamicMarketHook   | `0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0` (task 076 hook, 2026-10-10; markets created earlier stay on `0xb23d…28c0`) |
+| MarketFactory       | `0x52e8c370Ff772408b925f8524f49BFd1B96Beb93`                                                                            |
+| Resolver            | `0x448E16702C19fF0b0AF7b51D675Cc40f1b2D5281`                                                                            |
+| AgenticCommerce     | `0xC8972dd832f4465ad068c754062B01d2f7216b8D` (UUPS proxy, 2026-10-01)                                                   |
+| USDC (collateral)   | `0x3600000000000000000000000000000000000000`                                                                            |
 
 Each game's Market contract and YES/NO tokens are minted by the factory at ingest time, with
 deterministic ids and one market per side per game. The Resolver is the fixed settlement

@@ -135,11 +135,11 @@ describe("Arc Mainnet deployment pending", () => {
 describe("Dynamic Market stack on Arc Mainnet (H-009)", () => {
   const dm = DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID];
 
-  it("registers the deployed addresses from deploy/dynamic-market/README.md", () => {
+  it("registers the deployed addresses from deploy/dynamic-market/README.md (task 076 hook)", () => {
     assert.deepEqual(dm, {
       poolManager: "0xee196B3F83Fe6f57E074C399DBdeFe07e1407636",
       registry: "0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6",
-      hook: "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0",
+      hook: "0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0",
       operator: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
       keeper: "0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3",
     });

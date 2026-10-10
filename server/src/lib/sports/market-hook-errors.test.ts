@@ -24,7 +24,7 @@ import {
   withMarketHookErrors,
 } from "./market-hook-errors.ts";
 
-const HOOK = "0xb23d3EeC2272F3557f6B7BBEA8A9649Cf9c028c0";
+const HOOK = "0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0";
 
 /** A viem-shaped revert carrying raw revert data, as the RPC client throws. */
 class RevertWithData extends BaseError {

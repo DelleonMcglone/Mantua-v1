@@ -107,11 +107,15 @@ regular season as free.
 - [x] Runbook section "Redeploying the hook alone"; rehearsed on a local
       anvil (chain id 5042, CREATE2 proxy etched): stack deploy, then
       hook-only against it, probes and the bad-address guard.
-- [ ] **Arc Mainnet broadcast — needs the `mantua-deployer` keystore and
-      RPC egress, neither of which this cloud session has.** Run
-      `deploy/dynamic-market/deploy.sh hook-only` from the machine that
-      holds the keystore (the exports are in the runbook).
-- [ ] Record the new address and salt in the deployment record; update
-      `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook` and its test; run
-      `npm run verify:hooks`; run the `quoteFee` probe on the first new
-      market; security pass and sign-off for the new address.
+- [x] **Arc Mainnet broadcast** — run by the owner 2026-10-10 from the
+      `mantua-deployer` keystore: hook `0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0`,
+      salt `0x2443`, tx `0x1852e5d9…7dbd`, block 25298378, receipt `0x1`.
+- [x] Deployment record updated; `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook`
+      and its test point at the new hook; README address table updated.
+- [ ] Arcscan verification of the new hook (`verify.sh`, the wrapper's
+      `--verify` hit the known solmate-import failure).
+- [ ] `DYNAMIC_MARKET_HOOK_ADDRESS=0x5E9a32fb180A2ACE6a17D85eB696a27Ce5C028c0 npm run verify:hooks`
+      to refresh `docs/security/hook-deployments.md` (needs Arc RPC).
+- [ ] `quoteFee` probe on the first market created on the new hook: a
+      regular-season pool must quote `1000 ≤ breakdown.rate ≤ 7000`.
+- [ ] Security pass and sign-off for the new hook address.
