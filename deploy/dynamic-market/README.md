@@ -220,12 +220,64 @@ Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 > `0xb23d…28c0` was compiled from the D-105 source with the regular-season
 > gate: a pool registered with `playoffs == false` pays 0% on this
 > deployment. The source now charges the dynamic fee in every season, so
-> charging regular-season pools requires a **new hook deployment** (mined
-> salt, same `0x28C0` permission bits, same registry) and new markets
-> whose pools point at it; the `MarketStateRegistry` is unchanged and can
-> be reused. Open markets on the old hook keep their 0% regular-season
-> pricing until they resolve. Re-run `npm run verify:hooks`, the security
-> suite and the sign-off for the new address before any pool is created.
+> charging regular-season pools requires a **new hook deployment** — see
+> [Redeploying the hook alone](#redeploying-the-hook-alone-task-076)
+> below. The PoolManager, the registry and the periphery are reused; open
+> markets on the old hook keep their 0% regular-season pricing until they
+> resolve. Re-run `npm run verify:hooks`, the security suite and the
+> sign-off for the new address before any pool is created on it.
+
+## Redeploying the hook alone (task 076)
+
+The hook address is a per-market input: `createMarketsOnChain`
+(`server/src/lib/sports/markets-onchain.ts`) builds each new pool key
+from `DYNAMIC_MARKET_BY_CHAIN[chain].hook`, and nothing on-chain pins a
+PoolManager or registry to one hook. So a fee-model change is a
+**hook-only** deploy: `DeployDynamicMarketHook.s.sol` mines a fresh
+CREATE2 salt against the live `(PoolManager, Registry)` pair and deploys
+only the hook. Reusing the registry keeps the operator and keeper roles,
+and reusing the PoolManager keeps every periphery contract valid.
+
+```bash
+export POOL_MANAGER=0xee196B3F83Fe6f57E074C399DBdeFe07e1407636
+export MARKET_REGISTRY=0xEA8c2f329E7eBD9a67FA7E502CEcc938bE3ec7a6
+export ARC_RPC_URL=https://<dedicated-provider>/...    # optional
+deploy/dynamic-market/deploy.sh hook-only
+```
+
+The wrapper runs the same preflight as `hook` (chain id, deployer
+balance, the salt-mine and hook suites, a fork dry run with the gas
+estimate) and broadcasts only after an explicit `yes`. The script itself
+refuses an address with no code and calls `registry.globalPaused()` before
+mining, so a typo fails before anything is spent; after the deploy it
+asserts the mined address, the `0x28C0` bits, `hook.poolManager()` and
+`hook.registry()` in the same transaction. The hook step alone is about
+2.4M gas (≈ $0.05 at Arc's ~20 gwei).
+
+Rehearsed 2026-10-10 on a local anvil at chain id 5042 with the canonical
+CREATE2 proxy etched in: stack deploy, then `hook-only` against its
+PoolManager and registry — mined salt `0x49b4`, address `…40Ae8c0`, bits
+`10432`, both probes returning the reused contracts; a dead registry
+address was refused with `MARKET_REGISTRY has no code`. A mined salt is
+specific to the hook bytecode and the constructor pair, so the Arc run
+will mine its own.
+
+After the broadcast:
+
+1. Record the new address and salt in the deployment record below
+   (a "Hook redeploy" row; PoolManager and Registry unchanged).
+2. Probe `poolManager()` and `registry()` on the new hook.
+3. Point the server at it: `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook` in
+   `server/src/lib/v4-contracts.ts` (and the expected address in
+   `v4-contracts.test.ts`), then `DYNAMIC_MARKET_HOOK_ADDRESS=<Hook> npm run
+verify:hooks` to refresh `docs/security/hook-deployments.md`.
+4. Run the `quoteFee` probe (step 4 of the first-deploy runbook) on the
+   first new market: a regular-season pool now quotes
+   `1000 ≤ breakdown.rate ≤ 7000`.
+5. Markets created before the switch keep trading on the old hook with
+   its 0% regular-season rate; the server reads each market's own pool
+   key, so both hooks serve their pools side by side until the old
+   markets resolve.
 
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from

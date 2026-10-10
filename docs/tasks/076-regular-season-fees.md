@@ -96,3 +96,22 @@ regular season as free.
       `docs/specs/dynamic-market-hook.md` (§0.6 amendment), decision
       record, Terms draft, `deploy/dynamic-market/README.md`.
 - [x] `forge test`, server tests, client tests, lint, typecheck, format.
+
+## Deployment (owner directive 2026-10-10: "deploy a new hook")
+
+- [x] `contracts/script/DeployDynamicMarketHook.s.sol` — hook-only deploy
+      against the live PoolManager and registry; refuses an address with
+      no code; asserts the mined address, bits and wiring in the deploy tx.
+- [x] `deploy/dynamic-market/deploy.sh hook-only` — same preflight, dry run
+      and `yes` gate as the stack deploy; post-deploy checklist printed.
+- [x] Runbook section "Redeploying the hook alone"; rehearsed on a local
+      anvil (chain id 5042, CREATE2 proxy etched): stack deploy, then
+      hook-only against it, probes and the bad-address guard.
+- [ ] **Arc Mainnet broadcast — needs the `mantua-deployer` keystore and
+      RPC egress, neither of which this cloud session has.** Run
+      `deploy/dynamic-market/deploy.sh hook-only` from the machine that
+      holds the keystore (the exports are in the runbook).
+- [ ] Record the new address and salt in the deployment record; update
+      `DYNAMIC_MARKET_BY_CHAIN[ARC_CHAIN_ID].hook` and its test; run
+      `npm run verify:hooks`; run the `quoteFee` probe on the first new
+      market; security pass and sign-off for the new address.
