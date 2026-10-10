@@ -7,10 +7,10 @@ import {RiskPolicy} from "./RiskPolicy.sol";
 
 /// @title MarketFeeCalculator
 /// @notice PURPOSE: turns derived market conditions into the dynamic rate,
-///         the season-gated pip fee, and the trade cap. D-105 (H-003, H-004);
-///         spec §16-§18, §21, §22 as superseded by the fee model.
+///         the pip fee, and the trade cap. D-105 (H-003); spec §16-§18,
+///         §21, §22 as superseded by the fee model.
 ///
-/// @dev **Four drivers, one band.** The playoff rate is `MIN_RATE` plus four
+/// @dev **Four drivers, one band.** The rate is `MIN_RATE` plus four
 ///      premiums — liquidity, volatility, trading activity, market
 ///      uncertainty — each a bounded share of the headroom to `MAX_RATE`.
 ///      The shares total 100%, so every driver at maximum lands exactly on
@@ -23,9 +23,10 @@ import {RiskPolicy} from "./RiskPolicy.sol";
 ///      keeper model's disagreement with the pool, gated by its own stated
 ///      confidence (§11, §12), plus event-state risk (§17.5).
 ///
-///      **The season gate comes first.** A regular-season pool returns
-///      `REGULAR_SEASON_FEE` before any driver is read: no condition, stale
-///      or otherwise, can charge a fee outside the playoffs.
+///      **Every season pays.** D-105 originally gated the rate on the
+///      pool's `playoffs` flag (regular season: 0). The 2026-10-10
+///      amendment (task 076) removed that gate: the flag is carried into
+///      the breakdown as a season label and has no effect on the rate.
 library MarketFeeCalculator {
     /// @notice Everything the fee depends on. All bps except `liquidity`.
     struct Inputs {
@@ -102,9 +103,8 @@ library MarketFeeCalculator {
     ///         reverting, so an offline keeper cannot brick trading (§44).
     function rate(Inputs memory i) internal pure returns (Breakdown memory b) {
         b.probabilityBps = uint16(i.marketProbBps > BPS ? BPS : i.marketProbBps);
-        b.playoffs = i.playoffs;
+        b.playoffs = i.playoffs; // season label only (task 076); never a gate.
         b.stale = i.stale;
-        if (!i.playoffs) return b; // regular season: every field stays zero.
         b.minRate = RiskPolicy.MIN_RATE;
         if (i.stale) {
             b.rate = RiskPolicy.MAX_RATE;

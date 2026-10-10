@@ -468,10 +468,13 @@ Use Uniswap Trading API response — it returns permit data when needed. Sign wi
 
 ### Dynamic Market Hook & Fee Model (task 049, D-105)
 
-> Spec (authoritative): regular season 0%; playoffs dynamic 0.10%–0.70%
-> (immutable 0.70% ceiling) from liquidity, volatility, trading activity
-> and market uncertainty; `Fee = C × fee_rate × p × (1 − p)`, peaking at
-> p = 0.50. Detail: `docs/tasks/049-dynamic-market-fee-model.md`.
+> Spec (authoritative): dynamic 0.10%–0.70% (immutable 0.70% ceiling) from
+> liquidity, volatility, trading activity and market uncertainty;
+> `Fee = C × fee_rate × p × (1 − p)`, peaking at p = 0.50. Detail:
+> `docs/tasks/049-dynamic-market-fee-model.md`. _Amended 2026-10-10 (task
+> 076, `docs/tasks/076-regular-season-fees.md`): the regular-season 0%
+> exemption is withdrawn; the fee applies in every season. H-004's season
+> switch is now a label._
 
 | ID    | Task                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Status |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------ |

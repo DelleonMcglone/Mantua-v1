@@ -156,7 +156,6 @@ export async function quoteComboTicket(db: DB, input: ComboQuoteInput): Promise<
     stakeRaw: input.stakeRaw,
     legs: candidates.map((c) => ({ marketId: c.marketId, priceBps: c.priceBps ?? 10_000 })),
     pool,
-    playoffs: plan.playoffs,
   });
   const exposure = await openExposureUsd(db, input.userId);
   const gate = comboPolicyGate(input.policy, {

@@ -170,9 +170,8 @@ export const DOCS_GROUPS: DocsGroup[] = [
             <Table
               head={["When", "Fee", "What sets it"]}
               rows={[
-                ["Regular season", "0%", "Fixed"],
                 [
-                  "Playoffs",
+                  "Regular season and playoffs",
                   "0.10% to 0.70%",
                   "Liquidity, volatility and trading activity, adjusted on every trade",
                 ],

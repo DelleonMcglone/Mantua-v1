@@ -9,7 +9,6 @@ import { readFileSync } from "node:fs";
 import {
   MAX_RATE_PIPS,
   MIN_RATE_PIPS,
-  REGULAR_SEASON_FEE_PIPS,
   contractFee,
   effectiveFeePips,
   feeOnInput,
@@ -69,7 +68,6 @@ void describe("market-fee mirrors MarketFeeFormula.sol", () => {
   });
 
   void it("carries the D-105 bounds", () => {
-    assert.equal(REGULAR_SEASON_FEE_PIPS, 0);
     assert.equal(MIN_RATE_PIPS, 1000);
     assert.equal(MAX_RATE_PIPS, 7000);
     assert.equal(effectiveFeePips(MAX_RATE_PIPS, 0), MAX_RATE_PIPS, "never above the ceiling");
@@ -110,15 +108,33 @@ void describe("market-fee mirrors MarketFeeFormula.sol", () => {
     assert.equal(q.feeUsdcRaw, "75000", "0.3 YES at $0.25");
   });
 
-  void it("is zero in the regular season whatever the input", () => {
+  void it("prices a regular-season quote exactly like a playoff quote (task 076)", () => {
+    const playoff = feeQuoteFromBreakdown(
+      3500,
+      breakdown({ rate: MAX_RATE_PIPS }),
+      100_000_000n,
+      false,
+    );
+    const regular = feeQuoteFromBreakdown(
+      3500,
+      breakdown({ rate: MAX_RATE_PIPS, playoffs: false }),
+      100_000_000n,
+      false,
+    );
+    assert.equal(regular.feeRaw, playoff.feeRaw);
+    assert.equal(regular.feeUsdcRaw, "350000", "$0.35 on $100 spent in the regular season");
+    assert.equal(regular.ratePips, MAX_RATE_PIPS);
+    assert.equal(regular.playoffs, false, "the label still records the season");
+  });
+
+  void it("is zero only where the formula is zero: at certainty", () => {
     const q = feeQuoteFromBreakdown(
       0,
-      breakdown({ minRate: 0, rate: 0, playoffs: false, probabilityBps: 5000 }),
+      breakdown({ rate: MIN_RATE_PIPS, playoffs: false, probabilityBps: 10_000 }),
       123_456_789n,
       false,
     );
     assert.equal(q.feeRaw, "0");
     assert.equal(q.feeUsdcRaw, "0");
-    assert.equal(q.playoffs, false);
   });
 });

@@ -17,7 +17,7 @@ import {MarketFlow} from "./MarketFlow.sol";
 import {MarketMath} from "./MarketMath.sol";
 
 /// @title DynamicMarketHook
-/// @notice PURPOSE: the four callbacks — season-gated dynamic fee (D-105),
+/// @notice PURPOSE: the four callbacks — the dynamic fee (D-105, every season),
 ///         per-swap size cap, and trading halt for every Mantua prediction-
 ///         market pool — plus `quoteFee`, the view the pre-trade quote reads.
 ///
@@ -43,7 +43,7 @@ contract DynamicMarketHook {
     uint256 private _locked = 1;
 
     /// @notice Fee decomposition per swap: the four drivers, the rate, the
-    ///         price `p` and the season flag, and the pip fee charged. §29.
+    ///         price `p` and the season label, and the pip fee charged. §29.
     event MarketFeeUpdated(PoolId indexed poolId, Calc.Breakdown breakdown, uint24 effectiveFee);
 
     modifier onlyPoolManager() {

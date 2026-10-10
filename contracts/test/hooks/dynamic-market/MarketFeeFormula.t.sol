@@ -72,7 +72,7 @@ contract MarketFeeFormulaTest is Test {
         assertEq(F.effectiveFeePips(7000, 5000), 3500);
         assertEq(F.effectiveFeePips(7000, 0), 7000, "at p = 0 the input rate is the full rate");
         assertEq(F.effectiveFeePips(7000, 10_000), 0, "at p = 1 nothing is charged");
-        assertEq(F.effectiveFeePips(0, 5000), 0, "regular season");
+        assertEq(F.effectiveFeePips(0, 5000), 0, "a zero rate charges nothing");
     }
 
     /// @dev The derivation in the library header: pip fee on the input equals
@@ -94,9 +94,12 @@ contract MarketFeeFormulaTest is Test {
         assertLe(F.effectiveFeePips(rate, p), rate);
     }
 
-    function testFuzz_feeIsZeroInTheRegularSeasonForAnyPrice(uint256 p, uint256 contracts) public pure {
-        assertEq(F.effectiveFeePips(RiskPolicy.REGULAR_SEASON_FEE, p), 0);
-        assertEq(F.contractFee(contracts, RiskPolicy.REGULAR_SEASON_FEE, p), 0);
+    /// @dev Totality at the zero rate: the formula itself never charges when
+    ///      the rate is zero, whatever `p` or the size. (The calculator never
+    ///      produces a zero rate since task 076; this is the formula's own edge.)
+    function testFuzz_feeIsZeroAtZeroRateForAnyPrice(uint256 p, uint256 contracts) public pure {
+        assertEq(F.effectiveFeePips(0, p), 0);
+        assertEq(F.contractFee(contracts, 0, p), 0);
     }
 
     // ─── Rounding, precision, overflow (H-016) ───────────────────────────

@@ -42,7 +42,6 @@ export function ActivityTab({
                 <span className="text-text-dim">
                   {" "}
                   · fee ${a.feeUsdc > 0 ? Math.ceil(a.feeUsdc * 100) / 100 : 0}
-                  {a.playoffs === false && " (regular season)"}
                 </span>
               )}
             </div>

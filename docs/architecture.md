@@ -872,7 +872,8 @@ new.
 independent, distinct from every moneyline id, chain-mixed off Arc. The
 market's `startsAt` is the latest leg kickoff (the 12 h backstop outlives
 every leg), its label the legs joined, its opening price Π leg prices, its
-season flag on if any leg is a playoff game. `POST /api/combos/prepare`
+season label on if any leg is a playoff game (a label only since task 076;
+the planned fee is the hook's floor rate in every season). `POST /api/combos/prepare`
 creates it when absent through `createMarketsOnChain` with the combo seed
 (`COMBO_SEED_USDC`), under `COMBO_MAX_OPEN_MARKETS` (409 `COMBO_CAPACITY`).
 
@@ -1118,8 +1119,8 @@ The eight questions §43 requires answering:
    there is no kickoff setter, so nobody can push the backstop out either.
 
 6. **Stale keeper state fails closed, not shut.** Past `STALE_AFTER` the
-   playoff rate clamps to `MAX_RATE` and the cap to `MIN_TRADE_CAP`, and the
-   model-deviation premium drops out (a regular-season pool stays at 0%). Reverting instead would let keeper downtime brick a live
+   rate clamps to `MAX_RATE` and the cap to `MIN_TRADE_CAP`, and the
+   model-deviation premium drops out (in every season since task 076). Reverting instead would let keeper downtime brick a live
    market, turning an availability problem into a total loss of access;
    ignoring staleness would price against numbers nobody is maintaining.
    Expensive-but-open is the middle, and LPs are compensated for the
@@ -1171,7 +1172,18 @@ page: `docs/fee-model.md`. Review: `docs/security/dynamic-market-fee-review.md`.
    and a flag no key can flip cannot be used to turn fees on against
    traders mid-market. It rides `registerPool` next to the kickoff
    timestamp, which is immutable for the same reason. Unknown season data
-   defaults to the fee-free regular season.
+   defaults to the regular season.
+
+   **Amended 2026-10-10 (task 076).** The owner withdrew the regular-season
+   exemption: every pool pays the dynamic rate. `MarketFeeCalculator.rate`
+   no longer reads the flag except to copy it into the breakdown, and
+   `REGULAR_SEASON_FEE` is gone from `RiskPolicy`. The flag was kept rather
+   than removed because it is part of the registry and hook ABIs, the
+   `PoolRegistered` and `MarketFeeUpdated` events, the `market_fills`
+   telemetry and the ticket's season line; it is now a label, and the
+   invariant suite proves it never changes the rate. The hook deployed on
+   Arc Mainnet on 2026-09-30 predates the amendment and must be redeployed
+   for regular-season pools to be charged.
 
 3. **Why the ceiling is a `constant`.** As with `MAX_FEE` before it: no
    storage, no setter, no governance path, so an attacker holding every key

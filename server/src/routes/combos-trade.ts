@@ -194,7 +194,6 @@ function gateBuy(
     stakeRaw: amountRaw,
     legs: ctx.candidates.map((c) => ({ marketId: c.marketId, priceBps: c.priceBps ?? 10_000 })),
     pool: null,
-    playoffs: false,
   });
   const gate = comboPolicyGate(ctx.policy, {
     legs: ctx.rows.length,

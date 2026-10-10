@@ -27,8 +27,8 @@ function event(overrides: Partial<ProviderEvent> = {}): ProviderEvent {
   };
 }
 
-void describe("planMarkets season switch (D-105 / H-004)", () => {
-  void it("flags only postseason games for the dynamic fee", () => {
+void describe("planMarkets season label (D-105, task 076)", () => {
+  void it("labels only postseason games as playoffs", () => {
     for (const m of planMarkets(event({ seasonType: "postseason" }), NOW))
       assert.equal(m.playoffs, true);
     for (const m of planMarkets(event({ seasonType: "regular" }), NOW))
@@ -37,7 +37,7 @@ void describe("planMarkets season switch (D-105 / H-004)", () => {
       assert.equal(m.playoffs, false);
   });
 
-  void it("defaults to the fee-free regular season when the feed says nothing", () => {
+  void it("defaults to the regular-season label when the feed says nothing", () => {
     for (const m of planMarkets(event(), NOW)) assert.equal(m.playoffs, false);
   });
 });

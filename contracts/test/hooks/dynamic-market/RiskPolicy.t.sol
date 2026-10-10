@@ -12,7 +12,6 @@ contract RiskPolicyTest is Test {
     // ─── Values (D-105) ──────────────────────────────────────────────────
 
     function test_feeBoundsMatchTheFeeModel() public pure {
-        assertEq(RiskPolicy.REGULAR_SEASON_FEE, 0, "regular season is fee-free");
         assertEq(RiskPolicy.MIN_RATE, 1000, "MIN_RATE must be 0.10%");
         assertEq(RiskPolicy.MAX_RATE, 7000, "MAX_RATE must be 0.70%");
     }
@@ -33,7 +32,7 @@ contract RiskPolicyTest is Test {
 
     function test_minRateIsBelowMaxRate() public pure {
         assertLt(RiskPolicy.MIN_RATE, RiskPolicy.MAX_RATE);
-        assertLt(RiskPolicy.REGULAR_SEASON_FEE, RiskPolicy.MIN_RATE);
+        assertGt(RiskPolicy.MIN_RATE, 0, "every season pays at least the floor (task 076)");
     }
 
     function test_minTradeCapIsBelowAbsMax() public pure {

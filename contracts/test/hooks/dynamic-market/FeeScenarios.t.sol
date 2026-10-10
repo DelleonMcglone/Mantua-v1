@@ -3,8 +3,9 @@ pragma solidity ^0.8.26;
 
 // Purpose: the H-013 / H-015 scenario matrix — every fee-model claim checked
 // across p = 0 … 100% (including 5/25/50/75/95) under calm, thin, volatile,
-// one-sided, uncertain, stale, all-max, and regular-season conditions, plus
-// the trade-size extremes. Logs the table the fee-model docs quote.
+// one-sided, uncertain, stale, all-max, and regular-season (task 076: priced
+// like any other) conditions, plus the trade-size extremes. Logs the table
+// the fee-model docs quote.
 
 import {Test, console2} from "forge-std/Test.sol";
 import {MarketFeeCalculator as C} from "../../../src/hooks/dynamic-market/MarketFeeCalculator.sol";
@@ -95,19 +96,16 @@ contract FeeScenariosTest is Test {
 
                 assertLe(fee, RiskPolicy.MAX_RATE, "ceiling");
                 assertEq(fee, F.effectiveFeePips(b.rate, probs[k]), "fee is the rate shaped by 1 - p");
-                if (!base.playoffs) {
-                    assertEq(fee, 0, "regular season is free");
-                    continue;
-                }
+                assertEq(b.playoffs, base.playoffs, "the season label is carried through");
                 assertGe(b.rate, RiskPolicy.MIN_RATE, "floor");
                 if (probs[k] == 5000) rateAtHalf = b.rate;
                 if (b.rate > maxRate) maxRate = b.rate;
                 if (perHundred > peak) peak = perHundred;
             }
-            if (!base.playoffs) continue;
             assertEq(peak, F.contractFee(100e6, rateAtHalf, 5000), "50/50 pays the most per contract");
             if (n == 0) assertEq(rateAtHalf, RiskPolicy.MIN_RATE, "calm market pays exactly 0.10%");
             if (n == 5) assertEq(rateAtHalf, RiskPolicy.MAX_RATE, "stale pays exactly 0.70% at every p");
+            if (n == 7) assertEq(rateAtHalf, RiskPolicy.MAX_RATE, "a stale regular-season pool pays the ceiling too");
             // The model-deviation driver needs the widest gap (market at 0 or
             // 1 against the opposite model) to fill its share, so the all-max
             // row reaches the ceiling at the extremes and stays below it at 50/50.

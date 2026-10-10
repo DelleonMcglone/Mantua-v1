@@ -150,8 +150,8 @@ Programmable money buying programmable intelligence, then acting on it in one au
   agent actions and settlement; and the app installs from the browser as a PWA with its own
   manifest, icons and offline-capable shell.
 - **State-aware market execution.** The Dynamic Market Hook embeds pricing, fee logic, risk
-  caps, and circuit breakers directly into the market pool: 0% fees in the regular season, a
-  bounded dynamic rate in the playoffs, per-risk trade caps, and a freeze that fires on the
+  caps, and circuit breakers directly into the market pool: a bounded dynamic fee on every trade
+  in every season, per-risk trade caps, and a freeze that fires on the
   event's final state with a keeper-independent backstop (see
   [The Dynamic Market Hook](#the-dynamic-market-hook)).
 - **Analyze and research.** Inline conversational research: deterministic cited data cards for
@@ -296,8 +296,8 @@ _Deployed contracts_ below).
 
 > The hook shipped against the authoritative spec in
 > [`docs/specs/dynamic-market-hook.md`](docs/specs/dynamic-market-hook.md) and the Mantua fee
-> model (user page [`docs/fee-model.md`](docs/fee-model.md)): **0% fees in the regular season;
-> in the playoffs a dynamic 0.10% to 0.70% rate** (liquidity, volatility, trading activity,
+> model (user page [`docs/fee-model.md`](docs/fee-model.md)): **a dynamic 0.10% to 0.70% rate in
+> every season, regular season and playoffs alike** (liquidity, volatility, trading activity,
 > market uncertainty; the 0.70% ceiling is an immutable constant) applied as
 > `Fee = C × rate × p × (1 − p)`, so 50/50 contracts pay the most and near-certain ones almost
 > nothing. Plus per-risk trade caps, in-play trading that halts on the event's `FINAL` state

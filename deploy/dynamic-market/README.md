@@ -216,6 +216,17 @@ Base deploy of 2026-09-23 (blocks 51699745–51699746 / 51702795).
 | Keeper                  | `0x4EF85782DE0826BeaF9B40Cc534C9aAf849312C3`                                                                                                                                                                                           |
 | Verification status     | All 11 verified on Arcscan (2026-09-30) — exact matches on Sourcify (chain 5042) via `verify.sh`, which Arcscan imports; the hook (CREATE2, no creation tx indexed) was submitted through the explorer's web form. See the note below. |
 
+> **Fee model amendment (task 076, 2026-10-10).** The hook at
+> `0xb23d…28c0` was compiled from the D-105 source with the regular-season
+> gate: a pool registered with `playoffs == false` pays 0% on this
+> deployment. The source now charges the dynamic fee in every season, so
+> charging regular-season pools requires a **new hook deployment** (mined
+> salt, same `0x28C0` permission bits, same registry) and new markets
+> whose pools point at it; the `MarketStateRegistry` is unchanged and can
+> be reused. Open markets on the old hook keep their 0% regular-season
+> pricing until they resolve. Re-run `npm run verify:hooks`, the security
+> suite and the sign-off for the new address before any pool is created.
+
 > **Periphery is a second step.** `DeployDynamicMarket.s.sol` deploys the
 > `PoolManager` only; the periphery above came from
 > `contracts/script/DeployMarketPeriphery.s.sol` against it (`POOL_MANAGER`).
@@ -285,20 +296,22 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      wrong does not revert**; it inverts every probability the hook reads, so a
      25% market prices as a near-certainty. Compute it, do not guess it.
    - `6` — outcome-token decimals, confirmed in spec §0.1.
-   - `PLAYOFFS` — the D-105 season switch: `true` for a postseason game
-     (dynamic 0.10%–0.70% fee), `false` for the regular season (0%). **Once
-     only** — there is no setter; a wrong value means pause + a new market.
-     The sync cron takes it from the provider's season type
-     (`PlannedMarket.playoffs`), never by hand.
+   - `PLAYOFFS` — the D-105 season label: `true` for a postseason game,
+     `false` for the regular season. Since task 076 (2026-10-10) the
+     dynamic 0.10%–0.70% fee applies either way; the flag rides into the
+     fee breakdown and the telemetry as a label. **Once only** — there is
+     no setter; a wrong value means pause + a new market. The sync cron
+     takes it from the provider's season type (`PlannedMarket.playoffs`),
+     never by hand.
 
 2. **Initialize the pool** with `fee = 0x800000` (`DYNAMIC_FEE_FLAG`). A static
    fee is rejected: without the flag the PoolManager ignores the hook's fee
    override and the pool would silently run at a fixed tier.
 
 3. **Feed the keeper state.** Until the first `updateMarket`, the market reads
-   as stale, so a playoff pool's rate sits at `MAX_RATE` (0.70%) and the cap
-   at `MIN_TRADE_CAP` ($100); a regular-season pool stays at 0%. That is the
-   intended fail-closed posture (spec §22 / D-105), not a bug. The server's
+   as stale, so every pool's rate sits at `MAX_RATE` (0.70%) and the cap
+   at `MIN_TRADE_CAP` ($100), whatever its season. That is the intended
+   fail-closed posture (spec §22 / D-105), not a bug. The server's
    keeper (`server/src/lib/sports/registry-keeper.ts`, K-01) writes the three
    fields on every live-sync tick once `MARKET_SIGNER_PRIVATE_KEY` is set;
    `npm run keeper:fork-proof -w @mantua/server` rehearses it against the
@@ -315,9 +328,9 @@ the same USDC balance pays gas. The next sync-cron run creates, registers, initi
      --rpc-url https://rpc.mainnet.arc.io
    ```
 
-   Expect `fee == 0` and `breakdown.playoffs == false` on a regular-season
-   pool; on a playoff pool `fee == breakdown.rate × (10000 − p) / 10000`
-   with `1000 ≤ rate ≤ 7000`. The server's trade build calls exactly this.
+   Expect `fee == breakdown.rate × (10000 − p) / 10000` with
+   `1000 ≤ rate ≤ 7000` on every pool; `breakdown.playoffs` only reports the
+   season label. The server's trade build calls exactly this.
 
 5. **Record addresses** in the table above, then wire them into the
    server's env-driven contract registry (`server/src/lib/v4-contracts.ts`)
