@@ -77,6 +77,22 @@ export async function openShot(
     locale: "en-US",
   });
   const page = await context.newPage();
+  if (process.env["E2E_DEBUG"]) {
+    page.on("framenavigated", (f) => {
+      if (f === page.mainFrame()) console.log(`[nav] ${f.url()}`);
+    });
+    page.on("console", (m) => {
+      if (m.type() === "error" || m.type() === "warning")
+        console.log(`[page:${m.type()}] ${m.text()}`);
+    });
+    page.on("pageerror", (e) => {
+      console.log(`[pageerror] ${e.message}`);
+    });
+    page.on("response", (r) => {
+      if (r.status() >= 400)
+        console.log(`[${String(r.status())}] ${r.request().method()} ${r.url()}`);
+    });
+  }
   await page.clock.setFixedTime(data.nowMs);
   const t0 = Date.now();
   await mockApi(page, { termsAccepted: true });
