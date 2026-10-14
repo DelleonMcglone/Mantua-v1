@@ -15,7 +15,6 @@ mantua-intelligence/
 │   ├── tasks/               # roadmaps, task lists
 │   ├── decisions/           # decision memos
 │   ├── design/              # design tokens, mobile audits
-│   ├── marketing/           # product demo generators (motion pages rendered to video)
 │   ├── promptHistory/       # notable LLM prompts and outputs
 │   └── security/            # AI-assisted security analysis findings + sign-off
 └── README.md

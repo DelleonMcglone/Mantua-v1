@@ -22,10 +22,6 @@ export default tseslint.config(
       // audio worklet (task 069), which also runs in the audio rendering
       // realm and so does not share the browser globals the config assumes.
       "client/public/**",
-      // The marketing demo motion page (docs/marketing/*/js, render.mjs) —
-      // plain browser/Node ES modules outside every tsconfig project, so
-      // the typed rules have no program to consult. Formatted by Prettier.
-      "docs/marketing/**",
       "**/.vercel/**",
       "**/.vite/**",
       // esbuild-generated server bundles for the Vercel function (see

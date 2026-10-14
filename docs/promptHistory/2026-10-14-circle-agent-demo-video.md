@@ -15,33 +15,33 @@
 Attachments: the reference MP4 (Public.com "Agents", 34 s, 1108×720) and a
 portrait nebula image with the Mantua mark (843×1264).
 
+Follow-up (owner, same day), after a first cut built as a reconstructed
+motion page:
+
+> This is wrong! You should only be demoing the real app
+> https://www.mantua.ai/ not made up UIs
+
 ## Refined prompt
 
-Produce a ~45 s, 1280×720 product spot that follows the reference's beat
-sheet — app demo → agent created from one chat prompt → numbered workflow →
-"Activate your Agent" → live agent card → category text cards → closing —
-re-cut around Mantua's Circle Sports Agent. Replace the presenter beats
-with text spots on the supplied nebula art. Scene 1 demos the **Daily
-Brief** exactly as the product renders it (chip → "Assembling the brief" →
-the Daily Brief card rows → the agent's narration). Scene 2 is the **user
-flow into automation**: a standing instruction typed into the Ask bar
-becomes a recurring workflow under the user's policy cap and is activated.
-Scene 3 is the **automated process**: a scheduled run streaming the real
-tool steps (brief → analyze → simulate → execute) and placing the trade.
-Chapter cards name Daily Brief, Automated trading and Policy-capped risk.
-Close on "Find Your Edge" then "only at Mantua.AI" with the wordmark.
-
-Build it as a deterministic HTML motion page in the repo, rendered frame by
-frame with Playwright and ffmpeg, so the copy and timing are editable in one
-storyboard file and the render is reproducible. Use the dark design tokens,
-Inter and the app's logo mark; keep a disclaimer footer on in-app frames.
+Produce a ~50 s, 1280×720 product spot that follows the reference's beat
+sheet, **recorded from the real Mantua client** with the repo's demo
+pipeline (`client/e2e/demo/`: shimmed auth, scripted API, the agent stream
+served frame by frame). One continuous take: the board → the Sports Agent
+panel → the **Daily Brief** chip and the card it renders → an instruction
+typed into the dock → the agent's analysis and the **Preview** card →
+the **Confirm trade** press → the execution card with its transaction.
+Replace the presenter beats with text spots on the supplied nebula art
+(chapter cards: Daily Brief · Automated trading · Policy-capped risk).
+Close on "Find Your Edge" then "only at Mantua.AI" with the wordmark. No
+UI that is not the product's own; the closing card labels the figures
+illustrative.
 
 ## Why the refined prompt is better
 
-- It pins the three things the owner asked to see (brief, user flow,
-  automated process) to concrete product surfaces that exist in the code,
-  so nothing on screen misrepresents Mantua.
-- It makes "replicate" testable: the beat sheet is enumerated, so each
-  reference beat maps to a Mantua beat.
-- It chooses a reproducible build over a screen recording, which keeps the
-  asset editable and reviewable in a PR.
+- It pins "real app" to a concrete mechanism the repo already uses for its
+  landing-page demo, so every frame is the shipped UI and the cut is
+  reproducible in CI-like conditions.
+- It maps the owner's three asks (brief, user flow, automated process) to
+  product surfaces that exist (A-014 card, A-043 flow, D-114 gate).
+- It makes "replicate" testable: each reference beat maps to a take segment
+  or a text spot.

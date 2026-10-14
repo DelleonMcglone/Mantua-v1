@@ -4,92 +4,88 @@
 > as a Mantua version that demos the automated process with the Circle
 > Sports Agent — the Daily Brief and the user flow into the automated
 > process — with the supplied nebula art behind the text spots and the
-> closing line **Find Your Edge, only at Mantua.AI**.
+> closing line **Find Your Edge, only at Mantua.AI**. Owner correction the
+> same day: demo **the real app only**, no reconstructed UI.
 
 **Branch:** `claude/gracious-brown-8wm5k7` (the session's designated branch;
 the task number is carried here rather than in the branch name).
 **Prompt history:** `docs/promptHistory/2026-10-14-circle-agent-demo-video.md`
-**Deliverable:** `docs/marketing/circle-agent-demo/` (generator) →
+**Deliverable:** `client/e2e/demo/circle-agent/` (recorder + cut) →
 `out/mantua-circle-agent-demo.mp4` (rendered, git-ignored).
 
 ## Task description
 
 The reference is a 34 s screen-recorded spot: presenter → portfolio app →
-an agent created from one chat prompt → a numbered workflow → "Activate your
-Agent" → a live agent card → three category cards on dark art → a second
-prompt → closing lines and logo. Mantua has no presenter footage, so the
-presenter beats become text spots on the owner's art and the rest is a
-faithful re-cut around the product's real agent surface:
+an agent created from one chat prompt → a workflow → activation → a live
+agent card → category cards on dark art → closing lines and logo. The
+Mantua version is recorded from the real client the way the landing-page
+demo was (`client/e2e/demo/`, 2026-10-04): the shimmed dev server, the
+suite's scripted API, and the agent stream served frame by frame so the
+words arrive the way a model's do. One continuous take:
 
-1. The **Daily Brief** chip in "Your Sports Agent" and the Daily Brief card
-   it renders (A-014: wallet, positions, track record, policy, markets).
-2. The **user flow into automation**: a standing instruction typed into the
-   Ask bar becomes a recurring workflow (trigger → brief → analyze → act
-   within the per-trade cap) and is activated with one press.
-3. The **automated process**: a Sunday 9:00 AM run streams the A-043 tool
-   steps (brief → analyze → simulate → execute) and places the trade under
-   policy.
+1. The board → **Create / Manage Sports Agent** → the Sports Agent panel.
+2. The **Daily Brief** chip → "Assembling the brief" → the Daily Brief card
+   (A-014) → the agent names the edge.
+3. The instruction typed into the dock ("Take $10 of YES on the Chiefs if
+   the edge holds. Preview it first.") → the analysis source pill → the
+   **Preview** card with its **Confirm trade** button (A-043, D-114).
+4. The Confirm press → "Placing the trade" → the execution card with the
+   transaction and Explorer link.
 
-Built as a deterministic HTML motion page rendered frame by frame (Playwright
-→ ffmpeg) rather than a screen recording, so every cut, cursor move and typed
-character is reproducible and the copy is editable in one file.
+Text spots on the owner's art cut between the sections (Daily Brief ·
+Automated trading · Policy-capped risk), then "Find Your Edge" and the
+close with the wordmark and "only at Mantua.AI".
+
+A first cut built as a reconstructed motion page was rejected by the owner
+("only the real app, not made-up UIs") and removed in the same PR.
 
 ## Success criteria
 
-- [x] Same beat structure as the reference (app demo → create agent → activate → live card → category cards → closing)
-- [x] Demos the Daily Brief with the product's own card rows and tool-step verbs
-- [x] Shows the user flow from a plain-language instruction to an activated recurring agent
-- [x] Shows the automated run end to end, including the policy cap and the transaction
+- [x] Every in-app frame is the real client (the components deployed at mantua.ai), not a mock-up
+- [x] Same beat structure as the reference (app → instruction → preview → confirm → executed → category cards → closing)
+- [x] Demos the Daily Brief chip and the card it renders
+- [x] Shows the user flow from a plain-language instruction to the agent's automated analysis, sizing, preview and execution under the policy cap
 - [x] Text spots use the supplied nebula background
 - [x] Ends on "Find Your Edge" → "only at Mantua.AI"
-- [x] Brand-faithful: dark tokens from `tokens.css`, Inter, the app's logo mark, the agent teal
-- [x] Reproducible render from the repo with one command; copy and timing live in `js/timeline.js`
-- [x] Every source file ≤ 150 lines; Prettier-formatted; typed lint scoped away from the plain-JS page
-- [x] Disclaimer footer on every in-app frame (illustrative numbers, not advice)
+- [x] Reproducible from the repo with the documented three commands; every source file ≤ 150 lines; typecheck, lint and Prettier green
+- [x] The closing card labels the figures illustrative
 
 ## Failure conditions
 
-- A frame that misrepresents the product (money moving without a policy or
-  preview step; a feature Mantua does not have).
-- Copy or timing changes that require editing scene code rather than the
-  storyboard.
-- A render that differs between runs (non-deterministic animation).
+- Any frame that is not the product's own UI, or that shows money moving
+  without the preview → confirm gate.
+- A stream frame the real cards cannot render (the data types are the
+  client's own, so the typecheck catches a drift).
 
 ## Edge cases handled
 
-- Module scripts need an origin: the renderer serves the folder over
-  loopback HTTP instead of `file://`.
-- Playwright's browser download may be unavailable: `MANTUA_DEMO_CHROMIUM`
-  points the renderer at a preinstalled Chromium.
-- The art is portrait (843×1264): scenes pan it (background-position) so
-  the embedded logo is never half-cropped and the closing lands on the
-  city horizon.
-- The chat column overflows as the conversation grows: the create scene
-  anchors to the bottom like the real chat's scroll-into-view, and earlier
-  turns fade out as the workflow appears.
-- Narration must finish before a cut: typing speeds are derived from the
-  copy length (`typeDuration`) and checked against the scene end.
+- The Daily Brief chip sits below the fold of the panel: the pointer
+  helper scrolls a target into view before measuring and pressing it.
+- A headless recording has no pointer: a small overlay follows the real
+  mouse events so clicks read on screen.
+- Kickoff times render in the viewer's zone: the context is pinned to
+  America/New_York and the brief's kickoff is the board fixture's own.
+- The live site is not reachable from the sandbox's network policy and the
+  agent needs a signed-in Circle wallet: the recording uses the suite's
+  auth shim and scripted API, as the landing-page demo did.
 
 ## Implementation checklist
 
-- [x] Extract the reference's beats (1 fps contact sheets + key frames)
-- [x] Storyboard (`js/timeline.js`) with absolute times and all copy
-- [x] Stage, tokens and the art/chapter/outro stylesheets
-- [x] Shell (top bar, Sports Agent panel, wallet strip, Ask bar, footer)
-- [x] Brief, create, live and run scenes
-- [x] Engine with crossfades and `window.seek(t)`; real-time preview fallback
-- [x] Renderer: loopback server + Playwright frame capture → ffmpeg (libx264, crf 18, faststart)
-- [x] Stills reviewed at every beat; full render reviewed on a contact sheet
-- [x] `README.md` with render steps, layout, beat sheet and a voiceover script
-- [x] `eslint.config.js` ignore for `docs/marketing/**`; Prettier pass; lint + format:check green
-- [x] Architecture layout updated with `docs/marketing/`
+- [x] Extract the reference's beats (contact sheets + key frames)
+- [x] `data.ts` — typed tool results for the real cards
+- [x] `turns.ts` — the three turns in the stream's wire format (helpers exported from `e2e/demo/turns.ts`)
+- [x] `record.ts` — one continuous take with cut points and a visible pointer
+- [x] `cards.py` — nebula text spots in Inter
+- [x] `assemble.py` — the cut with crossfades
+- [x] Take reviewed frame by frame; final cut reviewed on a contact sheet
+- [x] README with the three commands and the file roles
+- [x] Reconstructed-UI generator removed; lint ignore and layout entry reverted
 
 ## Review notes
 
 The owner's process asks for an o3 pre-implementation review and a Gemini
 code review through the `llm` CLI; neither CLI is installed in this
 environment, so the review was a self-review against the reference frames
-and the product code the demo mirrors. Flagged for the owner: the video is
-silent — the voiceover script in the README can be recorded or synthesized
-(the session's Descript connector can add an AI voice) if a voice track is
-wanted.
+and the product code the demo drives. The video is silent; a voiceover
+script is in the README of the previous cut's PR description if a voice
+track is wanted.

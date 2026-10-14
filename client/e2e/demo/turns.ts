@@ -11,21 +11,21 @@ export interface Frame {
   event: Record<string, unknown>;
 }
 
-const text = (delta: string, wait = 60): Frame => ({ wait, event: { type: "text", delta } });
-const start = (id: string, tool: string, wait = 400): Frame => ({
+export const text = (delta: string, wait = 60): Frame => ({ wait, event: { type: "text", delta } });
+export const start = (id: string, tool: string, wait = 400): Frame => ({
   wait,
   event: { type: "tool_start", id, tool, args: {} },
 });
-const result = (id: string, tool: string, data: unknown, wait = 900): Frame => ({
+export const result = (id: string, tool: string, data: unknown, wait = 900): Frame => ({
   wait,
   event: { type: "tool_result", id, tool, ok: true, data },
 });
 /** Stream a sentence word by word, like a model does. */
-function words(s: string, perWord = 45): Frame[] {
+export function words(s: string, perWord = 45): Frame[] {
   return s.split(/(?<=\s)/).map((w, i) => text(w, i === 0 ? 250 : perWord));
 }
-const done: Frame = { wait: 300, event: { type: "done" } };
-const session: Frame = { wait: 0, event: { type: "session", sessionId: "demo" } };
+export const done: Frame = { wait: 300, event: { type: "done" } };
+export const session: Frame = { wait: 0, event: { type: "session", sessionId: "demo" } };
 
 export const TURN_1 = {
   prompt: "What sports markets should I be watching today?",
