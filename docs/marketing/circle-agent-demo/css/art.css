@@ -1,0 +1,138 @@
+/*
+ * Full-bleed "text spot" scenes on the nebula art: title, chapter, outro, and the pointer.
+ */
+/* Full-bleed art scenes share the nebula background (user-supplied art). */
+.art {
+  background: #06030c url("../assets/nebula-bg.jpg") center 50% / cover no-repeat;
+}
+.art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 55%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.55) 100%);
+}
+.art > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Centered text block for title / chapter / outro scenes. */
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 18px;
+}
+.eyebrow {
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--agent);
+  font-weight: 600;
+}
+.title {
+  font-family: var(--font-display);
+  font-size: 64px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  text-shadow: 0 6px 40px rgba(0, 0, 0, 0.6);
+}
+.sub {
+  font-size: 22px;
+  color: #d6d2e6;
+  font-weight: 400;
+  max-width: 760px;
+  line-height: 1.4;
+}
+.title .grad,
+.wordmark .grad {
+  background: linear-gradient(90deg, #9d6bff 0%, #38a8e8 50%, #1ce8a8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Chapter card: a framed strip with the "< label >" treatment. */
+.chapter {
+  width: 760px;
+  height: 190px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 2, 10, 0.55);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.6),
+    inset 0 0 60px rgba(139, 108, 240, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+.chapter .bars {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 0 1px,
+    transparent 1px 60px
+  );
+}
+.chapter .label {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  position: relative;
+}
+.chapter .chev {
+  color: var(--text-dim);
+  margin: 0 18px;
+  font-weight: 300;
+}
+.chapter .corner {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 1px solid #fff;
+}
+
+/* Outro: wordmark + tagline. */
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.wordmark img {
+  width: 120px;
+  height: 120px;
+  filter: drop-shadow(0 0 24px rgba(76, 198, 198, 0.45));
+}
+.wordmark .name {
+  font-family: var(--font-display);
+  font-size: 76px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+.tagline {
+  font-size: 26px;
+  color: #e7e3f5;
+  letter-spacing: 0.01em;
+}
+
+/* The pointer: drawn by the engine, moved by scenes. */
+#cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 22px;
+  height: 30px;
+  z-index: 50;
+  opacity: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}

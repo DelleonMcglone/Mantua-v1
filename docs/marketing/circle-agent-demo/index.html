@@ -1,0 +1,33 @@
+<!doctype html>
+<!--
+  Mantua × Circle Sports Agent — product demo motion page.
+  Open through a static server (module scripts) to preview in real time;
+  `node render.mjs` captures it frame by frame into out/mantua-circle-agent-demo.mp4.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1280, initial-scale=1" />
+    <title>Mantua — Circle Sports Agent demo</title>
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/art.css" />
+    <link rel="stylesheet" href="css/app-shell.css" />
+    <link rel="stylesheet" href="css/app-chat.css" />
+    <link rel="stylesheet" href="css/app-ask.css" />
+    <link rel="stylesheet" href="css/app-live.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <svg id="cursor" viewBox="0 0 22 30" aria-hidden="true">
+        <path
+          d="M2 2 L2 23 L7.5 18 L11 27 L15 25.5 L11.5 17 L19 17 Z"
+          fill="#fff"
+          stroke="#000"
+          stroke-width="1.6"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </div>
+    <script type="module" src="js/engine.js"></script>
+  </body>
+</html>

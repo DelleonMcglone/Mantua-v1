@@ -1,0 +1,124 @@
+/*
+ * The live agent card and the autonomous run (live + run scenes).
+ */
+/* The live agent card, on an aurora wash. */
+.live-bg {
+  background:
+    radial-gradient(60% 70% at 30% 30%, rgba(139, 108, 240, 0.35), transparent 60%),
+    radial-gradient(50% 60% at 75% 70%, rgba(76, 198, 198, 0.3), transparent 60%), var(--bg);
+}
+.live {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 460px;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--panel-solid);
+  padding: 22px 24px;
+  box-shadow:
+    0 30px 90px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+.live .mark {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 12px;
+}
+.live .t {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.live .d {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin: 8px 0 12px;
+  line-height: 1.45;
+}
+.live .pill {
+  display: inline-block;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--chip);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.live hr {
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  margin: 16px 0 12px;
+}
+.live .st {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.live .st .s {
+  font-size: 12px;
+  color: var(--agent);
+  font-weight: 600;
+}
+.live .st .r {
+  font-size: 14px;
+  margin-top: 4px;
+}
+.live .led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 12px var(--green);
+}
+
+/* The autonomous run header. */
+.runhd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.runhd .tag {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--agent-dim);
+  border: 1px solid var(--agent-bd);
+  color: var(--agent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.result {
+  border: 1px solid var(--agent-bd);
+  background: var(--agent-dim);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  width: 560px;
+}
+.result .t {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.result .m {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+.foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  text-align: center;
+  font-size: 10.5px;
+  color: var(--text-mute);
+}

@@ -1,0 +1,103 @@
+/*
+ * The Mantua shell: top bar, the "Your Sports Agent" panel and its wallet strip.
+ */
+.app {
+  background: var(--bg);
+}
+.topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  gap: 14px;
+  background: var(--bg-elev);
+}
+.topbar img {
+  width: 30px;
+  height: 30px;
+}
+.topbar .brand {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.topbar .nav {
+  display: flex;
+  gap: 22px;
+  margin-left: 36px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+}
+.topbar .nav .on {
+  color: var(--text);
+}
+.topbar .net {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.topbar .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+
+.panel {
+  position: absolute;
+  top: 84px;
+  left: 300px;
+  width: 680px;
+  bottom: 60px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel-solid);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.panel-h {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+.panel-h .ico {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--agent-dim);
+  border: 1px solid var(--agent-bd);
+  color: var(--agent);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+}
+.wallet {
+  display: flex;
+  gap: 14px;
+  padding: 10px 18px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border-soft);
+  font-family: var(--mono);
+}
+.wallet b {
+  color: var(--text);
+  font-weight: 500;
+}
+.wallet .ok {
+  color: var(--green);
+}

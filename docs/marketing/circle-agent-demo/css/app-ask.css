@@ -1,0 +1,110 @@
+/*
+ * The global "Ask Mantua" bar and the workflow builder (create scene).
+ */
+/* Global "Ask Mantua" bar at the bottom of the shell. */
+.ask {
+  position: absolute;
+  left: 300px;
+  width: 680px;
+  bottom: 14px;
+  height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 16px;
+  font-size: 13.5px;
+  color: var(--text-dim);
+  gap: 10px;
+}
+.ask .txt {
+  flex: 1;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+}
+.ask .ph {
+  color: var(--text-mute);
+}
+.ask .send {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  color: #fff;
+}
+.ask.focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(139, 108, 240, 0.25);
+}
+
+/* Workflow builder (the "create" scene) sits in the chat column. */
+.wf-title {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin: 2px 0 2px;
+}
+.wstep {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.wstep .n {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--chip);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+  flex: none;
+  margin-top: 6px;
+}
+.wstep .box {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
+  padding: 10px 14px;
+}
+.wstep .k {
+  font-size: 11px;
+  color: var(--agent);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.wstep .d {
+  font-size: 14px;
+  margin-top: 2px;
+}
+.wstep.hl .box {
+  border-color: var(--agent-bd);
+  box-shadow: 0 0 0 3px var(--agent-dim);
+}
+.activate {
+  align-self: center;
+  margin-top: 6px;
+  padding: 14px 30px;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  font-size: 17px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: 0 10px 40px rgba(139, 108, 240, 0.35);
+}
+.activate.press {
+  transform: scale(0.97);
+  background: #eae6ff;
+}

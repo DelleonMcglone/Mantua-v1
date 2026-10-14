@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Mantua">
+  <!-- Gradient tuned for dark backgrounds: violet → azure → spring mint. -->
+  <defs>
+    <linearGradient id="mantua-g-dark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9d6bff" />
+      <stop offset="0.5" stop-color="#38a8e8" />
+      <stop offset="1" stop-color="#1ce8a8" />
+    </linearGradient>
+    <!-- The leaf body blanks the M's lines behind it, like the source art. -->
+    <mask id="mantua-leaf-cut-dark">
+      <rect width="120" height="120" fill="white" />
+      <path d="M42 42 C26 37 17 56 33 79 C45 71 47 53 42 42 Z" fill="black" />
+    </mask>
+  </defs>
+  <g fill="none" stroke="url(#mantua-g-dark)" stroke-width="5">
+    <!-- Outlined capital M, pointed center vertex -->
+    <path
+      d="M28 88 V32 H42 L60 64 L78 32 H92 V88 H81 V46 L60 82 L39 46 V88 Z"
+      mask="url(#mantua-leaf-cut-dark)"
+    />
+    <!-- Leaf over the left stem, tip up-left, with center vein -->
+    <path d="M42 42 C26 37 17 56 33 79 C45 71 47 53 42 42 Z" stroke-linejoin="round" />
+    <path d="M34 74 C33 63 34 52 39 45" stroke-linecap="round" />
+  </g>
+</svg>
