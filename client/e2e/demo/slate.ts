@@ -57,6 +57,29 @@ const GAMES: [keyof typeof T, keyof typeof T, string, number][] = [
   ["BUF", "LAR", "2026-10-13T00:15:00Z", 5700],
 ];
 export function week5Slate() {
+  return slateFrom(GAMES);
+}
+
+/**
+ * The same matchups moved to the current week (the showcase screenshots,
+ * 2026-10-15): each kickoff keeps its weekday and hour, shifted forward by
+ * whole weeks until it is ahead of now. Illustrative, like the demo.
+ */
+export function thisWeekSlate() {
+  const WEEK = 7 * 86_400 * 1000;
+  const now = Date.now();
+  const shift = Math.max(0, Math.ceil((now - Date.parse(GAMES[0][2])) / WEEK)) * WEEK;
+  return slateFrom(
+    GAMES.map(([a, h, kickoff, p]) => [
+      a,
+      h,
+      new Date(Date.parse(kickoff) + shift).toISOString(),
+      p,
+    ]),
+  );
+}
+
+function slateFrom(games: typeof GAMES) {
   return {
     leagues: {
       nfl: {
@@ -64,7 +87,7 @@ export function week5Slate() {
         provider: "canonical",
         delayed: false,
         fetchedAt: Date.now(),
-        events: GAMES.map(([a, hm, kickoff, p], i) => ({
+        events: games.map(([a, hm, kickoff, p], i) => ({
           providerEventId: String(401772000 + i),
           startsAt: at(kickoff),
           status: "scheduled",

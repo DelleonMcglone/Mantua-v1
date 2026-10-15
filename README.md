@@ -1,5 +1,11 @@
 # Mantua.AI
 
+**Demo video: [youtu.be/siArImNtatM](https://youtu.be/siArImNtatM)**
+
+| The week's board                                              | A live market and its ticket                                    | The agent thread                                               |
+| ------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+| ![The NFL week, every game priced](docs/showcase/1-board.png) | ![A live market with a $100 ticket](docs/showcase/2-market.png) | ![The agent's probability-gap scan](docs/showcase/3-agent.png) |
+
 **Mantua is an agent-native prediction market for sports.** Take a position on a game in plain
 language, or hand the whole loop to an autonomous agent. It combines the **Dynamic Market
 Hook**, one Uniswap v4 hook that embeds pricing, fees, and circuit breakers directly into
