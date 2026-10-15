@@ -13,3 +13,17 @@ python3 e2e/demo/cards.py && python3 e2e/demo/assemble.py
 
 The turns live in `turns.ts`: the real Week 5 slate, authored analysis,
 labelled illustrative on the closing card.
+
+## Showcase screenshots
+
+Three stills from the same shimmed client, for a forum post: the week's board,
+a live market with its ticket, and the agent thread. Output: `docs/showcase/`.
+
+```bash
+# the shimmed dev server as above, then (a preinstalled Chromium is optional)
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium npx tsx e2e/demo/screenshots.ts
+npx tsx e2e/demo/screenshots.ts board   # or market, or agent
+```
+
+The board uses `thisWeekSlate()`: the Week 5 matchups moved to the current week,
+illustrative like the video.
