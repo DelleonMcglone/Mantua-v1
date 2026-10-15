@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { launchApp, signIn } from "../harness.ts";
-import { inThumbZone, mockMobileApi } from "./fixtures-mobile.ts";
+import { animationsSettled, inThumbZone, mockMobileApi } from "./fixtures-mobile.ts";
 import { TOUCH_TARGET_PX } from "../../src/lib/mobile.ts";
 import { INTERACTION_MS } from "../../src/lib/mobile-budgets.ts";
 
@@ -30,6 +30,8 @@ test("three taps to an executed trade, in a bottom sheet with Confirm under the 
   const sheet = page.getByTestId("trade-sheet");
   await expect(sheet).toBeVisible();
   expect(Date.now() - tapped).toBeLessThan(INTERACTION_MS + 1_000);
+  // Sizes are read off the settled sheet, not mid-slide (see animationsSettled).
+  await animationsSettled(sheet);
   await expect(sheet.locator("[data-side='1'][aria-pressed='true']")).toBeVisible();
   await expect(sheet.getByTestId("balance-line")).toContainText("$250.00");
 
