@@ -1,4 +1,9 @@
-# Showcase screenshots
+# Showcase
+
+**Demo video:** [youtu.be/siArImNtatM](https://youtu.be/siArImNtatM) (hosted on YouTube; the
+cut is reproduced from the client by `client/e2e/demo/record.ts`).
+
+## Screenshots
 
 Three stills that define the app, captured from the real client against the
 browser suite's scripted API (`client/e2e/demo/screenshots.ts`), 1440×960 at 2×.

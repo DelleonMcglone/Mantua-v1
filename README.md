@@ -31,6 +31,15 @@ From a single natural-language prompt you can:
 > [`docs/security/hook-deployments.md`](docs/security/hook-deployments.md) tracks the
 > deployment checklist.
 
+## Showcase
+
+**Demo video: [youtu.be/siArImNtatM](https://youtu.be/siArImNtatM).** Three stills that define
+the app, from [`docs/showcase/`](docs/showcase/README.md):
+
+| The week's board                                              | A live market and its ticket                                    | The agent thread                                               |
+| ------------------------------------------------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
+| ![The NFL week, every game priced](docs/showcase/1-board.png) | ![A live market with a $100 ticket](docs/showcase/2-market.png) | ![The agent's probability-gap scan](docs/showcase/3-agent.png) |
+
 ## Network
 
 Mantua runs on a single chain: **Arc Mainnet** — Circle's L1, where USDC is also the gas token.
