@@ -4,8 +4,9 @@ import { costLabel, pillFor } from "./source-pills.ts";
 
 /**
  * One data read as an inline pill: provider · category, a spinner while it
- * runs, then a tick and what it cost. Free reads say "free"; a paid x402
- * call shows the USDC charged.
+ * runs, then a tick — and, only for a paid x402 call, the USDC charged.
+ * Mantua's own reads show no cost: what was paid is the news, not what
+ * was free (owner, 2026-10-18).
  */
 export function SourcePill({
   tool,
