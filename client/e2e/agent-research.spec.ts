@@ -12,7 +12,7 @@ const frames = [
   {
     type: "text",
     delta:
-      "Researching the Browns game with Mantua's schedule, injury and market data — free, plus one paid data call. ",
+      "Researching the Browns game with Mantua's schedule, injury and market data, plus one paid data call. ",
   },
   { type: "tool_start", id: "t1", tool: "get_player_injury_status", args: {} },
   {
@@ -99,7 +99,7 @@ test("a research turn shows source pills with costs and the Summary card", async
   await expect(pills).toHaveCount(2);
   await expect(pills.nth(0)).toContainText("Mantua");
   await expect(pills.nth(0)).toContainText("injuries");
-  await expect(pills.nth(0)).toContainText("free");
+  await expect(pills.nth(0)).not.toContainText("free");
   await expect(pills.nth(1)).toContainText("Exa");
   await expect(pills.nth(1)).toContainText("0.01 USDC");
 

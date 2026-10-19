@@ -31,7 +31,7 @@ test("the analyst shows source pills between its findings", async ({ page }) => 
   await expect(pill).toHaveCount(1);
   await expect(pill).toContainText("Mantua");
   await expect(pill).toContainText("schedule");
-  await expect(pill).toContainText("free");
+  await expect(pill).not.toContainText("free");
   await expect(page.getByText("meet again on 1 November")).toBeVisible();
   // Reading order: the opening line sits above the pill, the finding below it.
   const y = async (text: string | RegExp) =>

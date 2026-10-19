@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { costLabel, isSourceTool, pillFor } from "./source-pills.ts";
 
 void describe("source pills", () => {
-  void it("labels Mantua's own reads by category and marks them free", () => {
+  void it("labels Mantua's own reads by category and shows no cost for them", () => {
     assert.deepEqual(pillFor("get_player_injury_status", undefined), {
       provider: "Mantua",
       category: "injuries",
     });
-    assert.equal(costLabel("get_player_injury_status", undefined), "free");
+    assert.equal(costLabel("get_player_injury_status", undefined), null);
   });
   void it("labels a paid call by its provider and shows what it cost", () => {
     const data = { provider: "Exa", service: "https://api.exa.ai/search", usdCost: 0.01 };
@@ -17,7 +17,7 @@ void describe("source pills", () => {
       category: "paid data",
     });
     assert.equal(costLabel("call_paid_service", data), "0.01 USDC");
-    assert.equal(costLabel("call_paid_service", { ...data, usdCost: 0 }), "free");
+    assert.equal(costLabel("call_paid_service", { ...data, usdCost: 0 }), null);
   });
   void it("says so when the marketplace is unavailable", () => {
     assert.equal(costLabel("call_paid_service", { available: false }), "unavailable");

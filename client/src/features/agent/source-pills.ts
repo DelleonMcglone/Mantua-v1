@@ -56,12 +56,13 @@ export function pillFor(tool: string, data: unknown): SourcePill | null {
   return null;
 }
 
-/** "0.01 USDC" for a paid call that charged; "free" for Mantua's data; null while unknown. */
+/** "0.01 USDC" for a paid call that charged; nothing for Mantua's own
+ *  data or a paid call that cost nothing (owner, 2026-10-18: say what was
+ *  paid, never that something was free); null while unknown. */
 export function costLabel(tool: string, data: unknown): string | null {
-  if (tool in MANTUA_SOURCES) return "free";
   if (tool !== "call_paid_service") return null;
   const d = (data ?? {}) as { usdCost?: unknown; available?: unknown };
   if (d.available === false) return "unavailable";
-  if (typeof d.usdCost !== "number") return null;
-  return d.usdCost === 0 ? "free" : `${d.usdCost.toFixed(2)} USDC`;
+  if (typeof d.usdCost !== "number" || d.usdCost === 0) return null;
+  return `${d.usdCost.toFixed(2)} USDC`;
 }
