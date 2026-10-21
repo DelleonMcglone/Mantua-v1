@@ -21,7 +21,7 @@ after(() => {
   for (const s of servers) s.close();
 });
 
-function serve(frozen: readonly FrozenNotFinalRow[]): Promise<string> {
+function serve(frozen: readonly FrozenNotFinalRow[], dbDown = false): Promise<string> {
   const app = express();
   app.use(
     createOpsMetricsRouter({
@@ -41,6 +41,8 @@ function serve(frozen: readonly FrozenNotFinalRow[]): Promise<string> {
       latencySnapshot: () => [],
       counterSnapshot: () => ({}),
       streamConnections: () => 0,
+      pingDatabase: () =>
+        dbDown ? Promise.reject(new Error("quota exceeded")) : Promise.resolve(),
       now: () => NOW,
     }),
   );
@@ -55,6 +57,14 @@ function serve(frozen: readonly FrozenNotFinalRow[]): Promise<string> {
 }
 
 void describe("GET /api/ops/alerts/probe (R-010 pager probe)", () => {
+  void it("answers 503 with database_down when the database refuses a select 1", async () => {
+    const base = await serve([], true);
+    const res = await fetch(`${base}/api/ops/alerts/probe`);
+    assert.equal(res.status, 503);
+    const body = (await res.json()) as { ok: boolean; critical: string[] };
+    assert.deepEqual(body.critical, ["database_down"]);
+  });
+
   void it("answers 200 ok with no auth when nothing critical is open", async () => {
     const base = await serve([]);
     const res = await fetch(`${base}/api/ops/alerts/probe`);
