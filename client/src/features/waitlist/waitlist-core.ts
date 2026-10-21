@@ -1,36 +1,21 @@
-/** The pure half of the waitlist form: what the server answers and how
- *  the form reads it. No React here so it runs under node:test. */
+/** The session flag: this visitor has been past the landing page once. */
+export const FRONT_DOOR_DONE_KEY = "mantua:front-door-done";
 
-export type WaitlistState =
-  | { kind: "idle" }
-  | { kind: "sending" }
-  | { kind: "done"; already: boolean }
-  | { kind: "error"; message: string };
-
-/** A light client-side gate so an obviously empty field never hits the
- *  network; the server is the real validator. */
-export function looksLikeEmail(value: string): boolean {
-  const v = value.trim();
-  return v.length >= 6 && v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v);
+export function readFrontDoorDone(): boolean {
+  try {
+    return sessionStorage.getItem(FRONT_DOOR_DONE_KEY) === "1";
+  } catch {
+    return false;
+  }
 }
 
-/** Turn the server's reply (or failure) into the form's next state. */
-export function readWaitlistReply(
-  status: number,
-  body: { ok?: boolean; already?: boolean; error?: string } | null,
-): WaitlistState {
-  if (status === 200 && body?.ok) return { kind: "done", already: body.already === true };
-  if (status === 429) return { kind: "error", message: "Too many tries — give it a minute." };
-  return {
-    kind: "error",
-    message: body?.error ?? "Could not save your email. Try again.",
-  };
+export function markFrontDoorDone(): void {
+  try {
+    sessionStorage.setItem(FRONT_DOOR_DONE_KEY, "1");
+  } catch {
+    // storage unavailable: the landing page shows again next time, no worse
+  }
 }
-
-export const DONE_COPY = {
-  fresh: "You're on the list. We'll email you when it's time.",
-  already: "You're already on the list — we'll email you when it's time.",
-} as const;
 
 /** The landing page's one URL. */
 export const WAITLIST_PATH = "/waitlist";
@@ -52,9 +37,10 @@ export function isLoginPath(pathname: string): boolean {
 const GATE_EXEMPT: ReadonlySet<string> = new Set(["waitlist", "legal", "docs", "agent-public"]);
 
 /**
- * Pre-launch front door: with the flag on, a visitor who is not signed in
- * sees the waitlist instead of the app — unless they came in through
- * `/login` (the owner and testers) or asked for a public page.
+ * The front door: with the flag on, a visitor who is not signed in and has
+ * not been in yet (`loginRequested`: `/login`, a past login, or a logout
+ * from the home page) sees the landing page instead of the app — unless
+ * they asked for a public page.
  */
 export function waitlistGate(input: {
   frontDoor: boolean;

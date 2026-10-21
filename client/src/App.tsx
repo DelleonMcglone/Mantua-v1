@@ -50,6 +50,8 @@ import {
   WAITLIST_PATH,
   isLoginPath,
   isWaitlistPath,
+  markFrontDoorDone,
+  readFrontDoorDone,
   waitlistGate,
 } from "./features/waitlist/waitlist-core.ts";
 import { WAITLIST_FRONT_DOOR } from "./features/waitlist/waitlist-flag.ts";
@@ -186,11 +188,17 @@ export default function App() {
       window.history.replaceState(null, "", clean);
     }
   }, []);
-  // Pre-launch front door: `/login` is the way past the waitlist. The
-  // request is remembered for the session so a redirect after the Privy
-  // round-trip does not bounce the user back to the landing page.
-  const [loginRequested] = useState(() => isLoginPath(window.location.pathname));
+  // The front door: a logged-out visitor's first stop is the landing
+  // page, where they log in (owner, 2026-10-21). Once they have been in
+  // — a login, or a logout from the home page — the session remembers,
+  // so signing out leaves them on the home page with its own Log in.
+  // `/login` still skips straight to the app with the modal up.
+  const [loginPathAtStart] = useState(() => isLoginPath(window.location.pathname));
   const [showLogin, setShowLogin] = useState(() => isLoginPath(window.location.pathname));
+  useEffect(() => {
+    if (authenticated) markFrontDoorDone();
+  }, [authenticated]);
+  const frontDoorDone = loginPathAtStart || authenticated || readFrontDoorDone();
 
   // Any surface can request the login modal without prop-drilling —
   // league-page and dock gate buttons dispatch this event.
@@ -347,22 +355,34 @@ export default function App() {
   }
 
   // The waitlist landing page is public and standalone: the home header
-  // (no help / login / sign-up), the hero, the email field, the footer.
-  // With the front door on, it is also what a logged-out visitor gets for
-  // any in-app route — the route itself is kept, so logging in through
-  // `/login` lands them where they were headed.
+  // (Log in / Sign up, no help), the hero, the demo, the footer. With the
+  // front door on, it is what a logged-out visitor gets for any in-app
+  // route until they have been in — the route itself is kept, so a login
+  // lands them where they were headed.
   if (
     route.kind === "waitlist" ||
     waitlistGate({
       frontDoor: WAITLIST_FRONT_DOOR,
       authenticated,
-      loginRequested,
+      loginRequested: frontDoorDone,
       routeKind: route.kind,
     })
   ) {
     return (
       <Suspense fallback={null}>
+        <LoginModal
+          open={showLogin}
+          onClose={() => {
+            setShowLogin(false);
+          }}
+        />
         <WaitlistPage
+          onLogin={() => {
+            setShowLogin(true);
+          }}
+          onSignup={() => {
+            setShowLogin(true);
+          }}
           onLogoClick={() => {
             setRoute({ kind: "waitlist" });
           }}
@@ -417,6 +437,9 @@ export default function App() {
     setShowLogin(true);
   };
   const handleDisconnect = () => {
+    // Signing out keeps the user on the home page (its header has Log in),
+    // not back at the landing page.
+    markFrontDoorDone();
     void logout();
   };
 
