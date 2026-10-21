@@ -4,6 +4,7 @@ import { PanelSubHeader } from "@/components/shell/PanelSubHeader.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { api, ApiError } from "@/lib/api.ts";
 import { IdentityForm, PostingForm, type IdentityValues } from "./SocialForms.tsx";
+import { XAccountSection } from "./XAccountSection.tsx";
 import { SocialPostsSection } from "./SocialPostsSection.tsx";
 import { handleProblem, type PostingPolicy, type SocialResponse } from "./social-core.ts";
 
@@ -132,6 +133,8 @@ export function SocialPanel({
             {notice && <span className="text-[12px] text-text-dim">{notice}</span>}
           </div>
         </section>
+
+        <XAccountSection />
 
         <SocialPostsSection enabled={claimed !== null} />
       </div>

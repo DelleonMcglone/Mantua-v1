@@ -153,6 +153,12 @@ const schema = z.object({
   X_API_SECRET: z.string().min(1).optional(),
   X_ACCESS_TOKEN: z.string().min(1).optional(),
   X_ACCESS_TOKEN_SECRET: z.string().min(1).optional(),
+  /** Per-user X connections (owner, 2026-10-21): the X developer app's
+   *  OAuth 2.0 client, confidential type, with
+   *  `${PUBLIC_APP_URL}/api/social/x/callback` registered as a redirect.
+   *  Absent → "Connect X" is not offered. */
+  X_CLIENT_ID: z.string().min(1).optional(),
+  X_CLIENT_SECRET: z.string().min(8).optional(),
   /** The posting account's handle without the @, for the post footer. */
   X_ACCOUNT_HANDLE: z
     .string()

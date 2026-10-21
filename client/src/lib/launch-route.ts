@@ -21,9 +21,10 @@ export type LaunchTarget =
   | { kind: "profile" }
   | { kind: "agent" }
   | { kind: "discover" }
+  | { kind: "social" }
   | { kind: "home" };
 
-const LAUNCH_KEYS = ["open", "league", "event", "side", "source"] as const;
+const LAUNCH_KEYS = ["open", "league", "event", "side", "source", "x"] as const;
 
 export function parseLaunchParams(search: string): LaunchTarget | null {
   const params = new URLSearchParams(search);
@@ -44,6 +45,7 @@ export function parseLaunchParams(search: string): LaunchTarget | null {
     case "profile":
     case "agent":
     case "discover":
+    case "social":
     case "home":
       return { kind: open };
     default:
