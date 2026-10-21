@@ -54,6 +54,13 @@ import { searchMarkets, summarizeMarketPositions } from "./agent/read-tools.ts";
 import { boundaryForTool } from "./agent/untrusted.ts";
 import { readAgentPerformance } from "./agent/performance.ts";
 import { recordActivity } from "./activity.ts";
+import { postForUser } from "./social/agent-post.ts";
+import { cardFromToolData } from "./social/card-from-tool.ts";
+import { renderCardPng } from "./social/card-image.ts";
+import { recordPost } from "./social/post-store.ts";
+import { accessTokenFor, readConnection } from "./social/x-connection-store.ts";
+import { postAsUser, uploadImage } from "./social/x-user-client.ts";
+import { xApp } from "../routes/social-x.ts";
 import { counters } from "./metrics.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { checkSpendingCap, recordSpending } from "./spending-cap.ts";
@@ -210,6 +217,7 @@ Sports betting — you evaluate sports markets, analyze matchups, and place bets
 - Frame prices as the market's implied view, not a guarantee, and never present a bet as risk-free.
 - A research turn (the user asks you to compare, review or research games — especially with a budget: "…so I can decide how to put $100 to work"): open with ONE status line naming the sources you will use ("Researching the Browns and Steelers games with Mantua's schedule, form, injury and market data." — add "and paid x402 data" only if you will call a paid service), then run the reads (the UI shows each as a source pill, with the USDC charged on a paid one), write the findings as short paragraphs between them, then call mantua_compare_markets with the teams and the budget so the Summary card renders, and close with the offer: "How would you like to put $100 to work? I can place it from your agent wallet — tell me the split." Do not list the card's rows again in prose. Never place anything in a research turn.
 - When the user replies to the offer with a split ("$60 on the Browns, $40 on the Raiders", "put it all on Cleveland", "weight it toward the favourites"): turn it into legs — the game's providerEventId, outcomeIndex (0 = home side's YES, 1 = away side's YES), the USDC amount and a short label — and call mantua_simulate_basket with the budget. The UI renders the Order preview card with an Approve button; say one line and wait. When the user approves, call mantua_execute_basket with exactly the executionArgs plus the confirmationId, then summarise the fills in one or two sentences (the card shows the rows and totals). A leg that failed is reported as such, never hidden.
+- Posting to the user's own X account (only when they have connected it under Profile → Social): after a research turn or a basket fill, offer once — "Want me to post this to your X?" If they say yes, compose the post (≤ 280 characters, plain, the facts from the card, no claims of guaranteed outcomes, end with "Not betting advice."), call mantua_preview_action with tool "mantua_post_to_x" and the args {kind, text, card} — card is the basket outcome or the compare_markets result you just received, so the image shows it — show the user the exact text, and on their confirm call mantua_post_to_x with the same args plus the confirmationId. Report the post's URL. Never post without the offer and the confirm; never post anything you did not show them first.
 - The six starter prompts (the user may type them or anything like them) and how you carry each out: (1) "What should I be watching today?" → mantua_search_markets for the window, then mantua_analyze_market on the five most interesting; for each, what the market prices in, what the evidence says, what could make it mispriced, with the data tools as sources. (2) "Take a deeper look at a game" → mantua_analyze_market plus get_recent_games, get_head_to_head, get_player_injury_status and get_market_history; separate what is established from what is uncertain and name what would change the thesis. (3) "Show me how I could trade this" → mantua_get_market for both sides' prices and liquidity, mantua_simulate_trade for the real quote, the P&L either way, the risks, and entering now versus waiting — do NOT place it. (4) "I want to risk $X" → mantua_size_position with the side's price: contracts, entry, max loss, max profit, take-profit level and the ±5/10/20% table — prepared for approval, not placed. (5) "Execute as prepared, then manage it" → mantua_simulate_trade again; if anything differs from what was prepared, stop and say so; on the user's confirm, mantua_execute_trade; then mantua_preview_action for mantua_arm_exit with the take-profit/stop you agreed, and on confirm arm it — the engine closes the position when crossed, and you report it in the next brief. Never open a new trade without approval. (6) "Find today's biggest probability gaps" → mantua_probability_gaps; per market give both probabilities, the gap in points, confidence, liquidity and the drivers, then why the gap exists and what would close it — no trades.
 - Sports data tools (canonical database): your sports knowledge comes from Mantua's own database via these read-only tools — NOT from web search or memory. get_game (a team's game + its marketIds), get_live_game_state, get_team_stats, get_player_stats, get_player_injury_status, get_recent_games, get_head_to_head, get_standings, get_play_by_play, and the market tools get_market_price / get_market_history / get_market_volume / get_market_liquidity. Identify teams and players by name — the tools fuzzy-match and return didYouMean candidates on ambiguity: relay the question, never pick one silently. A status of unavailable or a "not yet ingested" reason means the data isn't in the database yet — say so plainly and never invent scores, stats, injuries, or plays a tool didn't return. Chain them for a bet evaluation: mantua_search_markets finds the game; mantua_get_market gives every market's price, depth and volume in one call (get_game / the single market tools remain for detail); mantua_get_position shows what the agent already holds there.
 
@@ -822,6 +830,24 @@ const RAW_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: {} },
   },
   {
+    name: "mantua_post_to_x",
+    description:
+      "Post to the user's OWN connected X account — a research turn or an executed basket, with its card attached as an image. Offer it after a research turn or a basket fill; never post unasked. Public and irreversible, so it follows the confirmation protocol: mantua_preview_action with tool 'mantua_post_to_x' and these args, the user's explicit confirm, then this call with the confirmationId. Text ≤ 280 characters, plain, no claims of guaranteed outcomes, end with 'Not betting advice.' If the user has not connected X the tool says so — tell them it is under Profile → Social.",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["basket", "research"] },
+        text: { type: "string", description: "The post, ≤ 280 characters." },
+        card: {
+          type: "object",
+          description:
+            "The card to attach as an image: for 'basket' the mantua_execute_basket outcome (legs, placedUsdc, leftoverUsdc, requestedUsdc); for 'research' the mantua_compare_markets rows and budget. Omit to post text only.",
+        },
+      },
+      required: ["kind", "text"],
+    },
+  },
+  {
     name: "mantua_build_combo",
     description:
       "Task 072 — build a combo (parlay-like ticket: several teams that must ALL win, one trade, one payout). With no legs given, the server proposes legs from the slate by edge (consensus vs pool price) sized by the user's risk level and combo limits; with legs given, it quotes exactly those. Returns the fair probability, combined odds, shares, payout at par, the hook fee, each leg's price and what the same legs cost as separate tickets, plus the policy gate result. Saves the quote as the pending preview. Show the user the numbers and ask them to reply \"confirm\"; never execute from this tool.",
@@ -931,6 +957,7 @@ const MUTATING_TOOL_ACTIONS: Record<string, AuditAction> = {
   create_job: "agent_commerce",
   fund_job: "agent_commerce",
   settle_job: "agent_commerce",
+  mantua_post_to_x: "agent_social_post",
 };
 
 /**
@@ -1381,6 +1408,48 @@ async function executeTool(
           effectivePriceBps: result.quote.effectivePriceBps,
         };
       });
+      return outcome;
+    }
+    case "mantua_post_to_x": {
+      const userId = await resolveUserId(privyUserId);
+      if (!userId) throw new Error("User record not found.");
+      const app = xApp();
+      const kind = input["kind"] === "research" ? "research" : "basket";
+      const card = cardFromToolData(kind, input["card"]);
+      const outcome = await postForUser(
+        { kind, text: typeof input["text"] === "string" ? input["text"] : "", card },
+        {
+          connection: async () => {
+            if (!app) return null;
+            const [token, row] = await Promise.all([
+              accessTokenFor(db, app, userId, fetch),
+              readConnection(db, userId),
+            ]);
+            return token && row ? { token, handle: row.handle } : null;
+          },
+          renderPng: renderCardPng,
+          uploadImage: (token, png) => uploadImage(token, png, fetch),
+          post: (token, handle, text, mediaId) => postAsUser(token, handle, text, mediaId, fetch),
+          record: async (row) => {
+            await recordPost(db, { userId, ...row });
+            if (row.status === "posted") {
+              await recordActivity(db, {
+                kind: "agent_post",
+                actor: "agent",
+                userId,
+                asset: kind === "basket" ? "basket" : "research",
+                data: { url: row.detail["url"], withImage: row.detail["withImage"] },
+              });
+            }
+          },
+        },
+      );
+      if (outcome.status === "not_connected") {
+        return {
+          status: "not_connected",
+          note: "The user has not connected an X account. It is under Profile → Social → Your X account.",
+        };
+      }
       return outcome;
     }
     case "mantua_compare_markets":

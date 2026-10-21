@@ -44,6 +44,9 @@ export const MONEY_TOOLS: ReadonlySet<string> = new Set([
   "fund_job",
   "create_job",
   "settle_job",
+  // Not money, but public and irreversible: a post to the user's own X
+  // account goes through the same preview → confirm → id protocol.
+  "mantua_post_to_x",
 ]);
 
 export function isMoneyCall(tool: string, _args: Record<string, unknown>): boolean {

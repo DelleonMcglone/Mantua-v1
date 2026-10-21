@@ -71,10 +71,14 @@ export const socialPosts = pgTable(
     id: uuid("id")
       .primaryKey()
       .default(sql`gen_random_uuid()`),
-    profileId: uuid("profile_id")
-      .notNull()
-      .references(() => agentSocialProfiles.id, { onDelete: "cascade" }),
-    /** market_update | explain_move | price_signal (lib/social/templates.ts). */
+    /** The posting profile for the deployment account's posts; null for a
+     *  post made to the user's own X account (then `userId` is set). */
+    profileId: uuid("profile_id").references(() => agentSocialProfiles.id, {
+      onDelete: "cascade",
+    }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+    /** market_update | explain_move | price_signal (lib/social/templates.ts);
+     *  agent_basket | agent_research for the user's own account. */
     template: varchar("template", { length: 24 }).notNull(),
     marketId: varchar("market_id", { length: 66 }),
     text: text("text").notNull(),

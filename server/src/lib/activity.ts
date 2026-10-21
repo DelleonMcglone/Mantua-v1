@@ -38,6 +38,8 @@ export const ACTIVITY_KINDS = [
   "agent_research",
   "agent_simulation",
   "agent_recommendation",
+  // Owner 2026-10-21 — a post the agent made to the user's own X account.
+  "agent_post",
   "resolution",
   // Task 072 (Phase 16) — combo tickets
   "combo_open",
@@ -76,6 +78,7 @@ export function categoryOf(kind: ActivityKind): ActivityCategory {
     case "agent_research":
     case "agent_simulation":
     case "agent_recommendation":
+    case "agent_post":
       return "agent";
     case "redeem":
     case "settlement":
@@ -175,6 +178,8 @@ export function summarizeActivity(input: ActivityInput): string {
       return `Agent simulated ${asset || "a trade"}${value ? ` (${value})` : ""}`;
     case "agent_recommendation":
       return `Agent recommended${asset ? ` ${asset}` : ""}`;
+    case "agent_post":
+      return `Agent posted to X${asset ? ` — ${asset}` : ""}`;
     case "combo_open":
       return `${who}placed a combo${asset ? ` — ${asset}` : ""}${value ? ` for ${value}` : ""}`;
     case "combo_close":
