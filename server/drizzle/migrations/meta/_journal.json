@@ -225,6 +225,13 @@
       "when": 1792600000000,
       "tag": "0031_social_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792600100000,
+      "tag": "0032_social_posts_user",
+      "breakpoints": true
     }
   ]
 }

@@ -43,10 +43,13 @@ function item(over: Partial<ActivityItem>): ActivityItem {
 void describe("filters", () => {
   void it("maps every category to server kinds and builds the kind query", () => {
     assert.equal(kindQueryFor("all"), null);
-    assert.equal(kindQueryFor("agent"), "agent_research,agent_simulation,agent_recommendation");
+    assert.equal(
+      kindQueryFor("agent"),
+      "agent_research,agent_simulation,agent_recommendation,agent_post",
+    );
     const all = Object.values(KINDS_BY_CATEGORY).flat();
     assert.equal(new Set(all).size, all.length, "no kind belongs to two categories");
-    assert.equal(all.length, 21);
+    assert.equal(all.length, 22);
     assert.ok(all.includes("combo_open") && all.includes("combo_settle"), "task 072 kinds");
     const items = [item({ category: "trade" }), item({ id: "b", category: "agent" })];
     assert.equal(filterItems(items, "agent").length, 1);
