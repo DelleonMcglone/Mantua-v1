@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
+  xOutcomeFromSearch,
   describeCadence,
   handleProblem,
   splitPosts,
@@ -99,5 +100,14 @@ void describe("social-core", () => {
     assert.deepEqual(toggleTemplate(["market_update", "explain_move"], "market_update"), [
       "explain_move",
     ]);
+  });
+});
+
+void describe("xOutcomeFromSearch", () => {
+  void it("reads the callback outcome and ignores anything else", () => {
+    assert.equal(xOutcomeFromSearch("?open=social&x=connected"), "connected");
+    assert.equal(xOutcomeFromSearch("?x=denied"), "denied");
+    assert.equal(xOutcomeFromSearch("?x=whatever"), null);
+    assert.equal(xOutcomeFromSearch(""), null);
   });
 });

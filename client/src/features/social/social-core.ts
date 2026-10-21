@@ -137,3 +137,14 @@ export function toggleTemplate(
 ): PostTemplate[] {
   return templates.includes(t) ? templates.filter((x) => x !== t) : [...templates, t];
 }
+
+/** Where the X OAuth callback's `?x=` outcome waits for the panel to open. */
+export const X_OUTCOME_KEY = "mantua:x-outcome";
+
+export type XOutcome = "connected" | "denied" | "error";
+
+/** The `?x=` outcome the OAuth callback redirected back with, if any. */
+export function xOutcomeFromSearch(search: string): XOutcome | null {
+  const v = new URLSearchParams(search).get("x");
+  return v === "connected" || v === "denied" || v === "error" ? v : null;
+}

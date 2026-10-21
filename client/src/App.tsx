@@ -53,6 +53,7 @@ import {
   waitlistGate,
 } from "./features/waitlist/waitlist-core.ts";
 import { WAITLIST_FRONT_DOOR } from "./features/waitlist/waitlist-flag.ts";
+import { X_OUTCOME_KEY, xOutcomeFromSearch } from "./features/social/social-core.ts";
 import { SocialPanel } from "./features/social/SocialPanel.tsx";
 import { SupportPanel } from "./features/support/SupportPanel.tsx";
 import { PanelLoading } from "./components/shell/PanelLoading.tsx";
@@ -181,6 +182,16 @@ export default function App() {
   });
   const isMobile = useIsMobile();
   useEffect(() => {
+    // The X OAuth callback's outcome rides in `?x=`; stash it for the
+    // social panel before the launch params are cleaned off the URL.
+    const xOutcome = xOutcomeFromSearch(window.location.search);
+    if (xOutcome) {
+      try {
+        sessionStorage.setItem(X_OUTCOME_KEY, xOutcome);
+      } catch {
+        // storage unavailable — the panel simply shows no notice
+      }
+    }
     const clean = stripLaunchParams(window.location.href);
     if (clean !== window.location.pathname + window.location.search + window.location.hash) {
       window.history.replaceState(null, "", clean);
@@ -836,6 +847,8 @@ function launchRoute(search: string): Route | null {
         ...(target.eventId ? { selectEventId: target.eventId } : {}),
         ...(target.side !== undefined ? { selectSide: target.side } : {}),
       };
+    case "social":
+      return { kind: "social" };
     case "discover":
       return { kind: "discover", filters: { status: "open" } };
     case "profile":

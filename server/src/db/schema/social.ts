@@ -122,3 +122,38 @@ export type SocialPost = typeof socialPosts.$inferSelect;
 export type NewSocialPost = typeof socialPosts.$inferInsert;
 export type SupportTicket = typeof supportTickets.$inferSelect;
 export type NewSupportTicket = typeof supportTickets.$inferInsert;
+
+/**
+ * `social_connections` — a user's own X account, connected through OAuth
+ * 2.0 (owner, 2026-10-21) so the agent can post as them. One row per
+ * (user, platform); the tokens are sealed by `lib/social/x-oauth.ts`
+ * before they land here and opened only for a call. A revoked row keeps
+ * its handle for the record and its tokens cleared.
+ */
+export const socialConnections = pgTable(
+  "social_connections",
+  {
+    id: uuid("id")
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: varchar("platform", { length: 16 }).notNull().default("x"),
+    /** The platform's own id for the account (X user id). */
+    externalUserId: varchar("external_user_id", { length: 32 }).notNull(),
+    handle: varchar("handle", { length: 32 }).notNull(),
+    displayName: varchar("display_name", { length: 64 }).notNull().default(""),
+    /** Sealed (AES-256-GCM, lib/social/x-oauth.ts); null once revoked. */
+    accessTokenSealed: text("access_token_sealed"),
+    refreshTokenSealed: text("refresh_token_sealed"),
+    scopes: varchar("scopes", { length: 160 }).notNull().default(""),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    connectedAt: timestamp("connected_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  },
+  (t) => [uniqueIndex("social_connections_user_platform_uq").on(t.userId, t.platform)],
+);
+
+export type SocialConnection = typeof socialConnections.$inferSelect;
