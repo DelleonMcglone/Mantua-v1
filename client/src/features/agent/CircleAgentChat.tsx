@@ -153,6 +153,7 @@ const TOOL_VERB: Record<string, string> = {
   mantua_get_performance: "Reading the track record",
   mantua_daily_brief: "Assembling the brief",
   mantua_get_policy: "Reading your policy",
+  mantua_post_to_x: "Posting to your X",
 };
 
 let seq = 0;
@@ -694,6 +695,44 @@ function renderResult(step: ToolStep): ReactNode {
             }))}
           />
         </div>
+      );
+    }
+    case "mantua_post_to_x": {
+      const d = step.data as {
+        status: "posted" | "not_connected" | "rejected_lint" | "failed";
+        url?: string;
+        withImage?: boolean;
+        note?: string;
+        error?: string;
+        violations?: { rule: string; detail: string }[];
+      };
+      if (d.status === "posted") {
+        return (
+          <Banner
+            tone="success"
+            icon={<Check className="h-3.5 w-3.5" aria-hidden />}
+            title="Posted to your X"
+          >
+            {d.withImage ? "With the card as an image. " : ""}
+            {d.url && (
+              <a href={d.url} target="_blank" rel="noreferrer" className="underline">
+                Open the post
+              </a>
+            )}
+          </Banner>
+        );
+      }
+      return (
+        <Banner
+          tone="error"
+          icon="⊘"
+          title={d.status === "not_connected" ? "No X account connected" : "Not posted"}
+        >
+          {d.note ??
+            d.error ??
+            d.violations?.map((v) => v.detail).join(" · ") ??
+            "The post did not go out."}
+        </Banner>
       );
     }
     case "send": {

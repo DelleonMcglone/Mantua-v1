@@ -98,6 +98,7 @@ export type AuditAction =
   | "agent_swap"
   | "agent_intent"
   | "agent_commerce"
+  | "agent_social_post"
   | "agent_send"
   | "agent_add_liquidity"
   | "agent_remove_liquidity"
