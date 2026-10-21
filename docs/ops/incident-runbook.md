@@ -275,6 +275,20 @@ force a refresh of one key: `DEL mantua:cache:<key>` (e.g.
 max before raising it (the ceiling is max × instances against Neon's
 pooler), and check for a runaway query hitting the 15 s statement cap.
 
+### 9a. Database plan quota (the 2026-10-19 outage)
+
+Symptom: every DB-backed read fails fast with `Your account or project has
+exceeded the quota` (Neon), the board shows "Slate temporarily unavailable",
+the crons 500, and the probe (before the `database_down` alert) stayed
+green. Cause: the free plan's monthly compute hours ran out because the
+five-minute live tick, the 15-minute crons and the uptime probe kept the
+compute awake around the clock.
+
+Fix: raise the plan in Vercel → Storage → the Neon resource (Launch covers
+~300 compute-hours). Prevention shipped the same day: `database_down`
+pages through `/api/ops/alerts/probe`, and `/api/cron/live-sync` skips to
+an hourly tick outside game windows (`lib/sports/live-tick-gate.ts`).
+
 ## 10. Metrics and alerts (Phase 7, task 053)
 
 `GET /api/ops/alerts` (Bearer `CRON_SECRET`) is the on-call's first

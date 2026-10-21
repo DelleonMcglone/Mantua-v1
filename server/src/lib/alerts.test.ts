@@ -74,6 +74,20 @@ function input(over: Partial<AlertInput> = {}): AlertInput {
 
 const ids = (a: ReturnType<typeof evaluateAlerts>) => a.map((x) => `${x.severity}:${x.id}`);
 
+void describe("database_down", () => {
+  void it("pages when the ping failed and stays quiet when it passed or was not run", () => {
+    assert.ok(
+      ids(evaluateAlerts(input({ database: { ok: false, error: "quota" } }))).includes(
+        "critical:database_down",
+      ),
+    );
+    assert.ok(
+      !ids(evaluateAlerts(input({ database: { ok: true } }))).includes("critical:database_down"),
+    );
+    assert.ok(!ids(evaluateAlerts(input())).some((i) => i.endsWith("database_down")));
+  });
+});
+
 /**
  * Phase 7 / R-010 — the paging policy, pinned: each threshold fires
  * exactly where the doc says, nothing fires on a healthy platform, and

@@ -29,6 +29,7 @@ function serve(): Promise<string> {
   const app = express();
   app.use(
     createOpsMetricsRouter({
+      pingDatabase: () => Promise.resolve(),
       readStatus: () =>
         Promise.resolve(
           assessPlatformStatus(

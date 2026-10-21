@@ -39,6 +39,9 @@ export interface AlertInput {
   frozenNotFinal: readonly FrozenNotFinalRow[];
   /** Stream connections vs the per-instance cap. */
   stream: { connections: number; max: number };
+  /** A `select 1` against the database just now; the error when it failed.
+   *  Optional so older callers keep working; absent = not checked. */
+  database?: { ok: boolean; error?: string };
 }
 
 /** Minimum samples before a p95 is trusted for paging. */
@@ -56,6 +59,19 @@ export const AGENT_REFUSAL_RATE_WARN = 0.5;
 
 export function evaluateAlerts(input: AlertInput): Alert[] {
   const alerts: Alert[] = [];
+
+  // The 2026-10-19 outage: Neon refused every query (plan quota) for two
+  // days while the probe stayed green, because each reader swallowed its
+  // own error. One ping, one critical alert.
+  if (input.database && !input.database.ok) {
+    alerts.push({
+      id: "database_down",
+      severity: "critical",
+      title: "Database unreachable",
+      detail: `${input.database.error ?? "no detail"}. Nothing that reads or writes the canonical tables works: board, agent, signups, every cron.`,
+      runbook: "docs/ops/incident-runbook.md §9",
+    });
+  }
   const s = input.status;
 
   if (s.killSwitch) {

@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { sql } from "drizzle-orm";
 import { db, dbPoolSnapshot } from "../db/client.ts";
 import {
   evaluateAlerts,
@@ -28,6 +29,8 @@ export interface OpsDeps {
   latencySnapshot: () => ReturnType<typeof latency.snapshot>;
   counterSnapshot: () => Record<string, number>;
   streamConnections: () => number;
+  /** Resolves when the database answers `select 1`; rejects otherwise. */
+  pingDatabase: () => Promise<void>;
   now: () => number;
 }
 
@@ -38,14 +41,24 @@ export function defaultOpsDeps(): OpsDeps {
     latencySnapshot: () => latency.snapshot(),
     counterSnapshot: () => counters.snapshot(),
     streamConnections: liveStreamConnections,
+    pingDatabase: async () => {
+      await db.execute(sql`select 1`);
+    },
     now: () => Date.now(),
   };
 }
 
 export async function buildAlertInput(deps: OpsDeps): Promise<AlertInput> {
-  const [status, frozenNotFinal] = await Promise.all([
+  const [status, frozenNotFinal, database] = await Promise.all([
     deps.readStatus(),
     deps.readFrozenNotFinal().catch((): readonly FrozenNotFinalRow[] => []),
+    deps.pingDatabase().then(
+      () => ({ ok: true }),
+      (err: unknown) => ({
+        ok: false,
+        error: (err instanceof Error ? err.message : String(err)).slice(0, 200),
+      }),
+    ),
   ]);
   return {
     status,
@@ -53,6 +66,7 @@ export async function buildAlertInput(deps: OpsDeps): Promise<AlertInput> {
     counters: deps.counterSnapshot(),
     frozenNotFinal,
     stream: { connections: deps.streamConnections(), max: MAX_CONNECTIONS },
+    database,
   };
 }
 

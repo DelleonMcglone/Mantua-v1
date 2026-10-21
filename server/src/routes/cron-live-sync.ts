@@ -17,6 +17,8 @@ import { pushDeps } from "../lib/push/push-store.ts";
 import { eventStatuses } from "../lib/push/live-alerts-db.ts";
 import { runGameEventAlerts, runPositionAlerts } from "../lib/push/live-alerts-run.ts";
 import { parseDates } from "./sports-slate.ts";
+import { espnFallback } from "../lib/sports/active-provider.ts";
+import { liveTickGate } from "../lib/sports/live-tick-gate.ts";
 
 export const cronLiveSyncRouter = Router();
 
@@ -52,6 +54,23 @@ cronLiveSyncRouter.get(
     if (dates !== null && typeof dates === "object") {
       res.status(400).json({ error: dates.error, code: "BAD_DATES" });
       return;
+    }
+    // Database-quota guard (2026-10-19): outside a game window only the
+    // hourly tick goes on to Postgres. The slate read here is ESPN's,
+    // keyless and database-free; if it fails the tick runs as before.
+    if (dates === null) {
+      let gate = { run: true, reason: "gate_unavailable" as string };
+      try {
+        const slate = await espnFallback().getSlate("nfl");
+        gate = liveTickGate(Date.now(), slate.events);
+      } catch (err) {
+        logger.warn({ err }, "live-sync: gate read failed; running the tick");
+      }
+      if (!gate.run) {
+        res.json({ ok: true, skipped: gate.reason });
+        return;
+      }
+      res.setHeader("x-live-tick", gate.reason);
     }
     const results: Record<string, unknown> = {};
     let failures = 0;
