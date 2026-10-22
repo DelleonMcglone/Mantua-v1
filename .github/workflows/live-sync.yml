@@ -24,7 +24,12 @@
 name: live-sync
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      dates:
+        description: "Optional YYYYMMDD-YYYYMMDD: re-ingest a past window (finals the feed missed)"
+        required: false
+        default: ""
 
 permissions: {}
 
@@ -40,4 +45,4 @@ jobs:
         run: |
           curl -sS -f -m 120 \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://test-mantua.vercel.app/api/cron/live-sync
+            "https://test-mantua.vercel.app/api/cron/live-sync${{ inputs.dates && format('?dates={0}', inputs.dates) || '' }}"
