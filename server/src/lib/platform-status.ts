@@ -13,7 +13,7 @@
  * delayed — so the banner and the refusal never disagree.
  */
 
-import { CANONICAL_FRESH_MS } from "./sports/public-slate.ts";
+import { freshMsFor } from "./sports/feed-freshness.ts";
 import { IN_PLAY_FEED_MAX_AGE_MS } from "./sports/market-trade-build.ts";
 
 export interface LeagueFeedInput {
@@ -43,7 +43,7 @@ export interface LeagueFeedStatus {
   dataAsOf: number | null;
   /** ms since the last ingest; null when never ingested. */
   ageMs: number | null;
-  /** The slate route's rule: older than CANONICAL_FRESH_MS. */
+  /** The slate route's rule: older than `freshMsFor(liveGames > 0)`. */
   delayed: boolean;
   /** Games in play right now. */
   liveGames: number;
@@ -95,7 +95,9 @@ export function assessPlatformStatus(
   const feeds: Record<string, LeagueFeedStatus> = {};
   for (const f of input.feeds) {
     const ageMs = f.dataAsOf === null ? null : Math.max(0, now - f.dataAsOf);
-    const delayed = ageMs === null || ageMs > CANONICAL_FRESH_MS;
+    // The slate route's rule, quiet-hour aware (feed-freshness.ts): the
+    // game-time threshold with a game in play, one hourly tick otherwise.
+    const delayed = ageMs === null || ageMs > freshMsFor(f.liveGames > 0);
     const buysHalted = f.liveGames > 0 && (ageMs === null || ageMs > IN_PLAY_FEED_MAX_AGE_MS);
     feeds[f.league] = { dataAsOf: f.dataAsOf, ageMs, delayed, liveGames: f.liveGames, buysHalted };
   }

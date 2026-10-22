@@ -33,3 +33,13 @@ test("no timestamp at all is honest about it", () => {
   assert.equal(f.label, "Update time unknown");
   assert.equal(f.stale, true);
 });
+
+test("the server's verdict wins over the five-minute rule when it sent one", () => {
+  // A quiet hour: the feed is 50 minutes old and the server says that is fine.
+  const quiet = freshness({ fetchedAt: NOW - 50 * 60_000, delayed: false }, NOW);
+  assert.equal(quiet.stale, false);
+  assert.equal(quiet.label, "Updated 50m ago");
+  // A game on and the server says delayed, however young the read.
+  const live = freshness({ fetchedAt: NOW - 60_000, delayed: true }, NOW);
+  assert.equal(live.stale, true);
+});

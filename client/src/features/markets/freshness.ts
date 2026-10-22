@@ -23,7 +23,12 @@ export interface Freshness {
   delayed: boolean;
 }
 
-/** Mirrors the server's CANONICAL_FRESH_MS (public-slate.ts). */
+/**
+ * The client's own staleness rule, for reads the server did not label.
+ * When the server sent `delayed` it knows the cadence (a quiet hour ticks
+ * once; a game ticks every five minutes — feed-freshness.ts), so its verdict
+ * stands and this limit is not applied.
+ */
 export const STALE_AFTER_MS = 5 * 60_000;
 
 /** Accept ms or seconds: anything below 1e11 is treated as seconds. */
@@ -41,7 +46,7 @@ export function freshness(input: FreshnessInput, nowMs: number = Date.now()): Fr
   const delayed = Boolean(input.delayed);
   return {
     label: delayed ? `Data as of ${age}` : `Updated ${age}`,
-    stale: nowMs - ms > STALE_AFTER_MS,
+    stale: input.delayed === undefined ? nowMs - ms > STALE_AFTER_MS : delayed,
     delayed,
   };
 }

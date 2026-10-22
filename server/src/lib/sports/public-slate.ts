@@ -14,6 +14,7 @@
  * trusting every downstream consumer to remember.
  */
 
+import { anyInPlay, freshMsFor } from "./feed-freshness.ts";
 import type { ProviderEvent, ProviderSlate, ProviderTeam } from "./provider.ts";
 import type { CanonicalSlate } from "./store.ts";
 
@@ -137,7 +138,7 @@ export function toPublicSlate(slate: ProviderSlate): PublicSlate {
  * there is still real warning room between "labeled delayed" and "buys
  * actually halted".
  */
-export const CANONICAL_FRESH_MS = 10 * 60_000;
+export { CANONICAL_FRESH_MS } from "./feed-freshness.ts";
 
 /**
  * The canonical `events` rows as a public slate.
@@ -161,7 +162,9 @@ export function canonicalToPublicSlate(
   opts?: { now?: number; freshMs?: number },
 ): PublicSlate {
   const now = opts?.now ?? Date.now();
-  const freshMs = opts?.freshMs ?? CANONICAL_FRESH_MS;
+  // Quiet-hour rule (feed-freshness.ts): an hour-old feed with no game in
+  // play is the tick's own cadence, not a delay.
+  const freshMs = opts?.freshMs ?? freshMsFor(anyInPlay(canonical.events, now));
   const delayed =
     opts === undefined || canonical.dataAsOf === null || now - canonical.dataAsOf > freshMs;
   return {
