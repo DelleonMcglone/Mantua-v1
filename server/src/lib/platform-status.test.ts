@@ -8,6 +8,7 @@ process.env.PRIVY_APP_SECRET ??= "test-stub";
 
 const { assessPlatformStatus, readPlatformStatus } = await import("./platform-status.ts");
 const { CANONICAL_FRESH_MS } = await import("./sports/public-slate.ts");
+const { QUIET_FRESH_MS } = await import("./sports/feed-freshness.ts");
 const { IN_PLAY_FEED_MAX_AGE_MS } = await import("./sports/market-trade-build.ts");
 
 const NOW = 1_800_000_000_000;
@@ -102,7 +103,7 @@ void describe("assessPlatformStatus (R-005 degradation ladder)", () => {
 
     const allDark = assessPlatformStatus(
       {
-        feeds: [feed("nfl", CANONICAL_FRESH_MS + 1, 0), feed("wnba", CANONICAL_FRESH_MS * 2, 0)],
+        feeds: [feed("nfl", QUIET_FRESH_MS + 1, 0), feed("wnba", QUIET_FRESH_MS * 2, 0)],
         killSwitch: false,
         providerBreakers: noBreakers,
         rpc: null,
@@ -114,6 +115,33 @@ void describe("assessPlatformStatus (R-005 degradation ladder)", () => {
     assert.equal(allDark.trading, "open", "stale data closes nothing off-game");
     assert.match(allDark.message ?? "", /delayed/);
     assert.match(allDark.message ?? "", /Trading stays open/);
+  });
+
+  void it("a quiet hour: an hour-old feed with nothing in play is live, the same age with a game in play is delayed and halted", () => {
+    const quiet = assessPlatformStatus(
+      {
+        feeds: [feed("nfl", 55 * 60_000, 0)],
+        killSwitch: false,
+        providerBreakers: noBreakers,
+        rpc: null,
+      },
+      NOW,
+    );
+    assert.equal(quiet.feeds["nfl"].delayed, false, "one hourly tick is the quiet cadence");
+    assert.equal(quiet.mode, "live");
+    assert.equal(quiet.message, null);
+
+    const gameOn = assessPlatformStatus(
+      {
+        feeds: [feed("nfl", 55 * 60_000, 1)],
+        killSwitch: false,
+        providerBreakers: noBreakers,
+        rpc: null,
+      },
+      NOW,
+    );
+    assert.equal(gameOn.feeds["nfl"].delayed, true);
+    assert.equal(gameOn.trading, "buys_halted");
   });
 
   void it("the kill switch pauses trading and wins over every other signal, with reads still viewable", () => {
