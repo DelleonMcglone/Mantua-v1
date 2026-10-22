@@ -9,6 +9,7 @@ import {
 import { refreshSeasonSchedule } from "../lib/sports/season-schedule.ts";
 import { feedFreshnessSnapshot, refreshNextSlate } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
+import { backfillMissedFinals } from "../lib/sports/missed-finals.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
@@ -187,8 +188,20 @@ cronSportsSyncRouter.get(
           }
         }
 
+        // Finals the feed missed while it was dark (missed-finals.ts): the
+        // last seven days re-read through ESPN's dated scoreboard, so a
+        // row stuck before its final cannot halt buys for a week.
+        let missedFinals: unknown = null;
+        try {
+          missedFinals = await backfillMissedFinals(db, league, nowSeconds);
+        } catch (err) {
+          logger.warn({ league, err }, "sports-sync: missed-finals pass failed");
+          missedFinals = { error: err instanceof Error ? err.message : String(err) };
+        }
+
         results[league] = {
           season,
+          missedFinals,
           provider: refresh.provider,
           skippedProviders: skipped,
           events: eventsPersisted,
