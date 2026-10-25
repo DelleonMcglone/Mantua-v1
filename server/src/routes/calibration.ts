@@ -5,6 +5,7 @@ import { sharedCache } from "../lib/shared-cache.ts";
 import { requireCronSecret } from "../middleware/cron-auth.ts";
 import { forecastsCsv, readScoredRecords } from "../lib/forecast/calibration-read.ts";
 import { hitlReport, type HitlReport } from "../lib/forecast/hitl.ts";
+import { autonomyReadiness, type ReadinessReport } from "../lib/forecast/autonomy-readiness.ts";
 import { isScoreable, type ScoredRecord } from "../lib/forecast/scoring.ts";
 import { sliceReport, uniqueViews, type SliceReport } from "../lib/forecast/slices.ts";
 
@@ -26,6 +27,7 @@ export interface CalibrationReport extends SliceReport {
     afterKickoff: number;
   };
   hitl: HitlReport;
+  readiness: ReadinessReport;
 }
 
 export const CALIBRATION_CACHE_MS = 60_000;
@@ -47,6 +49,7 @@ export function buildCalibrationReport(
     },
     ...slices,
     hitl: hitlReport(records),
+    readiness: autonomyReadiness(slices.all, slices.byLeague),
   };
 }
 

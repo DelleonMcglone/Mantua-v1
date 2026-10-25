@@ -36,6 +36,11 @@ export const AgentPanel = lazy(() =>
 export const HistoryPage = lazy(() =>
   import("./features/markets/history/HistoryPage.tsx").then((m) => ({ default: m.HistoryPage })),
 );
+export const CalibrationPage = lazy(() =>
+  import("./features/calibration/CalibrationPage.tsx").then((m) => ({
+    default: m.CalibrationPage,
+  })),
+);
 export const DocsPage = lazy(() =>
   import("./components/docs/DocsPage.tsx").then((m) => ({ default: m.DocsPage })),
 );
