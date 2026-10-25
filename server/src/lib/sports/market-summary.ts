@@ -6,6 +6,7 @@
  * is a new model. Pure helpers are exported for tests; the DB walk is thin.
  */
 import { analyzeMarket, type EventRow, type SportsToolsDb } from "./agent-sports-tools.ts";
+import type { ForecastSink } from "../forecast/forecast-sink.ts";
 
 export type Rating = "Lean YES" | "Lean NO" | "Fair" | "Thin" | "No price";
 
@@ -68,8 +69,14 @@ export async function summaryRowFor(
   event: EventRow,
   outcomeIndex: 0 | 1,
   now: Date,
+  sink?: ForecastSink,
 ): Promise<SummaryRow | null> {
-  const a = await analyzeMarket(dbx, { providerEventId: event.providerEventId, outcomeIndex }, now);
+  const a = await analyzeMarket(
+    dbx,
+    { providerEventId: event.providerEventId, outcomeIndex },
+    now,
+    sink,
+  );
   if (a["status"] !== "ok") return null;
   const market = a["market"] as {
     marketId: string;
@@ -114,6 +121,7 @@ export async function compareMarkets(
   dbx: SportsToolsDb,
   input: { teams?: unknown; limit?: unknown; budgetUsdc?: unknown; windowHours?: unknown },
   now: Date = new Date(),
+  sink?: ForecastSink,
 ): Promise<Record<string, unknown>> {
   const teams = Array.isArray(input.teams)
     ? input.teams.filter((t): t is string => typeof t === "string" && t.trim() !== "").slice(0, 8)
@@ -146,7 +154,7 @@ export async function compareMarkets(
   }
   const rows: SummaryRow[] = [];
   for (const p of picks) {
-    const row = await summaryRowFor(dbx, p.event, p.outcomeIndex, now);
+    const row = await summaryRowFor(dbx, p.event, p.outcomeIndex, now, sink);
     if (row) rows.push(row);
   }
   return {

@@ -232,6 +232,13 @@
       "when": 1792600100000,
       "tag": "0032_social_posts_user",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792900000000,
+      "tag": "0033_forecasts",
+      "breakpoints": true
     }
   ]
 }

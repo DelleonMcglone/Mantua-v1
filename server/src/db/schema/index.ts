@@ -12,3 +12,4 @@ export * from "./social.ts";
 export * from "./push.ts";
 export * from "./institutions.ts";
 export * from "./waitlist.ts";
+export * from "./forecasts.ts";

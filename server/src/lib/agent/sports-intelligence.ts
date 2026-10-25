@@ -78,6 +78,18 @@ const FORM_PRIOR_GAMES = 3;
 /** Games of record below which an estimate is never "high" confidence. */
 const EARLY_SEASON_GAMES = 6;
 
+/**
+ * The named weights, exported for the forecast ledger's model version: a
+ * change here is a new version (forecast/model-version.ts).
+ */
+export const ESTIMATOR_WEIGHTS: Record<string, number> = {
+  homeAdvantageBps: DEFAULT_HOME_ADVANTAGE_BPS,
+  edgeThresholdBps: EDGE_THRESHOLD_BPS,
+  recordPriorGames: RECORD_PRIOR_GAMES,
+  formPriorGames: FORM_PRIOR_GAMES,
+  earlySeasonGames: EARLY_SEASON_GAMES,
+};
+
 function gamesOf(r: { wins: number; losses: number; ties: number } | null): number {
   return r ? r.wins + r.losses + r.ties : 0;
 }

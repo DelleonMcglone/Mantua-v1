@@ -5,6 +5,7 @@
  * from the pool's price. Read-only; the ranking itself is pure.
  */
 import { analyzeMarket, type EventRow, type SportsToolsDb } from "./agent-sports-tools.ts";
+import type { ForecastSink } from "../forecast/forecast-sink.ts";
 
 export interface GapRow {
   game: string;
@@ -72,6 +73,7 @@ export async function scanProbabilityGaps(
   dbx: SportsToolsDb,
   input: { league?: unknown; limit?: unknown; windowHours?: unknown },
   now: Date = new Date(),
+  sink?: ForecastSink,
 ): Promise<Record<string, unknown>> {
   const slug = typeof input.league === "string" ? input.league : "nfl";
   const limit = Math.min(10, Math.max(1, Number(input.limit) || 5));
@@ -97,6 +99,7 @@ export async function scanProbabilityGaps(
       dbx,
       { providerEventId: event.providerEventId, outcomeIndex: 0 },
       now,
+      sink,
     );
     const row = a["status"] === "ok" ? gapRowFromAnalysis(event, a) : null;
     if (row) rows.push(row);
