@@ -5,6 +5,7 @@ import { activeBreakerState, liveProviderChainFor } from "../lib/sports/active-p
 import { feedFreshnessSnapshot } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import { refreshPlayByPlay, upsertEvents } from "../lib/sports/store.ts";
+import { captureClosingLines, closingCandidates } from "../lib/forecast/closing-line.ts";
 import { snapshotMarketPoolPrices } from "../lib/sports/market-metrics.ts";
 import { runRegistryKeeper } from "../lib/sports/registry-keeper.ts";
 import type { LeagueSlug } from "../lib/sports/provider.ts";
@@ -116,7 +117,30 @@ cronLiveSyncRouter.get(
           playByPlay = { error: err instanceof Error ? err.message : String(err) };
         }
         feedDelayed = feedDelayed || refresh.delayed;
+        // The forecast ledger (task 077): the closing reference at the last
+        // pre-kickoff tick, once per market. Never on delayed data.
+        let closingLines: unknown = null;
+        if (!refresh.delayed) {
+          try {
+            closingLines = await captureClosingLines(
+              db,
+              closingCandidates(
+                refresh.events.map((e) => ({
+                  providerEventId: e.providerEventId,
+                  startsAt: e.startsAt,
+                  status: e.status,
+                  homeWinProbabilityBps: e.homeWinProbabilityBps ?? null,
+                })),
+                Date.now(),
+              ),
+            );
+          } catch (err) {
+            logger.warn({ league, err }, "live-sync: closing-line capture failed");
+            closingLines = { error: err instanceof Error ? err.message : String(err) };
+          }
+        }
         results[league] = {
+          closingLines,
           provider: refresh.provider,
           skippedProviders: skipped,
           ...(dates ? { backfillWindow: dates } : {}),

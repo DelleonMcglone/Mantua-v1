@@ -10,6 +10,7 @@ import { refreshSeasonSchedule } from "../lib/sports/season-schedule.ts";
 import { feedFreshnessSnapshot, refreshNextSlate } from "../lib/sports/ingest.ts";
 import { refreshSlateWithFallback } from "../lib/sports/slate-fallback.ts";
 import { backfillMissedFinals } from "../lib/sports/missed-finals.ts";
+import { markUnfilledProposals } from "../lib/forecast/proposal-followup.ts";
 import {
   listRebandCandidates,
   listReclaimCandidates,
@@ -248,6 +249,15 @@ cronSportsSyncRouter.get(
       }
     }
 
+    // The forecast ledger (task 077): proposals that lapsed with no decision.
+    let unfilledProposals: unknown;
+    try {
+      unfilledProposals = await markUnfilledProposals(db);
+    } catch (err) {
+      logger.warn({ err }, "sports-sync: unfilled-proposal sweep failed");
+      unfilledProposals = { error: err instanceof Error ? err.message : String(err) };
+    }
+
     res.status(failures === LEAGUES.length ? 502 : 200).json({
       ok: failures < LEAGUES.length,
       breakers: activeBreakerState(),
@@ -256,6 +266,7 @@ cronSportsSyncRouter.get(
       rebanded,
       settlement,
       priceSnapshots,
+      unfilledProposals,
       leagues: results,
     });
   },
