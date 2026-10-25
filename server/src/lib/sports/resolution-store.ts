@@ -29,6 +29,7 @@ import {
 } from "./resolution-confidence.ts";
 import type { StoredEventSnapshot } from "./resolution-freshness.ts";
 import { providerIdFor } from "./event-match.ts";
+import { recordForecastOutcome } from "../forecast/outcome-store.ts";
 import type {
   DisputeWindowGate,
   DisputeWindowState,
@@ -89,6 +90,15 @@ export function drizzleResolutionLog(db: DB, chainId = 5042): ResolutionLogWrite
             : { state: "RESOLVED", resolvedAt: new Date() },
         )
         .where(eq(markets.marketId, entry.marketId));
+
+      // The forecast ledger (task 077): the outcome, for every view on
+      // this market. Best-effort — a ledger miss never fails the log write
+      // that records a real transaction.
+      try {
+        await recordForecastOutcome(db, entry);
+      } catch (err) {
+        logger.warn({ err, marketId: entry.marketId }, "forecast outcome write failed");
+      }
 
       // S-024: a landed resolve advances the game's review VERIFIED →
       // RESOLVED. Conditional on VERIFIED so the transition table cannot be

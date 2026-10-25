@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { messageConfirmsAction } from "./confirmation-language.ts";
+import { messageConfirmsAction, messageNegatesAction } from "./confirmation-language.ts";
 
 /** Phase 8 / A-032 — consent is decided in code, conservatively. */
 void describe("messageConfirmsAction", () => {
@@ -44,6 +44,17 @@ void describe("messageConfirmsAction", () => {
       "confirm ".repeat(100),
     ]) {
       assert.equal(messageConfirmsAction(msg), false, `should NOT confirm: "${msg}"`);
+    }
+  });
+});
+
+void describe("messageNegatesAction (forecast ledger)", () => {
+  void it("reads a no, a cancel or a stop as a rejection, and anything else as not one", () => {
+    for (const m of ["no", "No, don't", "cancel that", "stop", "not now", "never mind"]) {
+      assert.equal(messageNegatesAction(m), true, m);
+    }
+    for (const m of ["confirm", "yes", "what are the odds?", "", "x".repeat(401)]) {
+      assert.equal(messageNegatesAction(m), false, m);
     }
   });
 });

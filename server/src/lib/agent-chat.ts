@@ -1,5 +1,7 @@
 import type { ForecastAction, ForecastSource } from "../db/schema/forecasts.ts";
 import { makeForecastSink, type ForecastSink } from "./forecast/forecast-sink.ts";
+import { rejectPendingProposals } from "./forecast/proposal-followup.ts";
+import { messageNegatesAction } from "./agent/confirmation-language.ts";
 import { hashModelVersion } from "./forecast/model-version.ts";
 import { ESTIMATOR_WEIGHTS } from "./agent/sports-intelligence.ts";
 import Anthropic from "@anthropic-ai/sdk";
@@ -2185,6 +2187,11 @@ export async function* runAgentChat(
   // simulations/previews → confirmations minted → executions / refusals.
   counters.inc("agent.funnel.turn");
   if (turn.confirmation) counters.inc("agent.funnel.confirm_minted");
+  // The forecast ledger (task 077): a "no" to a pending preview is a
+  // rejected proposal. Recorded beside the proposal; nothing executes either way.
+  if (turn.pendingPreview && !turn.spoken && messageNegatesAction(message)) {
+    deferBackground(rejectPendingProposals(db, sessionId));
+  }
 
   const history = await (deps.loadHistory ?? loadHistory)(sessionId);
   await persist({ sessionId, role: "user", content: message });

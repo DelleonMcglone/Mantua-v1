@@ -43,6 +43,14 @@ const NEGATION_PATTERNS: readonly RegExp[] = [
   /\b(don'?t|do not|never|no[,.]? |cancel|stop|abort|nevermind|never mind|not now)\b/i,
 ];
 
+/** True when the message says no to the pending action (the forecast ledger
+ *  records the rejection; execution still simply does not happen). */
+export function messageNegatesAction(message: string): boolean {
+  const text = message.trim();
+  if (text.length === 0 || text.length > 400) return false;
+  return /^no[,.!]?(\s|$)/i.test(text) || NEGATION_PATTERNS.some((re) => re.test(text));
+}
+
 /** True only when the message is an unambiguous, unhedged, unnegated confirmation. */
 export function messageConfirmsAction(message: string): boolean {
   const text = message.trim();
