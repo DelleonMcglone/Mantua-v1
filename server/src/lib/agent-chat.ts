@@ -1,3 +1,7 @@
+import type { ForecastAction, ForecastSource } from "../db/schema/forecasts.ts";
+import { makeForecastSink, type ForecastSink } from "./forecast/forecast-sink.ts";
+import { hashModelVersion } from "./forecast/model-version.ts";
+import { ESTIMATOR_WEIGHTS } from "./agent/sports-intelligence.ts";
 import Anthropic from "@anthropic-ai/sdk";
 import { asc, desc, eq } from "drizzle-orm";
 import { isAddress, formatUnits, parseAbi, parseUnits } from "viem";
@@ -899,6 +903,39 @@ const RAW_TOOLS: Anthropic.Tool[] = [
 /** Every money-moving tool carries the optional confirmationId (A-031). */
 /** The definitions of the named tools, for surfaces that reuse a subset
  *  (the read-only analyst shares the free sports reads). */
+// ─── The forecast ledger (owner, 2026-10-24) ────────────────────────────────
+// Every probability the agent forms is a forecast; the version stamped on
+// each row is a hash of what shaped it. Computed once, after RAW_TOOLS.
+let modelVersionCache: string | null = null;
+export function forecastModelVersion(): string {
+  modelVersionCache ??= hashModelVersion({
+    model: MODEL,
+    prompt: SYSTEM_PROMPT,
+    tools: RAW_TOOLS.map((t) => ({ name: t.name, description: t.description })),
+    weights: ESTIMATOR_WEIGHTS,
+  });
+  return modelVersionCache;
+}
+
+async function forecastSink(
+  privyUserId: string,
+  turn: TurnContext | undefined,
+  source: ForecastSource,
+  action: ForecastAction,
+  toolName: string,
+  tradeId: string | null = null,
+): Promise<ForecastSink> {
+  return makeForecastSink(db, {
+    userId: await resolveUserId(privyUserId),
+    sessionId: turn?.sessionId ?? null,
+    source,
+    action,
+    tradeId,
+    modelVersion: forecastModelVersion(),
+    toolName,
+  });
+}
+
 export function toolDefinitions(names: readonly string[]): Anthropic.Tool[] {
   return RAW_TOOLS.filter((t) => names.includes(t.name));
 }
@@ -1271,6 +1308,15 @@ async function executeTool(
           simulationId: sim.simulationId,
         },
       });
+      if (args.direction === "buy") {
+        // The forecast ledger: the view the user is being asked to approve.
+        await analyzeMarket(
+          sportsToolsDb,
+          { providerEventId: args.providerEventId, outcomeIndex: args.outcomeIndex },
+          new Date(),
+          await forecastSink(privyUserId, turn, "proposal", "proposed", name),
+        );
+      }
       await confirmationStore.savePreview({
         sessionId: turn.sessionId,
         kind: "market_trade",
@@ -1319,8 +1365,15 @@ async function executeTool(
       counters.inc("agent.funnel.simulate");
       const plan = planBasket(input);
       const sims = [];
+      const proposalSink = await forecastSink(privyUserId, turn, "proposal", "proposed", name);
       for (const leg of plan.legs) {
         const args = parseSimulationArgs({ ...leg, direction: "buy" });
+        await analyzeMarket(
+          sportsToolsDb,
+          { providerEventId: leg.providerEventId, outcomeIndex: leg.outcomeIndex },
+          new Date(),
+          proposalSink,
+        );
         const sim = await simulateMarketTrade(
           buildSimulationDeps(privyUserId, chainId),
           args,
@@ -1402,6 +1455,13 @@ async function executeTool(
             basket: true,
           },
         });
+        // The forecast ledger: the view this fill acted on, keyed by the tx.
+        await analyzeMarket(
+          sportsToolsDb,
+          { providerEventId: leg.providerEventId, outcomeIndex: leg.outcomeIndex },
+          new Date(),
+          await forecastSink(privyUserId, turn, "proposal", "filled", name, result.txHash),
+        );
         return {
           txHash: result.txHash,
           received: `${(Number(result.quote.amountOut) / 1e6).toFixed(2)} YES`,
@@ -1453,9 +1513,19 @@ async function executeTool(
       return outcome;
     }
     case "mantua_compare_markets":
-      return await compareMarkets(sportsToolsDb, input);
+      return await compareMarkets(
+        sportsToolsDb,
+        input,
+        new Date(),
+        await forecastSink(privyUserId, turn, "scan", "no_trade", name),
+      );
     case "mantua_probability_gaps":
-      return await scanProbabilityGaps(sportsToolsDb, input);
+      return await scanProbabilityGaps(
+        sportsToolsDb,
+        input,
+        new Date(),
+        await forecastSink(privyUserId, turn, "scan", "no_trade", name),
+      );
     case "mantua_size_position":
       return sizePosition(Number(input["riskUsdc"]), Number(input["entryPriceBps"]));
     case "mantua_arm_exit": {
@@ -1578,6 +1648,15 @@ async function executeTool(
             typeof input["confirmationId"] === "string" ? input["confirmationId"] : null,
         },
       });
+      if (direction === "buy") {
+        // The forecast ledger: the view this fill acted on, keyed by the tx.
+        await analyzeMarket(
+          sportsToolsDb,
+          { providerEventId: args.providerEventId, outcomeIndex: args.outcomeIndex },
+          new Date(),
+          await forecastSink(privyUserId, turn, "proposal", "filled", name, result.txHash),
+        );
+      }
       return {
         txHash: result.txHash,
         marketId: result.marketId,
@@ -1674,7 +1753,12 @@ async function executeTool(
     }
     case "mantua_analyze_market": {
       counters.inc("agent.funnel.analyze");
-      const analysis = await analyzeMarket(sportsToolsDb, input);
+      const analysis = await analyzeMarket(
+        sportsToolsDb,
+        input,
+        new Date(),
+        await forecastSink(privyUserId, turn, "research", "no_trade", name),
+      );
       // Task 062 / PF-020 — research and recommendations are activity too.
       if (analysis["status"] === "ok") {
         const user = await resolveUserId(privyUserId);

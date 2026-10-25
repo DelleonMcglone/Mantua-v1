@@ -29,6 +29,7 @@
  * are deliberately absent from agent-chat's MUTATING_TOOL_ACTIONS map).
  */
 
+import type { ForecastSink } from "../forecast/forecast-sink.ts";
 import { z } from "zod";
 import { and, desc, eq, gte, isNull, or } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
@@ -1914,6 +1915,18 @@ export async function analyzeMarket(
   dbx: SportsToolsDb,
   raw: unknown,
   now: Date = new Date(),
+  /** The forecast ledger: every successful analysis is a forecast. */
+  sink?: ForecastSink,
+): Promise<Record<string, unknown>> {
+  const out = await analyzeMarketInner(dbx, raw, now);
+  sink?.observe(out, raw);
+  return out;
+}
+
+async function analyzeMarketInner(
+  dbx: SportsToolsDb,
+  raw: unknown,
+  now: Date,
 ): Promise<Record<string, unknown>> {
   const input = parseInput(analyzeMarketInput, raw, "mantua_analyze_market");
   const catalog = await loadCatalog(dbx);
