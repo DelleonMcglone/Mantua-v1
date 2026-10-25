@@ -49,7 +49,13 @@ export function isLoginPath(pathname: string): boolean {
 
 /** Route kinds a logged-out visitor may still reach while gated: the
  *  public pages, and the landing page itself. */
-const GATE_EXEMPT: ReadonlySet<string> = new Set(["waitlist", "legal", "docs", "agent-public"]);
+const GATE_EXEMPT: ReadonlySet<string> = new Set([
+  "waitlist",
+  "legal",
+  "docs",
+  "agent-public",
+  "calibration",
+]);
 
 /**
  * Pre-launch front door: with the flag on, a visitor who is not signed in

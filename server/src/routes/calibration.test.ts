@@ -29,5 +29,7 @@ void describe("buildCalibrationReport", () => {
     assert.equal(r.tradesOnly.n, 1);
     assert.equal(r.hitl.proposals, 1);
     assert.equal(r.hitl.approved, 1);
+    assert.equal(r.readiness.rules.length, 4);
+    assert.equal(r.readiness.passing, false);
   });
 });

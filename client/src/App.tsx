@@ -12,6 +12,7 @@ import {
   AnalyzePanel,
   AssetDetailPanel,
   AssetsCard,
+  CalibrationPage,
   DocsPage,
   HistoryPage,
   MarketIntegrityPage,
@@ -45,6 +46,7 @@ import { HomePromptRow, type HomePromptId } from "./components/shell/HomeMenu.ts
 import { InputBar } from "./components/shell/InputBar.tsx";
 // Task 070 (Phase 13) — the public performance page, the agent's voice, support.
 import { PublicAgentPage } from "./features/reputation/PublicAgentPage.tsx";
+import { CALIBRATION_PATH, isCalibrationPath } from "./features/calibration/calibration-core.ts";
 import { agentHandleFromPath, agentPagePath } from "./features/reputation/reputation-core.ts";
 import {
   WAITLIST_PATH,
@@ -105,7 +107,9 @@ type Route =
   /** Task 070 — help & support, signed in or not. */
   | { kind: "support" }
   /** Task 072 — the Combo Builder (legs picked from league pages). */
-  | { kind: "combos" };
+  | { kind: "combos" }
+  /** Task 077 — the public forecast-calibration page at `/calibration` (no login). */
+  | { kind: "calibration" };
 
 // ─── Route persistence ────────────────────────────────────────────────────────
 // The route lives only in React state, so a refresh used to bounce back to
@@ -135,7 +139,8 @@ function sanitizeRouteForStorage(route: Route): Route | null {
     route.kind === "legal" ||
     route.kind === "docs" ||
     route.kind === "agent-public" ||
-    route.kind === "waitlist"
+    route.kind === "waitlist" ||
+    route.kind === "calibration"
   )
     return null;
   if (route.kind === "agent") return { kind: "agent" };
@@ -178,6 +183,7 @@ export default function App() {
     const handle = agentHandleFromPath(window.location.pathname);
     if (handle) return { kind: "agent-public", handle };
     if (isWaitlistPath(window.location.pathname)) return { kind: "waitlist" };
+    if (isCalibrationPath(window.location.pathname)) return { kind: "calibration" };
     return launchRoute(window.location.search) ?? loadStoredRoute() ?? { kind: "home" };
   });
   const isMobile = useIsMobile();
@@ -252,13 +258,17 @@ export default function App() {
         ? agentPagePath(route.handle)
         : route.kind === "waitlist"
           ? WAITLIST_PATH
-          : "/";
+          : route.kind === "calibration"
+            ? CALIBRATION_PATH
+            : "/";
     if (
       window.location.pathname !== wanted &&
       (route.kind === "agent-public" ||
         route.kind === "waitlist" ||
+        route.kind === "calibration" ||
         agentHandleFromPath(window.location.pathname) ||
         isWaitlistPath(window.location.pathname) ||
+        isCalibrationPath(window.location.pathname) ||
         isLoginPath(window.location.pathname))
     ) {
       window.history.replaceState(null, "", wanted);
@@ -354,6 +364,19 @@ export default function App() {
           setRoute({ kind: "home" });
         }}
       />
+    );
+  }
+
+  // Task 077 — the forecast calibration record is a public page, like docs.
+  if (route.kind === "calibration") {
+    return (
+      <Suspense fallback={<p className="p-4 text-sm text-text-dim">Loading…</p>}>
+        <CalibrationPage
+          onBack={() => {
+            setRoute({ kind: "home" });
+          }}
+        />
+      </Suspense>
     );
   }
 
