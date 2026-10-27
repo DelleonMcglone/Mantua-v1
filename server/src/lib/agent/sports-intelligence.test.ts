@@ -81,15 +81,31 @@ void describe("analyzeSide", () => {
     assert.match(early.riskFactors.join(" | "), /early season: records rest on 4 game/);
   });
 
-  void it("weighs a quarterback's absence, ignores injured reserve, counts others lightly", () => {
+  void it("weighs a quarterback's absence — on IR too — ignores other IR, counts others lightly, caps at 2000", () => {
     const base = facts({ headToHead: null });
     const at = (injuries: AnalysisFacts["team"]["injuries"]) =>
       analyzeSide({ ...base, team: { ...base.team, injuries } }).probabilityBps;
     const none = at([]);
     assert.equal(none - at([{ status: "out", player: "A", position: "QB" }]), 700);
     assert.equal(none - at([{ status: "out", player: "B", position: "G" }]), 150);
-    assert.equal(none - at([{ status: "ir", player: "C", position: "QB" }]), 0);
+    assert.equal(none - at([{ status: "ir", player: "C", position: "QB" }]), 700);
+    assert.equal(none - at([{ status: "ir", player: "C2", position: "RB" }]), 0);
     assert.equal(none - at([{ status: "questionable", player: "D", position: "QB" }]), 250);
+    // 2026-10-27, the Eagles: QB on IR (700) + two out (300) + one questionable (50) = 1050,
+    // which the old 900 cap swallowed; the new cap lets it through and still binds far above.
+    const eagles = [
+      { status: "ir", player: "Hurts", position: "QB" },
+      { status: "out", player: "Smith", position: "WR" },
+      { status: "out", player: "Carter", position: "CB" },
+      { status: "questionable", player: "Barkley", position: "RB" },
+    ];
+    assert.equal(none - at(eagles), 1050);
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      status: "out",
+      player: String(i),
+      position: "G",
+    }));
+    assert.equal(none - at(many), 2000);
   });
 
   void it("names risks: missing data, stale price, thin pool, delayed slate, live play, final", () => {
