@@ -1346,3 +1346,21 @@ would add a custodial, KYC-gated step the thesis rejects, for a capability
 (dollar funding) the thesis does not require.
 
 **Owner items.** Decide on the Terms wording change (consequence 2).
+
+## D-124 — A quarterback on injured reserve counts as out; the injury cap is 2000 bps (2026-10-27)
+
+**Context.** Cowboys at Eagles, Monday night: Kalshi 34%, Polymarket 33%,
+the agent 47% for Philadelphia. Hurts had gone on IR that week with
+DeVonta Smith and Michael Carter II out and Barkley questionable. The
+estimator skipped every IR player on the theory that the record already
+carries the absence, which is only true once games have been played
+without him, and the whole injury report was capped at 900 bps, so even a
+counted quarterback plus two starters could not move the side more than
+nine points.
+
+**Decision (owner).** A quarterback on IR is counted at the quarterback-out
+weight (700 bps); other IR players stay uncounted. The injury cap rises to
+2000 bps. The named weights join `ESTIMATOR_WEIGHTS`, so every forecast
+after this change carries a new model version and the ledger shows the
+two versions side by side; the rows that produced 47% keep the version
+that produced them.

@@ -78,6 +78,18 @@ const FORM_PRIOR_GAMES = 3;
 /** Games of record below which an estimate is never "high" confidence. */
 const EARLY_SEASON_GAMES = 6;
 
+/** A quarterback out, doubtful or on injured reserve: the one absence that moves a line alone. */
+const QB_OUT_BPS = 700;
+const QB_QUESTIONABLE_BPS = 250;
+const PLAYER_OUT_BPS = 150;
+const PLAYER_QUESTIONABLE_BPS = 50;
+/**
+ * The most an injury report can move a side. Was 900 until 2026-10-27:
+ * the Eagles with Hurts on IR, two starters out and Barkley questionable
+ * were priced 13 points above the books, and 900 could not express that.
+ */
+const INJURY_CAP_BPS = 2000;
+
 /**
  * The named weights, exported for the forecast ledger's model version: a
  * change here is a new version (forecast/model-version.ts).
@@ -88,6 +100,11 @@ export const ESTIMATOR_WEIGHTS: Record<string, number> = {
   recordPriorGames: RECORD_PRIOR_GAMES,
   formPriorGames: FORM_PRIOR_GAMES,
   earlySeasonGames: EARLY_SEASON_GAMES,
+  qbOutBps: QB_OUT_BPS,
+  qbQuestionableBps: QB_QUESTIONABLE_BPS,
+  playerOutBps: PLAYER_OUT_BPS,
+  playerQuestionableBps: PLAYER_QUESTIONABLE_BPS,
+  injuryCapBps: INJURY_CAP_BPS,
 };
 
 function gamesOf(r: { wins: number; losses: number; ties: number } | null): number {
@@ -112,20 +129,25 @@ function formPct(form: readonly ("W" | "L" | "T")[]): number | null {
 /**
  * Bps a side loses to its injury report. A quarterback out or doubtful is
  * the one absence that moves a line on its own; other players count a
- * little each. Injured reserve is not counted — those absences are
- * already in the record.
+ * little each. Injured reserve is not counted for other positions — those
+ * absences are in the record — but a quarterback on IR is counted as out:
+ * the record only absorbs the loss once games have been played without
+ * him, and the week he goes on IR it says nothing (2026-10-27, Hurts).
  */
 function injuryPenaltyBps(injuries: SideFacts["injuries"]): number {
   let bps = 0;
   for (const i of injuries) {
     const s = i.status.toLowerCase();
-    if (s === "ir") continue;
     const qb = (i.position ?? "").toUpperCase() === "QB";
-    if (s.includes("out") || s.includes("doubtful")) bps += qb ? 700 : 150;
+    if (s === "ir") {
+      if (qb) bps += QB_OUT_BPS;
+      continue;
+    }
+    if (s.includes("out") || s.includes("doubtful")) bps += qb ? QB_OUT_BPS : PLAYER_OUT_BPS;
     else if (s.includes("questionable") || s.includes("day") || s.includes("probable"))
-      bps += qb ? 250 : 50;
+      bps += qb ? QB_QUESTIONABLE_BPS : PLAYER_QUESTIONABLE_BPS;
   }
-  return Math.min(bps, 900);
+  return Math.min(bps, INJURY_CAP_BPS);
 }
 
 function clamp(bps: number, lo = 500, hi = 9500): number {
@@ -284,7 +306,7 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
   return {
     probabilityBps,
     method:
-      "Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × 5000, each share weighted toward .500 by 8 prior games), recent form (gap × 2000, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; injured reserve not counted; capped 900), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.",
+      "Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × 5000, each share weighted toward .500 by 8 prior games), recent form (gap × 2000, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; a quarterback on injured reserve counts as out, other IR not counted; capped 2000), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.",
     evidence,
     riskFactors: risks,
     discrepancyBps,
