@@ -1,0 +1,7 @@
+# Repo policy for Obvious agents.
+# Auto-detected from GitHub repo settings on 2026-09-03:
+#   default branch: main
+#   merge methods allowed: merge-commit, rebase, squash (none disabled)
+defaultBranch: main
+mergeMethod: squash
+deleteBranchOnMerge: false   # repo setting: branch deletion off
