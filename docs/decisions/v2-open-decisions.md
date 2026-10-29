@@ -1364,3 +1364,22 @@ weight (700 bps); other IR players stay uncounted. The injury cap rises to
 after this change carries a new model version and the ledger shows the
 two versions side by side; the rows that produced 47% keep the version
 that produced them.
+
+## D-125 — A lost confirmation on an agent trade is pending, and the same trade is refused for ten minutes (2026-10-29)
+
+**Context.** The agent's chat trades went through the Circle execute path
+without the durable ledger the strategy and combo paths use. If the
+receipt poll timed out, the tool threw with nothing persisted: the
+webhook finalizer could not resolve the transaction, no spend or timeline
+or forecast row was written, and a retry (new simulate, new confirm)
+created a second transaction. The user-signed path never had this gap.
+
+**Decision (owner, "fix plz").** The chat swap is persisted pending before
+the receipt wait as `kind: "agent_trade"`, and whichever path finalizes
+it applies the spend, the timeline entry and the forecast fill exactly
+once. A timeout is reported to the user as pending, never as a failure.
+Before executing, the same trade (wallet, game, side, direction, amount)
+submitted in the last ten minutes and still pending or already confirmed
+is refused with a typed error the agent relays; a reverted trade may be
+retried at once. Adding to a position with the identical amount inside
+that window needs a different amount or a short wait — accepted.

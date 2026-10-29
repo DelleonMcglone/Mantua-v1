@@ -41,6 +41,8 @@ export interface AgentTradeResult {
 /** Optional durable-ledger binding for the swap leg (C-015). */
 export interface AgentTradeLedger {
   kind: ExecutionKind;
+  /** Audit action for the final row; defaults to the strategy close. */
+  action?: string;
   userId?: string;
   walletAddress?: string;
   circleWalletId?: string;
@@ -91,7 +93,7 @@ export async function agentMarketTrade(args: {
     await recordPendingExecution({
       circleTxId: created.id,
       kind: args.ledger.kind,
-      action: "strategy_close",
+      action: args.ledger.action ?? "strategy_close",
       ...(args.ledger.userId ? { userId: args.ledger.userId } : {}),
       ...(args.ledger.walletAddress ? { walletAddress: args.ledger.walletAddress } : {}),
       ...(args.ledger.circleWalletId ? { circleWalletId: args.ledger.circleWalletId } : {}),
@@ -99,6 +101,8 @@ export async function agentMarketTrade(args: {
         ...args.ledger.payload,
         soldRaw: args.amountRaw.toString(),
         usdcOutRaw: built.quote.amountOut,
+        marketId: built.marketId,
+        expectedOutRaw: built.quote.amountOut,
       },
     });
   }
