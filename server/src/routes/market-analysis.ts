@@ -12,6 +12,8 @@ import { db } from "../db/client.ts";
 import { logger } from "../lib/logger.ts";
 import { sharedCache } from "../lib/shared-cache.ts";
 import { analyzeMarket, makeSportsToolsDb } from "../lib/sports/agent-sports-tools.ts";
+import { forecastModelVersion } from "../lib/agent-chat.ts";
+import { coalescedInsert, makeForecastSink } from "../lib/forecast/forecast-sink.ts";
 
 const querySchema = z.object({
   providerEventId: z.string().regex(/^\d{1,32}$/),
@@ -32,10 +34,25 @@ export function createMarketAnalysisRouter(overrides: Partial<MarketAnalysisDeps
         `market-analysis:${id}:${String(outcomeIndex)}`,
         ANALYSIS_TTL_MS,
         () =>
-          analyzeMarket(makeSportsToolsDb(db), {
-            providerEventId: id,
-            outcomeIndex,
-          }) as Promise<AnalysisResult>,
+          analyzeMarket(
+            makeSportsToolsDb(db),
+            { providerEventId: id, outcomeIndex },
+            new Date(),
+            // Task 079 (F-1) — the number the page shows is a forecast too:
+            // one ledger row per side, per model version, per hour.
+            makeForecastSink(
+              db,
+              {
+                userId: null,
+                sessionId: null,
+                source: "page",
+                action: "no_trade",
+                modelVersion: forecastModelVersion(),
+                toolName: "market_page",
+              },
+              { insert: coalescedInsert() },
+            ),
+          ) as Promise<AnalysisResult>,
       ),
     ...overrides,
   };

@@ -21,3 +21,7 @@ for every input; eight findings classified, the two high ones being that
 the forecast ledger is empty because the surfaces the owner reads record
 nothing, and that no timestamp-safe history exists yet for a backtest. No
 model logic changed.
+
+Owner: "ok, continue" → slice 1 (provenance, F-1): sources `page` and
+`analyst`, coalesced to one row per side per model version per hour, wired
+into the analysis route and the analyst's two tools. No model change.
