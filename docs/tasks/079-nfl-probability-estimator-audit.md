@@ -166,3 +166,48 @@ Owner: "ok, continue". Resolves F-1 without touching model logic.
   records under `research`; nothing to add there.
 - `uniqueViews` already counts every `no_trade` row as a view, so page and
   analyst reads enter the all-views slice and never the trades-only slice.
+
+## 7. Slice 2 delivered — the record-and-form reconstruction (2026-10-29)
+
+Resolves the "no history" half of F-2 with the only honest rebuild
+available: for every game of the season, venue + season record + last-5
+form computed from finals that had **ended before that kickoff**, scored
+against the final result. No injuries, no book line, no prior-season
+head-to-head: a partial-input **lower bound** on the estimator, never its
+score. Pure module `lib/forecast/reconstruct.ts` (leakage pinned by
+`reconstruct.test.ts`); report via `npm run estimator:reconstruct --
+season=2026 weeks=1-9`, which reads ESPN's public scoreboard only.
+
+Run on 2026-10-29 (weeks 1–7 final, 106 decided games, one tie excluded):
+
+| Slice  | n   | Brier  | Log loss | Favourite hit rate |
+| ------ | --- | ------ | -------- | ------------------ |
+| All    | 106 | 0.2450 | 0.6826   | 0.577              |
+| Week 1 | 16  | 0.2444 | 0.6819   | 0.625              |
+| Week 2 | 16  | 0.2601 | 0.7136   | 0.438              |
+| Week 3 | 16  | 0.2288 | 0.6493   | 0.688              |
+| Week 4 | 16  | 0.2246 | 0.6396   | 0.563              |
+| Week 5 | 14  | 0.2359 | 0.6649   | 0.643              |
+| Week 6 | 14  | 0.2520 | 0.6957   | 0.643              |
+| Week 7 | 14  | 0.2725 | 0.7396   | 0.417              |
+
+| Home prob. bin | n   | Mean predicted | Home win rate |
+| -------------- | --- | -------------- | ------------- |
+| 30–40%         | 12  | 35.7%          | 33.3%         |
+| 40–50%         | 25  | 44.5%          | 40.0%         |
+| 50–60%         | 44  | 53.1%          | 54.5%         |
+| 60–70%         | 19  | 63.7%          | 47.4%         |
+| 70–80%         | 5   | 73.2%          | 80.0%         |
+| 80–90%         | 1   | 82.4%          | 100.0%        |
+
+**Reading it.** Brier 0.2450 against a coin flip's 0.2500: the results-only
+view carries almost no information (a typical sportsbook closing line scores
+about 0.20–0.21 on NFL games). Calibration inside bins is not bad — the
+model is not over-confident — it is simply flat: 44 of 106 forecasts sit in
+50–60%. That is F-3 measured: record and form, shrunk by an 8-game prior,
+cannot separate teams. Week 1 is venue-only by construction (5250 for every
+home side). Sample sizes are small; the weekly rows are noise around the
+overall figure. The number to beat with any new strength term is **0.2450
+on these 106 games**, re-run with the same command, before the term is
+enabled — and the real test remains the ledger's own forecasts against
+outcomes once it has them.
