@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import type { DB } from "../../db/client.ts";
 import type { NewForecastRow } from "../../db/schema/forecasts.ts";
-import { makeForecastSink } from "./forecast-sink.ts";
+import { COALESCE_WINDOW_MS, coalescedInsert, makeForecastSink } from "./forecast-sink.ts";
 
 const ok = {
   status: "ok",
@@ -78,5 +78,52 @@ void describe("makeForecastSink", () => {
       /CREATE TRIGGER forecasts_immutable\s+BEFORE UPDATE OR DELETE ON "forecasts"/,
     );
     assert.match(sql, /RAISE EXCEPTION 'forecasts is append-only/);
+  });
+});
+
+void describe("coalescedInsert (Task 079, F-1)", () => {
+  const row = (createdAt: string) =>
+    ({
+      providerEventId: "401",
+      outcomeIndex: 0,
+      source: "page",
+      modelVersion: "v1",
+      createdAt: new Date(createdAt),
+    }) as unknown as NewForecastRow;
+
+  void it("skips the write when an equivalent row landed inside the window", async () => {
+    const asked: Date[] = [];
+    let inserted = 0;
+    const insert = coalescedInsert({
+      exists: (_db, _row, since) => {
+        asked.push(since);
+        return Promise.resolve(true);
+      },
+      insert: () => {
+        inserted += 1;
+        return Promise.resolve();
+      },
+    });
+    await insert({} as DB, row("2026-10-29T12:00:00Z"));
+    assert.equal(inserted, 0);
+    // The window is one hour back from the row's own timestamp.
+    assert.equal(asked[0]?.toISOString(), "2026-10-29T11:00:00.000Z");
+  });
+
+  void it("writes when nothing equivalent is on file", async () => {
+    let inserted = 0;
+    const insert = coalescedInsert({
+      exists: () => Promise.resolve(false),
+      insert: () => {
+        inserted += 1;
+        return Promise.resolve();
+      },
+    });
+    await insert({} as DB, row("2026-10-29T12:00:00Z"));
+    assert.equal(inserted, 1);
+  });
+
+  void it("defaults to a one-hour window", () => {
+    assert.equal(COALESCE_WINDOW_MS, 3_600_000);
   });
 });

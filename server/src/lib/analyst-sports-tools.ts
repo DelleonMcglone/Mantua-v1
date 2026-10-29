@@ -8,7 +8,8 @@
  */
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "../db/client.ts";
-import { toolDefinitions } from "./agent-chat.ts";
+import { forecastModelVersion, toolDefinitions } from "./agent-chat.ts";
+import { coalescedInsert, makeForecastSink } from "./forecast/forecast-sink.ts";
 import {
   analyzeMarket,
   getGame,
@@ -32,9 +33,28 @@ const RUNNERS: Partial<Record<string, Run>> = {
   get_recent_games: (i) => getRecentGames(dbx, i),
   get_head_to_head: (i) => getHeadToHead(dbx, i),
   get_standings: (i) => getStandings(dbx, i),
-  mantua_analyze_market: (i) => analyzeMarket(dbx, i),
-  mantua_probability_gaps: (i) => scanProbabilityGaps(dbx, i),
+  // Task 079 (F-1) — the analyst's views are forecasts too, recorded under
+  // their own source, one row per side per model version per hour.
+  mantua_analyze_market: (i) =>
+    analyzeMarket(dbx, i, new Date(), analystSink("mantua_analyze_market")),
+  mantua_probability_gaps: (i) =>
+    scanProbabilityGaps(dbx, i, new Date(), analystSink("mantua_probability_gaps")),
 };
+
+function analystSink(toolName: string) {
+  return makeForecastSink(
+    db,
+    {
+      userId: null,
+      sessionId: null,
+      source: "analyst",
+      action: "no_trade",
+      modelVersion: forecastModelVersion(),
+      toolName,
+    },
+    { insert: coalescedInsert() },
+  );
+}
 
 export const ANALYST_SPORTS_TOOL_NAMES: readonly string[] = Object.keys(RUNNERS);
 

@@ -21,7 +21,10 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-export const FORECAST_SOURCES = ["scan", "research", "proposal"] as const;
+/** Task 079 (F-1): `page` is the market page's analysis panel, `analyst`
+ *  the logged-out analyst's reads — the surfaces the owner actually looks
+ *  at, which recorded nothing before 2026-10-29. */
+export const FORECAST_SOURCES = ["scan", "research", "proposal", "page", "analyst"] as const;
 export type ForecastSource = (typeof FORECAST_SOURCES)[number];
 
 export const FORECAST_ACTIONS = [

@@ -147,3 +147,22 @@ leakage would enter (F-2), not the live path.
 3. **Strength term (F-3):** point differential from `events`, behind a new
    weight so the model version changes; evaluate on slice 2 before enabling.
 4. **Confidence (F-7):** gate "high" on ledger sample size and calibration.
+
+## 6. Slice 1 delivered — provenance for the surfaces the owner reads (2026-10-29)
+
+Owner: "ok, continue". Resolves F-1 without touching model logic.
+
+- New forecast sources `page` (the market page's analysis panel,
+  `/api/markets/analysis`) and `analyst` (the logged-out analyst's
+  `mantua_analyze_market` and `mantua_probability_gaps`). Both record with
+  `action: no_trade`, no user, no session. No migration: `source` is a
+  varchar with no check constraint.
+- `coalescedInsert` in `forecast-sink.ts`: one row per market, side, source
+  and model version per hour (`COALESCE_WINDOW_MS`). The page sits behind a
+  60-second cache and the analyst can be asked the same thing ten times;
+  the view does not change until an input or the model does, so a second
+  row inside the hour would only pad counts.
+- The X post is agent-written text from chat research, which already
+  records under `research`; nothing to add there.
+- `uniqueViews` already counts every `no_trade` row as a view, so page and
+  analyst reads enter the all-views slice and never the trades-only slice.
