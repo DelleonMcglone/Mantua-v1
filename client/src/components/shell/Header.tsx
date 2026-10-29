@@ -34,9 +34,9 @@ interface HeaderProps {
   onQuickAction?: ((id: HomePromptId) => void) | undefined;
   /** The league page currently open, highlighted in the league bar. */
   activeSport?: SportId | null | undefined;
-  /** The waitlist landing page: the same bar without help, login,
-   *  sign-up or the theme toggle (the page is always dark) — a visitor
-   *  can only leave an email there. */
+  /** The landing page: the same bar without help or the theme toggle
+   *  (the page is always dark); login and sign-up stay — that is how a
+   *  visitor gets in (owner, 2026-10-21). */
   minimal?: boolean;
   /** Extra classes on the `<header>` (the landing page makes it float
    *  over its background). */
@@ -114,17 +114,15 @@ export function Header({
               <Icon className="h-[18px] w-[18px]" />
             </Button>
           )}
-          {!minimal && (
-            <HeaderAccount
-              walletAddress={walletAddress}
-              onLogin={onLogin}
-              onSignup={onSignup}
-              onDisconnect={onDisconnect}
-              walletSetup={walletSetup}
-              onOpenProfile={onOpenProfile}
-              onOpenAgent={onOpenAgent}
-            />
-          )}
+          <HeaderAccount
+            walletAddress={walletAddress}
+            onLogin={onLogin}
+            onSignup={onSignup}
+            onDisconnect={onDisconnect}
+            walletSetup={walletSetup}
+            onOpenProfile={onOpenProfile}
+            onOpenAgent={onOpenAgent}
+          />
         </div>
       </div>
       {/* The league sub-header: every league with its logo, NFL live, the

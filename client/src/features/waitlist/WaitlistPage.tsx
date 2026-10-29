@@ -2,23 +2,32 @@ import { Header } from "@/components/shell/Header.tsx";
 import { Footer } from "@/components/shell/Footer.tsx";
 import type { LegalDoc } from "@/components/legal/LegalPage.tsx";
 import type { NavDestination } from "@/components/shell/MarketNav.tsx";
-import { WaitlistForm } from "./WaitlistForm.tsx";
 
 interface Props {
   onNavigate: (destination: NavDestination) => void;
   onLogoClick: () => void;
   onOpenDocs: () => void;
   onOpenLegal: (doc: LegalDoc) => void;
+  /** Both open the login modal; signing in takes the visitor into the app. */
+  onLogin: () => void;
+  onSignup: () => void;
 }
 
 /**
- * The pre-launch landing page at `/waitlist` (owner, 2026-10-04): the home
- * header without help / login / sign-up, the brand hero, one email field,
- * a demo-video slot, and the home footer — all over the night-sky art.
- * The art is always dark, so the page's text is fixed light regardless
- * of the theme.
+ * The landing page (owner, 2026-10-04; login from here since 2026-10-21):
+ * the home header with Log in / Sign up (no help, no theme toggle), the
+ * brand hero, the demo video, and the home footer — all over the
+ * night-sky art. The art is always dark, so the page's text is fixed
+ * light regardless of the theme.
  */
-export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal }: Props) {
+export function WaitlistPage({
+  onNavigate,
+  onLogoClick,
+  onOpenDocs,
+  onOpenLegal,
+  onLogin,
+  onSignup,
+}: Props) {
   return (
     <div
       className="theme-dark relative flex min-h-screen flex-col bg-[#07040f] text-white"
@@ -36,6 +45,8 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
       <div className="relative flex flex-1 flex-col">
         <Header
           minimal
+          onLogin={onLogin}
+          onSignup={onSignup}
           onLogoClick={onLogoClick}
           onNavigate={onNavigate}
           className="border-white/10 bg-black/25 backdrop-blur-sm"
@@ -59,18 +70,6 @@ export function WaitlistPage({ onNavigate, onLogoClick, onOpenDocs, onOpenLegal 
             <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-white/75 sm:text-[16px]">
               Research markets, size positions, and execute trades automatically. You set the
               strategy. Your agent executes it.
-            </p>
-          </section>
-
-          <section className="mt-10 w-full max-w-4xl text-center" aria-labelledby="waitlist-h">
-            <h2 id="waitlist-h" className="text-[13px] uppercase tracking-[0.2em] text-white/60">
-              Join the waitlist
-            </h2>
-            <div className="mt-4">
-              <WaitlistForm />
-            </div>
-            <p className="mt-3 text-[12px] text-white/45">
-              One email when we open. No spam, no sharing.
             </p>
           </section>
 
