@@ -25,3 +25,8 @@ model logic changed.
 Owner: "ok, continue" → slice 1 (provenance, F-1): sources `page` and
 `analyst`, coalesced to one row per side per model version per hour, wired
 into the analysis route and the analyst's two tools. No model change.
+
+Slice 2 (F-2, history): `lib/forecast/reconstruct.ts` + `npm run
+estimator:reconstruct` — record-and-form views rebuilt from prior finals
+only, scored on weeks 1–7 (106 games): Brier 0.2450 vs 0.2500 coin flip.
+A lower bound and the baseline any strength term must beat.

@@ -17,6 +17,7 @@
     "circle:e2e": "tsx --env-file-if-exists=.env src/scripts/circle-e2e.ts",
     "load:spike": "tsx --env-file-if-exists=.env src/scripts/load-test.ts",
     "drill:kill-switch": "tsx --env-file-if-exists=.env src/scripts/kill-switch-drill.ts",
+    "estimator:reconstruct": "tsx src/scripts/estimator-reconstruct.ts",
     "push:generate-keys": "tsx src/scripts/push-generate-keys.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
