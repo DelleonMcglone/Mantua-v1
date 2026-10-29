@@ -1878,17 +1878,30 @@ async function sideFacts(dbx: SportsToolsDb, team: TeamRow, limit = 5): Promise<
     dbx.listOpenInjuriesForTeam(team.id),
     dbx.listEventsForTeam(team, 200),
   ]);
-  const finals = events.filter(isFinal).slice(0, limit);
+  const allFinals = events.filter(isFinal);
+  const finals = allFinals.slice(0, limit);
   const recentForm = finals.map((e): "W" | "L" | "T" => {
     const side = sideOf(e, team) ?? "home";
     const us = (side === "home" ? e.homeScore : e.awayScore) ?? 0;
     const them = (side === "home" ? e.awayScore : e.homeScore) ?? 0;
     return us > them ? "W" : us < them ? "L" : "T";
   });
+  // Task 079 slice 3 — season points for and against, from every final on file.
+  const margin = allFinals.reduce(
+    (m, e) => {
+      const side = sideOf(e, team) ?? "home";
+      m.pointsFor += (side === "home" ? e.homeScore : e.awayScore) ?? 0;
+      m.pointsAgainst += (side === "home" ? e.awayScore : e.homeScore) ?? 0;
+      m.games += 1;
+      return m;
+    },
+    { pointsFor: 0, pointsAgainst: 0, games: 0 },
+  );
   return {
     name: clean(team.name),
     record: recordOf(records),
     recentForm,
+    margin: margin.games > 0 ? margin : null,
     injuries: injuries.map((i) => ({
       status: clean(i.status),
       player: i.playerName === null ? null : clean(i.playerName),

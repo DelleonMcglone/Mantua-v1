@@ -57,6 +57,17 @@ function resultFor(g: GameRow, team: string): "W" | "L" | "T" {
 export function sideFactsAt(priorFinals: readonly GameRow[], team: string): SideFacts {
   const mine = priorFinals.filter((g) => g.home === team || g.away === team);
   const results = mine.map((g) => resultFor(g, team));
+  const margin =
+    mine.length === 0
+      ? null
+      : {
+          pointsFor: mine.reduce((s, g) => s + (g.home === team ? g.homeScore : g.awayScore), 0),
+          pointsAgainst: mine.reduce(
+            (s, g) => s + (g.home === team ? g.awayScore : g.homeScore),
+            0,
+          ),
+          games: mine.length,
+        };
   const record =
     results.length === 0
       ? null
@@ -65,7 +76,7 @@ export function sideFactsAt(priorFinals: readonly GameRow[], team: string): Side
           losses: results.filter((r) => r === "L").length,
           ties: results.filter((r) => r === "T").length,
         };
-  return { name: team, record, recentForm: results.slice(0, FORM_GAMES), injuries: [] };
+  return { name: team, record, recentForm: results.slice(0, FORM_GAMES), injuries: [], margin };
 }
 
 /** The estimator's facts for the home side of `game`, from prior finals only. */
@@ -100,7 +111,11 @@ export function factsAt(games: readonly GameRow[], game: GameRow, league = "nfl"
   };
 }
 
-export function reconstructSeason(games: readonly GameRow[]): ReconstructedForecast[] {
+export function reconstructSeason(
+  games: readonly GameRow[],
+  /** Evaluation only: estimator weights to try in place of the deployed ones. */
+  overrides: Partial<Record<string, number>> = {},
+): ReconstructedForecast[] {
   return [...games]
     .sort((a, b) => a.startsAt - b.startsAt)
     .map((g) => ({
@@ -109,7 +124,7 @@ export function reconstructSeason(games: readonly GameRow[]): ReconstructedForec
       startsAt: g.startsAt,
       home: g.home,
       away: g.away,
-      homeProbabilityBps: analyzeSide(factsAt(games, g)).probabilityBps,
+      homeProbabilityBps: analyzeSide(factsAt(games, g), overrides).probabilityBps,
       outcome: !g.final || g.homeScore === g.awayScore ? null : g.homeScore > g.awayScore ? 1 : 0,
     }));
 }

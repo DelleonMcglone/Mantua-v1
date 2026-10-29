@@ -1383,3 +1383,24 @@ submitted in the last ten minutes and still pending or already confirmed
 is refused with a typed error the agent relays; a reverted trade may be
 retried at once. Adding to a position with the identical amount inside
 that window needs a different amount or a short wait — accepted.
+
+## D-126 — The point-differential term ships off; no estimator weight changes without an out-of-sample win (2026-10-29)
+
+**Context.** The owner's estimator brief (Task 079) asked for better
+independent inputs and set a gate: promote nothing for being closer to
+consensus, only for measured out-of-sample improvement. A season point
+differential term was built behind `marginBpsPerPoint` and scored by the
+results-only reconstruction, weights chosen on weeks 1–4 and judged on
+weeks 5–7 of 2026. Every positive weight, at every shrinkage and record
+weight tried, scored worse than the deployed estimator on the held-out
+weeks; the best cases were a dead heat.
+
+**Decision (owner's gate, applied).** The term stays in the code with
+weight 0: present, tested, switchable, silent. The same rule applies to
+every future weight: a change needs a better Brier on games it was not
+tuned on, reported with its sample size, before it is enabled. Record and
+form weights joined `ESTIMATOR_WEIGHTS` so they are subject to the same
+test. Separating teams further needs data the catalog does not hold
+(prior-season strength, quarterback quality, opponent-adjusted
+efficiency) — each a sources decision for the owner before it is a model
+change.

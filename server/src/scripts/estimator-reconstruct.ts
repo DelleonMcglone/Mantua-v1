@@ -1,14 +1,18 @@
 /**
- * Task 079, slice 2 — rebuild the record-and-form part of the estimator for
+ * Task 079, slices 2–3 — rebuild the results-only part of the estimator for
  * every game of a season, using only finals that had ended before each
  * kickoff, and score it against outcomes.
  *
  *   npm run estimator:reconstruct -- [season=2026] [weeks=1-9]
+ *   npm run estimator:reconstruct -- grid=1 train=1-4 test=5-7
  *
- * Reads ESPN's public scoreboard (no key, no secrets). Prints a Markdown
- * report: overall Brier / log loss against a 0.25 coin flip, the favoured
- * side's hit rate, and the same by week. This is a partial-input lower
- * bound — no injuries, no book line — and the report says so.
+ * Reads ESPN's public scoreboard (no key, no secrets). The default prints a
+ * Markdown report for the deployed weights. `grid=1` scores candidate
+ * weights for the point-differential term (and a reduced record weight) on
+ * the train weeks and the held-out test weeks separately, so a weight is
+ * chosen on one and judged on the other. Partial inputs — no injuries, no
+ * book line — so every number here is a lower bound, never the estimator's
+ * score.
  */
 
 import {
@@ -20,6 +24,7 @@ import {
 
 const arg = (k: string, d: string): string =>
   process.argv.find((a) => a.startsWith(`${k}=`))?.slice(k.length + 1) ?? d;
+const range = (s: string): [number, number] => s.split("-").map(Number) as [number, number];
 
 async function fetchWeek(season: string, week: number): Promise<GameRow[]> {
   const url = `https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?seasontype=2&week=${String(week)}&dates=${season}`;
@@ -61,19 +66,15 @@ function reportLine(label: string, rows: readonly ReconstructedForecast[]): stri
   return `| ${label} | ${String(s.n)} | ${fmt(s.brier)} | ${fmt(s.logLoss)} | ${fmt(s.favouriteHitRate, 3)} |`;
 }
 
-async function main(): Promise<void> {
-  const season = arg("season", "2026");
-  const [from, to] = arg("weeks", "1-9").split("-").map(Number) as [number, number];
-  const games: GameRow[] = [];
-  for (let w = from; w <= to; w += 1) games.push(...(await fetchWeek(season, w)));
+function report(season: string, from: number, to: number, games: GameRow[]): void {
   const rows = reconstructSeason(games);
   const finals = rows.filter((r) => r.outcome !== null);
   console.log(
-    `# Record-and-form reconstruction — ${season} regular season, weeks ${String(from)}–${String(to)}\n`,
+    `# Results-only reconstruction — ${season} regular season, weeks ${String(from)}–${String(to)}\n`,
   );
   console.log(
     `Games fetched: ${String(games.length)}; scored (final, not tied): ${String(finals.length)}. ` +
-      "Inputs per game: venue, season record and last-5 form from finals that ended BEFORE kickoff. " +
+      "Inputs per game: venue, season record, point differential and last-5 form from finals that ended BEFORE kickoff. " +
       "No injuries, no book line, no prior-season head-to-head. Coin-flip Brier is 0.2500.\n",
   );
   console.log("| Slice | n | Brier | Log loss | Favourite hit rate |");
@@ -103,6 +104,39 @@ async function main(): Promise<void> {
       `| ${String(b * 10)}–${String(b * 10 + 10)}% | ${String(v.n)} | ${(v.sum / v.n / 100).toFixed(1)}% | ${((100 * v.hits) / v.n).toFixed(1)}% |`,
     );
   }
+}
+
+/** Candidate weights: margin bps per point × record gap bps. */
+function grid(games: GameRow[], train: [number, number], test: [number, number]): void {
+  const inWeeks = (r: ReconstructedForecast, [a, b]: [number, number]) =>
+    r.week !== null && r.week >= a && r.week <= b;
+  console.log(
+    `# Weight grid — train weeks ${String(train[0])}–${String(train[1])}, test weeks ${String(test[0])}–${String(test[1])}\n`,
+  );
+  console.log(
+    "| margin bps/pt | record gap bps | n train | Brier train | n test | Brier test | Brier all |",
+  );
+  console.log("|---|---|---|---|---|---|---|");
+  for (const recordGapBps of [5000, 2500, 0]) {
+    for (const marginBpsPerPoint of [0, 100, 150, 200, 250, 300, 400]) {
+      const rows = reconstructSeason(games, { marginBpsPerPoint, recordGapBps });
+      const tr = scoreReconstruction(rows.filter((r) => inWeeks(r, train)));
+      const te = scoreReconstruction(rows.filter((r) => inWeeks(r, test)));
+      const all = scoreReconstruction(rows);
+      console.log(
+        `| ${String(marginBpsPerPoint)} | ${String(recordGapBps)} | ${String(tr.n)} | ${fmt(tr.brier)} | ${String(te.n)} | ${fmt(te.brier)} | ${fmt(all.brier)} |`,
+      );
+    }
+  }
+}
+
+async function main(): Promise<void> {
+  const season = arg("season", "2026");
+  const [from, to] = range(arg("weeks", "1-9"));
+  const games: GameRow[] = [];
+  for (let w = from; w <= to; w += 1) games.push(...(await fetchWeek(season, w)));
+  if (arg("grid", "0") === "1") grid(games, range(arg("train", "1-4")), range(arg("test", "5-7")));
+  else report(season, from, to, games);
 }
 
 main().catch((err: unknown) => {

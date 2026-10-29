@@ -128,3 +128,25 @@ void describe("reconstruct — what a pregame view may see", () => {
     assert.equal(scoreReconstruction([]).brier, null);
   });
 });
+
+void describe("reconstruct — point differential facts (slice 3)", () => {
+  void it("sideFactsAt sums points for and against over prior finals", () => {
+    const prior = finalsBefore(SEASON, SEASON[3].startsAt);
+    // A: 24-10 at home, 17-20 away → 41 for, 30 against, 2 games.
+    assert.deepEqual(sideFactsAt(prior, "A").margin, {
+      pointsFor: 41,
+      pointsAgainst: 30,
+      games: 2,
+    });
+    assert.equal(sideFactsAt(prior, "Z").margin, null);
+  });
+
+  void it("reconstructSeason passes weight overrides through to the estimator", () => {
+    const off = reconstructSeason(SEASON);
+    const on = reconstructSeason(SEASON, { marginBpsPerPoint: 200 });
+    const g4off = off.find((r) => r.id === "4");
+    const g4on = on.find((r) => r.id === "4");
+    assert.ok(g4off && g4on);
+    assert.notEqual(g4on.homeProbabilityBps, g4off.homeProbabilityBps);
+  });
+});
