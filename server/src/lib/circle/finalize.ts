@@ -12,6 +12,11 @@ import { logger } from "../logger.ts";
 import { engineExecuted } from "../sports/strategy-store.ts";
 import { recordSpending, reverseSpending } from "../spending-cap.ts";
 import { isTerminalFailureState, isTerminalSuccessState } from "./execute.ts";
+import {
+  agentTradePlan,
+  recordAgentTradeFill,
+  type AgentTradePayload,
+} from "./finalize-agent-trade.ts";
 
 /**
  * C-015 — execution finalization.
@@ -31,7 +36,7 @@ import { isTerminalFailureState, isTerminalSuccessState } from "./execute.ts";
 export type FinalizationSource = "poll" | "webhook";
 
 /** `circle_executions.kind` values. Closed set — extend with the plan builder. */
-export type ExecutionKind = "agent_send" | "strategy_close" | "combo_trade";
+export type ExecutionKind = "agent_send" | "strategy_close" | "combo_trade" | "agent_trade";
 
 /** Expected `payload` for `kind: "agent_send"` executions. */
 export const agentSendPayloadSchema = z.object({
@@ -93,6 +98,13 @@ export type FinalizationEffect =
   | { type: "audit"; entry: AuditEntry }
   /** Task 072 — the webhook finalizer records a combo ticket or close itself. */
   | { type: "combo_fill"; payload: ComboTradePayload; txHash: string }
+  /** The agent's chat trade (2026-10-29): timeline entry + forecast fill row. */
+  | {
+      type: "agent_trade_fill";
+      payload: AgentTradePayload;
+      txHash: string;
+      userId: string | null;
+    }
   | { type: "close_position"; strategyId: string; detail: Record<string, unknown>; txHash: string }
   | {
       type: "audit_strategy";
@@ -145,6 +157,15 @@ export interface FinalizationInput {
  */
 export function buildFinalizationPlan(input: FinalizationInput): FinalizationPlan | null {
   if (input.status !== "pending") return null; // already finalized — never again
+
+  if (input.kind === "agent_trade") {
+    if (isTerminalSuccessState(input.state)) return agentTradePlan(input, "confirmed");
+    if (isTerminalFailureState(input.state)) {
+      const reason = `Circle transaction ${input.state}${input.errorReason ? `: ${input.errorReason}` : ""}`;
+      return agentTradePlan(input, "failed", reason);
+    }
+    return null;
+  }
 
   if (isTerminalSuccessState(input.state)) {
     if (input.kind === "agent_send") {
@@ -393,6 +414,9 @@ export async function applyFinalization(plan: FinalizationPlan): Promise<void> {
         });
         break;
       }
+      case "agent_trade_fill":
+        await recordAgentTradeFill(db, effect.payload, effect.txHash, effect.userId, plan.source);
+        break;
       case "close_position":
         await engineExecuted(db, effect.strategyId, effect.detail, effect.txHash);
         break;

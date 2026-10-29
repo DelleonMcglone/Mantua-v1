@@ -34,7 +34,10 @@ import {
 } from "./agent-wallet.ts";
 import { sendFromAgentWallet } from "./agent-send.ts";
 import { getUserPortfolio } from "./user-portfolio.ts";
-import { agentMarketTrade } from "./sports/market-agent-trade.ts";
+import { agentMarketTrade, type AgentTradeResult } from "./sports/market-agent-trade.ts";
+import { refuseDuplicateAgentTrade } from "./sports/agent-trade-guard.ts";
+import { CircleReceiptTimeoutError } from "./circle/execute.ts";
+import { recordAgentTradeFill } from "./circle/finalize-agent-trade.ts";
 import { readCanonicalPublicSlate } from "./sports/store.ts";
 import { withLiveOdds } from "./sports/live-odds.ts";
 import {
@@ -1620,50 +1623,72 @@ async function executeTool(
       const wallet = await getAgentWallet(privyUserId, chainId);
       if (!wallet) throw new Error("No agent wallet provisioned — call manage_wallet first.");
       if (direction === "buy") await checkSpendingCap(wallet.address, amountNum);
-      const result = await agentMarketTrade({
-        walletId: wallet.circleWalletId,
+      const userId = await resolveUserId(privyUserId);
+      const confirmationId =
+        typeof input["confirmationId"] === "string" ? input["confirmationId"] : null;
+      const identity = {
         providerEventId: args.providerEventId,
         outcomeIndex: args.outcomeIndex,
         direction,
-        amountRaw: args.amountRaw,
-        chainId,
-      });
-      if (direction === "buy") await recordSpending(wallet.address, amountNum);
-      counters.inc("agent.funnel.execute_ok");
-      // Task 062 / PF-015 — the agent's trade on the timeline (best-effort).
-      await recordActivity(db, {
-        kind: direction === "buy" ? "market_buy" : "market_sell",
-        actor: "agent",
-        userId: await resolveUserId(privyUserId),
-        walletAddress: wallet.address,
-        txHash: result.txHash,
-        chainId,
-        marketId: result.marketId,
-        asset: "YES",
-        amountRaw: direction === "buy" ? result.quote.amountOut : args.amountRaw.toString(),
-        valueUsd: direction === "buy" ? amountNum : Number(result.quote.amountOut) / 1e6,
-        data: {
-          direction,
+        amountRaw: args.amountRaw.toString(),
+      };
+      // Recovery (2026-10-29): the same trade submitted in the last ten
+      // minutes and still pending or already confirmed is never sent again.
+      await refuseDuplicateAgentTrade(db, wallet.circleWalletId, identity);
+      const payload = { agentAddress: wallet.address, ...identity, chainId, confirmationId };
+      let result: AgentTradeResult;
+      try {
+        result = await agentMarketTrade({
+          walletId: wallet.circleWalletId,
           providerEventId: args.providerEventId,
           outcomeIndex: args.outcomeIndex,
-          confirmationId:
-            typeof input["confirmationId"] === "string" ? input["confirmationId"] : null,
-        },
-      });
-      if (direction === "buy") {
-        // The forecast ledger: the view this fill acted on, keyed by the tx.
-        await analyzeMarket(
-          sportsToolsDb,
-          { providerEventId: args.providerEventId, outcomeIndex: args.outcomeIndex },
-          new Date(),
-          await forecastSink(privyUserId, turn, "proposal", "filled", name, result.txHash),
+          direction,
+          amountRaw: args.amountRaw,
+          chainId,
+          // Persisted pending before the receipt wait: a timed-out poll
+          // leaves the webhook finalizer something to resolve.
+          ledger: {
+            kind: "agent_trade",
+            action: "agent_market_trade",
+            ...(userId ? { userId } : {}),
+            walletAddress: wallet.address,
+            circleWalletId: wallet.circleWalletId,
+            payload,
+          },
+        });
+      } catch (err) {
+        if (!(err instanceof CircleReceiptTimeoutError)) throw err;
+        // Submitted, outcome unknown: not a success, not a failure. The
+        // finalizer records the spend, the timeline entry and the forecast
+        // row once Circle reports the terminal state.
+        counters.inc("agent.funnel.execute_pending");
+        return {
+          status: "pending",
+          circleTxId: err.circleTxId,
+          txHash: err.txHash,
+          confirmationId,
+          explorer: err.txHash ? `${getChainInfo(chainId).explorerUrl}/tx/${err.txHash}` : null,
+          next: "Tell the user the trade was submitted but has not confirmed yet, and that it will settle on its own. Do NOT simulate or execute it again — the same trade is refused for ten minutes while it settles.",
+        };
+      }
+      counters.inc("agent.funnel.execute_ok");
+      // Exactly once: when the webhook finalized first it already wrote the
+      // spend, the timeline entry and the forecast row.
+      if (result.finalizedBy === "poll") {
+        if (direction === "buy") await recordSpending(wallet.address, amountNum);
+        await recordAgentTradeFill(
+          db,
+          { ...payload, marketId: result.marketId, expectedOutRaw: result.quote.amountOut },
+          result.txHash,
+          userId,
+          "poll",
+          turn?.sessionId ?? null,
         );
       }
       return {
         txHash: result.txHash,
         marketId: result.marketId,
-        confirmationId:
-          typeof input["confirmationId"] === "string" ? input["confirmationId"] : null,
+        confirmationId,
         received:
           direction === "buy"
             ? `${(Number(result.quote.amountOut) / 1e6).toFixed(2)} YES`
