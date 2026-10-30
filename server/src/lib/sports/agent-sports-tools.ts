@@ -33,7 +33,14 @@ import type { ForecastSink } from "../forecast/forecast-sink.ts";
 import { z } from "zod";
 import { and, desc, eq, gte, isNull, or } from "drizzle-orm";
 import type { DB } from "../../db/client.ts";
-import { analyzeSide, type AnalysisFacts, type SideFacts } from "../agent/sports-intelligence.ts";
+import {
+  analyzeSide,
+  EDGE_THRESHOLD_BPS,
+  type AnalysisFacts,
+  type SideFacts,
+} from "../agent/sports-intelligence.ts";
+import { kickoffContext } from "./kickoff-context.ts";
+import { qualifyEdge, type CalibrationStatus } from "./edge-qualification.ts";
 import {
   events,
   gamePlays,
@@ -169,6 +176,9 @@ export interface TeamRecordRow {
  * live in the tool functions so they are covered by unit tests.
  */
 export interface SportsToolsDb {
+  /** Goal 4 — the deployed model version's scored track record on the
+   *  ledger, for the edge gate. Optional: fakes and the reconstruction omit it. */
+  calibrationStatus?(): Promise<CalibrationStatus | null>;
   listLeagues(): Promise<LeagueRow[]>;
   listTeams(): Promise<TeamRow[]>;
   listPlayers(): Promise<PlayerRow[]>;
@@ -250,6 +260,25 @@ export function makeSportsToolsDb(db: DB): SportsToolsDb {
     updatedAt: teamRecords.updatedAt,
   };
   return {
+    async calibrationStatus() {
+      // Loaded late: agent-chat owns the model version and imports this module.
+      const [{ forecastModelVersion }, { readScoredRecords }, { scoreRecords }] = await Promise.all(
+        [
+          import("../agent-chat.ts"),
+          import("../forecast/calibration-read.ts"),
+          import("../forecast/scoring.ts"),
+        ],
+      );
+      const modelVersion = forecastModelVersion();
+      const records = (await readScoredRecords(db)).filter((r) => r.modelVersion === modelVersion);
+      const m = scoreRecords(records);
+      return {
+        modelVersion,
+        settled: m.agent.n,
+        agentBrier: m.agent.brier,
+        referenceBrier: m.reference.brier,
+      };
+    },
     async listLeagues() {
       return db.select({ id: leagues.id, slug: leagues.slug, name: leagues.name }).from(leagues);
     },
@@ -1906,6 +1935,11 @@ async function sideFacts(dbx: SportsToolsDb, team: TeamRow, limit = 5): Promise<
       status: clean(i.status),
       player: i.playerName === null ? null : clean(i.playerName),
       position: i.position === null ? null : clean(i.position),
+      // Goal 3 — when it was reported and how many finals the team has
+      // played since: the estimator treats a long-standing absence as
+      // already in the record rather than penalising it again.
+      reportedAt: i.reportedAt.toISOString(),
+      gamesSince: allFinals.filter((e) => e.startsAt.getTime() > i.reportedAt.getTime()).length,
     })),
   };
 }
@@ -2048,6 +2082,20 @@ async function analyzeMarketInner(
   // reference to compare against while no pool price exists.
   const homeBook = event.homeWinProbabilityBps ?? null;
   const bookBps = homeBook === null ? null : side === "home" ? homeBook : 10_000 - homeBook;
+  // Reliability brief (2026-10-30): the clock (Goal 1) and the edge gate
+  // (Goal 4) ride with every analysis so the narrative has no room to
+  // invent a calendar or call a gap "value".
+  const timing = kickoffContext(event.startsAt, now, event.status);
+  const calibration = dbx.calibrationStatus ? await dbx.calibrationStatus() : null;
+  const edge = qualifyEdge({
+    probabilityBps: analysis.probabilityBps,
+    poolBps: price ? price.impliedProbabilityBps : null,
+    poolAgeSeconds: price ? price.ageSeconds : null,
+    liquidityUsdc: liquidity,
+    bookBps,
+    calibration,
+    thresholdBps: EDGE_THRESHOLD_BPS,
+  });
   return {
     status: "ok",
     skill: "sports_intelligence",
@@ -2055,13 +2103,20 @@ async function analyzeMarketInner(
     side,
     team: team.name,
     opponent: opponent.name,
+    timing,
+    edge,
     bookLine:
       bookBps === null
         ? null
         : {
             impliedProbabilityBps: bookBps,
             gapPoints: Math.round((analysis.probabilityBps - bookBps) / 10) / 10,
-            source: "sportsbook closing line, vig removed (not a Mantua market price)",
+            vigRemoved: true,
+            method:
+              "both moneylines → implied probabilities, normalized to sum to 1 (proportional de-vig); spread → normal CDF (σ 13.5) when no moneyline",
+            source:
+              "sportsbook line from the feed, vig removed — a reference, NOT a Mantua market price; no trade executes at it",
+            capturedAt: null,
           },
     market: market
       ? {

@@ -22,8 +22,17 @@ export interface SideFacts {
   /** Task 079 slice 3 — points scored and allowed over this season's finals
    *  (absent or null when the caller has no scores). */
   margin?: { pointsFor: number; pointsAgainst: number; games: number } | null;
-  /** Open injuries: status strings as the provider reports them. */
-  injuries: { status: string; player: string | null; position: string | null }[];
+  /** Open injuries: status strings as the provider reports them. Goal 3:
+   *  `reportedAt` and `gamesSince` (finals the team has played since the
+   *  report) let a long-standing absence be recognised as already in the
+   *  record rather than penalised again. */
+  injuries: {
+    status: string;
+    player: string | null;
+    position: string | null;
+    reportedAt?: string | null;
+    gamesSince?: number | null;
+  }[];
 }
 
 export interface AnalysisFacts {
@@ -65,7 +74,29 @@ export interface SportsAnalysis {
     kind: "consider_buy_yes" | "consider_fade" | "hold" | "no_market_price";
     rationale: string;
   };
+  /** Goal 2 — the arithmetic, term by term, in one unit. */
+  attribution: {
+    units: "bps";
+    baselineBps: number;
+    terms: { factor: string; effectBps: number }[];
+    sumBps: number;
+    /** The bound the sum hit, when the clamp changed the number. */
+    clampedTo: number | null;
+    finalBps: number;
+  };
+  /** Goal 3 — every injury considered, with what it cost and why. */
+  injuryContributions: { team: InjuryContribution[]; opponent: InjuryContribution[] };
   disclaimers: string[];
+}
+
+export interface InjuryContribution {
+  player: string | null;
+  position: string | null;
+  status: string;
+  reportedAt: string | null;
+  gamesSince: number | null;
+  impactBps: number;
+  rationale: string;
 }
 
 const HOME_ADVANTAGE_BPS: Record<string, number> = { nfl: 250, wnba: 300 };
@@ -92,6 +123,10 @@ const PLAYER_QUESTIONABLE_BPS = 50;
  * were priced 13 points above the books, and 900 could not express that.
  */
 const INJURY_CAP_BPS = 2000;
+/** Goal 3 — an absence the team has already played this many finals
+ *  without is in the record and form terms; counting it again would be
+ *  double counting (D-127). */
+const LONG_STANDING_GAMES = 3;
 
 /**
  * The named weights, exported for the forecast ledger's model version: a
@@ -124,6 +159,7 @@ export const ESTIMATOR_WEIGHTS: Record<string, number> = {
   playerOutBps: PLAYER_OUT_BPS,
   playerQuestionableBps: PLAYER_QUESTIONABLE_BPS,
   injuryCapBps: INJURY_CAP_BPS,
+  longStandingGames: LONG_STANDING_GAMES,
 };
 
 function gamesOf(r: { wins: number; losses: number; ties: number } | null): number {
@@ -153,20 +189,46 @@ function formPct(form: readonly ("W" | "L" | "T")[]): number | null {
  * the record only absorbs the loss once games have been played without
  * him, and the week he goes on IR it says nothing (2026-10-27, Hurts).
  */
-function injuryPenaltyBps(injuries: SideFacts["injuries"]): number {
-  let bps = 0;
+function injuryPenalty(injuries: SideFacts["injuries"]): {
+  bps: number;
+  items: InjuryContribution[];
+} {
+  let raw = 0;
+  const items: InjuryContribution[] = [];
   for (const i of injuries) {
     const s = i.status.toLowerCase();
     const qb = (i.position ?? "").toUpperCase() === "QB";
-    if (s === "ir") {
-      if (qb) bps += QB_OUT_BPS;
-      continue;
+    const since = i.gamesSince ?? null;
+    let impact = 0;
+    let rationale: string;
+    if (since !== null && since >= LONG_STANDING_GAMES) {
+      rationale = `long-standing: ${String(since)} games played without him — already in the record and form, not counted again`;
+    } else if (s === "ir") {
+      impact = qb ? QB_OUT_BPS : 0;
+      rationale = qb
+        ? "quarterback on injured reserve, recent: counted as out until the record absorbs it"
+        : "injured reserve, non-quarterback: not counted (the record carries it)";
+    } else if (s.includes("out") || s.includes("doubtful")) {
+      impact = qb ? QB_OUT_BPS : PLAYER_OUT_BPS;
+      rationale = qb ? "quarterback out or doubtful" : "starter out or doubtful";
+    } else if (s.includes("questionable") || s.includes("day") || s.includes("probable")) {
+      impact = qb ? QB_QUESTIONABLE_BPS : PLAYER_QUESTIONABLE_BPS;
+      rationale = qb ? "quarterback questionable" : "player questionable";
+    } else {
+      rationale = `status "${i.status}" carries no weight`;
     }
-    if (s.includes("out") || s.includes("doubtful")) bps += qb ? QB_OUT_BPS : PLAYER_OUT_BPS;
-    else if (s.includes("questionable") || s.includes("day") || s.includes("probable"))
-      bps += qb ? QB_QUESTIONABLE_BPS : PLAYER_QUESTIONABLE_BPS;
+    raw += impact;
+    items.push({
+      player: i.player,
+      position: i.position,
+      status: i.status,
+      reportedAt: i.reportedAt ?? null,
+      gamesSince: since,
+      impactBps: impact,
+      rationale,
+    });
   }
-  return Math.min(bps, INJURY_CAP_BPS);
+  return { bps: Math.min(raw, INJURY_CAP_BPS), items };
 }
 
 /** Season margin per game, shrunk toward zero by `prior` phantom games. */
@@ -256,14 +318,17 @@ export function analyzeSide(
   }
 
   // 4. Injuries (each side's penalty moves the other way).
-  const pa = injuryPenaltyBps(f.team.injuries);
-  const pb = injuryPenaltyBps(f.opponent.injuries);
+  const ia = injuryPenalty(f.team.injuries);
+  const ib = injuryPenalty(f.opponent.injuries);
+  const pa = ia.bps;
+  const pb = ib.bps;
+  const counted = (items: InjuryContribution[]) => items.filter((x) => x.impactBps > 0).length;
   if (pa > 0 || pb > 0) {
     const eff = pb - pa;
     bps += eff;
     evidence.push({
       factor: "injuries",
-      detail: `${f.team.name} ${String(f.team.injuries.length)} open (${f.team.injuries.map((i) => i.status).join(", ") || "none"}); ${f.opponent.name} ${String(f.opponent.injuries.length)} open (${f.opponent.injuries.map((i) => i.status).join(", ") || "none"})`,
+      detail: `${f.team.name} −${String(pa)} (${String(counted(ia.items))} of ${String(ia.items.length)} open counted); ${f.opponent.name} −${String(pb)} (${String(counted(ib.items))} of ${String(ib.items.length)} open counted); long-standing absences are in the record, not here`,
       effectBps: eff,
     });
     if (pa >= 300) risks.push(`${f.team.name} has a player listed out or doubtful`);
@@ -296,6 +361,16 @@ export function analyzeSide(
   }
 
   const probabilityBps = clamp(bps);
+  // Goal 2 — the arithmetic as applied, so the number can be audited.
+  const sumBps = Math.round(bps);
+  const attribution: SportsAnalysis["attribution"] = {
+    units: "bps",
+    baselineBps: 5000,
+    terms: evidence.map((e) => ({ factor: e.factor, effectBps: e.effectBps })),
+    sumBps,
+    clampedTo: probabilityBps === sumBps ? null : probabilityBps,
+    finalBps: probabilityBps,
+  };
 
   // Market comparison and risks about the market itself.
   const market = f.marketImpliedBps;
@@ -353,7 +428,9 @@ export function analyzeSide(
 
   return {
     probabilityBps,
-    method: `Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × ${String(W["recordGapBps"])}, each share weighted toward .500 by 8 prior games), point differential (${perPoint > 0 ? `season margin per game shrunk by 8 prior games, gap × ${String(perPoint)}/pt, capped ±${String(W["marginCapBps"])}` : "off"}), recent form (gap × ${String(W["formGapBps"])}, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; a quarterback on injured reserve counts as out, other IR not counted; capped 2000), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.`,
+    attribution,
+    injuryContributions: { team: ia.items, opponent: ib.items },
+    method: `Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × ${String(W["recordGapBps"])}, each share weighted toward .500 by 8 prior games), point differential (${perPoint > 0 ? `season margin per game shrunk by 8 prior games, gap × ${String(perPoint)}/pt, capped ±${String(W["marginCapBps"])}` : "off"}), recent form (gap × ${String(W["formGapBps"])}, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; a quarterback on injured reserve counts as out, other IR not counted; an absence the team has already played ${String(LONG_STANDING_GAMES)} finals without is in the record and not counted again; capped 2000), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.`,
     evidence,
     riskFactors: risks,
     discrepancyBps,

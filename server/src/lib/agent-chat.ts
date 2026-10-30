@@ -36,6 +36,7 @@ import { sendFromAgentWallet } from "./agent-send.ts";
 import { getUserPortfolio } from "./user-portfolio.ts";
 import { agentMarketTrade, type AgentTradeResult } from "./sports/market-agent-trade.ts";
 import { refuseDuplicateAgentTrade } from "./sports/agent-trade-guard.ts";
+import { clockPrompt } from "./agent/clock-prompt.ts";
 import { CircleReceiptTimeoutError } from "./circle/execute.ts";
 import { recordAgentTradeFill } from "./circle/finalize-agent-trade.ts";
 import { readCanonicalPublicSlate } from "./sports/store.ts";
@@ -2236,6 +2237,7 @@ export async function* runAgentChat(
           text: `Active chain for this conversation: ${getChainInfo(chainId).displayName} (chain id ${String(chainId)}). ALL wallet actions — swap, send, liquidity, pools, portfolio, funding, and sports market trades — execute on this chain from this chain's agent wallet, and balances quoted to the user must be this chain's.`,
         },
         { type: "text", text: turnContextPrompt(turn) },
+        { type: "text", text: clockPrompt(new Date()) },
       ],
       tools: TOOLS,
       messages,

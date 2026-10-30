@@ -8,6 +8,7 @@ import { readCanonicalPublicSlate } from "./sports/store.ts";
 import { withLiveOdds } from "./sports/live-odds.ts";
 import type { LeagueSlug } from "./sports/provider.ts";
 import { analystSportsTools, runAnalystSportsTool } from "./analyst-sports-tools.ts";
+import { clockPrompt } from "./agent/clock-prompt.ts";
 
 /**
  * Conversational, READ-ONLY research analyst.
@@ -180,7 +181,10 @@ export async function* runResearchChat(params: {
     const stream = client.messages.stream({
       model: MODEL,
       max_tokens: 2048,
-      system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
+      system: [
+        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        { type: "text", text: clockPrompt(new Date()) },
+      ],
       tools: TOOLS,
       messages,
     });
