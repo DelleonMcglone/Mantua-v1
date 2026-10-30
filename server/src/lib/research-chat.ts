@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { logger } from "./logger.ts";
+import { caveatLine, checkNarrative } from "./agent/narrative-check.ts";
 import { getAnthropic, type AgentChatEvent } from "./agent-chat.ts";
 import { isX402Available, searchServices, callPaidService } from "./x402-buyer.ts";
 import { readSchedule } from "./sports/schedule-read.ts";
@@ -177,6 +178,8 @@ export async function* runResearchChat(params: {
     { role: "user", content: params.message },
   ];
 
+  let assistantText = "";
+  const toolData: unknown[] = [];
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
     const stream = client.messages.stream({
       model: MODEL,
@@ -191,6 +194,7 @@ export async function* runResearchChat(params: {
 
     for await (const ev of stream) {
       if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
+        assistantText += ev.delta.text;
         yield { type: "text", delta: ev.delta.text };
       }
     }
@@ -208,6 +212,7 @@ export async function* runResearchChat(params: {
       yield { type: "tool_start", id: tu.id, tool: tu.name, args };
       try {
         const data = await executeTool(tu.name, args);
+        toolData.push(data);
         yield { type: "tool_result", id: tu.id, tool: tu.name, ok: true, data };
         toolResults.push({
           type: "tool_result",
@@ -228,6 +233,14 @@ export async function* runResearchChat(params: {
     }
     messages.push({ role: "user", content: toolResults });
   }
+
+  // Goal 7 — the analyst's prose is checked against this turn's tool results.
+  const check = checkNarrative(assistantText, toolData, new Date());
+  if (!check.ok) {
+    logger.warn({ violations: check.violations }, "research narrative check failed");
+    yield { type: "text", delta: caveatLine(check) };
+  }
+  yield { type: "narrative_check", ...check };
 
   yield { type: "done" };
 }

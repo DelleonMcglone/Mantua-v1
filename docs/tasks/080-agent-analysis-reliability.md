@@ -8,15 +8,15 @@ injury updates" for a Thursday night game.
 
 The brief's seven goals map onto work already done and work done here:
 
-| Goal                           | Status                                                                                                  |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| G1 temporal correctness (P0)   | **Delivered here**                                                                                      |
-| G2 auditable attribution (P0)  | Reproduction done in Task 079 §1; **structured block delivered here**                                   |
-| G3 injury double counting (P0) | **Delivered here** (D-127)                                                                              |
-| G4 edge qualification (P0)     | **Delivered here**                                                                                      |
-| G5 statistical validation (P1) | Task 079 §7–8: reconstruction baseline and the grid; the ledger fills from 2026-10-29                   |
-| G6 better evidence (P1)        | Task 079 §8 names the inputs the catalog lacks; a sources decision for the owner                        |
-| G7 narrative faithfulness (P1) | Prompt rules delivered here; a structural prose-vs-forecast validator is **not** built — see "Not done" |
+| Goal                           | Status                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------- |
+| G1 temporal correctness (P0)   | **Delivered here**                                                                    |
+| G2 auditable attribution (P0)  | Reproduction done in Task 079 §1; **structured block delivered here**                 |
+| G3 injury double counting (P0) | **Delivered here** (D-127)                                                            |
+| G4 edge qualification (P0)     | **Delivered here**                                                                    |
+| G5 statistical validation (P1) | Task 079 §7–8: reconstruction baseline and the grid; the ledger fills from 2026-10-29 |
+| G6 better evidence (P1)        | Task 079 §8 names the inputs the catalog lacks; a sources decision for the owner      |
+| G7 narrative faithfulness (P1) | Prompt rules **and** the post-turn narrative check delivered (second PR, same day)    |
 
 ## G1 — Temporal correctness
 
@@ -78,11 +78,31 @@ this model version, needs 30"), which is the honest state.
 
 ## Not done, and why
 
-- **G7 structural validator** (prose numbers checked against the tool
-  snapshot before publication): the prompt rules are in; a post-generation
-  checker that parses the narrative is a separate piece of work with its
-  own false-positive risk. Proposed as the next slice.
 - **G6 new data sources**: no new inputs were added; the brief forbids
   claiming data that is not there.
 - The `suggestedAction` kinds are unchanged for the client; `edge` is the
   gate the narrative must obey.
+
+## G7 — The narrative check (second PR, 2026-10-30)
+
+`lib/agent/narrative-check.ts`: after a turn's prose is complete, every
+percentage and bps figure in it is matched against the numbers in that
+turn's tool results (display rounding allowed; a bps figure may also be
+the gap between two reported bps values); "value / edge / mispriced"
+language is a violation unless an analysis on the turn has
+`edge.status: "qualified"` or the prose itself disclaims it; and a weekday
+named with report/update language that falls after a pregame kickoff on
+the turn is a violation (the reference defect: "Friday/Saturday injury
+updates" for a Thursday game, now caught by test).
+
+A failed check is never silent, and never blocks: streaming has already
+put the prose in front of the user, so the generator appends one visible
+caveat line naming each unverified claim, emits a `narrative_check` event
+before `done`, counts it (`agent.narrative_check.failed`) and logs it.
+Both the wallet agent and the read-only analyst run it. The stored
+transcript keeps the caveat.
+
+Known limits: dollar amounts, records ("4-3") and player names are not
+checked; a figure the model computes correctly from two reported numbers
+(other than a bps gap) will be flagged — the caveat says "could not be
+verified", not "wrong".
