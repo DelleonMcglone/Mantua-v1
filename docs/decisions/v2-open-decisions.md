@@ -1404,3 +1404,21 @@ test. Separating teams further needs data the catalog does not hold
 (prior-season strength, quarterback quality, opponent-adjusted
 efficiency) — each a sources decision for the owner before it is a model
 change.
+
+## D-127 — An absence the team has already played three finals without is not counted again (2026-10-30)
+
+**Context.** The reliability brief flagged a double-counting risk: the
+record and form terms already reflect games played without an injured
+player, yet the injury term penalised every open listing by status alone.
+D-124 had made the opposite correction for the week a quarterback goes on
+injured reserve, when the record says nothing yet.
+
+**Decision (owner's brief, applied).** Each injury carries its report date
+and the number of finals the team has played since. At three or more it
+is long-standing: listed with zero impact and the rationale "already in
+the record", never counted again. Under three the existing rules apply,
+including D-124's quarterback-on-IR weight. Every contribution is
+reported per player (status, report date, games since, impact,
+rationale). The rule is a correctness rule, not a tuned weight: it cannot
+be back-tested because the ledger holds no injury history before
+2026-10-29, and it is recorded as such. The model version changes.
