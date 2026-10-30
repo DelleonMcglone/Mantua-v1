@@ -19,6 +19,9 @@ export interface SideFacts {
   record: { wins: number; losses: number; ties: number } | null;
   /** Results of recent finished games, newest first. */
   recentForm: ("W" | "L" | "T")[];
+  /** Task 079 slice 3 — points scored and allowed over this season's finals
+   *  (absent or null when the caller has no scores). */
+  margin?: { pointsFor: number; pointsAgainst: number; games: number } | null;
   /** Open injuries: status strings as the provider reports them. */
   injuries: { status: string; player: string | null; position: string | null }[];
 }
@@ -94,11 +97,27 @@ const INJURY_CAP_BPS = 2000;
  * The named weights, exported for the forecast ledger's model version: a
  * change here is a new version (forecast/model-version.ts).
  */
+/** Task 079 slice 3 — point differential. Each side's season margin per
+ *  game is shrunk toward zero by `MARGIN_PRIOR_GAMES`, the gap is worth
+ *  `MARGIN_BPS_PER_POINT` and the whole term is capped. The weight is
+ *  chosen by the reconstruction (`npm run estimator:reconstruct`), never
+ *  by closeness to a book; see docs/tasks/079 §8. */
+const RECORD_GAP_BPS = 5000;
+const FORM_GAP_BPS = 2000;
+const MARGIN_BPS_PER_POINT = 0;
+const MARGIN_PRIOR_GAMES = 8;
+const MARGIN_CAP_BPS = 1500;
+
 export const ESTIMATOR_WEIGHTS: Record<string, number> = {
   homeAdvantageBps: DEFAULT_HOME_ADVANTAGE_BPS,
   edgeThresholdBps: EDGE_THRESHOLD_BPS,
   recordPriorGames: RECORD_PRIOR_GAMES,
+  recordGapBps: RECORD_GAP_BPS,
   formPriorGames: FORM_PRIOR_GAMES,
+  formGapBps: FORM_GAP_BPS,
+  marginBpsPerPoint: MARGIN_BPS_PER_POINT,
+  marginPriorGames: MARGIN_PRIOR_GAMES,
+  marginCapBps: MARGIN_CAP_BPS,
   earlySeasonGames: EARLY_SEASON_GAMES,
   qbOutBps: QB_OUT_BPS,
   qbQuestionableBps: QB_QUESTIONABLE_BPS,
@@ -150,12 +169,25 @@ function injuryPenaltyBps(injuries: SideFacts["injuries"]): number {
   return Math.min(bps, INJURY_CAP_BPS);
 }
 
+/** Season margin per game, shrunk toward zero by `prior` phantom games. */
+function marginPerGame(m: SideFacts["margin"] | undefined, prior: number): number | null {
+  if (!m || m.games === 0) return null;
+  return (m.pointsFor - m.pointsAgainst) / (m.games + prior);
+}
+
+const signed = (n: number): string => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`;
+
 function clamp(bps: number, lo = 500, hi = 9500): number {
   return Math.max(lo, Math.min(hi, Math.round(bps)));
 }
 
 /** Pure: the estimate, its evidence, risks and the market comparison. */
-export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
+export function analyzeSide(
+  f: AnalysisFacts,
+  /** Evaluation only (the reconstruction grid): weights to try in place of the deployed ones. */
+  overrides: Partial<Record<string, number>> = {},
+): SportsAnalysis {
+  const W = { ...ESTIMATOR_WEIGHTS, ...overrides } as Record<string, number>;
   const evidence: EvidenceItem[] = [];
   const risks: string[] = [];
   let bps = 5000;
@@ -174,7 +206,7 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
   const a = winPct(f.team.record);
   const b = winPct(f.opponent.record);
   if (a !== null && b !== null) {
-    const eff = Math.round((a - b) * 5000);
+    const eff = Math.round((a - b) * (W["recordGapBps"] ?? RECORD_GAP_BPS));
     bps += eff;
     evidence.push({
       factor: "season record",
@@ -189,11 +221,27 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
     risks.push("no season record for one or both teams — strength unweighted");
   }
 
+  // 2b. Point differential (Task 079 slice 3) — margin per game shrunk
+  // toward zero, the gap in bps per point, capped. Off while the weight is 0.
+  const perPoint = W["marginBpsPerPoint"] ?? MARGIN_BPS_PER_POINT;
+  const ma = marginPerGame(f.team.margin, W["marginPriorGames"] ?? MARGIN_PRIOR_GAMES);
+  const mb = marginPerGame(f.opponent.margin, W["marginPriorGames"] ?? MARGIN_PRIOR_GAMES);
+  if (perPoint > 0 && ma !== null && mb !== null) {
+    const cap = W["marginCapBps"] ?? MARGIN_CAP_BPS;
+    const eff = Math.max(-cap, Math.min(cap, Math.round((ma - mb) * perPoint)));
+    bps += eff;
+    evidence.push({
+      factor: "point differential",
+      detail: `${f.team.name} ${signed(ma)}/game vs ${f.opponent.name} ${signed(mb)}/game (season, shrunk)`,
+      effectBps: eff,
+    });
+  }
+
   // 3. Recent form.
   const fa = formPct(f.team.recentForm);
   const fb = formPct(f.opponent.recentForm);
   if (fa !== null && fb !== null) {
-    const eff = Math.round((fa - fb) * 2000);
+    const eff = Math.round((fa - fb) * (W["formGapBps"] ?? FORM_GAP_BPS));
     bps += eff;
     evidence.push({
       factor: "recent form",
@@ -305,8 +353,7 @@ export function analyzeSide(f: AnalysisFacts): SportsAnalysis {
 
   return {
     probabilityBps,
-    method:
-      "Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × 5000, each share weighted toward .500 by 8 prior games), recent form (gap × 2000, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; a quarterback on injured reserve counts as out, other IR not counted; capped 2000), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.",
+    method: `Additive bps adjustments on a 50/50 baseline: venue (±250–300), season record (win-share gap × ${String(W["recordGapBps"])}, each share weighted toward .500 by 8 prior games), point differential (${perPoint > 0 ? `season margin per game shrunk by 8 prior games, gap × ${String(perPoint)}/pt, capped ±${String(W["marginCapBps"])}` : "off"}), recent form (gap × ${String(W["formGapBps"])}, weighted toward .500 by 3 games), injuries (out/doubtful −150 per player, −700 for a quarterback; questionable −50, −250 for a quarterback; a quarterback on injured reserve counts as out, other IR not counted; capped 2000), head-to-head (share × 800), live margin (250/pt, capped ±3000); clamped 5–95%.`,
     evidence,
     riskFactors: risks,
     discrepancyBps,

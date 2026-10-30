@@ -211,3 +211,48 @@ overall figure. The number to beat with any new strength term is **0.2450
 on these 106 games**, re-run with the same command, before the term is
 enabled — and the real test remains the ledger's own forecasts against
 outcomes once it has them.
+
+## 8. Slice 3 — the point-differential term, built, measured, left OFF (2026-10-29)
+
+**What was built.** `SideFacts.margin` (season points for and against) from
+every final on file, in the live fact builder and the reconstruction; a
+term in `analyzeSide`: each side's margin per game shrunk toward zero by
+`marginPriorGames` phantom games, the gap × `marginBpsPerPoint`, capped
+±`marginCapBps`. `analyzeSide` takes weight overrides for evaluation only;
+`npm run estimator:reconstruct -- grid=1 train=1-4 test=5-7` scores the
+candidates. The record and form gap weights (5000, 2000) joined
+`ESTIMATOR_WEIGHTS` so they can be varied the same way.
+
+**What the grid said** (2026, chosen on weeks 1–4 = 64 games, judged on
+weeks 5–7 = 42 games; Brier, lower is better):
+
+| margin bps/pt    | record gap | prior | train  | test   | all    |
+| ---------------- | ---------- | ----- | ------ | ------ | ------ |
+| **0 (deployed)** | 5000       | —     | 0.2394 | 0.2535 | 0.2450 |
+| 100              | 5000       | 8     | 0.2400 | 0.2584 | 0.2473 |
+| 200              | 5000       | 8     | 0.2419 | 0.2655 | 0.2513 |
+| 100              | 2500       | 8     | 0.2399 | 0.2537 | 0.2454 |
+| 100              | 2500       | 32    | 0.2400 | 0.2516 | 0.2446 |
+| 300              | 2500       | 32    | 0.2396 | 0.2540 | 0.2453 |
+| 0                | 2500       | —     | 0.2403 | 0.2509 | 0.2445 |
+
+Full grids (0–500 bps/pt × record 5000/2500/0 × prior 8/16/32) are in the
+prompt history. **No setting beat the deployed weights on the held-out
+weeks.** Light shrinkage makes it worse at every weight; heavy shrinkage
+(32 phantom games) brings it back to a dead heat, which is the term doing
+nothing. Halving the record weight is 0.0026 better on test and 0.0009
+worse on train — noise on 42 games.
+
+**Decision (gate applied, D-126).** The term ships with weight 0: present,
+tested, switchable, off. This season's point differentials do not predict
+this season's results better than records already do, at least in the
+results-only setting. The owner's gate forbids promoting a change for
+anything but measured out-of-sample improvement, and there is none.
+
+**What it does say about F-3.** The flatness is not fixed by any
+results-derived term; margin is just another view of the same 7 games per
+team. Separating teams needs information the results do not carry:
+prior-season strength as a season-start prior, quarterback quality, or an
+opponent-adjusted efficiency source. Each of those needs data the catalog
+does not hold, so each is an owner decision on sources before it is a
+model change.
