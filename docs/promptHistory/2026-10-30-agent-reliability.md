@@ -21,3 +21,9 @@ with the three-finals long-standing rule and per-player contributions
 (G3, D-127); `qualifyEdge` with the ledger-backed calibration gate and an
 honest `bookLine` (G4). G5 was covered by Task 079; G6 is a sources
 decision; G7's structural validator is proposed next.
+
+Owner: "ok, continue" / "Continue until complete" → G7: `narrative-check.ts`
+runs after every turn of both agents; unverified figures, undisclaimed
+edge language and post-kickoff weekdays get a visible caveat line, an
+event, a counter and a log line. Task 080 complete except G6 (a data
+sources decision).

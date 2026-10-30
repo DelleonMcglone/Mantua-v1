@@ -37,6 +37,7 @@ import { getUserPortfolio } from "./user-portfolio.ts";
 import { agentMarketTrade, type AgentTradeResult } from "./sports/market-agent-trade.ts";
 import { refuseDuplicateAgentTrade } from "./sports/agent-trade-guard.ts";
 import { clockPrompt } from "./agent/clock-prompt.ts";
+import { caveatLine, checkNarrative, type NarrativeViolation } from "./agent/narrative-check.ts";
 import { CircleReceiptTimeoutError } from "./circle/execute.ts";
 import { recordAgentTradeFill } from "./circle/finalize-agent-trade.ts";
 import { readCanonicalPublicSlate } from "./sports/store.ts";
@@ -185,6 +186,13 @@ export type AgentChatEvent =
   | { type: "tool_start"; id: string; tool: string; args: Record<string, unknown> }
   | { type: "tool_result"; id: string; tool: string; ok: boolean; data?: unknown; error?: string }
   | { type: "done" }
+  /** Goal 7 — the narrative check for the turn, emitted before `done`. */
+  | {
+      type: "narrative_check";
+      ok: boolean;
+      figuresChecked: number;
+      violations: NarrativeViolation[];
+    }
   | { type: "error"; message: string };
 
 interface ToolStep {
@@ -2324,6 +2332,23 @@ export async function* runAgentChat(
     }
     messages.push({ role: "user", content: toolResults });
   }
+
+  // Goal 7 — the prose is checked against this turn's tool results. A
+  // failed check is never silent: the user sees the caveat, the counter
+  // and the log carry it, and the stored transcript includes the line.
+  const check = checkNarrative(
+    assistantText,
+    steps.filter((s) => s.ok).map((s) => s.data),
+    new Date(),
+  );
+  if (!check.ok) {
+    counters.inc("agent.narrative_check.failed");
+    logger.warn({ sessionId, violations: check.violations }, "agent narrative check failed");
+    const line = caveatLine(check);
+    assistantText += line;
+    yield { type: "text", delta: line };
+  }
+  yield { type: "narrative_check", ...check };
 
   await persist({
     sessionId,
